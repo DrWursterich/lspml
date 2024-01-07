@@ -1,0 +1,20 @@
+ 
+<%-- comment --%>
+<sp:set name="_someVariable" value="someValue"/>
+
+<sp:include uri="/functions/doSomething.spml">
+	<sp:argument name="someVariable" object="someVariable"/>
+</sp:include>
+
+<sp:include module="${module.id}" uri="/functions/doSomething.spml">
+	<sp:argument name="someVariable" object="someVariable"/>
+</sp:include>
+
+<sp:include module="sitekit-module" uri="/functions/doSomething.spml">
+	<sp:argument name="someVariable" object="someVariable"/>
+</sp:include>
+
+<sp:print name="_someVariable"/>
+
+<sp:return condition="false"/>
+
