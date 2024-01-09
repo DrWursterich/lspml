@@ -1,5 +1,4 @@
  
-<%-- comment --%>
 <sp:set name="_someVariable" value="someValue"/>
 
 <sp:include uri="/functions/doSomething.spml">

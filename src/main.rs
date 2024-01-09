@@ -1,14 +1,67 @@
 use anyhow::Result;
 use lsp_server::{Connection, Message, Response};
 use lsp_types::{
-    CancelParams, CompletionOptions, CompletionOptionsCompletionItem, CompletionParams,
-    DidSaveTextDocumentParams, GotoDefinitionParams, GotoDefinitionResponse, InitializeParams,
-    Location, OneOf, Position, Range, ServerCapabilities, Url,
+    CancelParams, CompletionItem, CompletionItemKind, CompletionItemLabelDetails,
+    CompletionOptions, CompletionOptionsCompletionItem, CompletionParams, CompletionResponse,
+    DidSaveTextDocumentParams, Documentation, GotoDefinitionParams, GotoDefinitionResponse,
+    InitializeParams, Location, OneOf, Position, Range, ServerCapabilities, Url,
 };
 use std::error::Error;
 use tree_sitter::{Parser, Point};
 mod parser;
 mod project;
+
+const TAG_NAMES: [&str; 49] = [
+    "sp:argument",
+    "sp:attribute",
+    "sp:barcode",
+    "sp:break",
+    "sp:calendarsheet",
+    "sp:checkbox",
+    "sp:code",
+    "sp:collection",
+    "sp:condition",
+    "sp:diff",
+    "sp:else",
+    "sp:elseif",
+    "sp:error",
+    "sp:expire",
+    "sp:filter",
+    "sp:for",
+    "sp:form",
+    "sp:hidden",
+    "sp:if",
+    "sp:include",
+    "sp:io",
+    "sp:iterator",
+    "sp:json",
+    "sp:linktree",
+    "sp:livetree",
+    "sp:log",
+    "sp:login",
+    "sp:loop",
+    "sp:map",
+    "sp:option",
+    "sp:print",
+    "sp:radio",
+    "sp:range",
+    "sp:return",
+    "sp:scaleimage",
+    "sp:scope",
+    "sp:select",
+    "sp:set",
+    "sp:sort",
+    "sp:sass",
+    "sp:subinformation",
+    "sp:tagbody",
+    "sp:text",
+    "sp:textarea",
+    "sp:textimage",
+    "sp:upload",
+    "sp:url",
+    "sp:warning",
+    "sp:worklist",
+];
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     // logging to stderr as stdout is used for result messages
@@ -70,7 +123,14 @@ fn main_loop(
                     }
                     "textDocument/completion" => {
                         eprintln!("got completion request: {request:?}");
-                        complete(serde_json::from_value(request.params)?);
+                        let result = complete(serde_json::from_value(request.params)?);
+                        connection.sender.send(Message::Response(Response {
+                            id: request.id,
+                            result: result.map(|value| {
+                                serde_json::to_value(CompletionResponse::Array(value)).unwrap()
+                            }),
+                            error: None,
+                        }))?;
                     }
                     _ => eprintln!("got unknonwn request: {request:?}"),
                 }
@@ -113,7 +173,8 @@ fn definition(params: GotoDefinitionParams) -> Option<Location> {
         // if there happens to be an sp:include tag on this line we assume thats where we want to
         // go to. we (currently) don't check wether the cursor is inside it.
         if let Some(include) = parser::find_include_uri(&line) {
-            let working_directory = project::get_working_directory(text_params.text_document.uri).unwrap();
+            let working_directory =
+                project::get_working_directory(text_params.text_document.uri).unwrap();
             let target_module = include
                 .module
                 .filter(|module| module != "${module.id}")
@@ -162,9 +223,9 @@ fn definition(params: GotoDefinitionParams) -> Option<Location> {
     return None;
 }
 
-fn complete(params: CompletionParams) -> Option<()> {
+fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
     let text_params = params.text_document_position;
-    let text = parser::get_text_document(&text_params).unwrap();
+    let text = parser::get_text_document(&text_params).ok()?;
     let mut parser = Parser::new();
     match parser.set_language(tree_sitter_html::language()) {
         Err(err) => {
@@ -182,17 +243,65 @@ fn complete(params: CompletionParams) -> Option<()> {
         text_params.position.line as usize,
         text_params.position.character as usize,
     );
-    let closest_node = root_node.descendant_for_point_range(trigger_point, trigger_point)?;
+    let node = root_node.descendant_for_point_range(trigger_point, trigger_point)?;
     eprintln!(
-        "closest: {closest_node:?} (kind: {}, content: {})",
-        closest_node.kind(),
-        closest_node.utf8_text(text.as_bytes()).unwrap()
+        "closest: {node:?} (kind: {}, content: {})",
+        node.kind(),
+        node.utf8_text(text.as_bytes()).unwrap()
     );
-    match closest_node.kind() {
-        "attribute_name" => {}
-        "element" => {}
-        "fragment" => {}
-        _ => {}
-    }
-    return None;
+    return match node.kind() {
+        // "element" => 
+        // "start_tag" => 
+        "<" => Some(
+            TAG_NAMES
+                .iter()
+                .map(|tag_name| {
+                    let mut insert_text = "<".to_owned();
+                    insert_text.push_str(tag_name);
+                    return CompletionItem {
+                        kind: Some(CompletionItemKind::KEYWORD),
+                        label_details: Some(CompletionItemLabelDetails {
+                            detail: Some("label_details.details".to_string()),
+                            description: Some("label_details.description".to_string()),
+                        }),
+                        detail: Some("details".to_string()),
+                        documentation: Some(Documentation::String("documentation".to_string())),
+                        insert_text: Some(insert_text),
+                        ..Default::default()
+                    };
+                })
+                .collect(),
+        ),
+        "tag_name" => Some(
+            TAG_NAMES
+                .iter()
+                .map(|tag_name| {
+                    return CompletionItem {
+                        kind: Some(CompletionItemKind::KEYWORD),
+                        label_details: Some(CompletionItemLabelDetails {
+                            detail: Some("label_details.details".to_string()),
+                            description: Some("label_details.description".to_string()),
+                        }),
+                        detail: Some("details".to_string()),
+                        documentation: Some(Documentation::String("documentation".to_string())),
+                        insert_text: Some(tag_name.to_string()),
+                        ..Default::default()
+                    };
+                })
+                .collect(),
+        ),
+        // "attribute" => 
+        // "attribute_name" => 
+        // "quoted_attribute_value" => 
+        // "attribute_value" => 
+        // "raw_text" => 
+        // "end_tag" => 
+        // "self_closing_tag" => 
+        // "error" => 
+        // "expression_statement" => 
+        // "member_expression" => 
+        // "object" => 
+        // "property" => 
+        _ => None,
+    };
 }
