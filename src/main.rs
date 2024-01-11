@@ -1,10 +1,10 @@
 use anyhow::Result;
 use lsp_server::{Connection, Message, Response};
 use lsp_types::{
-    CancelParams, CompletionItem, CompletionItemLabelDetails, CompletionOptions, CompletionOptionsCompletionItem,
-    CompletionParams, CompletionResponse, DidSaveTextDocumentParams, GotoDefinitionParams,
-    GotoDefinitionResponse, InitializeParams, Location, OneOf, Position, Range, ServerCapabilities,
-    Url,
+    CancelParams, CompletionItem, CompletionItemKind, //CompletionItemLabelDetails,
+    CompletionOptions, CompletionOptionsCompletionItem, CompletionParams, CompletionResponse,
+    DidSaveTextDocumentParams, Documentation, GotoDefinitionParams, GotoDefinitionResponse,
+    InitializeParams, Location, OneOf, Position, Range, ServerCapabilities, Url,
 };
 use std::error::Error;
 use tree_sitter::{Parser, Point};
@@ -176,9 +176,9 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
     let text_params = params.text_document_position;
     let text = parser::get_text_document(&text_params).ok()?;
     let mut parser = Parser::new();
-    match parser.set_language(tree_sitter_html::language()) {
+    match parser.set_language(tree_sitter_spml::language()) {
         Err(err) => {
-            eprintln!("failed to set tree sitter language to html: {}", err);
+            eprintln!("failed to set tree sitter language to spml: {}", err);
             return None;
         }
         _ => {}
@@ -192,64 +192,60 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
         text_params.position.line as usize,
         text_params.position.character as usize,
     );
-    let node = root_node.descendant_for_point_range(trigger_point, trigger_point)?;
+    // let node = root_node.descendant_for_point_range(trigger_point, trigger_point)?;
+    let mut cursor = root_node.walk();
+    let mut node;
+    let mut previous;
+    loop {
+        node = cursor.node();
+        if node.end_position() < trigger_point {
+            previous = Some(node);
+            if !cursor.goto_next_sibling() || cursor.node().start_position() > trigger_point {
+                node = node.parent().unwrap();
+                break;
+            }
+        } else if !cursor.goto_first_child() {
+            previous = node.prev_sibling();
+            break;
+        }
+    }
+    if let Some(prev) = previous {
+        if prev.kind() == "ERROR" {
+            previous = prev.child(prev.child_count() - 1);
+        }
+    }
     eprintln!(
-        "closest: {node:?} (kind: {}, content: {})",
-        node.kind(),
+        "previous: {previous:?}, closest: {node:?} ({})",
         node.utf8_text(text.as_bytes()).unwrap()
     );
     return match node.kind() {
-        "element" | "<" => Some(
+        // "element" | "<" => Some(
+        //     symbols::SpTag::iter()
+        //         .map(|tag| tag.properties())
+        //         .map(|properties| {
+        //             let mut insert_text = "<".to_owned();
+        //             insert_text.push_str(&properties.name);
+        //             return CompletionItem {
+        //                 detail: properties.detail,
+        //                 documentation: properties.documentation,
+        //                 insert_text: Some(insert_text),
+        //                 label_details: Some(CompletionItemLabelDetails {
+        //                     detail: Some("label_details.details".to_string()),
+        //                     description: Some("label_details.description".to_string()),
+        //                 }),
+        //                 ..Default::default()
+        //             };
+        //         })
+        //         .collect(),
+        // ),
+        // "tag_name" =>
+        // "text" => {
+        //     return match parent.kind() {
+        "text" | "document" => Some(
             symbols::SpTag::iter()
-                .map(|tag| tag.properties())
-                .map(|properties| {
-                    let mut insert_text = "<".to_owned();
-                    insert_text.push_str(&properties.name);
-                    return CompletionItem {
-                        detail: properties.detail,
-                        documentation: properties.documentation,
-                        insert_text: Some(insert_text),
-                        label_details: Some(CompletionItemLabelDetails {
-                            detail: Some("label_details.details".to_string()),
-                            description: Some("label_details.description".to_string()),
-                        }),
-                        ..Default::default()
-                    };
-                })
-                .collect(),
-        ),
-        "tag_name" => Some(
-            symbols::SpTag::iter()
-                .filter(|tag| {
-                    // TODO: this is not feasable without a proper tree-sitter grammar
-                    let parent = node
-                        .parent()
-                        .unwrap()
-                        .parent()
-                        .unwrap()
-                        .prev_sibling()
-                        .unwrap()
-                        .child(0)
-                        .unwrap();
-                    let parent_tag_name = parent.utf8_text(text.as_bytes()).unwrap();
-                    eprintln!("parent kind: {}, text: {}", parent.kind(), parent_tag_name);
-                    if parent.kind() != "tag_name" {
-                        // we're not inside any tag, everything's allowed!
-                        return true;
-                    }
-                    let parent_tag = symbols::SpTag::from_treesitter_tag_name(
-                        parent_tag_name,
-                    )
-                    .unwrap();
-                    return match parent_tag.properties().children {
-                        symbols::TagChildren::None => false,
-                        symbols::TagChildren::Any => true,
-                        symbols::TagChildren::Scalar(t) => &t == *tag,
-                        symbols::TagChildren::Vector(v) => v.contains(tag),
-                    };
-                })
                 .map(|tag| tag.properties())
                 .map(|properties| CompletionItem {
+                    kind: Some(CompletionItemKind::METHOD),
                     detail: properties.detail,
                     documentation: properties.documentation,
                     insert_text: Some(properties.name),
@@ -257,6 +253,70 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
                 })
                 .collect(),
         ),
+        // _ => None
+        // };
+        // }
+        "include_tag" => match previous.unwrap().kind() {
+            ">" | "argument_tag" => Some(vec![CompletionItem {
+                kind: Some(CompletionItemKind::METHOD),
+                detail: symbols::SpTag::Argument.properties().detail,
+                documentation: symbols::SpTag::Argument.properties().documentation,
+                insert_text: Some(symbols::SpTag::Argument.properties().name),
+                ..Default::default()
+            }]),
+            "argument_tag_open" => Some(vec![CompletionItem {
+                kind: Some(CompletionItemKind::FIELD),
+                detail: Some(String::from("Attribute(String)")),
+                documentation: Some(Documentation::String(String::from(
+                    "the name of the argument",
+                ))),
+                insert_text: Some(String::from("name=\"")),
+                ..Default::default()
+            }]),
+            "name_attribute" => {
+                let previous_previous = previous?.prev_sibling();
+                eprintln!("previous_previous: {previous_previous:?}");
+                return match previous_previous?.kind() {
+                    "argument_tag_open" => Some(vec![CompletionItem {
+                        kind: Some(CompletionItemKind::FIELD),
+                        detail: Some(String::from("Attribute(Object)")),
+                        documentation: Some(Documentation::String(String::from(
+                            "the interpreted value of the argument",
+                        ))),
+                        insert_text: Some(String::from("object=\"")),
+                        ..Default::default()
+                    }]),
+                    _ => None,
+                };
+            }
+            _ => None,
+        },
+        "string" => match previous?.kind() {
+            "name=" => match previous?.parent()?.prev_sibling()?.kind() {
+                "argument_tag_open" => Some(vec![
+                    CompletionItem {
+                        kind: Some(CompletionItemKind::PROPERTY),
+                        detail: Some(String::from("Argument(ID)")),
+                        documentation: Some(Documentation::String(String::from(
+                            "the itemScope to do something for",
+                        ))),
+                        insert_text: Some(String::from("itemScope\"")),
+                        ..Default::default()
+                    },
+                    CompletionItem {
+                        kind: Some(CompletionItemKind::PROPERTY),
+                        detail: Some(String::from("Argument(Map)")),
+                        documentation: Some(Documentation::String(String::from(
+                            "options to configure the process of doing something",
+                        ))),
+                        insert_text: Some(String::from("options\"")),
+                        ..Default::default()
+                    },
+                ]),
+                _ => None,
+            },
+            _ => None,
+        },
         // "start_tag" =>
         // "attribute" =>
         // "attribute_name" =>

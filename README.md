@@ -5,8 +5,11 @@ A proof-of-concept language server for the sitepark markup language (spml).
 ## features
 
 - go to definition for variables and `<sp:include/>` tags
+- completion for tags (mostly)
 
 ## building
+
+Currently you will have to set a local path to [tree-sitter-spml](https://github.com/DrWursterich/tree-sitter-spml) in `Cargo.toml` in order to be able to build this with:
 
 ```bash
 cargo build
@@ -49,7 +52,6 @@ As of now there is no `lsp-config` configuration for lspml, so attatching it has
 			})
 		end
 	})
-
 ```
 
 The `lspml` executable is best found with
