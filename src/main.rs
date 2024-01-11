@@ -1,67 +1,16 @@
 use anyhow::Result;
 use lsp_server::{Connection, Message, Response};
 use lsp_types::{
-    CancelParams, CompletionItem, CompletionItemKind, CompletionItemLabelDetails,
-    CompletionOptions, CompletionOptionsCompletionItem, CompletionParams, CompletionResponse,
-    DidSaveTextDocumentParams, Documentation, GotoDefinitionParams, GotoDefinitionResponse,
-    InitializeParams, Location, OneOf, Position, Range, ServerCapabilities, Url,
+    CancelParams, CompletionItem, CompletionItemLabelDetails, CompletionOptions, CompletionOptionsCompletionItem,
+    CompletionParams, CompletionResponse, DidSaveTextDocumentParams, GotoDefinitionParams,
+    GotoDefinitionResponse, InitializeParams, Location, OneOf, Position, Range, ServerCapabilities,
+    Url,
 };
 use std::error::Error;
 use tree_sitter::{Parser, Point};
 mod parser;
 mod project;
-
-const TAG_NAMES: [&str; 49] = [
-    "sp:argument",
-    "sp:attribute",
-    "sp:barcode",
-    "sp:break",
-    "sp:calendarsheet",
-    "sp:checkbox",
-    "sp:code",
-    "sp:collection",
-    "sp:condition",
-    "sp:diff",
-    "sp:else",
-    "sp:elseif",
-    "sp:error",
-    "sp:expire",
-    "sp:filter",
-    "sp:for",
-    "sp:form",
-    "sp:hidden",
-    "sp:if",
-    "sp:include",
-    "sp:io",
-    "sp:iterator",
-    "sp:json",
-    "sp:linktree",
-    "sp:livetree",
-    "sp:log",
-    "sp:login",
-    "sp:loop",
-    "sp:map",
-    "sp:option",
-    "sp:print",
-    "sp:radio",
-    "sp:range",
-    "sp:return",
-    "sp:scaleimage",
-    "sp:scope",
-    "sp:select",
-    "sp:set",
-    "sp:sort",
-    "sp:sass",
-    "sp:subinformation",
-    "sp:tagbody",
-    "sp:text",
-    "sp:textarea",
-    "sp:textimage",
-    "sp:upload",
-    "sp:url",
-    "sp:warning",
-    "sp:worklist",
-];
+mod symbols;
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     // logging to stderr as stdout is used for result messages
@@ -250,58 +199,77 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
         node.utf8_text(text.as_bytes()).unwrap()
     );
     return match node.kind() {
-        // "element" => 
-        // "start_tag" => 
-        "<" => Some(
-            TAG_NAMES
-                .iter()
-                .map(|tag_name| {
+        "element" | "<" => Some(
+            symbols::SpTag::iter()
+                .map(|tag| tag.properties())
+                .map(|properties| {
                     let mut insert_text = "<".to_owned();
-                    insert_text.push_str(tag_name);
+                    insert_text.push_str(&properties.name);
                     return CompletionItem {
-                        kind: Some(CompletionItemKind::KEYWORD),
+                        detail: properties.detail,
+                        documentation: properties.documentation,
+                        insert_text: Some(insert_text),
                         label_details: Some(CompletionItemLabelDetails {
                             detail: Some("label_details.details".to_string()),
                             description: Some("label_details.description".to_string()),
                         }),
-                        detail: Some("details".to_string()),
-                        documentation: Some(Documentation::String("documentation".to_string())),
-                        insert_text: Some(insert_text),
                         ..Default::default()
                     };
                 })
                 .collect(),
         ),
         "tag_name" => Some(
-            TAG_NAMES
-                .iter()
-                .map(|tag_name| {
-                    return CompletionItem {
-                        kind: Some(CompletionItemKind::KEYWORD),
-                        label_details: Some(CompletionItemLabelDetails {
-                            detail: Some("label_details.details".to_string()),
-                            description: Some("label_details.description".to_string()),
-                        }),
-                        detail: Some("details".to_string()),
-                        documentation: Some(Documentation::String("documentation".to_string())),
-                        insert_text: Some(tag_name.to_string()),
-                        ..Default::default()
+            symbols::SpTag::iter()
+                .filter(|tag| {
+                    // TODO: this is not feasable without a proper tree-sitter grammar
+                    let parent = node
+                        .parent()
+                        .unwrap()
+                        .parent()
+                        .unwrap()
+                        .prev_sibling()
+                        .unwrap()
+                        .child(0)
+                        .unwrap();
+                    let parent_tag_name = parent.utf8_text(text.as_bytes()).unwrap();
+                    eprintln!("parent kind: {}, text: {}", parent.kind(), parent_tag_name);
+                    if parent.kind() != "tag_name" {
+                        // we're not inside any tag, everything's allowed!
+                        return true;
+                    }
+                    let parent_tag = symbols::SpTag::from_treesitter_tag_name(
+                        parent_tag_name,
+                    )
+                    .unwrap();
+                    return match parent_tag.properties().children {
+                        symbols::TagChildren::None => false,
+                        symbols::TagChildren::Any => true,
+                        symbols::TagChildren::Scalar(t) => &t == *tag,
+                        symbols::TagChildren::Vector(v) => v.contains(tag),
                     };
+                })
+                .map(|tag| tag.properties())
+                .map(|properties| CompletionItem {
+                    detail: properties.detail,
+                    documentation: properties.documentation,
+                    insert_text: Some(properties.name),
+                    ..Default::default()
                 })
                 .collect(),
         ),
-        // "attribute" => 
-        // "attribute_name" => 
-        // "quoted_attribute_value" => 
-        // "attribute_value" => 
-        // "raw_text" => 
-        // "end_tag" => 
-        // "self_closing_tag" => 
-        // "error" => 
-        // "expression_statement" => 
-        // "member_expression" => 
-        // "object" => 
-        // "property" => 
+        // "start_tag" =>
+        // "attribute" =>
+        // "attribute_name" =>
+        // "quoted_attribute_value" =>
+        // "attribute_value" =>
+        // "raw_text" =>
+        // "end_tag" =>
+        // "self_closing_tag" =>
+        // "error" =>
+        // "expression_statement" =>
+        // "member_expression" =>
+        // "object" =>
+        // "property" =>
         _ => None,
     };
 }

@@ -1,7 +1,6 @@
 use anyhow::{Error, Result};
 use lsp_types::TextDocumentPositionParams;
-use std::fmt;
-use std::fs;
+use std::{fmt, fs};
 
 pub(crate) enum IteratingDirection {
     Forwards,
