@@ -2,13 +2,14 @@
 %><%@ taglib uri="http://www.sitepark.com/taglibs/core" prefix="sp"
 %>
 
+<%-- <sp:set name="_someVariable" value="someValue"/> --%>
 <sp:set name="_someVariable" value="someValue"/>
 
 <sp:include uri="/functions/doSomething.spml">
 	<sp:argument name="someVariable" object="_someVariable"/>
 </sp:include>
 
-<sp:include module="${module.id}" uri="/functions/doSomething.spml">
+<sp:include module="${module.id}" uri="/functions/doSomething.spml" return="_i">
 	<sp:argument name="someVariable" object="_someVariable"/>
 </sp:include>
 
@@ -18,7 +19,12 @@
 
 </sp:include>
 
+<sp:break/>
 
+<sp:for index="_i" from="${_start}" condition="${_i} >= (${_end} + 1)" step="${_step}">
+	<sp:print name="_i"/><br>
+	<br>
+</sp:for>
 
 <sp:print name="_someVariable"/>
 
