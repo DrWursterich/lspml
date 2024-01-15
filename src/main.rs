@@ -1,16 +1,150 @@
 use anyhow::Result;
 use lsp_server::{Connection, Message, Response};
 use lsp_types::{
-    CancelParams, CompletionItem, CompletionItemKind, //CompletionItemLabelDetails,
-    CompletionOptions, CompletionOptionsCompletionItem, CompletionParams, CompletionResponse,
-    DidSaveTextDocumentParams, Documentation, GotoDefinitionParams, GotoDefinitionResponse,
-    InitializeParams, Location, OneOf, Position, Range, ServerCapabilities, Url,
+    CancelParams,
+    CompletionItem,
+    CompletionItemKind,
+    //CompletionItemLabelDetails,
+    CompletionOptions,
+    CompletionOptionsCompletionItem,
+    CompletionParams,
+    CompletionResponse,
+    DidSaveTextDocumentParams,
+    Documentation,
+    GotoDefinitionParams,
+    GotoDefinitionResponse,
+    InitializeParams,
+    Location,
+    OneOf,
+    Position,
+    Range,
+    ServerCapabilities,
+    Url,
 };
-use std::error::Error;
-use tree_sitter::{Parser, Point};
+use std::{error::Error, path::Path};
+use tree_sitter::{Parser, Point, Query, QueryCursor};
 mod parser;
 mod project;
 mod symbols;
+
+// format!(
+//     r#"
+//     (
+//         [
+//             (attribute_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (barcode_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (calendarsheet_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (checkbox_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (
+//                 (collection_tag
+//                     (name_attribute
+//                         (string) @attribute)
+//                     (action_attribute
+//                         (string) @action))
+//                 (#eq? @action "new")
+//             )
+//             (diff_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (filter_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (for_tag
+//                 (index_attribute
+//                     (string) @attribute))
+//             (hidden_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (include_tag
+//                 (return_attribute
+//                     (string) @attribute))
+//             (iterator_tag
+//                 (item_attribute
+//                     (string) @attribute))
+//             (json_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (linkedInformation_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (linktree_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (livetree_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (loop_tag
+//                 (item_attribute
+//                     (string) @attribute))
+//             (
+//                 (map_tag
+//                     (name_attribute
+//                         (string) @attribute)
+//                     (action_attribute
+//                         (string) @action))
+//                 (#eq? @action "new")
+//             )
+//             (querytree_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (radio_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (range_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (sass_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (scaleimage_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (search_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (select_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (set_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (sort_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (subinformation_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (text_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (textarea_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (textimage_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (upload_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (worklist_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//             (zip_tag
+//                 (name_attribute
+//                     (string) @attribute))
+//         ]
+//         (#eq? @attribute "{variable}")
+//     )"#,
+//     variable
+// )
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     // logging to stderr as stdout is used for result messages
@@ -113,63 +247,259 @@ fn main_loop(
  */
 fn definition(params: GotoDefinitionParams) -> Option<Location> {
     let text_params = params.text_document_position_params;
-    let text = parser::get_text_document(&text_params).unwrap();
-    let target_line = text_params.position.line as usize;
-    for (line_count, line) in text.lines().enumerate() {
-        if line_count < target_line {
-            continue;
+    let text = parser::get_text_document(&text_params).ok()?;
+    let mut parser = Parser::new();
+    match parser.set_language(tree_sitter_spml::language()) {
+        Err(err) => {
+            eprintln!("failed to set tree sitter language to spml: {}", err);
+            return None;
         }
-        // if there happens to be an sp:include tag on this line we assume thats where we want to
-        // go to. we (currently) don't check wether the cursor is inside it.
-        if let Some(include) = parser::find_include_uri(&line) {
-            let working_directory =
-                project::get_working_directory(text_params.text_document.uri).unwrap();
-            let target_module = include
-                .module
-                .filter(|module| module != "${module.id}")
-                .or(Some(working_directory.module))
-                .unwrap();
-            let mut target = "file://".to_owned();
-            target.push_str(&working_directory.path);
-            target.push_str(&target_module);
-            target.push_str("/src/main/webapp");
-            target.push_str(&include.uri);
-            return Some(Location {
-                range: Range {
-                    ..Default::default()
-                },
-                uri: Url::parse(&target).unwrap(),
-            });
-        }
-        let keyword = parser::find_keyword(&line, text_params.position.character as usize).unwrap();
-        // otherwise we search for the first appearance of the keyword in question
-        for (line_count, line) in text.lines().enumerate() {
-            if let Some(index) = line.find(keyword) {
-                eprintln!(
-                    "first appearance of keyword {} found at line {} and character {}",
-                    keyword, line_count, index
-                );
-                return Some(Location {
-                    range: Range {
-                        start: Position {
-                            line: line_count as u32,
-                            character: index as u32,
-                        },
-                        end: Position {
-                            line: line_count as u32,
-                            character: (index + keyword.len()) as u32,
-                        },
-                    },
-                    uri: text_params.text_document.uri,
-                });
-            }
-            if line_count > target_line {
+        _ => {}
+    }
+    eprintln!("created parser");
+    let tree = parser.parse(&text, None)?;
+    eprintln!("successfully parsed file");
+    let root_node = tree.root_node();
+    eprintln!("found root_node: {}", root_node.id());
+    let trigger_point = Point::new(
+        text_params.position.line as usize,
+        text_params.position.character as usize,
+    );
+    // let node = root_node.descendant_for_point_range(trigger_point, trigger_point)?;
+    let mut cursor = root_node.walk();
+    let mut node;
+    let mut previous;
+    loop {
+        node = cursor.node();
+        if node.end_position() < trigger_point {
+            previous = Some(node);
+            if !cursor.goto_next_sibling() || cursor.node().start_position() > trigger_point {
+                node = node.parent().unwrap();
                 break;
             }
+        } else if !cursor.goto_first_child() {
+            previous = node.prev_sibling();
+            break;
         }
-        break;
     }
-    return None;
+    if let Some(prev) = previous {
+        if prev.kind() == "ERROR" {
+            previous = prev.child(prev.child_count() - 1);
+        }
+    }
+    eprintln!(
+        "previous: {previous:?}, closest: {node:?} ({})",
+        node.utf8_text(text.as_bytes()).unwrap()
+    );
+    let working_directory = project::get_working_directory(&text_params.text_document.uri)?;
+    return match node.kind() {
+        // if string is not evaluated ....
+        "string" => match node.parent()?.kind() {
+            "name_attribute" => match node.parent()?.parent()?.kind() {
+                "argument_tag" => None, // would be nice
+                _ => {
+                    let variable = &node.utf8_text(text.as_bytes()).unwrap();
+                    // let variable = &variable[1..variable.len() - 1];
+                    let qry = format!(
+                        r#"
+                        [
+                            (attribute_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (barcode_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (calendarsheet_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (checkbox_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (collection_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (diff_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (filter_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (for_tag
+                                (index_attribute
+                                    (string) @attribute))
+                            (hidden_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (include_tag
+                                (return_attribute
+                                    (string) @attribute))
+                            (iterator_tag
+                                (item_attribute
+                                    (string) @attribute))
+                            (json_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (linkedInformation_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (linktree_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (livetree_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (loop_tag
+                                (item_attribute
+                                    (string) @attribute))
+                            (map_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (querytree_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (radio_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (range_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (sass_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (scaleimage_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (search_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (select_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (set_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (sort_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (subinformation_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (text_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (textarea_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (textimage_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (upload_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (worklist_tag
+                                (name_attribute
+                                    (string) @attribute))
+                            (zip_tag
+                                (name_attribute
+                                    (string) @attribute))
+                        ]"#
+                    );
+                    return match Query::new(tree_sitter_spml::language(), qry.as_str()) {
+                        Ok(query) => QueryCursor::new()
+                            .matches(&query, root_node, text.as_bytes())
+                            .into_iter()
+                            .flat_map(|m| m.captures.iter())
+                            .map(|c| {
+                                eprintln!(
+                                    "query found {c:?} '{}'",
+                                    c.node.utf8_text(text.as_bytes()).unwrap()
+                                );
+                                c.node
+                            })
+                            // '#eq?' predicates do not work, we have to do it manually:
+                            .filter(|n| n.utf8_text(text.as_bytes()).unwrap() == *variable)
+                            .min_by(|a, b| a.start_position().cmp(&b.start_position()))
+                            .map(|result| Location {
+                                range: Range {
+                                    start: Position {
+                                        line: result.start_position().row as u32,
+                                        character: result.start_position().column as u32 + 1,
+                                    },
+                                    end: Position {
+                                        line: result.end_position().row as u32,
+                                        character: result.end_position().column as u32 - 1,
+                                    },
+                                },
+                                uri: text_params.text_document.uri,
+                            }),
+                        Err(err) => {
+                            eprintln!("error in query for declaration of {}: {}", variable, err);
+                            return None;
+                        }
+                    };
+                }
+            },
+            "uri_attribute" => match node.parent()?.parent()?.kind() {
+                "include_tag" => match &node.utf8_text(text.as_bytes()) {
+                    Ok(path) => match node
+                        .parent()?
+                        .parent()?
+                        .children(&mut tree.walk())
+                        .find(|node| node.kind() == "module_attribute")
+                        .and_then(|attribute| attribute.child(1))
+                        .map(|node| node.utf8_text(text.as_bytes()))
+                    {
+                        Some(Ok("\"${module.id}\"")) | None => {
+                            Some(working_directory.module.as_str())
+                        }
+                        Some(Ok(module)) => Some(&module[1..module.len() - 1]),
+                        Some(Err(err)) => {
+                            eprintln!(
+                                "error while reading include_tag module_attribute text {}",
+                                err
+                            );
+                            return None;
+                        }
+                    }
+                    .map(|include_module| {
+                        // .unwrap_or(working_directory.module.as_str());
+                        let mut file = working_directory.path;
+                        file.push_str(&include_module);
+                        file.push_str("/src/main/webapp");
+                        file.push_str(&path[1..path.len() - 1]);
+                        if !Path::new(&file).exists() {
+                            eprintln!("file {} does not exist", file);
+                            return None;
+                        }
+                        let mut target = "file://".to_owned();
+                        target.push_str(&file);
+                        return Some(Location {
+                            range: Range {
+                                ..Default::default()
+                            },
+                            uri: Url::parse(&target).unwrap(),
+                        });
+                    })?,
+                    Err(err) => {
+                        eprintln!("error while reading include_tag uri_attribute text {}", err);
+                        return None;
+                    }
+                },
+                _ => None,
+            },
+            kind => {
+                eprintln!("string parent is not uri_attribute, its {}", kind);
+                return None;
+            }
+        },
+        "interpolated_string" => {
+            return None;
+        }
+        // TODO:
+        "java_code" => None,
+        "tag_code" => None,
+        _ => None,
+    };
 }
 
 fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
