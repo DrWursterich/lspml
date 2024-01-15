@@ -29,7 +29,7 @@ use lsp_types::{
     WorkDoneProgressOptions,
 };
 use std::{error::Error, path::Path};
-use tree_sitter::{Parser, Point, Query, QueryCursor};
+use tree_sitter::{Parser, Query, QueryCursor};
 mod parser;
 mod project;
 mod symbols;
@@ -196,7 +196,7 @@ fn main_loop(
     connection: Connection,
     _initialization_params: InitializeParams,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
-    eprintln!("server started, entering main loop");
+    eprintln!("server started");
 
     for message in &connection.receiver {
         match message {
@@ -270,48 +270,11 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
     let text_params = params.text_document_position;
     let text = parser::get_text_document(&text_params).ok()?;
     let mut parser = Parser::new();
-    match parser.set_language(tree_sitter_spml::language()) {
-        Err(err) => {
-            eprintln!("failed to set tree sitter language to spml: {}", err);
-            return None;
-        }
-        _ => {}
-    }
-    eprintln!("created parser");
+    parser
+        .set_language(tree_sitter_spml::language())
+        .expect("failed to set tree sitter language to spml");
     let tree = parser.parse(&text, None)?;
-    eprintln!("successfully parsed file");
-    let root_node = tree.root_node();
-    eprintln!("found root_node: {}", root_node.id());
-    let trigger_point = Point::new(
-        text_params.position.line as usize,
-        text_params.position.character as usize,
-    );
-    // let node = root_node.descendant_for_point_range(trigger_point, trigger_point)?;
-    let mut cursor = root_node.walk();
-    let mut node;
-    let mut previous;
-    loop {
-        node = cursor.node();
-        if node.end_position() <= trigger_point {
-            previous = Some(node);
-            if !cursor.goto_next_sibling() || cursor.node().start_position() > trigger_point {
-                node = node.parent().unwrap();
-                break;
-            }
-        } else if !cursor.goto_first_child() {
-            previous = node.prev_sibling();
-            break;
-        }
-    }
-    if let Some(prev) = previous {
-        if prev.kind() == "ERROR" {
-            previous = prev.child(prev.child_count() - 1);
-        }
-    }
-    eprintln!(
-        "previous: {previous:?}, closest: {node:?} ({})",
-        node.utf8_text(text.as_bytes()).unwrap()
-    );
+    let (node, previous) = parser::find_current_and_previous_nodes(&tree, text_params.position)?;
     return match node.kind() {
         // "element" | "<" => Some(
         //     symbols::SpTag::iter()
@@ -438,48 +401,11 @@ fn definition(params: GotoDefinitionParams) -> Option<Location> {
     let text_params = params.text_document_position_params;
     let text = parser::get_text_document(&text_params).ok()?;
     let mut parser = Parser::new();
-    match parser.set_language(tree_sitter_spml::language()) {
-        Err(err) => {
-            eprintln!("failed to set tree sitter language to spml: {}", err);
-            return None;
-        }
-        _ => {}
-    }
-    eprintln!("created parser");
+    parser
+        .set_language(tree_sitter_spml::language())
+        .expect("failed to set tree sitter language to spml");
     let tree = parser.parse(&text, None)?;
-    eprintln!("successfully parsed file");
-    let root_node = tree.root_node();
-    eprintln!("found root_node: {}", root_node.id());
-    let trigger_point = Point::new(
-        text_params.position.line as usize,
-        text_params.position.character as usize,
-    );
-    // let node = root_node.descendant_for_point_range(trigger_point, trigger_point)?;
-    let mut cursor = root_node.walk();
-    let mut node;
-    let mut previous;
-    loop {
-        node = cursor.node();
-        if node.end_position() <= trigger_point {
-            previous = Some(node);
-            if !cursor.goto_next_sibling() || cursor.node().start_position() > trigger_point {
-                node = node.parent().unwrap();
-                break;
-            }
-        } else if !cursor.goto_first_child() {
-            previous = node.prev_sibling();
-            break;
-        }
-    }
-    if let Some(prev) = previous {
-        if prev.kind() == "ERROR" {
-            previous = prev.child(prev.child_count() - 1);
-        }
-    }
-    eprintln!(
-        "previous: {previous:?}, closest: {node:?} ({})",
-        node.utf8_text(text.as_bytes()).unwrap()
-    );
+    let (node, _) = parser::find_current_and_previous_nodes(&tree, text_params.position)?;
     let working_directory = project::get_working_directory(&text_params.text_document.uri)
         .expect("cannot determine module - requires path to be <module>/src/main/webapp/");
     return match node.kind() {
@@ -596,7 +522,7 @@ fn definition(params: GotoDefinitionParams) -> Option<Location> {
                     );
                     return match Query::new(tree_sitter_spml::language(), qry.as_str()) {
                         Ok(query) => QueryCursor::new()
-                            .matches(&query, root_node, text.as_bytes())
+                            .matches(&query, tree.root_node(), text.as_bytes())
                             .into_iter()
                             .flat_map(|m| m.captures.iter())
                             .map(|c| {
@@ -696,58 +622,31 @@ fn hover(params: HoverParams) -> Option<HoverContents> {
     let text_params = params.text_document_position_params;
     let text = parser::get_text_document(&text_params).ok()?;
     let mut parser = Parser::new();
-    match parser.set_language(tree_sitter_spml::language()) {
-        Err(err) => {
-            eprintln!("failed to set tree sitter language to spml: {}", err);
-            return None;
-        }
-        _ => {}
-    }
-    eprintln!("created parser");
+    parser
+        .set_language(tree_sitter_spml::language())
+        .expect("failed to set tree sitter language to spml");
     let tree = parser.parse(&text, None)?;
-    eprintln!("successfully parsed file");
-    let root_node = tree.root_node();
-    eprintln!("found root_node: {}", root_node.id());
-    let trigger_point = Point::new(
-        text_params.position.line as usize,
-        text_params.position.character as usize,
-    );
-    // let node = root_node.descendant_for_point_range(trigger_point, trigger_point)?;
-    let mut cursor = root_node.walk();
-    let mut node;
-    let mut previous;
-    loop {
-        node = cursor.node();
-        if node.end_position() <= trigger_point {
-            previous = Some(node);
-            if !cursor.goto_next_sibling() || cursor.node().start_position() > trigger_point {
-                node = node.parent().unwrap();
-                break;
-            }
-        } else if !cursor.goto_first_child() {
-            previous = node.prev_sibling();
-            break;
-        }
-    }
-    if let Some(prev) = previous {
-        if prev.kind() == "ERROR" {
-            previous = prev.child(prev.child_count() - 1);
-        }
-    }
-    eprintln!(
-        "previous: {previous:?}, closest: {node:?} ({})",
-        node.utf8_text(text.as_bytes()).unwrap()
-    );
+    let (node, _) = parser::find_current_and_previous_nodes(&tree, text_params.position)?;
     return match node.kind() {
-        "argument_tag_open" | "argument_tag_close" => symbols::SpTag::Argument.properties().documentation,
-        "attribute_tag_open" | "attribute_tag_close" => symbols::SpTag::Attribute.properties().documentation,
-        "barcode_tag_open" | "barcode_tag_close" => symbols::SpTag::Barcode.properties().documentation,
-        "break_tag_open" | "break_tag_close" => symbols::SpTag::Break.properties().documentation,
-        "calendarsheet_tag_open" | "calendarsheet_tag_close" => symbols::SpTag::Calendarsheet.properties().documentation,
-        "checkbox_tag_open" | "checkbox_tag_close" => symbols::SpTag::Checkbox.properties().documentation,
+        "argument_tag_open" | "argument_tag_close" => {
+            symbols::SpTag::Argument.properties().documentation
+        }
+        "attribute_tag_open" => symbols::SpTag::Attribute.properties().documentation,
+        "barcode_tag_open" => symbols::SpTag::Barcode.properties().documentation,
+        "break_tag_open" => symbols::SpTag::Break.properties().documentation,
+        "calendarsheet_tag_open" | "calendarsheet_tag_close" => {
+            symbols::SpTag::Calendarsheet.properties().documentation
+        }
+        "checkbox_tag_open" | "checkbox_tag_close" => {
+            symbols::SpTag::Checkbox.properties().documentation
+        }
         "code_tag_open" | "code_tag_close" => symbols::SpTag::Code.properties().documentation,
-        "collection_tag_open" | "collection_tag_close" => symbols::SpTag::Collection.properties().documentation,
-        "condition_tag_open" | "condition_tag_close" => symbols::SpTag::Condition.properties().documentation,
+        "collection_tag_open" | "collection_tag_close" => {
+            symbols::SpTag::Collection.properties().documentation
+        }
+        "condition_tag_open" | "condition_tag_close" => {
+            symbols::SpTag::Condition.properties().documentation
+        }
         "diff_tag_open" | "diff_tag_close" => symbols::SpTag::Diff.properties().documentation,
         "else_tag_open" | "else_tag_close" => symbols::SpTag::Else.properties().documentation,
         "elseif_tag_open" | "elseif_tag_close" => symbols::SpTag::Elseif.properties().documentation,
@@ -758,43 +657,66 @@ fn hover(params: HoverParams) -> Option<HoverContents> {
         "form_tag_open" | "form_tag_close" => symbols::SpTag::Form.properties().documentation,
         "hidden_tag_open" | "hidden_tag_close" => symbols::SpTag::Hidden.properties().documentation,
         "if_tag_open" | "if_tag_close" => symbols::SpTag::If.properties().documentation,
-        "include_tag_open" | "include_tag_close" => symbols::SpTag::Include.properties().documentation,
+        "include_tag_open" | "include_tag_close" => {
+            symbols::SpTag::Include.properties().documentation
+        }
         "io_tag_open" | "io_tag_close" => symbols::SpTag::Io.properties().documentation,
-        "iterator_tag_open" | "iterator_tag_close" => symbols::SpTag::Iterator.properties().documentation,
+        "iterator_tag_open" | "iterator_tag_close" => {
+            symbols::SpTag::Iterator.properties().documentation
+        }
         "json_tag_open" | "json_tag_close" => symbols::SpTag::Json.properties().documentation,
-        "linktree_tag_open" | "linktree_tag_close" => symbols::SpTag::Linktree.properties().documentation,
-        "linkedinformation_tag_open" | "linkedinformation_tag_close" => symbols::SpTag::LinkedInformation.properties().documentation,
-        "livetree_tag_open" | "livetree_tag_close" => symbols::SpTag::Livetree.properties().documentation,
+        "linktree_tag_open" | "linktree_tag_close" => {
+            symbols::SpTag::Linktree.properties().documentation
+        }
+        "linkedinformation_tag_open" | "linkedinformation_tag_close" => {
+            symbols::SpTag::LinkedInformation.properties().documentation
+        }
+        "livetree_tag_open" => symbols::SpTag::Livetree.properties().documentation,
         "log_tag_open" | "log_tag_close" => symbols::SpTag::Log.properties().documentation,
-        "login_tag_open" | "login_tag_close" => symbols::SpTag::Login.properties().documentation,
+        "login_tag_open" => symbols::SpTag::Login.properties().documentation,
         "loop_tag_open" | "loop_tag_close" => symbols::SpTag::Loop.properties().documentation,
         "map_tag_open" | "map_tag_close" => symbols::SpTag::Map.properties().documentation,
         "option_tag_open" | "option_tag_close" => symbols::SpTag::Option.properties().documentation,
-        "password_tag_open" | "password_tag_close" => symbols::SpTag::Password.properties().documentation,
+        "password_tag_open" | "password_tag_close" => {
+            symbols::SpTag::Password.properties().documentation
+        }
         "print_tag_open" | "print_tag_close" => symbols::SpTag::Print.properties().documentation,
-        "querytree_tag_open" | "querytree_tag_close" => symbols::SpTag::Querytree.properties().documentation,
+        "querytree_tag_open" | "querytree_tag_close" => {
+            symbols::SpTag::Querytree.properties().documentation
+        }
         "radio_tag_open" | "radio_tag_close" => symbols::SpTag::Radio.properties().documentation,
         "range_tag_open" | "range_tag_close" => symbols::SpTag::Range.properties().documentation,
         "return_tag_open" | "return_tag_close" => symbols::SpTag::Return.properties().documentation,
         "sass_tag_open" | "sass_tag_close" => symbols::SpTag::Sass.properties().documentation,
-        "scaleimage_tag_open" | "scaleimage_tag_close" => symbols::SpTag::Scaleimage.properties().documentation,
+        "scaleimage_tag_open" => symbols::SpTag::Scaleimage.properties().documentation,
         "scope_tag_open" | "scope_tag_close" => symbols::SpTag::Scope.properties().documentation,
         "search_tag_open" | "search_tag_close" => symbols::SpTag::Search.properties().documentation,
         "select_tag_open" | "select_tag_close" => symbols::SpTag::Select.properties().documentation,
         "set_tag_open" | "set_tag_close" => symbols::SpTag::Set.properties().documentation,
         "sort_tag_open" | "sort_tag_close" => symbols::SpTag::Sort.properties().documentation,
-        "subinformation_tag_open" | "subinformation_tag_close" => symbols::SpTag::Subinformation.properties().documentation,
-        "tagbody_tag_open" | "tagbody_tag_close" => symbols::SpTag::Tagbody.properties().documentation,
+        "subinformation_tag_open" | "subinformation_tag_close" => {
+            symbols::SpTag::Subinformation.properties().documentation
+        }
+        "tagbody_tag_open" => symbols::SpTag::Tagbody.properties().documentation,
         "text_tag_open" | "text_tag_close" => symbols::SpTag::Text.properties().documentation,
-        "textarea_tag_open" | "textarea_tag_close" => symbols::SpTag::Textarea.properties().documentation,
-        "textimage_tag_open" | "textimage_tag_close" => symbols::SpTag::Textimage.properties().documentation,
-        "throw_tag_open" | "throw_tag_close" => symbols::SpTag::Throw.properties().documentation,
+        "textarea_tag_open" | "textarea_tag_close" => {
+            symbols::SpTag::Textarea.properties().documentation
+        }
+        "textimage_tag_open" => symbols::SpTag::Textimage.properties().documentation,
+        "throw_tag_open" => symbols::SpTag::Throw.properties().documentation,
         "upload_tag_open" | "upload_tag_close" => symbols::SpTag::Upload.properties().documentation,
         "url_tag_open" | "url_tag_close" => symbols::SpTag::Url.properties().documentation,
-        "warning_tag_open" | "warning_tag_close" => symbols::SpTag::Warning.properties().documentation,
-        "worklist_tag_open" | "worklist_tag_close" => symbols::SpTag::Worklist.properties().documentation,
+        "warning_tag_open" | "warning_tag_close" => {
+            symbols::SpTag::Warning.properties().documentation
+        }
+        "worklist_tag_open" | "worklist_tag_close" => {
+            symbols::SpTag::Worklist.properties().documentation
+        }
         "zip_tag_open" | "zip_tag_close" => symbols::SpTag::Zip.properties().documentation,
-        _ => None,
+        kind => {
+            eprintln!("no hover information about {}", kind);
+            return None
+        },
     }
     .map(|doc| match doc {
         Documentation::MarkupContent(markup) => HoverContents::Markup(markup),
