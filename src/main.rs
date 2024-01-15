@@ -271,7 +271,7 @@ fn definition(params: GotoDefinitionParams) -> Option<Location> {
     let mut previous;
     loop {
         node = cursor.node();
-        if node.end_position() < trigger_point {
+        if node.end_position() <= trigger_point {
             previous = Some(node);
             if !cursor.goto_next_sibling() || cursor.node().start_position() > trigger_point {
                 node = node.parent().unwrap();
@@ -529,7 +529,7 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
     let mut previous;
     loop {
         node = cursor.node();
-        if node.end_position() < trigger_point {
+        if node.end_position() <= trigger_point {
             previous = Some(node);
             if !cursor.goto_next_sibling() || cursor.node().start_position() > trigger_point {
                 node = node.parent().unwrap();
