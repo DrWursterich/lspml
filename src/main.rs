@@ -13,13 +13,20 @@ use lsp_types::{
     Documentation,
     GotoDefinitionParams,
     GotoDefinitionResponse,
+    Hover,
+    HoverContents,
+    HoverOptions,
+    HoverParams,
+    HoverProviderCapability,
     InitializeParams,
     Location,
+    MarkedString,
     OneOf,
     Position,
     Range,
     ServerCapabilities,
     Url,
+    WorkDoneProgressOptions,
 };
 use std::{error::Error, path::Path};
 use tree_sitter::{Parser, Point, Query, QueryCursor};
@@ -160,6 +167,11 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
             }),
             ..CompletionOptions::default()
         }),
+        hover_provider: Some(HoverProviderCapability::Options(HoverOptions {
+            work_done_progress_options: WorkDoneProgressOptions {
+                work_done_progress: Some(true),
+            },
+        })),
         ..Default::default()
     })
     .unwrap();
@@ -193,6 +205,17 @@ fn main_loop(
                     return Ok(());
                 }
                 match request.method.as_str() {
+                    "textDocument/completion" => {
+                        eprintln!("got completion request: {request:?}");
+                        let result = complete(serde_json::from_value(request.params)?);
+                        connection.sender.send(Message::Response(Response {
+                            id: request.id,
+                            result: result.map(|value| {
+                                serde_json::to_value(CompletionResponse::Array(value)).unwrap()
+                            }),
+                            error: None,
+                        }))?;
+                    }
                     "textDocument/definition" => {
                         eprintln!("got go to definition request: {request:?}");
                         let result = definition(serde_json::from_value(request.params)?);
@@ -204,13 +227,17 @@ fn main_loop(
                             error: None,
                         }))?;
                     }
-                    "textDocument/completion" => {
-                        eprintln!("got completion request: {request:?}");
-                        let result = complete(serde_json::from_value(request.params)?);
+                    "textDocument/hover" => {
+                        eprintln!("got hover request: {request:?}");
+                        let result = hover(serde_json::from_value(request.params)?);
                         connection.sender.send(Message::Response(Response {
                             id: request.id,
                             result: result.map(|value| {
-                                serde_json::to_value(CompletionResponse::Array(value)).unwrap()
+                                serde_json::to_value(Hover {
+                                    contents: value,
+                                    range: None,
+                                })
+                                .unwrap()
                             }),
                             error: None,
                         }))?;
@@ -237,6 +264,168 @@ fn main_loop(
     }
 
     return Ok(());
+}
+
+fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
+    let text_params = params.text_document_position;
+    let text = parser::get_text_document(&text_params).ok()?;
+    let mut parser = Parser::new();
+    match parser.set_language(tree_sitter_spml::language()) {
+        Err(err) => {
+            eprintln!("failed to set tree sitter language to spml: {}", err);
+            return None;
+        }
+        _ => {}
+    }
+    eprintln!("created parser");
+    let tree = parser.parse(&text, None)?;
+    eprintln!("successfully parsed file");
+    let root_node = tree.root_node();
+    eprintln!("found root_node: {}", root_node.id());
+    let trigger_point = Point::new(
+        text_params.position.line as usize,
+        text_params.position.character as usize,
+    );
+    // let node = root_node.descendant_for_point_range(trigger_point, trigger_point)?;
+    let mut cursor = root_node.walk();
+    let mut node;
+    let mut previous;
+    loop {
+        node = cursor.node();
+        if node.end_position() <= trigger_point {
+            previous = Some(node);
+            if !cursor.goto_next_sibling() || cursor.node().start_position() > trigger_point {
+                node = node.parent().unwrap();
+                break;
+            }
+        } else if !cursor.goto_first_child() {
+            previous = node.prev_sibling();
+            break;
+        }
+    }
+    if let Some(prev) = previous {
+        if prev.kind() == "ERROR" {
+            previous = prev.child(prev.child_count() - 1);
+        }
+    }
+    eprintln!(
+        "previous: {previous:?}, closest: {node:?} ({})",
+        node.utf8_text(text.as_bytes()).unwrap()
+    );
+    return match node.kind() {
+        // "element" | "<" => Some(
+        //     symbols::SpTag::iter()
+        //         .map(|tag| tag.properties())
+        //         .map(|properties| {
+        //             let mut insert_text = "<".to_owned();
+        //             insert_text.push_str(&properties.name);
+        //             return CompletionItem {
+        //                 detail: properties.detail,
+        //                 documentation: properties.documentation,
+        //                 insert_text: Some(insert_text),
+        //                 label_details: Some(CompletionItemLabelDetails {
+        //                     detail: Some("label_details.details".to_string()),
+        //                     description: Some("label_details.description".to_string()),
+        //                 }),
+        //                 ..Default::default()
+        //             };
+        //         })
+        //         .collect(),
+        // ),
+        // "tag_name" =>
+        // "text" => {
+        //     return match parent.kind() {
+        "text" | "document" => Some(
+            symbols::SpTag::iter()
+                .map(|tag| tag.properties())
+                .map(|properties| CompletionItem {
+                    kind: Some(CompletionItemKind::METHOD),
+                    detail: properties.detail,
+                    documentation: properties.documentation,
+                    insert_text: Some(properties.name),
+                    ..Default::default()
+                })
+                .collect(),
+        ),
+        // _ => None
+        // };
+        // }
+        "include_tag" => match previous.unwrap().kind() {
+            ">" | "argument_tag" => Some(vec![CompletionItem {
+                kind: Some(CompletionItemKind::METHOD),
+                detail: symbols::SpTag::Argument.properties().detail,
+                documentation: symbols::SpTag::Argument.properties().documentation,
+                insert_text: Some(symbols::SpTag::Argument.properties().name),
+                ..Default::default()
+            }]),
+            "argument_tag_open" => Some(vec![CompletionItem {
+                kind: Some(CompletionItemKind::FIELD),
+                detail: Some(String::from("Attribute(String)")),
+                documentation: Some(Documentation::String(String::from(
+                    "the name of the argument",
+                ))),
+                insert_text: Some(String::from("name=\"")),
+                ..Default::default()
+            }]),
+            "name_attribute" => {
+                let previous_previous = previous?.prev_sibling();
+                eprintln!("previous_previous: {previous_previous:?}");
+                return match previous_previous?.kind() {
+                    "argument_tag_open" => Some(vec![CompletionItem {
+                        kind: Some(CompletionItemKind::FIELD),
+                        detail: Some(String::from("Attribute(Object)")),
+                        documentation: Some(Documentation::String(String::from(
+                            "the interpreted value of the argument",
+                        ))),
+                        insert_text: Some(String::from("object=\"")),
+                        ..Default::default()
+                    }]),
+                    _ => None,
+                };
+            }
+            _ => None,
+        },
+        "string" => match previous?.kind() {
+            "name=" => match previous?.parent()?.prev_sibling()?.kind() {
+                "argument_tag_open" => Some(vec![
+                    CompletionItem {
+                        kind: Some(CompletionItemKind::PROPERTY),
+                        detail: Some(String::from("Argument(ID)")),
+                        documentation: Some(Documentation::String(String::from(
+                            "the itemScope to do something for",
+                        ))),
+                        insert_text: Some(String::from("itemScope\"")),
+                        ..Default::default()
+                    },
+                    CompletionItem {
+                        kind: Some(CompletionItemKind::PROPERTY),
+                        detail: Some(String::from("Argument(Map)")),
+                        documentation: Some(Documentation::String(String::from(
+                            "options to configure the process of doing something",
+                        ))),
+                        insert_text: Some(String::from("options\"")),
+                        ..Default::default()
+                    },
+                ]),
+                _ => None,
+            },
+            _ => None,
+        },
+        // "start_tag" =>
+        // "attribute" =>
+        // "attribute_name" =>
+        // "quoted_attribute_value" =>
+        // "attribute_value" =>
+        // "raw_text" =>
+        // "end_tag" =>
+        // "self_closing_tag" =>
+        // "error" =>
+        // "expression_statement" =>
+        // "member_expression" =>
+        // "object" =>
+        // "property" =>
+        _ => None,
+    };
 }
 
 /**
@@ -503,8 +692,8 @@ fn definition(params: GotoDefinitionParams) -> Option<Location> {
     };
 }
 
-fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
-    let text_params = params.text_document_position;
+fn hover(params: HoverParams) -> Option<HoverContents> {
+    let text_params = params.text_document_position_params;
     let text = parser::get_text_document(&text_params).ok()?;
     let mut parser = Parser::new();
     match parser.set_language(tree_sitter_spml::language()) {
@@ -550,117 +739,65 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
         node.utf8_text(text.as_bytes()).unwrap()
     );
     return match node.kind() {
-        // "element" | "<" => Some(
-        //     symbols::SpTag::iter()
-        //         .map(|tag| tag.properties())
-        //         .map(|properties| {
-        //             let mut insert_text = "<".to_owned();
-        //             insert_text.push_str(&properties.name);
-        //             return CompletionItem {
-        //                 detail: properties.detail,
-        //                 documentation: properties.documentation,
-        //                 insert_text: Some(insert_text),
-        //                 label_details: Some(CompletionItemLabelDetails {
-        //                     detail: Some("label_details.details".to_string()),
-        //                     description: Some("label_details.description".to_string()),
-        //                 }),
-        //                 ..Default::default()
-        //             };
-        //         })
-        //         .collect(),
-        // ),
-        // "tag_name" =>
-        // "text" => {
-        //     return match parent.kind() {
-        "text" | "document" => Some(
-            symbols::SpTag::iter()
-                .map(|tag| tag.properties())
-                .map(|properties| CompletionItem {
-                    kind: Some(CompletionItemKind::METHOD),
-                    detail: properties.detail,
-                    documentation: properties.documentation,
-                    insert_text: Some(properties.name),
-                    ..Default::default()
-                })
-                .collect(),
-        ),
-        // _ => None
-        // };
-        // }
-        "include_tag" => match previous.unwrap().kind() {
-            ">" | "argument_tag" => Some(vec![CompletionItem {
-                kind: Some(CompletionItemKind::METHOD),
-                detail: symbols::SpTag::Argument.properties().detail,
-                documentation: symbols::SpTag::Argument.properties().documentation,
-                insert_text: Some(symbols::SpTag::Argument.properties().name),
-                ..Default::default()
-            }]),
-            "argument_tag_open" => Some(vec![CompletionItem {
-                kind: Some(CompletionItemKind::FIELD),
-                detail: Some(String::from("Attribute(String)")),
-                documentation: Some(Documentation::String(String::from(
-                    "the name of the argument",
-                ))),
-                insert_text: Some(String::from("name=\"")),
-                ..Default::default()
-            }]),
-            "name_attribute" => {
-                let previous_previous = previous?.prev_sibling();
-                eprintln!("previous_previous: {previous_previous:?}");
-                return match previous_previous?.kind() {
-                    "argument_tag_open" => Some(vec![CompletionItem {
-                        kind: Some(CompletionItemKind::FIELD),
-                        detail: Some(String::from("Attribute(Object)")),
-                        documentation: Some(Documentation::String(String::from(
-                            "the interpreted value of the argument",
-                        ))),
-                        insert_text: Some(String::from("object=\"")),
-                        ..Default::default()
-                    }]),
-                    _ => None,
-                };
-            }
-            _ => None,
-        },
-        "string" => match previous?.kind() {
-            "name=" => match previous?.parent()?.prev_sibling()?.kind() {
-                "argument_tag_open" => Some(vec![
-                    CompletionItem {
-                        kind: Some(CompletionItemKind::PROPERTY),
-                        detail: Some(String::from("Argument(ID)")),
-                        documentation: Some(Documentation::String(String::from(
-                            "the itemScope to do something for",
-                        ))),
-                        insert_text: Some(String::from("itemScope\"")),
-                        ..Default::default()
-                    },
-                    CompletionItem {
-                        kind: Some(CompletionItemKind::PROPERTY),
-                        detail: Some(String::from("Argument(Map)")),
-                        documentation: Some(Documentation::String(String::from(
-                            "options to configure the process of doing something",
-                        ))),
-                        insert_text: Some(String::from("options\"")),
-                        ..Default::default()
-                    },
-                ]),
-                _ => None,
-            },
-            _ => None,
-        },
-        // "start_tag" =>
-        // "attribute" =>
-        // "attribute_name" =>
-        // "quoted_attribute_value" =>
-        // "attribute_value" =>
-        // "raw_text" =>
-        // "end_tag" =>
-        // "self_closing_tag" =>
-        // "error" =>
-        // "expression_statement" =>
-        // "member_expression" =>
-        // "object" =>
-        // "property" =>
+        "argument_tag_open" | "argument_tag_close" => symbols::SpTag::Argument.properties().documentation,
+        "attribute_tag_open" | "attribute_tag_close" => symbols::SpTag::Attribute.properties().documentation,
+        "barcode_tag_open" | "barcode_tag_close" => symbols::SpTag::Barcode.properties().documentation,
+        "break_tag_open" | "break_tag_close" => symbols::SpTag::Break.properties().documentation,
+        "calendarsheet_tag_open" | "calendarsheet_tag_close" => symbols::SpTag::Calendarsheet.properties().documentation,
+        "checkbox_tag_open" | "checkbox_tag_close" => symbols::SpTag::Checkbox.properties().documentation,
+        "code_tag_open" | "code_tag_close" => symbols::SpTag::Code.properties().documentation,
+        "collection_tag_open" | "collection_tag_close" => symbols::SpTag::Collection.properties().documentation,
+        "condition_tag_open" | "condition_tag_close" => symbols::SpTag::Condition.properties().documentation,
+        "diff_tag_open" | "diff_tag_close" => symbols::SpTag::Diff.properties().documentation,
+        "else_tag_open" | "else_tag_close" => symbols::SpTag::Else.properties().documentation,
+        "elseif_tag_open" | "elseif_tag_close" => symbols::SpTag::Elseif.properties().documentation,
+        "error_tag_open" | "error_tag_close" => symbols::SpTag::Error.properties().documentation,
+        "expire_tag_open" | "expire_tag_close" => symbols::SpTag::Expire.properties().documentation,
+        "filter_tag_open" | "filter_tag_close" => symbols::SpTag::Filter.properties().documentation,
+        "for_tag_open" | "for_tag_close" => symbols::SpTag::For.properties().documentation,
+        "form_tag_open" | "form_tag_close" => symbols::SpTag::Form.properties().documentation,
+        "hidden_tag_open" | "hidden_tag_close" => symbols::SpTag::Hidden.properties().documentation,
+        "if_tag_open" | "if_tag_close" => symbols::SpTag::If.properties().documentation,
+        "include_tag_open" | "include_tag_close" => symbols::SpTag::Include.properties().documentation,
+        "io_tag_open" | "io_tag_close" => symbols::SpTag::Io.properties().documentation,
+        "iterator_tag_open" | "iterator_tag_close" => symbols::SpTag::Iterator.properties().documentation,
+        "json_tag_open" | "json_tag_close" => symbols::SpTag::Json.properties().documentation,
+        "linktree_tag_open" | "linktree_tag_close" => symbols::SpTag::Linktree.properties().documentation,
+        "linkedinformation_tag_open" | "linkedinformation_tag_close" => symbols::SpTag::LinkedInformation.properties().documentation,
+        "livetree_tag_open" | "livetree_tag_close" => symbols::SpTag::Livetree.properties().documentation,
+        "log_tag_open" | "log_tag_close" => symbols::SpTag::Log.properties().documentation,
+        "login_tag_open" | "login_tag_close" => symbols::SpTag::Login.properties().documentation,
+        "loop_tag_open" | "loop_tag_close" => symbols::SpTag::Loop.properties().documentation,
+        "map_tag_open" | "map_tag_close" => symbols::SpTag::Map.properties().documentation,
+        "option_tag_open" | "option_tag_close" => symbols::SpTag::Option.properties().documentation,
+        "password_tag_open" | "password_tag_close" => symbols::SpTag::Password.properties().documentation,
+        "print_tag_open" | "print_tag_close" => symbols::SpTag::Print.properties().documentation,
+        "querytree_tag_open" | "querytree_tag_close" => symbols::SpTag::Querytree.properties().documentation,
+        "radio_tag_open" | "radio_tag_close" => symbols::SpTag::Radio.properties().documentation,
+        "range_tag_open" | "range_tag_close" => symbols::SpTag::Range.properties().documentation,
+        "return_tag_open" | "return_tag_close" => symbols::SpTag::Return.properties().documentation,
+        "sass_tag_open" | "sass_tag_close" => symbols::SpTag::Sass.properties().documentation,
+        "scaleimage_tag_open" | "scaleimage_tag_close" => symbols::SpTag::Scaleimage.properties().documentation,
+        "scope_tag_open" | "scope_tag_close" => symbols::SpTag::Scope.properties().documentation,
+        "search_tag_open" | "search_tag_close" => symbols::SpTag::Search.properties().documentation,
+        "select_tag_open" | "select_tag_close" => symbols::SpTag::Select.properties().documentation,
+        "set_tag_open" | "set_tag_close" => symbols::SpTag::Set.properties().documentation,
+        "sort_tag_open" | "sort_tag_close" => symbols::SpTag::Sort.properties().documentation,
+        "subinformation_tag_open" | "subinformation_tag_close" => symbols::SpTag::Subinformation.properties().documentation,
+        "tagbody_tag_open" | "tagbody_tag_close" => symbols::SpTag::Tagbody.properties().documentation,
+        "text_tag_open" | "text_tag_close" => symbols::SpTag::Text.properties().documentation,
+        "textarea_tag_open" | "textarea_tag_close" => symbols::SpTag::Textarea.properties().documentation,
+        "textimage_tag_open" | "textimage_tag_close" => symbols::SpTag::Textimage.properties().documentation,
+        "throw_tag_open" | "throw_tag_close" => symbols::SpTag::Throw.properties().documentation,
+        "upload_tag_open" | "upload_tag_close" => symbols::SpTag::Upload.properties().documentation,
+        "url_tag_open" | "url_tag_close" => symbols::SpTag::Url.properties().documentation,
+        "warning_tag_open" | "warning_tag_close" => symbols::SpTag::Warning.properties().documentation,
+        "worklist_tag_open" | "worklist_tag_close" => symbols::SpTag::Worklist.properties().documentation,
+        "zip_tag_open" | "zip_tag_close" => symbols::SpTag::Zip.properties().documentation,
         _ => None,
-    };
+    }
+    .map(|doc| match doc {
+        Documentation::MarkupContent(markup) => HoverContents::Markup(markup),
+        Documentation::String(string) => HoverContents::Scalar(MarkedString::String(string)),
+    });
 }
