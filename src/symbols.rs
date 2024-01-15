@@ -597,7 +597,7 @@ Das Tag, erzeugt ein Eingabefeld zum Herunderladen von Dateien."#,
                     kind: MarkupKind::Markdown,
                     value: String::from(
                         r#"
-Fügt den ContextPath vor die angegebene URL und hüngt, falls nötig die Session ID an die URL."#,
+Fügt den ContextPath vor die angegebene URL und hängt, falls nötig die Session ID an die URL."#,
                     ),
                 })),
                 // children: TagChildren::Any,
