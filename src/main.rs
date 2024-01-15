@@ -291,7 +291,8 @@ fn definition(params: GotoDefinitionParams) -> Option<Location> {
         "previous: {previous:?}, closest: {node:?} ({})",
         node.utf8_text(text.as_bytes()).unwrap()
     );
-    let working_directory = project::get_working_directory(&text_params.text_document.uri)?;
+    let working_directory = project::get_working_directory(&text_params.text_document.uri)
+        .expect("cannot determine module - requires path to be <module>/src/main/webapp/");
     return match node.kind() {
         // if string is not evaluated ....
         "string" => match node.parent()?.kind() {
