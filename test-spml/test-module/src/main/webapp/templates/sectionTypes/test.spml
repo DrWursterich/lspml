@@ -3,6 +3,8 @@
 %>
 
 <%-- <sp:set name="_someVariable" value="someValue"/> --%>
+<sp:map name="_someVariable" action="new"/>
+
 <sp:set name="_someVariable" value="someValue"/>
 
 <sp:include uri="/functions/doSomething.spml">
@@ -15,7 +17,7 @@
 
 <sp:include module="sitekit-module" uri="/functions/doSomething.spml">
 
-	<sp:argument name="someVariable" object="_someVariable"/>
+	<sp:argument name="someArgument" object="_someVariable"/>
 
 </sp:include>
 

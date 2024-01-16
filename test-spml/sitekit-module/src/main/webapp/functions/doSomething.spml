@@ -5,3 +5,7 @@
 <%-- This is an included file in the sitekit-module --%>
 <%-- ./sitekit-module/src/main/webapp/functions/doSomething.spml --%>
 
+<sp:set name="_someArgument" object="system.arguments.someVariable"/>
+
+<sp:print name="_someArgument"/>
+

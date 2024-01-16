@@ -1,32 +1,14 @@
 use anyhow::Result;
 use lsp_server::{Connection, Message, Response};
 use lsp_types::{
-    CancelParams,
-    CompletionItem,
-    CompletionItemKind,
-    //CompletionItemLabelDetails,
-    CompletionOptions,
-    CompletionOptionsCompletionItem,
-    CompletionParams,
-    CompletionResponse,
-    DidSaveTextDocumentParams,
-    Documentation,
-    GotoDefinitionParams,
-    GotoDefinitionResponse,
-    Hover,
-    HoverContents,
-    HoverOptions,
-    HoverParams,
-    HoverProviderCapability,
-    InitializeParams,
-    Location,
-    MarkedString,
-    OneOf,
-    Position,
-    Range,
-    ServerCapabilities,
-    Url,
-    WorkDoneProgressOptions,
+    CancelParams, CompletionItem, CompletionItemKind, CompletionOptions,
+    CompletionOptionsCompletionItem, CompletionParams, CompletionResponse, Diagnostic,
+    DiagnosticOptions, DiagnosticServerCapabilities, DidSaveTextDocumentParams,
+    DocumentDiagnosticParams, Documentation, FullDocumentDiagnosticReport, GotoDefinitionParams,
+    GotoDefinitionResponse, Hover, HoverContents, HoverOptions, HoverParams,
+    HoverProviderCapability, InitializeParams, InsertTextMode, Location, MarkedString, OneOf,
+    Position, Range, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Url,
+    WorkDoneProgressOptions, DiagnosticSeverity, DidChangeTextDocumentParams,
 };
 use std::{error::Error, path::Path};
 use tree_sitter::{Parser, Query, QueryCursor};
@@ -160,10 +142,14 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let (connection, io_threads) = Connection::stdio();
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
         definition_provider: Some(OneOf::Left(true)),
+        text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::NONE)),
+        diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
+            inter_file_dependencies: true,
+            ..DiagnosticOptions::default()
+        })),
         completion_provider: Some(CompletionOptions {
             completion_item: Some(CompletionOptionsCompletionItem {
                 label_details_support: Some(true),
-                ..CompletionOptionsCompletionItem::default()
             }),
             ..CompletionOptions::default()
         }),
@@ -172,7 +158,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
                 work_done_progress: Some(true),
             },
         })),
-        ..Default::default()
+        ..ServerCapabilities::default()
     })
     .unwrap();
     let initialization_params = match connection.initialize(server_capabilities) {
@@ -227,6 +213,21 @@ fn main_loop(
                             error: None,
                         }))?;
                     }
+                    "textDocument/diagnostic" => {
+                        eprintln!("got diagnose request: {request:?}");
+                        let result = diagnose(serde_json::from_value(request.params)?);
+                        connection.sender.send(Message::Response(Response {
+                            id: request.id,
+                            result: result.map(|value| {
+                                serde_json::to_value(FullDocumentDiagnosticReport {
+                                    result_id: None,
+                                    items: value,
+                                })
+                                .unwrap()
+                            }),
+                            error: None,
+                        }))?;
+                    }
                     "textDocument/hover" => {
                         eprintln!("got hover request: {request:?}");
                         let result = hover(serde_json::from_value(request.params)?);
@@ -249,6 +250,11 @@ fn main_loop(
                 eprintln!("got unknown response: {response:?}");
             }
             Message::Notification(notification) => match notification.method.as_str() {
+                "textDocument/didChange" => {
+                    let params: DidChangeTextDocumentParams =
+                        serde_json::from_value(notification.params).unwrap();
+                    eprintln!("{} changed", params.text_document.uri);
+                }
                 "textDocument/didSave" => {
                     let params: DidSaveTextDocumentParams =
                         serde_json::from_value(notification.params).unwrap();
@@ -268,7 +274,7 @@ fn main_loop(
 
 fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
     let text_params = params.text_document_position;
-    let text = parser::get_text_document(&text_params).ok()?;
+    let text = parser::get_text_document(&text_params.text_document).ok()?;
     let mut parser = Parser::new();
     parser
         .set_language(tree_sitter_spml::language())
@@ -276,28 +282,6 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
     let tree = parser.parse(&text, None)?;
     let (node, previous) = parser::find_current_and_previous_nodes(&tree, text_params.position)?;
     return match node.kind() {
-        // "element" | "<" => Some(
-        //     symbols::SpTag::iter()
-        //         .map(|tag| tag.properties())
-        //         .map(|properties| {
-        //             let mut insert_text = "<".to_owned();
-        //             insert_text.push_str(&properties.name);
-        //             return CompletionItem {
-        //                 detail: properties.detail,
-        //                 documentation: properties.documentation,
-        //                 insert_text: Some(insert_text),
-        //                 label_details: Some(CompletionItemLabelDetails {
-        //                     detail: Some("label_details.details".to_string()),
-        //                     description: Some("label_details.description".to_string()),
-        //                 }),
-        //                 ..Default::default()
-        //             };
-        //         })
-        //         .collect(),
-        // ),
-        // "tag_name" =>
-        // "text" => {
-        //     return match parent.kind() {
         "text" | "document" => Some(
             symbols::SpTag::iter()
                 .map(|tag| tag.properties())
@@ -306,19 +290,18 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
                     detail: properties.detail,
                     documentation: properties.documentation,
                     insert_text: Some(properties.name),
+                    insert_text_mode: Some(InsertTextMode::AS_IS),
                     ..Default::default()
                 })
                 .collect(),
         ),
-        // _ => None
-        // };
-        // }
         "include_tag" => match previous.unwrap().kind() {
             ">" | "argument_tag" => Some(vec![CompletionItem {
                 kind: Some(CompletionItemKind::METHOD),
                 detail: symbols::SpTag::Argument.properties().detail,
                 documentation: symbols::SpTag::Argument.properties().documentation,
                 insert_text: Some(symbols::SpTag::Argument.properties().name),
+                insert_text_mode: Some(InsertTextMode::AS_IS),
                 ..Default::default()
             }]),
             "argument_tag_open" => Some(vec![CompletionItem {
@@ -328,6 +311,7 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
                     "the name of the argument",
                 ))),
                 insert_text: Some(String::from("name=\"")),
+                insert_text_mode: Some(InsertTextMode::AS_IS),
                 ..Default::default()
             }]),
             "name_attribute" => {
@@ -341,6 +325,7 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
                             "the interpreted value of the argument",
                         ))),
                         insert_text: Some(String::from("object=\"")),
+                        insert_text_mode: Some(InsertTextMode::AS_IS),
                         ..Default::default()
                     }]),
                     _ => None,
@@ -358,6 +343,7 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
                             "the itemScope to do something for",
                         ))),
                         insert_text: Some(String::from("itemScope\"")),
+                        insert_text_mode: Some(InsertTextMode::AS_IS),
                         ..Default::default()
                     },
                     CompletionItem {
@@ -367,6 +353,7 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
                             "options to configure the process of doing something",
                         ))),
                         insert_text: Some(String::from("options\"")),
+                        insert_text_mode: Some(InsertTextMode::AS_IS),
                         ..Default::default()
                     },
                 ]),
@@ -399,7 +386,7 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
  */
 fn definition(params: GotoDefinitionParams) -> Option<Location> {
     let text_params = params.text_document_position_params;
-    let text = parser::get_text_document(&text_params).ok()?;
+    let text = parser::get_text_document(&text_params.text_document).ok()?;
     let mut parser = Parser::new();
     parser
         .set_language(tree_sitter_spml::language())
@@ -618,9 +605,46 @@ fn definition(params: GotoDefinitionParams) -> Option<Location> {
     };
 }
 
+fn diagnose(params: DocumentDiagnosticParams) -> Option<Vec<Diagnostic>> {
+    let text = parser::get_text_document(&params.text_document).ok()?;
+    let mut parser = Parser::new();
+    parser
+        .set_language(tree_sitter_spml::language())
+        .expect("failed to set tree sitter language to spml");
+    let tree = parser.parse(&text, None)?;
+    return match Query::new(tree_sitter_spml::language(), "(ERROR)+ @error") {
+        Ok(query) => Some(QueryCursor::new()
+            .matches(&query, tree.root_node(), text.as_bytes())
+            .into_iter()
+            .flat_map(|m| m.captures.iter())
+            .map(|c| c.node)
+            .map(|result| Diagnostic {
+                source: Some("lspml".to_string()),
+                message: "syntax error".to_string(),
+                range: Range {
+                    start: Position {
+                        line: result.start_position().row as u32,
+                        character: result.start_position().column as u32,
+                    },
+                    end: Position {
+                        line: result.end_position().row as u32,
+                        character: result.end_position().column as u32,
+                    }
+                },
+                severity: Some(DiagnosticSeverity::ERROR),
+                ..Default::default()
+            })
+            .collect()),
+        Err(err) => {
+            eprintln!("error in query for ERROR location: {}", err);
+            return None;
+        }
+    };
+}
+
 fn hover(params: HoverParams) -> Option<HoverContents> {
     let text_params = params.text_document_position_params;
-    let text = parser::get_text_document(&text_params).ok()?;
+    let text = parser::get_text_document(&text_params.text_document).ok()?;
     let mut parser = Parser::new();
     parser
         .set_language(tree_sitter_spml::language())
@@ -715,8 +739,8 @@ fn hover(params: HoverParams) -> Option<HoverContents> {
         "zip_tag_open" | "zip_tag_close" => symbols::SpTag::Zip.properties().documentation,
         kind => {
             eprintln!("no hover information about {}", kind);
-            return None
-        },
+            return None;
+        }
     }
     .map(|doc| match doc {
         Documentation::MarkupContent(markup) => HoverContents::Markup(markup),
