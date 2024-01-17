@@ -993,6 +993,7 @@ fn hover(params: HoverParams) -> Result<Option<HoverContents>, LsError> {
         }
         "textimage_tag_open" => symbols::SpTag::Textimage.properties().documentation,
         "throw_tag_open" => symbols::SpTag::Throw.properties().documentation,
+        "toggle_tag_open" | "toggle_tag_close" => symbols::SpTag::Toggle.properties().documentation,
         "upload_tag_open" | "upload_tag_close" => symbols::SpTag::Upload.properties().documentation,
         "url_tag_open" | "url_tag_close" => symbols::SpTag::Url.properties().documentation,
         "warning_tag_open" | "warning_tag_close" => {

@@ -69,6 +69,7 @@ pub(crate) enum SpTag {
     Textarea,
     Textimage,
     Throw,
+    Toggle,
     Upload,
     Url,
     Warning,
@@ -573,9 +574,21 @@ Textarea-Tag, erzeugt einen Einabebereich."#,
                 // children: TagChildren::Any,
             },
             SpTag::Throw => TagProperties {
-                name: String::from("<sp:querytree"),
+                name: String::from("<sp:throw"),
                 detail: None,
                 documentation: None,
+                // children: TagChildren::Any,
+            },
+            SpTag::Toggle => TagProperties {
+                name: String::from("<sp:toggle"),
+                detail: None,
+                documentation: Some(Documentation::MarkupContent(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: String::from(
+                        r#"
+Toggle-Tag erzeugt einen toggle der einen einzigen boolischen Wert speichert"#,
+                    ),
+                })),
                 // children: TagChildren::Any,
             },
             SpTag::Upload => TagProperties {
@@ -640,7 +653,7 @@ Findet die gewünschte Workliste"#,
     // }
 
     pub fn iter() -> Iter<'static, SpTag> {
-        static SP_TAGS: [SpTag; 55] = [
+        static SP_TAGS: [SpTag; 56] = [
             SpTag::Argument,
             SpTag::Attribute,
             SpTag::Barcode,
@@ -691,6 +704,7 @@ Findet die gewünschte Workliste"#,
             SpTag::Textarea,
             SpTag::Textimage,
             SpTag::Throw,
+            SpTag::Toggle,
             SpTag::Upload,
             SpTag::Url,
             SpTag::Warning,
