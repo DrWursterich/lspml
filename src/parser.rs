@@ -1,15 +1,12 @@
 use anyhow::{Error, Result};
-use lsp_types::{Position, TextDocumentIdentifier};
+use lsp_types::{Position, Url};
 use std::fs;
 use tree_sitter::{Node, Point, Tree};
 
-pub(crate) fn get_text_document(document: &TextDocumentIdentifier) -> Result<String> {
-    return match document.uri.to_file_path() {
+pub(crate) fn get_text_document(uri: &Url) -> Result<String> {
+    return match uri.to_file_path() {
         Ok(path) => fs::read_to_string(path.to_owned()).map_err(Error::from),
-        Err(_) => Result::Err(anyhow::anyhow!(
-            "failed to read file path from uri {}",
-            document.uri
-        )),
+        Err(_) => Result::Err(anyhow::anyhow!("failed to read file path from uri {}", uri)),
     };
 }
 

@@ -3,15 +3,17 @@ use lsp_server::{Connection, Message, Response};
 use lsp_types::{
     CancelParams, CompletionItem, CompletionItemKind, CompletionOptions,
     CompletionOptionsCompletionItem, CompletionParams, CompletionResponse, Diagnostic,
-    DiagnosticOptions, DiagnosticServerCapabilities, DidSaveTextDocumentParams,
+    DiagnosticOptions, DiagnosticServerCapabilities, DiagnosticSeverity,
+    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
     DocumentDiagnosticParams, Documentation, FullDocumentDiagnosticReport, GotoDefinitionParams,
     GotoDefinitionResponse, Hover, HoverContents, HoverOptions, HoverParams,
     HoverProviderCapability, InitializeParams, InsertTextMode, Location, MarkedString, OneOf,
     Position, Range, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Url,
-    WorkDoneProgressOptions, DiagnosticSeverity, DidChangeTextDocumentParams,
+    WorkDoneProgressOptions,
 };
-use std::{error::Error, path::Path};
+use std::{error::Error, fmt, path::Path};
 use tree_sitter::{Parser, Query, QueryCursor};
+mod document_store;
 mod parser;
 mod project;
 mod symbols;
@@ -159,10 +161,9 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
             },
         })),
         ..ServerCapabilities::default()
-    })
-    .unwrap();
+    })?;
     let initialization_params = match connection.initialize(server_capabilities) {
-        Ok(params) => serde_json::from_value(params).unwrap(),
+        Ok(params) => serde_json::from_value(params)?,
         Err(err) => {
             if err.channel_is_disconnected() {
                 io_threads.join()?;
@@ -176,6 +177,41 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
     eprintln!("shutting down lspml...");
     return Ok(());
+}
+
+#[derive(Debug)]
+enum ResponseErrorCode {
+    RequestFailed = -32803,
+    // ServerCancelled = -32802,
+    // ContentModified = -32801,
+    // RequestCancelled = -32800,
+    // ParseError = -32700,
+    // InternalError = -32603,
+    // InvalidParams = -32602,
+    // MethodNotFound = -32601,
+    // InvalidRequest = -32600,
+    // ServerNotInitialized = -32002,
+    // UnknownErrorCode = -32001,
+}
+
+impl fmt::Display for ResponseErrorCode {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        return write!(formatter, "{}", self.to_string());
+    }
+}
+
+#[derive(Debug)]
+struct LsError {
+    message: String,
+    code: ResponseErrorCode,
+}
+
+impl Error for LsError {}
+
+impl fmt::Display for LsError {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        return write!(formatter, "{}: {}", self.code, self.message);
+    }
 }
 
 fn main_loop(
@@ -193,55 +229,102 @@ fn main_loop(
                 match request.method.as_str() {
                     "textDocument/completion" => {
                         eprintln!("got completion request: {request:?}");
-                        let result = complete(serde_json::from_value(request.params)?);
-                        connection.sender.send(Message::Response(Response {
-                            id: request.id,
-                            result: result.map(|value| {
-                                serde_json::to_value(CompletionResponse::Array(value)).unwrap()
-                            }),
-                            error: None,
-                        }))?;
+                        connection.sender.send(Message::Response(
+                            match complete(serde_json::from_value(request.params)?) {
+                                Ok(completions) => Response {
+                                    id: request.id,
+                                    result: serde_json::to_value(CompletionResponse::Array(
+                                        completions,
+                                    ))
+                                    .ok(),
+                                    error: None,
+                                },
+                                Err(err) => Response {
+                                    id: request.id,
+                                    result: None,
+                                    error: Some(lsp_server::ResponseError {
+                                        message: err.message,
+                                        code: err.code as i32,
+                                        data: None,
+                                    }),
+                                },
+                            },
+                        ))?;
                     }
                     "textDocument/definition" => {
                         eprintln!("got go to definition request: {request:?}");
-                        let result = definition(serde_json::from_value(request.params)?);
-                        connection.sender.send(Message::Response(Response {
-                            id: request.id,
-                            result: result.map(|value| {
-                                serde_json::to_value(GotoDefinitionResponse::Scalar(value)).unwrap()
-                            }),
-                            error: None,
-                        }))?;
+                        connection.sender.send(Message::Response(
+                            match definition(serde_json::from_value(request.params)?) {
+                                Ok(definition) => Response {
+                                    id: request.id,
+                                    result: definition.and_then(|d| {
+                                        serde_json::to_value(GotoDefinitionResponse::Scalar(d)).ok()
+                                    }),
+                                    error: None,
+                                },
+                                Err(err) => Response {
+                                    id: request.id,
+                                    result: None,
+                                    error: Some(lsp_server::ResponseError {
+                                        message: err.message,
+                                        code: err.code as i32,
+                                        data: None,
+                                    }),
+                                },
+                            },
+                        ))?;
                     }
                     "textDocument/diagnostic" => {
                         eprintln!("got diagnose request: {request:?}");
-                        let result = diagnose(serde_json::from_value(request.params)?);
-                        connection.sender.send(Message::Response(Response {
-                            id: request.id,
-                            result: result.map(|value| {
-                                serde_json::to_value(FullDocumentDiagnosticReport {
-                                    result_id: None,
-                                    items: value,
-                                })
-                                .unwrap()
-                            }),
-                            error: None,
-                        }))?;
+                        connection.sender.send(Message::Response(
+                            match diagnose(serde_json::from_value(request.params)?) {
+                                Ok(result) => Response {
+                                    id: request.id,
+                                    result: serde_json::to_value(FullDocumentDiagnosticReport {
+                                        result_id: None,
+                                        items: result,
+                                    })
+                                    .ok(),
+                                    error: None,
+                                },
+                                Err(err) => Response {
+                                    id: request.id,
+                                    result: None,
+                                    error: Some(lsp_server::ResponseError {
+                                        message: err.message,
+                                        code: err.code as i32,
+                                        data: None,
+                                    }),
+                                },
+                            },
+                        ))?;
                     }
                     "textDocument/hover" => {
                         eprintln!("got hover request: {request:?}");
-                        let result = hover(serde_json::from_value(request.params)?);
-                        connection.sender.send(Message::Response(Response {
-                            id: request.id,
-                            result: result.map(|value| {
-                                serde_json::to_value(Hover {
-                                    contents: value,
-                                    range: None,
-                                })
-                                .unwrap()
-                            }),
-                            error: None,
-                        }))?;
+                        connection.sender.send(Message::Response(
+                            match hover(serde_json::from_value(request.params)?) {
+                                Ok(result) => Response {
+                                    id: request.id,
+                                    result: result.and_then(|value| {
+                                        serde_json::to_value(Hover {
+                                            contents: value,
+                                            range: None,
+                                        })
+                                        .ok()
+                                    }),
+                                    error: None,
+                                },
+                                Err(err) => Response {
+                                    id: request.id,
+                                    result: None,
+                                    error: Some(lsp_server::ResponseError {
+                                        message: err.message,
+                                        code: err.code as i32,
+                                        data: None,
+                                    }),
+                                },
+                            },
+                        ))?;
                     }
                     _ => eprintln!("got unknonwn request: {request:?}"),
                 }
@@ -251,14 +334,13 @@ fn main_loop(
             }
             Message::Notification(notification) => match notification.method.as_str() {
                 "textDocument/didChange" => {
-                    let params: DidChangeTextDocumentParams =
-                        serde_json::from_value(notification.params).unwrap();
-                    eprintln!("{} changed", params.text_document.uri);
+                    changed(serde_json::from_value(notification.params)?)?;
+                }
+                "textDocument/didOpen" => {
+                    opened(serde_json::from_value(notification.params)?)?;
                 }
                 "textDocument/didSave" => {
-                    let params: DidSaveTextDocumentParams =
-                        serde_json::from_value(notification.params).unwrap();
-                    eprintln!("{} was saved", params.text_document.uri);
+                    saved(serde_json::from_value(notification.params)?)?;
                 }
                 "$/cancelRequest" => {
                     let params: CancelParams = serde_json::from_value(notification.params).unwrap();
@@ -272,31 +354,92 @@ fn main_loop(
     return Ok(());
 }
 
-fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
+// is probably called on every key hit when TextDocumentSyncKind is INCREMENTAL.
+fn changed(params: DidChangeTextDocumentParams) -> Result<()> {
+    return match document_store::get(&params.text_document.uri) {
+        Some(_) => Result::Ok(()),
+        None => parser::get_text_document(&params.text_document.uri).map(|_| {
+            eprintln!("updated {}", params.text_document.uri);
+            return ();
+        }),
+    };
+}
+
+fn opened(params: DidOpenTextDocumentParams) -> Result<()> {
+    return match document_store::get(&params.text_document.uri) {
+        Some(_) => Result::Ok(()),
+        None => parser::get_text_document(&params.text_document.uri).map(|_| {
+            eprintln!("opened {}", params.text_document.uri);
+            return ();
+        }),
+    };
+}
+
+fn saved(params: DidSaveTextDocumentParams) -> Result<()> {
+    return parser::get_text_document(&params.text_document.uri).map(|text| {
+        document_store::put(&params.text_document.uri, document_store::Document { text });
+        eprintln!("updated {}", params.text_document.uri);
+        return ();
+    });
+}
+
+fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, LsError> {
     let text_params = params.text_document_position;
-    let text = parser::get_text_document(&text_params.text_document).ok()?;
+    let document = match document_store::get(&text_params.text_document.uri) {
+        Some(document) => Ok(document),
+        None => parser::get_text_document(&text_params.text_document.uri)
+            .map(|text| {
+                document_store::put(
+                    &text_params.text_document.uri,
+                    document_store::Document { text },
+                )
+            })
+            .map_err(|err| {
+                eprintln!("failed to read {}: {}", text_params.text_document.uri, err);
+                return LsError {
+                    message: format!("cannot read file {}", text_params.text_document.uri),
+                    code: ResponseErrorCode::RequestFailed,
+                };
+            }),
+    }?;
     let mut parser = Parser::new();
     parser
         .set_language(tree_sitter_spml::language())
-        .expect("failed to set tree sitter language to spml");
-    let tree = parser.parse(&text, None)?;
-    let (node, previous) = parser::find_current_and_previous_nodes(&tree, text_params.position)?;
+        .map_err(|err| {
+            eprintln!("failed to set tree sitter language to spml: {}", err);
+            return LsError {
+                message: format!("failed to set tree sitter language to spml: {}", err),
+                code: ResponseErrorCode::RequestFailed,
+            };
+        })?;
+    let tree = parser.parse(&document.text, None).ok_or_else(|| LsError {
+        message: format!("cannot parse file {}", text_params.text_document.uri),
+        code: ResponseErrorCode::RequestFailed,
+    })?;
+    let (node, previous) = parser::find_current_and_previous_nodes(&tree, text_params.position)
+        .ok_or_else(|| LsError {
+            message: format!(
+                "could not determine node in {} at line {}, character {}",
+                text_params.text_document.uri,
+                text_params.position.line,
+                text_params.position.character
+            ),
+            code: ResponseErrorCode::RequestFailed,
+        })?;
     return match node.kind() {
-        "text" | "document" => Some(
-            symbols::SpTag::iter()
-                .map(|tag| tag.properties())
-                .map(|properties| CompletionItem {
-                    kind: Some(CompletionItemKind::METHOD),
-                    detail: properties.detail,
-                    documentation: properties.documentation,
-                    insert_text: Some(properties.name),
-                    insert_text_mode: Some(InsertTextMode::AS_IS),
-                    ..Default::default()
-                })
-                .collect(),
-        ),
-        "include_tag" => match previous.unwrap().kind() {
-            ">" | "argument_tag" => Some(vec![CompletionItem {
+        "text" | "document" => Ok(symbols::SpTag::iter()
+            .map(|tag| tag.properties())
+            .map(|properties| CompletionItem {
+                kind: Some(CompletionItemKind::METHOD),
+                detail: properties.detail,
+                documentation: properties.documentation,
+                insert_text: Some(properties.name),
+                insert_text_mode: Some(InsertTextMode::AS_IS),
+                ..Default::default()
+            })
+            .collect()),
+        "include_tag" => match previous.map(|p| p.kind()) {
+            Some(">") | Some("argument_tag") => Ok(vec![CompletionItem {
                 kind: Some(CompletionItemKind::METHOD),
                 detail: symbols::SpTag::Argument.properties().detail,
                 documentation: symbols::SpTag::Argument.properties().documentation,
@@ -304,7 +447,7 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
                 insert_text_mode: Some(InsertTextMode::AS_IS),
                 ..Default::default()
             }]),
-            "argument_tag_open" => Some(vec![CompletionItem {
+            Some("argument_tag_open") => Ok(vec![CompletionItem {
                 kind: Some(CompletionItemKind::FIELD),
                 detail: Some(String::from("Attribute(String)")),
                 documentation: Some(Documentation::String(String::from(
@@ -314,11 +457,9 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
                 insert_text_mode: Some(InsertTextMode::AS_IS),
                 ..Default::default()
             }]),
-            "name_attribute" => {
-                let previous_previous = previous?.prev_sibling();
-                eprintln!("previous_previous: {previous_previous:?}");
-                return match previous_previous?.kind() {
-                    "argument_tag_open" => Some(vec![CompletionItem {
+            Some("name_attribute") => {
+                match previous.and_then(|p| p.prev_sibling()).map(|p| p.kind()) {
+                    Some("argument_tag_open") => Ok(vec![CompletionItem {
                         kind: Some(CompletionItemKind::FIELD),
                         detail: Some(String::from("Attribute(Object)")),
                         documentation: Some(Documentation::String(String::from(
@@ -328,14 +469,18 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
                         insert_text_mode: Some(InsertTextMode::AS_IS),
                         ..Default::default()
                     }]),
-                    _ => None,
-                };
+                    _ => Ok(Vec::new()),
+                }
             }
-            _ => None,
+            _ => Ok(Vec::new()),
         },
-        "string" => match previous?.kind() {
-            "name=" => match previous?.parent()?.prev_sibling()?.kind() {
-                "argument_tag_open" => Some(vec![
+        "string" => match previous.map(|p| p.kind()) {
+            Some("name=") => match previous
+                .and_then(|p| p.parent())
+                .and_then(|p| p.prev_sibling())
+                .map(|p| p.kind())
+            {
+                Some("argument_tag_open") => Ok(vec![
                     CompletionItem {
                         kind: Some(CompletionItemKind::PROPERTY),
                         detail: Some(String::from("Argument(ID)")),
@@ -357,9 +502,9 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
                         ..Default::default()
                     },
                 ]),
-                _ => None,
+                _ => Ok(Vec::new()),
             },
-            _ => None,
+            _ => Ok(Vec::new()),
         },
         // "start_tag" =>
         // "attribute" =>
@@ -374,7 +519,7 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
         // "member_expression" =>
         // "object" =>
         // "property" =>
-        _ => None,
+        _ => Ok(Vec::new()),
     };
 }
 
@@ -384,27 +529,62 @@ fn complete(params: CompletionParams) -> Option<Vec<CompletionItem>> {
  * imports
  * object params and functions? (would probably have to jump into java sources..)
  */
-fn definition(params: GotoDefinitionParams) -> Option<Location> {
+fn definition(params: GotoDefinitionParams) -> Result<Option<Location>, LsError> {
     let text_params = params.text_document_position_params;
-    let text = parser::get_text_document(&text_params.text_document).ok()?;
+    let document = match document_store::get(&text_params.text_document.uri) {
+        Some(document) => Ok(document),
+        None => parser::get_text_document(&text_params.text_document.uri)
+            .map(|text| {
+                document_store::put(
+                    &text_params.text_document.uri,
+                    document_store::Document { text },
+                )
+            })
+            .map_err(|err| {
+                eprintln!("failed to read {}: {}", text_params.text_document.uri, err);
+                return LsError {
+                    message: format!("cannot read file {}", text_params.text_document.uri),
+                    code: ResponseErrorCode::RequestFailed,
+                };
+            }),
+    }?;
     let mut parser = Parser::new();
     parser
         .set_language(tree_sitter_spml::language())
-        .expect("failed to set tree sitter language to spml");
-    let tree = parser.parse(&text, None)?;
-    let (node, _) = parser::find_current_and_previous_nodes(&tree, text_params.position)?;
+        .map_err(|err| {
+            eprintln!("failed to set tree sitter language to spml: {}", err);
+            return LsError {
+                message: format!("failed to set tree sitter language to spml: {}", err),
+                code: ResponseErrorCode::RequestFailed,
+            };
+        })?;
+    let tree = parser.parse(&document.text, None).ok_or_else(|| LsError {
+        message: format!("cannot parse file {}", text_params.text_document.uri),
+        code: ResponseErrorCode::RequestFailed,
+    })?;
+    let (node, _) = parser::find_current_and_previous_nodes(&tree, text_params.position)
+        .ok_or_else(|| LsError {
+            message: format!(
+                "could not determine node in {} at line {}, character {}",
+                text_params.text_document.uri,
+                text_params.position.line,
+                text_params.position.character
+            ),
+            code: ResponseErrorCode::RequestFailed,
+        })?;
     let working_directory = project::get_working_directory(&text_params.text_document.uri)
         .expect("cannot determine module - requires path to be <module>/src/main/webapp/");
     return match node.kind() {
         // if string is not evaluated ....
-        "string" => match node.parent()?.kind() {
-            "name_attribute" => match node.parent()?.parent()?.kind() {
-                "argument_tag" => None, // would be nice
-                _ => {
-                    let variable = &node.utf8_text(text.as_bytes()).unwrap();
-                    // let variable = &variable[1..variable.len() - 1];
-                    let qry = format!(
-                        r#"
+        "string" => match node.parent().map(|p| p.kind()) {
+            Some("name_attribute") => {
+                match node.parent().and_then(|p| p.parent()).map(|p| p.kind()) {
+                    Some("argument_tag") => Ok(None), // would be nice
+                    _ => {
+                        let variable = &node.utf8_text(document.text.as_bytes()).unwrap();
+                        // let variable = &variable[1..variable.len() - 1];
+                        let qry = format!(
+                            r#"
                         [
                             (attribute_tag
                                 (name_attribute
@@ -506,51 +686,63 @@ fn definition(params: GotoDefinitionParams) -> Option<Location> {
                                 (name_attribute
                                     (string) @attribute))
                         ]"#
-                    );
-                    return match Query::new(tree_sitter_spml::language(), qry.as_str()) {
-                        Ok(query) => QueryCursor::new()
-                            .matches(&query, tree.root_node(), text.as_bytes())
-                            .into_iter()
-                            .flat_map(|m| m.captures.iter())
-                            .map(|c| {
-                                eprintln!(
-                                    "query found {c:?} '{}'",
-                                    c.node.utf8_text(text.as_bytes()).unwrap()
-                                );
-                                c.node
-                            })
-                            // '#eq?' predicates do not work, we have to do it manually:
-                            .filter(|n| n.utf8_text(text.as_bytes()).unwrap() == *variable)
-                            .min_by(|a, b| a.start_position().cmp(&b.start_position()))
-                            .map(|result| Location {
-                                range: Range {
-                                    start: Position {
-                                        line: result.start_position().row as u32,
-                                        character: result.start_position().column as u32 + 1,
+                        );
+                        return match Query::new(tree_sitter_spml::language(), qry.as_str()) {
+                            Ok(query) => Ok(QueryCursor::new()
+                                .matches(&query, tree.root_node(), document.text.as_bytes())
+                                .into_iter()
+                                .flat_map(|m| m.captures.iter())
+                                .map(|c| {
+                                    eprintln!(
+                                        "query found {c:?} '{}'",
+                                        c.node.utf8_text(document.text.as_bytes()).unwrap()
+                                    );
+                                    c.node
+                                })
+                                // '#eq?' predicates do not work, we have to do it manually:
+                                .filter(|n| {
+                                    n.utf8_text(document.text.as_bytes()).unwrap() == *variable
+                                })
+                                .min_by(|a, b| a.start_position().cmp(&b.start_position()))
+                                .map(|result| Location {
+                                    range: Range {
+                                        start: Position {
+                                            line: result.start_position().row as u32,
+                                            character: result.start_position().column as u32 + 1,
+                                        },
+                                        end: Position {
+                                            line: result.end_position().row as u32,
+                                            character: result.end_position().column as u32 - 1,
+                                        },
                                     },
-                                    end: Position {
-                                        line: result.end_position().row as u32,
-                                        character: result.end_position().column as u32 - 1,
-                                    },
-                                },
-                                uri: text_params.text_document.uri,
-                            }),
-                        Err(err) => {
-                            eprintln!("error in query for declaration of {}: {}", variable, err);
-                            return None;
-                        }
-                    };
+                                    uri: text_params.text_document.uri,
+                                })),
+                            Err(err) => {
+                                eprintln!("error in definition query of {}: {}", variable, err);
+                                return Err(LsError {
+                                    message: format!(
+                                        "error in definition query of {}: {}",
+                                        variable, err
+                                    ),
+                                    code: ResponseErrorCode::RequestFailed,
+                                });
+                            }
+                        };
+                    }
                 }
-            },
-            "uri_attribute" => match node.parent()?.parent()?.kind() {
-                "include_tag" => match &node.utf8_text(text.as_bytes()) {
-                    Ok(path) => match node
-                        .parent()?
-                        .parent()?
-                        .children(&mut tree.walk())
-                        .find(|node| node.kind() == "module_attribute")
+            }
+            Some("uri_attribute") => match node.parent().and_then(|p| p.parent()).map(|p| p.kind())
+            {
+                Some("include_tag") => match &node.utf8_text(document.text.as_bytes()) {
+                    Ok(path) => Ok(match node
+                        .parent()
+                        .and_then(|p| p.parent())
+                        .and_then(|p| {
+                            p.children(&mut tree.walk())
+                                .find(|node| node.kind() == "module_attribute")
+                        })
                         .and_then(|attribute| attribute.child(1))
-                        .map(|node| node.utf8_text(text.as_bytes()))
+                        .map(|node| node.utf8_text(document.text.as_bytes()))
                     {
                         Some(Ok("\"${module.id}\"")) | None => {
                             Some(working_directory.module.as_str())
@@ -561,10 +753,16 @@ fn definition(params: GotoDefinitionParams) -> Option<Location> {
                                 "error while reading include_tag module_attribute text {}",
                                 err
                             );
-                            return None;
+                            return Err(LsError {
+                                message: format!(
+                                    "error while reading include_tag module_attribute text {}",
+                                    err
+                                ),
+                                code: ResponseErrorCode::RequestFailed,
+                            });
                         }
                     }
-                    .map(|include_module| {
+                    .and_then(|include_module| {
                         // .unwrap_or(working_directory.module.as_str());
                         let mut file = working_directory.path;
                         file.push_str(&include_module);
@@ -582,76 +780,143 @@ fn definition(params: GotoDefinitionParams) -> Option<Location> {
                             },
                             uri: Url::parse(&target).unwrap(),
                         });
-                    })?,
+                    })),
                     Err(err) => {
                         eprintln!("error while reading include_tag uri_attribute text {}", err);
-                        return None;
+                        return Err(LsError {
+                            message: format!(
+                                "error while reading include_tag uri_attribute text {}",
+                                err
+                            ),
+                            code: ResponseErrorCode::RequestFailed,
+                        });
                     }
                 },
-                _ => None,
+                _ => Ok(None),
             },
-            kind => {
+            Some(kind) => {
                 eprintln!("string parent is not uri_attribute, its {}", kind);
-                return None;
+                return Ok(None);
             }
+            _ => Ok(None),
         },
         "interpolated_string" => {
-            return None;
+            return Ok(None);
         }
         // TODO:
-        "java_code" => None,
-        "tag_code" => None,
-        _ => None,
+        "java_code" => Ok(None),
+        "tag_code" => Ok(None),
+        _ => Ok(None),
     };
 }
 
-fn diagnose(params: DocumentDiagnosticParams) -> Option<Vec<Diagnostic>> {
-    let text = parser::get_text_document(&params.text_document).ok()?;
-    let mut parser = Parser::new();
-    parser
-        .set_language(tree_sitter_spml::language())
-        .expect("failed to set tree sitter language to spml");
-    let tree = parser.parse(&text, None)?;
-    return match Query::new(tree_sitter_spml::language(), "(ERROR)+ @error") {
-        Ok(query) => Some(QueryCursor::new()
-            .matches(&query, tree.root_node(), text.as_bytes())
-            .into_iter()
-            .flat_map(|m| m.captures.iter())
-            .map(|c| c.node)
-            .map(|result| Diagnostic {
-                source: Some("lspml".to_string()),
-                message: "syntax error".to_string(),
-                range: Range {
-                    start: Position {
-                        line: result.start_position().row as u32,
-                        character: result.start_position().column as u32,
-                    },
-                    end: Position {
-                        line: result.end_position().row as u32,
-                        character: result.end_position().column as u32,
-                    }
-                },
-                severity: Some(DiagnosticSeverity::ERROR),
-                ..Default::default()
+fn diagnose(params: DocumentDiagnosticParams) -> Result<Vec<Diagnostic>, LsError> {
+    let document = match document_store::get(&params.text_document.uri) {
+        Some(document) => Ok(document),
+        None => parser::get_text_document(&params.text_document.uri)
+            .map(|text| {
+                document_store::put(&params.text_document.uri, document_store::Document { text })
             })
-            .collect()),
-        Err(err) => {
-            eprintln!("error in query for ERROR location: {}", err);
-            return None;
-        }
-    };
-}
-
-fn hover(params: HoverParams) -> Option<HoverContents> {
-    let text_params = params.text_document_position_params;
-    let text = parser::get_text_document(&text_params.text_document).ok()?;
+            .map_err(|err| {
+                eprintln!("failed to read {}: {}", params.text_document.uri, err);
+                return LsError {
+                    message: format!("cannot read file {}", params.text_document.uri),
+                    code: ResponseErrorCode::RequestFailed,
+                };
+            }),
+    }?;
     let mut parser = Parser::new();
     parser
         .set_language(tree_sitter_spml::language())
-        .expect("failed to set tree sitter language to spml");
-    let tree = parser.parse(&text, None)?;
-    let (node, _) = parser::find_current_and_previous_nodes(&tree, text_params.position)?;
-    return match node.kind() {
+        .map_err(|err| {
+            eprintln!("failed to set tree sitter language to spml: {}", err);
+            return LsError {
+                message: format!("failed to set tree sitter language to spml: {}", err),
+                code: ResponseErrorCode::RequestFailed,
+            };
+        })?;
+    let tree = parser.parse(&document.text, None).ok_or_else(|| LsError {
+        message: format!("cannot parse file {}", params.text_document.uri),
+        code: ResponseErrorCode::RequestFailed,
+    })?;
+    return Query::new(tree_sitter_spml::language(), "(ERROR)+ @error")
+        .map(|query| {
+            QueryCursor::new()
+                .matches(&query, tree.root_node(), document.text.as_bytes())
+                .into_iter()
+                .flat_map(|m| m.captures.iter())
+                .map(|c| c.node)
+                .map(|result| Diagnostic {
+                    source: Some("lspml".to_string()),
+                    message: "syntax error".to_string(),
+                    range: Range {
+                        start: Position {
+                            line: result.start_position().row as u32,
+                            character: result.start_position().column as u32,
+                        },
+                        end: Position {
+                            line: result.end_position().row as u32,
+                            character: result.end_position().column as u32,
+                        },
+                    },
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    ..Default::default()
+                })
+                .collect()
+        })
+        .map_err(|err| {
+            eprintln!("error in query for ERROR location: {}", err);
+            return LsError {
+                message: format!("error in query for ERROR location: {}", err),
+                code: ResponseErrorCode::RequestFailed,
+            };
+        });
+}
+
+fn hover(params: HoverParams) -> Result<Option<HoverContents>, LsError> {
+    let text_params = params.text_document_position_params;
+    let document = match document_store::get(&text_params.text_document.uri) {
+        Some(document) => Ok(document),
+        None => parser::get_text_document(&text_params.text_document.uri)
+            .map(|text| {
+                document_store::put(
+                    &text_params.text_document.uri,
+                    document_store::Document { text },
+                )
+            })
+            .map_err(|err| {
+                eprintln!("failed to read {}: {}", text_params.text_document.uri, err);
+                return LsError {
+                    message: format!("cannot read file {}", text_params.text_document.uri),
+                    code: ResponseErrorCode::RequestFailed,
+                };
+            }),
+    }?;
+    let mut parser = Parser::new();
+    parser
+        .set_language(tree_sitter_spml::language())
+        .map_err(|err| {
+            eprintln!("failed to set tree sitter language to spml: {}", err);
+            return LsError {
+                message: format!("failed to set tree sitter language to spml: {}", err),
+                code: ResponseErrorCode::RequestFailed,
+            };
+        })?;
+    let tree = parser.parse(&document.text, None).ok_or_else(|| LsError {
+        message: format!("cannot parse file {}", text_params.text_document.uri),
+        code: ResponseErrorCode::RequestFailed,
+    })?;
+    let (node, _) = parser::find_current_and_previous_nodes(&tree, text_params.position)
+        .ok_or_else(|| LsError {
+            message: format!(
+                "could not determine node in {} at line {}, character {}",
+                text_params.text_document.uri,
+                text_params.position.line,
+                text_params.position.character
+            ),
+            code: ResponseErrorCode::RequestFailed,
+        })?;
+    return Ok((match node.kind() {
         "argument_tag_open" | "argument_tag_close" => {
             symbols::SpTag::Argument.properties().documentation
         }
@@ -739,11 +1004,11 @@ fn hover(params: HoverParams) -> Option<HoverContents> {
         "zip_tag_open" | "zip_tag_close" => symbols::SpTag::Zip.properties().documentation,
         kind => {
             eprintln!("no hover information about {}", kind);
-            return None;
+            return Ok(None);
         }
-    }
+    })
     .map(|doc| match doc {
         Documentation::MarkupContent(markup) => HoverContents::Markup(markup),
         Documentation::String(string) => HoverContents::Scalar(MarkedString::String(string)),
-    });
+    }));
 }
