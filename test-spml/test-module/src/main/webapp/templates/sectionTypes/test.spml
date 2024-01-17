@@ -3,6 +3,7 @@
 %>
 
 <%-- <sp:set name="_someVariable" value="someValue"/> --%>
+<sp:map name="_someVariable" action="clear"/>
 <sp:map name="_someVariable" action="new"/>
 
 <sp:set name="_someVariable" value="someValue"/>

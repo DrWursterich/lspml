@@ -18,125 +18,6 @@ mod parser;
 mod project;
 mod symbols;
 
-// format!(
-//     r#"
-//     (
-//         [
-//             (attribute_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (barcode_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (calendarsheet_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (checkbox_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (
-//                 (collection_tag
-//                     (name_attribute
-//                         (string) @attribute)
-//                     (action_attribute
-//                         (string) @action))
-//                 (#eq? @action "new")
-//             )
-//             (diff_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (filter_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (for_tag
-//                 (index_attribute
-//                     (string) @attribute))
-//             (hidden_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (include_tag
-//                 (return_attribute
-//                     (string) @attribute))
-//             (iterator_tag
-//                 (item_attribute
-//                     (string) @attribute))
-//             (json_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (linkedInformation_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (linktree_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (livetree_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (loop_tag
-//                 (item_attribute
-//                     (string) @attribute))
-//             (
-//                 (map_tag
-//                     (name_attribute
-//                         (string) @attribute)
-//                     (action_attribute
-//                         (string) @action))
-//                 (#eq? @action "new")
-//             )
-//             (querytree_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (radio_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (range_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (sass_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (scaleimage_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (search_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (select_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (set_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (sort_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (subinformation_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (text_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (textarea_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (textimage_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (upload_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (worklist_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//             (zip_tag
-//                 (name_attribute
-//                     (string) @attribute))
-//         ]
-//         (#eq? @attribute "{variable}")
-//     )"#,
-//     variable
-// )
-
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     // logging to stderr as stdout is used for result messages
     eprintln!("lspml starting...");
@@ -582,127 +463,129 @@ fn definition(params: GotoDefinitionParams) -> Result<Option<Location>, LsError>
                     Some("argument_tag") => Ok(None), // would be nice
                     _ => {
                         let variable = &node.utf8_text(document.text.as_bytes()).unwrap();
-                        // let variable = &variable[1..variable.len() - 1];
+                        let variable = &variable[1..variable.len() - 1];
                         let qry = format!(
                             r#"
-                        [
-                            (attribute_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (barcode_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (calendarsheet_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (checkbox_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (collection_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (diff_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (filter_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (for_tag
-                                (index_attribute
-                                    (string) @attribute))
-                            (hidden_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (include_tag
-                                (return_attribute
-                                    (string) @attribute))
-                            (iterator_tag
-                                (item_attribute
-                                    (string) @attribute))
-                            (json_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (linkedInformation_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (linktree_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (livetree_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (loop_tag
-                                (item_attribute
-                                    (string) @attribute))
-                            (map_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (querytree_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (radio_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (range_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (sass_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (scaleimage_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (search_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (select_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (set_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (sort_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (subinformation_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (text_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (textarea_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (textimage_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (upload_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (worklist_tag
-                                (name_attribute
-                                    (string) @attribute))
-                            (zip_tag
-                                (name_attribute
-                                    (string) @attribute))
-                        ]"#
-                        );
+                            (
+                                [
+                                    (attribute_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (barcode_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (calendarsheet_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (checkbox_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (
+                                        (collection_tag
+                                            (name_attribute
+                                                (string) @attribute)
+                                            (action_attribute
+                                                (string) @action))
+                                        (.eq? @action "\"new\"")
+                                    )
+                                    (diff_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (filter_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (for_tag
+                                        (index_attribute
+                                            (string) @attribute))
+                                    (hidden_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (include_tag
+                                        (return_attribute
+                                            (string) @attribute))
+                                    (iterator_tag
+                                        (item_attribute
+                                            (string) @attribute))
+                                    (json_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (linkedInformation_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (linktree_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (livetree_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (loop_tag
+                                        (item_attribute
+                                            (string) @attribute))
+                                    (
+                                        (map_tag
+                                            (name_attribute
+                                                (string) @attribute)
+                                            (action_attribute
+                                                (string) @action))
+                                        (.eq? @action "\"new\"")
+                                    )
+                                    (querytree_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (radio_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (range_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (sass_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (scaleimage_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (search_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (select_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (set_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (sort_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (subinformation_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (text_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (textarea_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (textimage_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (upload_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (worklist_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (zip_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                ]
+                                (.eq? @attribute "\"{variable}\"")
+                            )"#);
                         return match Query::new(tree_sitter_spml::language(), qry.as_str()) {
                             Ok(query) => Ok(QueryCursor::new()
                                 .matches(&query, tree.root_node(), document.text.as_bytes())
                                 .into_iter()
                                 .flat_map(|m| m.captures.iter())
-                                .map(|c| {
-                                    eprintln!(
-                                        "query found {c:?} '{}'",
-                                        c.node.utf8_text(document.text.as_bytes()).unwrap()
-                                    );
-                                    c.node
-                                })
-                                // '#eq?' predicates do not work, we have to do it manually:
-                                .filter(|n| {
-                                    n.utf8_text(document.text.as_bytes()).unwrap() == *variable
-                                })
+                                .map(|c| c.node)
                                 .min_by(|a, b| a.start_position().cmp(&b.start_position()))
                                 .map(|result| Location {
                                     range: Range {
