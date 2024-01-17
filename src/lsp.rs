@@ -39,10 +39,10 @@ pub(crate) fn dump_current_node(text_params: &TextDocumentPositionParams) -> Res
         .root_node()
         .descendant_for_point_range(cursor, cursor)
         .ok_or_else(|| anyhow::anyhow!(""))?;
-    eprintln!("node: {node:?}");
+    log::debug!("node: {node:?}");
     node.utf8_text(text.as_bytes())
         .map(|text| {
-            eprintln!("kind: {}, text: {}", node.kind(), text);
+            log::debug!("kind: {}, text: {}", node.kind(), text);
             //     (
             //         match node.kind() {
             //             "element" => Symbol::Element,

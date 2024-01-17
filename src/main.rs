@@ -1,4 +1,5 @@
 use anyhow::Result;
+use clap::Parser;
 use lsp_server::{Connection, Message, Response};
 use lsp_types::{
     CancelParams, CompletionItem, CompletionItemKind, CompletionOptions,
@@ -11,16 +12,38 @@ use lsp_types::{
     Position, Range, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Url,
     WorkDoneProgressOptions,
 };
-use std::{error::Error, fmt, path::Path};
-use tree_sitter::{Parser, Query, QueryCursor};
+use std::{error::Error, fmt, fs::File, path::Path};
+use structured_logger::Builder;
+use tree_sitter::{Query, QueryCursor};
 mod document_store;
 mod parser;
 mod project;
 mod symbols;
 
+#[derive(Parser, Debug)]
+#[clap(name = "lspml")]
+struct CommandLineOpts {
+    #[clap(long)]
+    log_file: Option<String>,
+    #[clap(long, default_value = "INFO")]
+    log_level: String,
+}
+
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
-    // logging to stderr as stdout is used for result messages
-    eprintln!("lspml starting...");
+    let opts = CommandLineOpts::parse();
+
+    Builder::with_level(&opts.log_level)
+        .with_target_writer(
+            "*",
+            opts.log_file
+                .clone()
+                .and_then(|file| File::options().create(true).append(true).open(file).ok())
+                .map(|file| structured_logger::json::new_writer(file))
+                .unwrap_or_else(|| structured_logger::json::new_writer(std::io::stderr())),
+        )
+        .init();
+    log::info!("lspml starting...");
+    log::trace!("commandline opts: {:?}", &opts);
 
     let (connection, io_threads) = Connection::stdio();
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
@@ -56,7 +79,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     main_loop(connection, initialization_params)?;
     io_threads.join()?;
 
-    eprintln!("shutting down lspml...");
+    log::info!("shutting down lspml...");
     return Ok(());
 }
 
@@ -99,7 +122,7 @@ fn main_loop(
     connection: Connection,
     _initialization_params: InitializeParams,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
-    eprintln!("server started");
+    log::info!("server started");
 
     for message in &connection.receiver {
         match message {
@@ -109,7 +132,7 @@ fn main_loop(
                 }
                 match request.method.as_str() {
                     "textDocument/completion" => {
-                        eprintln!("got completion request: {request:?}");
+                        log::debug!("got completion request: {request:?}");
                         connection.sender.send(Message::Response(
                             match complete(serde_json::from_value(request.params)?) {
                                 Ok(completions) => Response {
@@ -133,7 +156,7 @@ fn main_loop(
                         ))?;
                     }
                     "textDocument/definition" => {
-                        eprintln!("got go to definition request: {request:?}");
+                        log::debug!("got go to definition request: {request:?}");
                         connection.sender.send(Message::Response(
                             match definition(serde_json::from_value(request.params)?) {
                                 Ok(definition) => Response {
@@ -156,7 +179,7 @@ fn main_loop(
                         ))?;
                     }
                     "textDocument/diagnostic" => {
-                        eprintln!("got diagnose request: {request:?}");
+                        log::debug!("got diagnose request: {request:?}");
                         connection.sender.send(Message::Response(
                             match diagnose(serde_json::from_value(request.params)?) {
                                 Ok(result) => Response {
@@ -181,7 +204,7 @@ fn main_loop(
                         ))?;
                     }
                     "textDocument/hover" => {
-                        eprintln!("got hover request: {request:?}");
+                        log::debug!("got hover request: {request:?}");
                         connection.sender.send(Message::Response(
                             match hover(serde_json::from_value(request.params)?) {
                                 Ok(result) => Response {
@@ -207,11 +230,11 @@ fn main_loop(
                             },
                         ))?;
                     }
-                    _ => eprintln!("got unknonwn request: {request:?}"),
+                    _ => log::info!("got unknonwn request: {request:?}"),
                 }
             }
             Message::Response(response) => {
-                eprintln!("got unknown response: {response:?}");
+                log::info!("got unknown response: {response:?}");
             }
             Message::Notification(notification) => match notification.method.as_str() {
                 "textDocument/didChange" => {
@@ -225,9 +248,9 @@ fn main_loop(
                 }
                 "$/cancelRequest" => {
                     let params: CancelParams = serde_json::from_value(notification.params).unwrap();
-                    eprintln!("attempted to cancel request {:?}", params.id);
+                    log::debug!("attempted to cancel request {:?}", params.id);
                 }
-                _ => eprintln!("got unknown notification: {notification:?}"),
+                _ => log::info!("got unknown notification: {notification:?}"),
             },
         }
     }
@@ -240,7 +263,7 @@ fn changed(params: DidChangeTextDocumentParams) -> Result<()> {
     return match document_store::get(&params.text_document.uri) {
         Some(_) => Result::Ok(()),
         None => parser::get_text_document(&params.text_document.uri).map(|_| {
-            eprintln!("updated {}", params.text_document.uri);
+            log::debug!("updated {}", params.text_document.uri);
             return ();
         }),
     };
@@ -250,7 +273,7 @@ fn opened(params: DidOpenTextDocumentParams) -> Result<()> {
     return match document_store::get(&params.text_document.uri) {
         Some(_) => Result::Ok(()),
         None => parser::get_text_document(&params.text_document.uri).map(|_| {
-            eprintln!("opened {}", params.text_document.uri);
+            log::debug!("opened {}", params.text_document.uri);
             return ();
         }),
     };
@@ -259,7 +282,7 @@ fn opened(params: DidOpenTextDocumentParams) -> Result<()> {
 fn saved(params: DidSaveTextDocumentParams) -> Result<()> {
     return parser::get_text_document(&params.text_document.uri).map(|text| {
         document_store::put(&params.text_document.uri, document_store::Document { text });
-        eprintln!("updated {}", params.text_document.uri);
+        log::debug!("updated {}", params.text_document.uri);
         return ();
     });
 }
@@ -276,18 +299,18 @@ fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, LsError> {
                 )
             })
             .map_err(|err| {
-                eprintln!("failed to read {}: {}", text_params.text_document.uri, err);
+                log::error!("failed to read {}: {}", text_params.text_document.uri, err);
                 return LsError {
                     message: format!("cannot read file {}", text_params.text_document.uri),
                     code: ResponseErrorCode::RequestFailed,
                 };
             }),
     }?;
-    let mut parser = Parser::new();
+    let mut parser = tree_sitter::Parser::new();
     parser
         .set_language(tree_sitter_spml::language())
         .map_err(|err| {
-            eprintln!("failed to set tree sitter language to spml: {}", err);
+            log::error!("failed to set tree sitter language to spml: {}", err);
             return LsError {
                 message: format!("failed to set tree sitter language to spml: {}", err),
                 code: ResponseErrorCode::RequestFailed,
@@ -422,18 +445,18 @@ fn definition(params: GotoDefinitionParams) -> Result<Option<Location>, LsError>
                 )
             })
             .map_err(|err| {
-                eprintln!("failed to read {}: {}", text_params.text_document.uri, err);
+                log::error!("failed to read {}: {}", text_params.text_document.uri, err);
                 return LsError {
                     message: format!("cannot read file {}", text_params.text_document.uri),
                     code: ResponseErrorCode::RequestFailed,
                 };
             }),
     }?;
-    let mut parser = Parser::new();
+    let mut parser = tree_sitter::Parser::new();
     parser
         .set_language(tree_sitter_spml::language())
         .map_err(|err| {
-            eprintln!("failed to set tree sitter language to spml: {}", err);
+            log::error!("failed to set tree sitter language to spml: {}", err);
             return LsError {
                 message: format!("failed to set tree sitter language to spml: {}", err),
                 code: ResponseErrorCode::RequestFailed,
@@ -579,7 +602,8 @@ fn definition(params: GotoDefinitionParams) -> Result<Option<Location>, LsError>
                                             (string) @attribute))
                                 ]
                                 (.eq? @attribute "\"{variable}\"")
-                            )"#);
+                            )"#
+                        );
                         return match Query::new(tree_sitter_spml::language(), qry.as_str()) {
                             Ok(query) => Ok(QueryCursor::new()
                                 .matches(&query, tree.root_node(), document.text.as_bytes())
@@ -601,7 +625,7 @@ fn definition(params: GotoDefinitionParams) -> Result<Option<Location>, LsError>
                                     uri: text_params.text_document.uri,
                                 })),
                             Err(err) => {
-                                eprintln!("error in definition query of {}: {}", variable, err);
+                                log::error!("error in definition query of {}: {}", variable, err);
                                 return Err(LsError {
                                     message: format!(
                                         "error in definition query of {}: {}",
@@ -632,7 +656,7 @@ fn definition(params: GotoDefinitionParams) -> Result<Option<Location>, LsError>
                         }
                         Some(Ok(module)) => Some(&module[1..module.len() - 1]),
                         Some(Err(err)) => {
-                            eprintln!(
+                            log::error!(
                                 "error while reading include_tag module_attribute text {}",
                                 err
                             );
@@ -652,7 +676,7 @@ fn definition(params: GotoDefinitionParams) -> Result<Option<Location>, LsError>
                         file.push_str("/src/main/webapp");
                         file.push_str(&path[1..path.len() - 1]);
                         if !Path::new(&file).exists() {
-                            eprintln!("file {} does not exist", file);
+                            log::info!("included file {} does not exist", file);
                             return None;
                         }
                         let mut target = "file://".to_owned();
@@ -665,7 +689,7 @@ fn definition(params: GotoDefinitionParams) -> Result<Option<Location>, LsError>
                         });
                     })),
                     Err(err) => {
-                        eprintln!("error while reading include_tag uri_attribute text {}", err);
+                        log::error!("error while reading include_tag uri_attribute text {}", err);
                         return Err(LsError {
                             message: format!(
                                 "error while reading include_tag uri_attribute text {}",
@@ -677,10 +701,6 @@ fn definition(params: GotoDefinitionParams) -> Result<Option<Location>, LsError>
                 },
                 _ => Ok(None),
             },
-            Some(kind) => {
-                eprintln!("string parent is not uri_attribute, its {}", kind);
-                return Ok(None);
-            }
             _ => Ok(None),
         },
         "interpolated_string" => {
@@ -701,18 +721,18 @@ fn diagnose(params: DocumentDiagnosticParams) -> Result<Vec<Diagnostic>, LsError
                 document_store::put(&params.text_document.uri, document_store::Document { text })
             })
             .map_err(|err| {
-                eprintln!("failed to read {}: {}", params.text_document.uri, err);
+                log::error!("failed to read {}: {}", params.text_document.uri, err);
                 return LsError {
                     message: format!("cannot read file {}", params.text_document.uri),
                     code: ResponseErrorCode::RequestFailed,
                 };
             }),
     }?;
-    let mut parser = Parser::new();
+    let mut parser = tree_sitter::Parser::new();
     parser
         .set_language(tree_sitter_spml::language())
         .map_err(|err| {
-            eprintln!("failed to set tree sitter language to spml: {}", err);
+            log::error!("failed to set tree sitter language to spml: {}", err);
             return LsError {
                 message: format!("failed to set tree sitter language to spml: {}", err),
                 code: ResponseErrorCode::RequestFailed,
@@ -748,7 +768,7 @@ fn diagnose(params: DocumentDiagnosticParams) -> Result<Vec<Diagnostic>, LsError
                 .collect()
         })
         .map_err(|err| {
-            eprintln!("error in query for ERROR location: {}", err);
+            log::error!("error in query for ERROR location: {}", err);
             return LsError {
                 message: format!("error in query for ERROR location: {}", err),
                 code: ResponseErrorCode::RequestFailed,
@@ -768,18 +788,18 @@ fn hover(params: HoverParams) -> Result<Option<HoverContents>, LsError> {
                 )
             })
             .map_err(|err| {
-                eprintln!("failed to read {}: {}", text_params.text_document.uri, err);
+                log::error!("failed to read {}: {}", text_params.text_document.uri, err);
                 return LsError {
                     message: format!("cannot read file {}", text_params.text_document.uri),
                     code: ResponseErrorCode::RequestFailed,
                 };
             }),
     }?;
-    let mut parser = Parser::new();
+    let mut parser = tree_sitter::Parser::new();
     parser
         .set_language(tree_sitter_spml::language())
         .map_err(|err| {
-            eprintln!("failed to set tree sitter language to spml: {}", err);
+            log::error!("failed to set tree sitter language to spml: {}", err);
             return LsError {
                 message: format!("failed to set tree sitter language to spml: {}", err),
                 code: ResponseErrorCode::RequestFailed,
@@ -887,7 +907,7 @@ fn hover(params: HoverParams) -> Result<Option<HoverContents>, LsError> {
         }
         "zip_tag_open" | "zip_tag_close" => symbols::SpTag::Zip.properties().documentation,
         kind => {
-            eprintln!("no hover information about {}", kind);
+            log::info!("no hover information about {}", kind);
             return Ok(None);
         }
     })

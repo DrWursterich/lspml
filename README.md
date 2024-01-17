@@ -9,6 +9,17 @@ A proof-of-concept language server for the sitepark markup language (spml).
 - diagnostics on syntax errors
 - completion for tags (extremly rudimentary)
 
+## commandline
+
+```
+Usage: lspml [OPTIONS]
+
+Options:
+      --log-file <LOG_FILE>
+      --log-level <LOG_LEVEL>  [default: INFO]
+  -h, --help                   Print help
+```
+
 ## build
 
 Currently you will have to set a local path to [tree-sitter-spml](https://github.com/DrWursterich/tree-sitter-spml) in `Cargo.toml` in order to be able to build this with:

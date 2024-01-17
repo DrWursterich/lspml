@@ -38,6 +38,6 @@ pub(crate) fn find_current_and_previous_nodes<'tree>(
             previous = prev.child(prev.child_count() - 1);
         }
     }
-    eprintln!("node: {node:?}, previous: {previous:?}",);
+    log::debug!("node: {node:?}, previous: {previous:?}",);
     return Some((node, previous));
 }
