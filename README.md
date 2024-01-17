@@ -4,12 +4,12 @@ A proof-of-concept language server for the sitepark markup language (spml).
 
 ## features
 
-- go to definition for variables and `<sp:include/>` tags
+- go to definition for variables and `<sp:include>` tags
 - hover for documentation of most tags
 - diagnostics on syntax errors
 - completion for tags (extremly rudimentary)
 
-## building
+## build
 
 Currently you will have to set a local path to [tree-sitter-spml](https://github.com/DrWursterich/tree-sitter-spml) in `Cargo.toml` in order to be able to build this with:
 
@@ -17,7 +17,7 @@ Currently you will have to set a local path to [tree-sitter-spml](https://github
 cargo build
 ```
 
-## installation
+## install
 
 ### nvim
 
