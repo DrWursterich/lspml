@@ -81,7 +81,7 @@ impl SpTag {
     pub fn properties(&self) -> TagProperties {
         return match self {
             SpTag::Argument => TagProperties {
-                name: String::from("<sp:argument"),
+                name: String::from("sp:argument"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -93,19 +93,19 @@ Setzt ein Argument für ein sp:include"#,
                 // children: TagChildren::Any,
             },
             SpTag::Attribute => TagProperties {
-                name: String::from("<sp:attribute"),
+                name: String::from("sp:attribute"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::Barcode => TagProperties {
-                name: String::from("<sp:barcode"),
+                name: String::from("sp:barcode"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::Break => TagProperties {
-                name: String::from("<sp:break"),
+                name: String::from("sp:break"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -117,7 +117,7 @@ Beendet FOR- und ITERATE-Schleifen."#,
                 // children: TagChildren::Any,
             },
             SpTag::Calendarsheet => TagProperties {
-                name: String::from("<sp:calendarsheet"),
+                name: String::from("sp:calendarsheet"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -129,7 +129,7 @@ CalendarSheet manage dates and objects"#,
                 // children: TagChildren::Any,
             },
             SpTag::Checkbox => TagProperties {
-                name: String::from("<sp:checkbox"),
+                name: String::from("sp:checkbox"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -141,7 +141,7 @@ Check-Box-Tag, erzeugt eine checkBox."#,
                 // children: TagChildren::Any,
             },
             SpTag::Code => TagProperties {
-                name: String::from("<sp:code"),
+                name: String::from("sp:code"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -153,7 +153,7 @@ Schreibt den bodyContent ohne dass dieser ausgeführt wird in die Ergebnis-Datei
                 // children: TagChildren::Any,
             },
             SpTag::Collection => TagProperties {
-                name: String::from("<sp:collection"),
+                name: String::from("sp:collection"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -165,7 +165,7 @@ Collection tag offers certain operation that deal with a common collection. For 
                 // children: TagChildren::Any,
             },
             SpTag::Condition => TagProperties {
-                name: String::from("<sp:condition"),
+                name: String::from("sp:condition"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -177,7 +177,7 @@ Umklammert einen if-else Konstrukt."#,
                 // children: TagChildren::Vector(vec![SpTag::If, SpTag::Else, SpTag::Elseif]),
             },
             SpTag::Diff => TagProperties {
-                name: String::from("<sp:diff"),
+                name: String::from("sp:diff"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -189,7 +189,7 @@ Vergleicht ein Attribute von zwei Versionen einer Information"#,
                 // children: TagChildren::Any,
             },
             SpTag::Else => TagProperties {
-                name: String::from("<sp:else"),
+                name: String::from("sp:else"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -201,7 +201,7 @@ passendes else zu einem If innerhalb eines contitionTag."#,
                 // children: TagChildren::Any,
             },
             SpTag::Elseif => TagProperties {
-                name: String::from("<sp:elseif"),
+                name: String::from("sp:elseif"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -213,7 +213,7 @@ ElseIf-Tag, schreibt Body wenn Bedingung ok ist und vorheriges if fehl schlug."#
                 // children: TagChildren::Any,
             },
             SpTag::Error => TagProperties {
-                name: String::from("<sp:error"),
+                name: String::from("sp:error"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -225,13 +225,13 @@ Prüft ein Fehler aufgetreten ist, markiert ihn gegebenenfals als gefangen und f
                 // children: TagChildren::Any,
             },
             SpTag::Expire => TagProperties {
-                name: String::from("<sp:expire"),
+                name: String::from("sp:expire"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::Filter => TagProperties {
-                name: String::from("<sp:filter"),
+                name: String::from("sp:filter"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -243,7 +243,7 @@ Filtert eine Liste"#,
                 // children: TagChildren::Any,
             },
             SpTag::For => TagProperties {
-                name: String::from("<sp:for"),
+                name: String::from("sp:for"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -255,7 +255,7 @@ For-Tag, wiederholt solange wie angegeben."#,
                 // children: TagChildren::Any,
             },
             SpTag::Form => TagProperties {
-                name: String::from("<sp:form"),
+                name: String::from("sp:form"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -267,7 +267,7 @@ Erzeugt ein HTML-Form-Tag mit einem angepassten Kommando"#,
                 // children: TagChildren::Any,
             },
             SpTag::Hidden => TagProperties {
-                name: String::from("<sp:hidden"),
+                name: String::from("sp:hidden"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -279,7 +279,7 @@ Hidden-Tag, erzeugt ein Hiddenfeld."#,
                 // children: TagChildren::Any,
             },
             SpTag::If => TagProperties {
-                name: String::from("<sp:if"),
+                name: String::from("sp:if"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -291,7 +291,7 @@ If-Tag, schreibt Body wenn Bedingung ok ist."#,
                 // children: TagChildren::Any,
             },
             SpTag::Include => TagProperties {
-                name: String::from("<sp:include"),
+                name: String::from("sp:include"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -303,7 +303,7 @@ includiert ein anderes bereits im System gespeichertes Template."#,
                 // children: TagChildren::Scalar(SpTag::Argument),
             },
             SpTag::Io => TagProperties {
-                name: String::from("<sp:io"),
+                name: String::from("sp:io"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -315,7 +315,7 @@ IO-Tag"#,
                 // children: TagChildren::Any,
             },
             SpTag::Iterator => TagProperties {
-                name: String::from("<sp:iterator"),
+                name: String::from("sp:iterator"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -327,13 +327,13 @@ Wird für den Aufbau von Wiederholfeldern verwendet."#,
                 // children: TagChildren::Any,
             },
             SpTag::Json => TagProperties {
-                name: String::from("<sp:json"),
+                name: String::from("sp:json"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::LinkedInformation => TagProperties {
-                name: String::from("<sp:linkedInformation"),
+                name: String::from("sp:linkedInformation"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -346,31 +346,31 @@ Diese Tag definiert einen Link eines Artikels auf einen Anderen Artikel. Das Bes
                 // children: TagChildren::Any,
             },
             SpTag::Linktree => TagProperties {
-                name: String::from("<sp:linktree"),
+                name: String::from("sp:linktree"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::Livetree => TagProperties {
-                name: String::from("<sp:livetree"),
+                name: String::from("sp:livetree"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::Log => TagProperties {
-                name: String::from("<sp:log"),
+                name: String::from("sp:log"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::Login => TagProperties {
-                name: String::from("<sp:login"),
+                name: String::from("sp:login"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::Loop => TagProperties {
-                name: String::from("<sp:loop"),
+                name: String::from("sp:loop"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -382,13 +382,13 @@ Dient zur Ausgabe eines oder mehrerer Elemente."#,
                 // children: TagChildren::Any,
             },
             SpTag::Map => TagProperties {
-                name: String::from("<sp:map"),
+                name: String::from("sp:map"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::Option => TagProperties {
-                name: String::from("<sp:option"),
+                name: String::from("sp:option"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -400,7 +400,7 @@ Option-Tag, für das Select Tag."#,
                 // children: TagChildren::Any,
             },
             SpTag::Password => TagProperties {
-                name: String::from("<sp:password"),
+                name: String::from("sp:password"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -412,7 +412,7 @@ Password-Tag, erzeugt ein Passwordfeld."#,
                 // children: TagChildren::Any,
             },
             SpTag::Print => TagProperties {
-                name: String::from("<sp:print"),
+                name: String::from("sp:print"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -424,13 +424,13 @@ Dient zur Ausgabe eines Attributes"#,
                 // children: TagChildren::Any,
             },
             SpTag::Querytree => TagProperties {
-                name: String::from("<sp:querytree"),
+                name: String::from("sp:querytree"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::Radio => TagProperties {
-                name: String::from("<sp:radio"),
+                name: String::from("sp:radio"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -442,13 +442,13 @@ Radio Button-Tag, erzeugt einen RadioButton."#,
                 // children: TagChildren::Any,
             },
             SpTag::Range => TagProperties {
-                name: String::from("<sp:range"),
+                name: String::from("sp:range"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::Return => TagProperties {
-                name: String::from("<sp:return"),
+                name: String::from("sp:return"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -460,19 +460,19 @@ Verlässt die SPML-Seite und setzt ggf. einen Rückgabewert für sp:include"#,
                 // children: TagChildren::None,
             },
             SpTag::Sass => TagProperties {
-                name: String::from("<sp:sass"),
+                name: String::from("sp:sass"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::Scaleimage => TagProperties {
-                name: String::from("<sp:scaleimage"),
+                name: String::from("sp:scaleimage"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::Scope => TagProperties {
-                name: String::from("<sp:scope"),
+                name: String::from("sp:scope"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -484,7 +484,7 @@ Setzt bereichsweise oder global den Scope für die folgenden Tags"#,
                 // children: TagChildren::Any,
             },
             SpTag::Search => TagProperties {
-                name: String::from("<sp:search"),
+                name: String::from("sp:search"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -496,7 +496,7 @@ Findet die gewünschte Suche"#,
                 // children: TagChildren::Any,
             },
             SpTag::Select => TagProperties {
-                name: String::from("<sp:select"),
+                name: String::from("sp:select"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -508,7 +508,7 @@ Select-Tag, erzeugt den Rahmen einen Auswahlliste."#,
                 // children: TagChildren::Any,
             },
             SpTag::Set => TagProperties {
-                name: String::from("<sp:set"),
+                name: String::from("sp:set"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -520,7 +520,7 @@ Setzt ein Attribute"#,
                 // children: TagChildren::Any,
             },
             SpTag::Sort => TagProperties {
-                name: String::from("<sp:sort"),
+                name: String::from("sp:sort"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -532,19 +532,19 @@ Sortiert eine Liste"#,
                 // children: TagChildren::Any,
             },
             SpTag::Subinformation => TagProperties {
-                name: String::from("<sp:subinformation"),
+                name: String::from("sp:subinformation"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::Tagbody => TagProperties {
-                name: String::from("<sp:tagbody"),
+                name: String::from("sp:tagbody"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::Text => TagProperties {
-                name: String::from("<sp:text"),
+                name: String::from("sp:text"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -556,7 +556,7 @@ Text-Tag, erzeugt ein Eingabefeld."#,
                 // children: TagChildren::Any,
             },
             SpTag::Textarea => TagProperties {
-                name: String::from("<sp:textarea"),
+                name: String::from("sp:textarea"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -568,19 +568,19 @@ Textarea-Tag, erzeugt einen Einabebereich."#,
                 // children: TagChildren::Any,
             },
             SpTag::Textimage => TagProperties {
-                name: String::from("<sp:textimage"),
+                name: String::from("sp:textimage"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::Throw => TagProperties {
-                name: String::from("<sp:throw"),
+                name: String::from("sp:throw"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,
             },
             SpTag::Toggle => TagProperties {
-                name: String::from("<sp:toggle"),
+                name: String::from("sp:toggle"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -592,7 +592,7 @@ Toggle-Tag erzeugt einen toggle der einen einzigen boolischen Wert speichert"#,
                 // children: TagChildren::Any,
             },
             SpTag::Upload => TagProperties {
-                name: String::from("<sp:upload"),
+                name: String::from("sp:upload"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -604,7 +604,7 @@ Das Tag, erzeugt ein Eingabefeld zum Herunderladen von Dateien."#,
                 // children: TagChildren::Any,
             },
             SpTag::Url => TagProperties {
-                name: String::from("<sp:url"),
+                name: String::from("sp:url"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -616,7 +616,7 @@ Fügt den ContextPath vor die angegebene URL und hängt, falls nötig die Sessio
                 // children: TagChildren::Any,
             },
             SpTag::Warning => TagProperties {
-                name: String::from("<sp:warning"),
+                name: String::from("sp:warning"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -628,7 +628,7 @@ Prüft, ob eine Warnung aufgetreten ist, markiert sie gegebenenfalls als gefange
                 // children: TagChildren::Any,
             },
             SpTag::Worklist => TagProperties {
-                name: String::from("<sp:worklist"),
+                name: String::from("sp:worklist"),
                 detail: None,
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -640,7 +640,7 @@ Findet die gewünschte Workliste"#,
                 // children: TagChildren::Any,
             },
             SpTag::Zip => TagProperties {
-                name: String::from("<sp:zip"),
+                name: String::from("sp:zip"),
                 detail: None,
                 documentation: None,
                 // children: TagChildren::Any,

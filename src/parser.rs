@@ -7,7 +7,6 @@ pub(crate) fn find_current_and_previous_nodes<'tree>(
 ) -> Option<(Node<'tree>, Option<Node<'tree>>)> {
     let root_node = tree.root_node();
     let trigger_point = Point::new(position.line as usize, position.character as usize);
-    // let node = root_node.descendant_for_point_range(trigger_point, trigger_point)?;
     let mut cursor = root_node.walk();
     let mut node;
     let mut previous;
@@ -29,6 +28,7 @@ pub(crate) fn find_current_and_previous_nodes<'tree>(
             previous = prev.child(prev.child_count() - 1);
         }
     }
-    log::debug!("node: {node:?}, previous: {previous:?}",);
+    let descendant = root_node.descendant_for_point_range(trigger_point, trigger_point)?;
+    log::debug!("node: {node:?}, previous: {previous:?}, descendant: {descendant:?}",);
     return Some((node, previous));
 }
