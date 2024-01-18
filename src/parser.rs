@@ -1,14 +1,5 @@
-use anyhow::{Error, Result};
-use lsp_types::{Position, Url};
-use std::fs;
+use lsp_types::Position;
 use tree_sitter::{Node, Point, Tree};
-
-pub(crate) fn get_text_document(uri: &Url) -> Result<String> {
-    return match uri.to_file_path() {
-        Ok(path) => fs::read_to_string(path.to_owned()).map_err(Error::from),
-        Err(_) => Result::Err(anyhow::anyhow!("failed to read file path from uri {}", uri)),
-    };
-}
 
 pub(crate) fn find_current_and_previous_nodes<'tree>(
     tree: &'tree Tree,

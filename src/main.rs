@@ -16,9 +16,9 @@ use std::{error::Error, fmt, fs::File, path::Path};
 use structured_logger::Builder;
 use tree_sitter::{Query, QueryCursor};
 mod document_store;
+mod grammar;
 mod parser;
 mod project;
-mod symbols;
 
 #[derive(Parser, Debug)]
 #[clap(name = "lspml")]
@@ -260,19 +260,18 @@ fn main_loop(
 
 // is probably called on every key hit when TextDocumentSyncKind is INCREMENTAL.
 fn changed(params: DidChangeTextDocumentParams) -> Result<()> {
-    return match document_store::get(&params.text_document.uri) {
-        Some(_) => Result::Ok(()),
-        None => parser::get_text_document(&params.text_document.uri).map(|_| {
-            log::debug!("updated {}", params.text_document.uri);
-            return ();
-        }),
-    };
+    return document_store::Document::new(&params.text_document.uri).map(|document| {
+        document_store::put(&params.text_document.uri, document);
+        log::debug!("updated {}", params.text_document.uri);
+        return ();
+    });
 }
 
 fn opened(params: DidOpenTextDocumentParams) -> Result<()> {
     return match document_store::get(&params.text_document.uri) {
         Some(_) => Result::Ok(()),
-        None => parser::get_text_document(&params.text_document.uri).map(|_| {
+        None => document_store::Document::new(&params.text_document.uri).map(|document| {
+            document_store::put(&params.text_document.uri, document);
             log::debug!("opened {}", params.text_document.uri);
             return ();
         }),
@@ -280,8 +279,8 @@ fn opened(params: DidOpenTextDocumentParams) -> Result<()> {
 }
 
 fn saved(params: DidSaveTextDocumentParams) -> Result<()> {
-    return parser::get_text_document(&params.text_document.uri).map(|text| {
-        document_store::put(&params.text_document.uri, document_store::Document { text });
+    return document_store::Document::new(&params.text_document.uri).map(|document| {
+        document_store::put(&params.text_document.uri, document);
         log::debug!("updated {}", params.text_document.uri);
         return ();
     });
@@ -291,13 +290,8 @@ fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, LsError> {
     let text_params = params.text_document_position;
     let document = match document_store::get(&text_params.text_document.uri) {
         Some(document) => Ok(document),
-        None => parser::get_text_document(&text_params.text_document.uri)
-            .map(|text| {
-                document_store::put(
-                    &text_params.text_document.uri,
-                    document_store::Document { text },
-                )
-            })
+        None => document_store::Document::new(&text_params.text_document.uri)
+            .map(|document| document_store::put(&text_params.text_document.uri, document))
             .map_err(|err| {
                 log::error!("failed to read {}: {}", text_params.text_document.uri, err);
                 return LsError {
@@ -306,32 +300,20 @@ fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, LsError> {
                 };
             }),
     }?;
-    let mut parser = tree_sitter::Parser::new();
-    parser
-        .set_language(tree_sitter_spml::language())
-        .map_err(|err| {
-            log::error!("failed to set tree sitter language to spml: {}", err);
-            return LsError {
-                message: format!("failed to set tree sitter language to spml: {}", err),
+    let (node, previous) =
+        parser::find_current_and_previous_nodes(&document.tree, text_params.position).ok_or_else(
+            || LsError {
+                message: format!(
+                    "could not determine node in {} at line {}, character {}",
+                    text_params.text_document.uri,
+                    text_params.position.line,
+                    text_params.position.character
+                ),
                 code: ResponseErrorCode::RequestFailed,
-            };
-        })?;
-    let tree = parser.parse(&document.text, None).ok_or_else(|| LsError {
-        message: format!("cannot parse file {}", text_params.text_document.uri),
-        code: ResponseErrorCode::RequestFailed,
-    })?;
-    let (node, previous) = parser::find_current_and_previous_nodes(&tree, text_params.position)
-        .ok_or_else(|| LsError {
-            message: format!(
-                "could not determine node in {} at line {}, character {}",
-                text_params.text_document.uri,
-                text_params.position.line,
-                text_params.position.character
-            ),
-            code: ResponseErrorCode::RequestFailed,
-        })?;
+            },
+        )?;
     return match node.kind() {
-        "text" | "document" => Ok(symbols::SpTag::iter()
+        "text" | "document" => Ok(grammar::SpTag::iter()
             .map(|tag| tag.properties())
             .map(|properties| CompletionItem {
                 kind: Some(CompletionItemKind::METHOD),
@@ -345,9 +327,9 @@ fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, LsError> {
         "include_tag" => match previous.map(|p| p.kind()) {
             Some(">") | Some("argument_tag") => Ok(vec![CompletionItem {
                 kind: Some(CompletionItemKind::METHOD),
-                detail: symbols::SpTag::Argument.properties().detail,
-                documentation: symbols::SpTag::Argument.properties().documentation,
-                insert_text: Some(symbols::SpTag::Argument.properties().name),
+                detail: grammar::SpTag::Argument.properties().detail,
+                documentation: grammar::SpTag::Argument.properties().documentation,
+                insert_text: Some(grammar::SpTag::Argument.properties().name),
                 insert_text_mode: Some(InsertTextMode::AS_IS),
                 ..Default::default()
             }]),
@@ -437,13 +419,13 @@ fn definition(params: GotoDefinitionParams) -> Result<Option<Location>, LsError>
     let text_params = params.text_document_position_params;
     let document = match document_store::get(&text_params.text_document.uri) {
         Some(document) => Ok(document),
-        None => parser::get_text_document(&text_params.text_document.uri)
-            .map(|text| {
+        None => document_store::Document::new(&text_params.text_document.uri)
+            .map(|document|
                 document_store::put(
                     &text_params.text_document.uri,
-                    document_store::Document { text },
+                    document,
                 )
-            })
+            )
             .map_err(|err| {
                 log::error!("failed to read {}: {}", text_params.text_document.uri, err);
                 return LsError {
@@ -452,21 +434,7 @@ fn definition(params: GotoDefinitionParams) -> Result<Option<Location>, LsError>
                 };
             }),
     }?;
-    let mut parser = tree_sitter::Parser::new();
-    parser
-        .set_language(tree_sitter_spml::language())
-        .map_err(|err| {
-            log::error!("failed to set tree sitter language to spml: {}", err);
-            return LsError {
-                message: format!("failed to set tree sitter language to spml: {}", err),
-                code: ResponseErrorCode::RequestFailed,
-            };
-        })?;
-    let tree = parser.parse(&document.text, None).ok_or_else(|| LsError {
-        message: format!("cannot parse file {}", text_params.text_document.uri),
-        code: ResponseErrorCode::RequestFailed,
-    })?;
-    let (node, _) = parser::find_current_and_previous_nodes(&tree, text_params.position)
+    let (node, _) = parser::find_current_and_previous_nodes(&document.tree, text_params.position)
         .ok_or_else(|| LsError {
             message: format!(
                 "could not determine node in {} at line {}, character {}",
@@ -606,7 +574,7 @@ fn definition(params: GotoDefinitionParams) -> Result<Option<Location>, LsError>
                         );
                         return match Query::new(tree_sitter_spml::language(), qry.as_str()) {
                             Ok(query) => Ok(QueryCursor::new()
-                                .matches(&query, tree.root_node(), document.text.as_bytes())
+                                .matches(&query, document.tree.root_node(), document.text.as_bytes())
                                 .into_iter()
                                 .flat_map(|m| m.captures.iter())
                                 .map(|c| c.node)
@@ -645,7 +613,7 @@ fn definition(params: GotoDefinitionParams) -> Result<Option<Location>, LsError>
                         .parent()
                         .and_then(|p| p.parent())
                         .and_then(|p| {
-                            p.children(&mut tree.walk())
+                            p.children(&mut document.tree.walk())
                                 .find(|node| node.kind() == "module_attribute")
                         })
                         .and_then(|attribute| attribute.child(1))
@@ -716,10 +684,8 @@ fn definition(params: GotoDefinitionParams) -> Result<Option<Location>, LsError>
 fn diagnose(params: DocumentDiagnosticParams) -> Result<Vec<Diagnostic>, LsError> {
     let document = match document_store::get(&params.text_document.uri) {
         Some(document) => Ok(document),
-        None => parser::get_text_document(&params.text_document.uri)
-            .map(|text| {
-                document_store::put(&params.text_document.uri, document_store::Document { text })
-            })
+        None => document_store::Document::new(&params.text_document.uri)
+            .map(|document| document_store::put(&params.text_document.uri, document))
             .map_err(|err| {
                 log::error!("failed to read {}: {}", params.text_document.uri, err);
                 return LsError {
@@ -728,24 +694,10 @@ fn diagnose(params: DocumentDiagnosticParams) -> Result<Vec<Diagnostic>, LsError
                 };
             }),
     }?;
-    let mut parser = tree_sitter::Parser::new();
-    parser
-        .set_language(tree_sitter_spml::language())
-        .map_err(|err| {
-            log::error!("failed to set tree sitter language to spml: {}", err);
-            return LsError {
-                message: format!("failed to set tree sitter language to spml: {}", err),
-                code: ResponseErrorCode::RequestFailed,
-            };
-        })?;
-    let tree = parser.parse(&document.text, None).ok_or_else(|| LsError {
-        message: format!("cannot parse file {}", params.text_document.uri),
-        code: ResponseErrorCode::RequestFailed,
-    })?;
     return Query::new(tree_sitter_spml::language(), "(ERROR)+ @error")
         .map(|query| {
             QueryCursor::new()
-                .matches(&query, tree.root_node(), document.text.as_bytes())
+                .matches(&query, document.tree.root_node(), document.text.as_bytes())
                 .into_iter()
                 .flat_map(|m| m.captures.iter())
                 .map(|c| c.node)
@@ -780,13 +732,8 @@ fn hover(params: HoverParams) -> Result<Option<HoverContents>, LsError> {
     let text_params = params.text_document_position_params;
     let document = match document_store::get(&text_params.text_document.uri) {
         Some(document) => Ok(document),
-        None => parser::get_text_document(&text_params.text_document.uri)
-            .map(|text| {
-                document_store::put(
-                    &text_params.text_document.uri,
-                    document_store::Document { text },
-                )
-            })
+        None => document_store::Document::new(&text_params.text_document.uri)
+            .map(|document| document_store::put(&text_params.text_document.uri, document))
             .map_err(|err| {
                 log::error!("failed to read {}: {}", text_params.text_document.uri, err);
                 return LsError {
@@ -795,21 +742,7 @@ fn hover(params: HoverParams) -> Result<Option<HoverContents>, LsError> {
                 };
             }),
     }?;
-    let mut parser = tree_sitter::Parser::new();
-    parser
-        .set_language(tree_sitter_spml::language())
-        .map_err(|err| {
-            log::error!("failed to set tree sitter language to spml: {}", err);
-            return LsError {
-                message: format!("failed to set tree sitter language to spml: {}", err),
-                code: ResponseErrorCode::RequestFailed,
-            };
-        })?;
-    let tree = parser.parse(&document.text, None).ok_or_else(|| LsError {
-        message: format!("cannot parse file {}", text_params.text_document.uri),
-        code: ResponseErrorCode::RequestFailed,
-    })?;
-    let (node, _) = parser::find_current_and_previous_nodes(&tree, text_params.position)
+    let (node, _) = parser::find_current_and_previous_nodes(&document.tree, text_params.position)
         .ok_or_else(|| LsError {
             message: format!(
                 "could not determine node in {} at line {}, character {}",
@@ -821,91 +754,91 @@ fn hover(params: HoverParams) -> Result<Option<HoverContents>, LsError> {
         })?;
     return Ok((match node.kind() {
         "argument_tag_open" | "argument_tag_close" => {
-            symbols::SpTag::Argument.properties().documentation
+            grammar::SpTag::Argument.properties().documentation
         }
-        "attribute_tag_open" => symbols::SpTag::Attribute.properties().documentation,
-        "barcode_tag_open" => symbols::SpTag::Barcode.properties().documentation,
-        "break_tag_open" => symbols::SpTag::Break.properties().documentation,
+        "attribute_tag_open" => grammar::SpTag::Attribute.properties().documentation,
+        "barcode_tag_open" => grammar::SpTag::Barcode.properties().documentation,
+        "break_tag_open" => grammar::SpTag::Break.properties().documentation,
         "calendarsheet_tag_open" | "calendarsheet_tag_close" => {
-            symbols::SpTag::Calendarsheet.properties().documentation
+            grammar::SpTag::Calendarsheet.properties().documentation
         }
         "checkbox_tag_open" | "checkbox_tag_close" => {
-            symbols::SpTag::Checkbox.properties().documentation
+            grammar::SpTag::Checkbox.properties().documentation
         }
-        "code_tag_open" | "code_tag_close" => symbols::SpTag::Code.properties().documentation,
+        "code_tag_open" | "code_tag_close" => grammar::SpTag::Code.properties().documentation,
         "collection_tag_open" | "collection_tag_close" => {
-            symbols::SpTag::Collection.properties().documentation
+            grammar::SpTag::Collection.properties().documentation
         }
         "condition_tag_open" | "condition_tag_close" => {
-            symbols::SpTag::Condition.properties().documentation
+            grammar::SpTag::Condition.properties().documentation
         }
-        "diff_tag_open" | "diff_tag_close" => symbols::SpTag::Diff.properties().documentation,
-        "else_tag_open" | "else_tag_close" => symbols::SpTag::Else.properties().documentation,
-        "elseif_tag_open" | "elseif_tag_close" => symbols::SpTag::Elseif.properties().documentation,
-        "error_tag_open" | "error_tag_close" => symbols::SpTag::Error.properties().documentation,
-        "expire_tag_open" | "expire_tag_close" => symbols::SpTag::Expire.properties().documentation,
-        "filter_tag_open" | "filter_tag_close" => symbols::SpTag::Filter.properties().documentation,
-        "for_tag_open" | "for_tag_close" => symbols::SpTag::For.properties().documentation,
-        "form_tag_open" | "form_tag_close" => symbols::SpTag::Form.properties().documentation,
-        "hidden_tag_open" | "hidden_tag_close" => symbols::SpTag::Hidden.properties().documentation,
-        "if_tag_open" | "if_tag_close" => symbols::SpTag::If.properties().documentation,
+        "diff_tag_open" | "diff_tag_close" => grammar::SpTag::Diff.properties().documentation,
+        "else_tag_open" | "else_tag_close" => grammar::SpTag::Else.properties().documentation,
+        "elseif_tag_open" | "elseif_tag_close" => grammar::SpTag::Elseif.properties().documentation,
+        "error_tag_open" | "error_tag_close" => grammar::SpTag::Error.properties().documentation,
+        "expire_tag_open" | "expire_tag_close" => grammar::SpTag::Expire.properties().documentation,
+        "filter_tag_open" | "filter_tag_close" => grammar::SpTag::Filter.properties().documentation,
+        "for_tag_open" | "for_tag_close" => grammar::SpTag::For.properties().documentation,
+        "form_tag_open" | "form_tag_close" => grammar::SpTag::Form.properties().documentation,
+        "hidden_tag_open" | "hidden_tag_close" => grammar::SpTag::Hidden.properties().documentation,
+        "if_tag_open" | "if_tag_close" => grammar::SpTag::If.properties().documentation,
         "include_tag_open" | "include_tag_close" => {
-            symbols::SpTag::Include.properties().documentation
+            grammar::SpTag::Include.properties().documentation
         }
-        "io_tag_open" | "io_tag_close" => symbols::SpTag::Io.properties().documentation,
+        "io_tag_open" | "io_tag_close" => grammar::SpTag::Io.properties().documentation,
         "iterator_tag_open" | "iterator_tag_close" => {
-            symbols::SpTag::Iterator.properties().documentation
+            grammar::SpTag::Iterator.properties().documentation
         }
-        "json_tag_open" | "json_tag_close" => symbols::SpTag::Json.properties().documentation,
+        "json_tag_open" | "json_tag_close" => grammar::SpTag::Json.properties().documentation,
         "linktree_tag_open" | "linktree_tag_close" => {
-            symbols::SpTag::Linktree.properties().documentation
+            grammar::SpTag::Linktree.properties().documentation
         }
         "linkedinformation_tag_open" | "linkedinformation_tag_close" => {
-            symbols::SpTag::LinkedInformation.properties().documentation
+            grammar::SpTag::LinkedInformation.properties().documentation
         }
-        "livetree_tag_open" => symbols::SpTag::Livetree.properties().documentation,
-        "log_tag_open" | "log_tag_close" => symbols::SpTag::Log.properties().documentation,
-        "login_tag_open" => symbols::SpTag::Login.properties().documentation,
-        "loop_tag_open" | "loop_tag_close" => symbols::SpTag::Loop.properties().documentation,
-        "map_tag_open" | "map_tag_close" => symbols::SpTag::Map.properties().documentation,
-        "option_tag_open" | "option_tag_close" => symbols::SpTag::Option.properties().documentation,
+        "livetree_tag_open" => grammar::SpTag::Livetree.properties().documentation,
+        "log_tag_open" | "log_tag_close" => grammar::SpTag::Log.properties().documentation,
+        "login_tag_open" => grammar::SpTag::Login.properties().documentation,
+        "loop_tag_open" | "loop_tag_close" => grammar::SpTag::Loop.properties().documentation,
+        "map_tag_open" | "map_tag_close" => grammar::SpTag::Map.properties().documentation,
+        "option_tag_open" | "option_tag_close" => grammar::SpTag::Option.properties().documentation,
         "password_tag_open" | "password_tag_close" => {
-            symbols::SpTag::Password.properties().documentation
+            grammar::SpTag::Password.properties().documentation
         }
-        "print_tag_open" | "print_tag_close" => symbols::SpTag::Print.properties().documentation,
+        "print_tag_open" | "print_tag_close" => grammar::SpTag::Print.properties().documentation,
         "querytree_tag_open" | "querytree_tag_close" => {
-            symbols::SpTag::Querytree.properties().documentation
+            grammar::SpTag::Querytree.properties().documentation
         }
-        "radio_tag_open" | "radio_tag_close" => symbols::SpTag::Radio.properties().documentation,
-        "range_tag_open" | "range_tag_close" => symbols::SpTag::Range.properties().documentation,
-        "return_tag_open" | "return_tag_close" => symbols::SpTag::Return.properties().documentation,
-        "sass_tag_open" | "sass_tag_close" => symbols::SpTag::Sass.properties().documentation,
-        "scaleimage_tag_open" => symbols::SpTag::Scaleimage.properties().documentation,
-        "scope_tag_open" | "scope_tag_close" => symbols::SpTag::Scope.properties().documentation,
-        "search_tag_open" | "search_tag_close" => symbols::SpTag::Search.properties().documentation,
-        "select_tag_open" | "select_tag_close" => symbols::SpTag::Select.properties().documentation,
-        "set_tag_open" | "set_tag_close" => symbols::SpTag::Set.properties().documentation,
-        "sort_tag_open" | "sort_tag_close" => symbols::SpTag::Sort.properties().documentation,
+        "radio_tag_open" | "radio_tag_close" => grammar::SpTag::Radio.properties().documentation,
+        "range_tag_open" | "range_tag_close" => grammar::SpTag::Range.properties().documentation,
+        "return_tag_open" | "return_tag_close" => grammar::SpTag::Return.properties().documentation,
+        "sass_tag_open" | "sass_tag_close" => grammar::SpTag::Sass.properties().documentation,
+        "scaleimage_tag_open" => grammar::SpTag::Scaleimage.properties().documentation,
+        "scope_tag_open" | "scope_tag_close" => grammar::SpTag::Scope.properties().documentation,
+        "search_tag_open" | "search_tag_close" => grammar::SpTag::Search.properties().documentation,
+        "select_tag_open" | "select_tag_close" => grammar::SpTag::Select.properties().documentation,
+        "set_tag_open" | "set_tag_close" => grammar::SpTag::Set.properties().documentation,
+        "sort_tag_open" | "sort_tag_close" => grammar::SpTag::Sort.properties().documentation,
         "subinformation_tag_open" | "subinformation_tag_close" => {
-            symbols::SpTag::Subinformation.properties().documentation
+            grammar::SpTag::Subinformation.properties().documentation
         }
-        "tagbody_tag_open" => symbols::SpTag::Tagbody.properties().documentation,
-        "text_tag_open" | "text_tag_close" => symbols::SpTag::Text.properties().documentation,
+        "tagbody_tag_open" => grammar::SpTag::Tagbody.properties().documentation,
+        "text_tag_open" | "text_tag_close" => grammar::SpTag::Text.properties().documentation,
         "textarea_tag_open" | "textarea_tag_close" => {
-            symbols::SpTag::Textarea.properties().documentation
+            grammar::SpTag::Textarea.properties().documentation
         }
-        "textimage_tag_open" => symbols::SpTag::Textimage.properties().documentation,
-        "throw_tag_open" => symbols::SpTag::Throw.properties().documentation,
-        "toggle_tag_open" | "toggle_tag_close" => symbols::SpTag::Toggle.properties().documentation,
-        "upload_tag_open" | "upload_tag_close" => symbols::SpTag::Upload.properties().documentation,
-        "url_tag_open" | "url_tag_close" => symbols::SpTag::Url.properties().documentation,
+        "textimage_tag_open" => grammar::SpTag::Textimage.properties().documentation,
+        "throw_tag_open" => grammar::SpTag::Throw.properties().documentation,
+        "toggle_tag_open" | "toggle_tag_close" => grammar::SpTag::Toggle.properties().documentation,
+        "upload_tag_open" | "upload_tag_close" => grammar::SpTag::Upload.properties().documentation,
+        "url_tag_open" | "url_tag_close" => grammar::SpTag::Url.properties().documentation,
         "warning_tag_open" | "warning_tag_close" => {
-            symbols::SpTag::Warning.properties().documentation
+            grammar::SpTag::Warning.properties().documentation
         }
         "worklist_tag_open" | "worklist_tag_close" => {
-            symbols::SpTag::Worklist.properties().documentation
+            grammar::SpTag::Worklist.properties().documentation
         }
-        "zip_tag_open" | "zip_tag_close" => symbols::SpTag::Zip.properties().documentation,
+        "zip_tag_open" | "zip_tag_close" => grammar::SpTag::Zip.properties().documentation,
         kind => {
             log::info!("no hover information about {}", kind);
             return Ok(None);
