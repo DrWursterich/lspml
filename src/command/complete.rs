@@ -4,6 +4,7 @@ use crate::grammar;
 use crate::parser;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionParams, Documentation, InsertTextMode,
+    MarkupContent, MarkupKind,
 };
 
 pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, LsError> {
@@ -37,9 +38,14 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
             .map(|tag| tag.properties())
             .map(|properties| CompletionItem {
                 kind: Some(CompletionItemKind::METHOD),
-                detail: properties.detail,
-                documentation: properties.documentation,
-                insert_text: Some(properties.name),
+                detail: properties.detail.map(|detail| detail.to_string()),
+                documentation: properties.documentation.map(|detail| {
+                    Documentation::MarkupContent(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value: detail.to_string(),
+                    })
+                }),
+                insert_text: Some(format!("<{}", properties.name.to_string())),
                 insert_text_mode: Some(InsertTextMode::AS_IS),
                 ..Default::default()
             })
@@ -47,9 +53,23 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
         "include_tag" => match previous.map(|p| p.kind()) {
             Some(">") | Some("argument_tag") => Ok(vec![CompletionItem {
                 kind: Some(CompletionItemKind::METHOD),
-                detail: grammar::SpTag::Argument.properties().detail,
-                documentation: grammar::SpTag::Argument.properties().documentation,
-                insert_text: Some(grammar::SpTag::Argument.properties().name),
+                detail: grammar::SpTag::Argument
+                    .properties()
+                    .detail
+                    .map(|detail| detail.to_string()),
+                documentation: grammar::SpTag::Argument
+                    .properties()
+                    .documentation
+                    .map(|detail| {
+                        Documentation::MarkupContent(MarkupContent {
+                            kind: MarkupKind::Markdown,
+                            value: detail.to_string(),
+                        })
+                    }),
+                insert_text: Some(format!(
+                    "<{}",
+                    grammar::SpTag::Argument.properties().name.to_string()
+                )),
                 insert_text_mode: Some(InsertTextMode::AS_IS),
                 ..Default::default()
             }]),

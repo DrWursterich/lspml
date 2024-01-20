@@ -2,7 +2,7 @@ use super::{LsError, ResponseErrorCode};
 use crate::document_store;
 use crate::grammar;
 use crate::parser;
-use lsp_types::{Documentation, Hover, HoverContents, HoverParams, MarkedString};
+use lsp_types::{Hover, HoverContents, HoverParams, MarkupContent, MarkupKind};
 
 pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
     let text_params = params.text_document_position_params;
@@ -121,10 +121,10 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
         }
     })
     .map(|doc| Hover {
-        contents: match doc {
-            Documentation::MarkupContent(markup) => HoverContents::Markup(markup),
-            Documentation::String(string) => HoverContents::Scalar(MarkedString::String(string)),
-        },
+        contents: HoverContents::Markup(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: doc.to_string(),
+        }),
         range: None,
     }));
 }

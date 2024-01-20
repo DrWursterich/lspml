@@ -31,7 +31,7 @@ impl LsError {
                 code: self.code as i32,
                 data: None,
             }),
-        }
+        };
     }
 }
 
