@@ -3,10 +3,25 @@ use std::{slice::Iter, str::FromStr};
 
 #[derive(Debug)]
 pub(crate) struct TagProperties {
-    pub name: &'static str,
-    pub detail: Option<&'static str>,
-    pub documentation: Option<&'static str>,
-    pub children: TagChildren,
+    pub(crate) name: &'static str,
+    pub(crate) detail: Option<&'static str>,
+    pub(crate) documentation: Option<&'static str>,
+    pub(crate) children: TagChildren,
+    pub(crate) attribute_rules: &'static [AttributeRule],
+}
+
+#[derive(Debug)]
+pub(crate) enum AttributeRule {
+    Deprecated(&'static str),
+    ExactlyOneOf(&'static [&'static str]),
+    OnlyOneOf(&'static [&'static str]),
+    AtleastOneOf(&'static [&'static str]),
+    OnlyWith(&'static str, &'static str),
+    OnlyWithEither(&'static str, &'static [&'static str]),
+    Required(&'static str),
+    // TODO:
+    // OnlyIfAttributeHasValue
+    // Body?!?
 }
 
 #[derive(Debug)]
@@ -80,9 +95,16 @@ pub(crate) enum SpTag {
 const ARGUMENT: TagProperties = TagProperties {
     name: "sp:argument",
     detail: None,
-    documentation: Some(r#"
-Setzt ein Argument für ein sp:include"#),
+    documentation: Some(
+        r#"
+Setzt ein Argument für ein sp:include"#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::ExactlyOneOf(&["value", "expression", "condition", "object"]), // or body
+        AttributeRule::OnlyWithEither("default", &["object", "expression"]),
+    ],
 };
 
 const ATTRIBUTE: TagProperties = TagProperties {
@@ -90,6 +112,10 @@ const ATTRIBUTE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Deprecated("name"),
+        AttributeRule::ExactlyOneOf(&["name", "text", "object", "dynamics"]),
+    ],
 };
 
 const BARCODE: TagProperties = TagProperties {
@@ -97,86 +123,152 @@ const BARCODE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::Required("text"),
+        AttributeRule::Required("type"),
+    ],
 };
 
 const BREAK: TagProperties = TagProperties {
     name: "sp:break",
     detail: None,
-    documentation: Some(r#"
-Beendet FOR- und ITERATE-Schleifen."#),
+    documentation: Some(
+        r#"
+Beendet FOR- und ITERATE-Schleifen."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[],
 };
 
 const CALENDARSHEET: TagProperties = TagProperties {
     name: "sp:calendarsheet",
     detail: None,
-    documentation: Some(r#"
-CalendarSheet manage dates and objects"#),
+    documentation: Some(
+        r#"
+CalendarSheet manage dates and objects"#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::Required("action"),
+        AttributeRule::Required("from"),
+        AttributeRule::Required("to"),
+        AttributeRule::ExactlyOneOf(&["value", "object", "date"]),
+    ],
 };
 
 const CHECKBOX: TagProperties = TagProperties {
     name: "sp:checkbox",
     detail: None,
-    documentation: Some(r#"
-Check-Box-Tag, erzeugt eine checkBox."#),
+    documentation: Some(
+        r#"
+Check-Box-Tag, erzeugt eine checkBox."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[AttributeRule::Required("name")],
 };
 
 const CODE: TagProperties = TagProperties {
     name: "sp:code",
     detail: None,
-    documentation: Some(r#"
-Schreibt den bodyContent ohne dass dieser ausgeführt wird in die Ergebnis-Datei."#),
+    documentation: Some(
+        r#"
+Schreibt den bodyContent ohne dass dieser ausgeführt wird in die Ergebnis-Datei."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[],
 };
 
 const COLLECTION: TagProperties = TagProperties {
     name: "sp:collection",
     detail: None,
-    documentation: Some(r#"
-Collection tag offers certain operation that deal with a common collection. For further description see the javadoc of the class com.sitepark.ies.taglib.core.CollectionTag."#),
+    documentation: Some(
+        r#"
+Collection tag offers certain operation that deal with a common collection. For further description see the javadoc of the class com.sitepark.ies.taglib.core.CollectionTag."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::ExactlyOneOf(&["action", "query"]),
+        AttributeRule::ExactlyOneOf(&["value", "object", "expression", "condition"]), // or body
+                                                                                      // index is required if "value" is "remove" or "replace"
+    ],
 };
 
 const CONDITION: TagProperties = TagProperties {
     name: "sp:condition",
     detail: None,
-    documentation: Some(r#"
-Umklammert einen if-else Konstrukt."#),
+    documentation: Some(
+        r#"
+Umklammert einen if-else Konstrukt."#,
+    ),
     children: TagChildren::Vector(&[SpTag::If, SpTag::Else, SpTag::Elseif]),
+    attribute_rules: &[],
 };
 
 const DIFF: TagProperties = TagProperties {
     name: "sp:diff",
     detail: None,
-    documentation: Some(r#"
-Vergleicht ein Attribute von zwei Versionen einer Information"#),
+    documentation: Some(
+        r#"
+Vergleicht ein Attribute von zwei Versionen einer Information"#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::Required("from"),
+        AttributeRule::Required("to"),
+        AttributeRule::OnlyWith("lookup", "locale"), // is that correct?
+    ],
 };
 
 const ELSE: TagProperties = TagProperties {
     name: "sp:else",
     detail: None,
-    documentation: Some(r#"
-passendes else zu einem If innerhalb eines contitionTag."#),
+    documentation: Some(
+        r#"
+passendes else zu einem If innerhalb eines contitionTag."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[],
 };
 
 const ELSEIF: TagProperties = TagProperties {
     name: "sp:elseif",
     detail: None,
-    documentation: Some(r#"
-ElseIf-Tag, schreibt Body wenn Bedingung ok ist und vorheriges if fehl schlug."#),
+    documentation: Some(
+        r#"
+ElseIf-Tag, schreibt Body wenn Bedingung ok ist und vorheriges if fehl schlug."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::ExactlyOneOf(&["name", "condition"]),
+        AttributeRule::OnlyOneOf(&[
+            "isNull", "contains", "match", "eq", "neq", "gt", "gte", "lt", "lte",
+        ]),
+        AttributeRule::OnlyWith("isNull", "name"),
+        AttributeRule::OnlyWith("contains", "name"),
+        AttributeRule::OnlyWith("match", "name"),
+        AttributeRule::OnlyWith("eq", "name"),
+        AttributeRule::OnlyWith("neq", "name"),
+        AttributeRule::OnlyWith("gt", "name"),
+        AttributeRule::OnlyWith("gte", "name"),
+        AttributeRule::OnlyWith("lt", "name"),
+        AttributeRule::OnlyWith("lte", "name"),
+        AttributeRule::OnlyWithEither("ic", &["eq", "neq", "gt", "gte", "lt", "lte", "contains"]),
+    ],
 };
 
 const ERROR: TagProperties = TagProperties {
     name: "sp:error",
     detail: None,
-    documentation: Some(r#"
-Prüft ein Fehler aufgetreten ist, markiert ihn gegebenenfals als gefangen und führt den innhalt des Tags aus."#),
+    documentation: Some(
+        r#"
+Prüft ein Fehler aufgetreten ist, markiert ihn gegebenenfals als gefangen und führt den innhalt des Tags aus."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[AttributeRule::Required("code")],
 };
 
 const EXPIRE: TagProperties = TagProperties {
@@ -184,70 +276,136 @@ const EXPIRE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[AttributeRule::Required("date")],
 };
 
 const FILTER: TagProperties = TagProperties {
     name: "sp:filter",
     detail: None,
-    documentation: Some(r#"
-Filtert eine Liste"#),
+    documentation: Some(
+        r#"
+Filtert eine Liste"#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::Required("collection"),
+        AttributeRule::OnlyWithEither("ic", &["filter"]),
+        AttributeRule::OnlyWithEither("type", &["from", "to"]),
+        AttributeRule::OnlyWithEither("format", &["from", "to"]),
+    ],
 };
 
 const FOR: TagProperties = TagProperties {
     name: "sp:for",
     detail: None,
-    documentation: Some(r#"
-For-Tag, wiederholt solange wie angegeben."#),
+    documentation: Some(
+        r#"
+For-Tag, wiederholt solange wie angegeben."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("index"),
+        AttributeRule::Required("from"),
+        AttributeRule::ExactlyOneOf(&["to", "condition"]),
+    ],
 };
 
 const FORM: TagProperties = TagProperties {
     name: "sp:form",
     detail: None,
-    documentation: Some(r#"
-Erzeugt ein HTML-Form-Tag mit einem angepassten Kommando"#),
+    documentation: Some(
+        r#"
+Erzeugt ein HTML-Form-Tag mit einem angepassten Kommando"#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Deprecated("command"),
+        AttributeRule::OnlyOneOf(&["uri", "template"]),
+        AttributeRule::OnlyWith("module", "uri"),
+    ],
 };
 
 const HIDDEN: TagProperties = TagProperties {
     name: "sp:hidden",
     detail: None,
-    documentation: Some(r#"
-Hidden-Tag, erzeugt ein Hiddenfeld."#),
+    documentation: Some(
+        r#"
+Hidden-Tag, erzeugt ein Hiddenfeld."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::ExactlyOneOf(&["value", "fixvalue"]),
+    ],
 };
 
 const IF: TagProperties = TagProperties {
     name: "sp:if",
     detail: None,
-    documentation: Some(r#"
-If-Tag, schreibt Body wenn Bedingung ok ist."#),
+    documentation: Some(
+        r#"
+If-Tag, schreibt Body wenn Bedingung ok ist."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::ExactlyOneOf(&["name", "condition"]),
+        AttributeRule::OnlyOneOf(&[
+            "isNull", "contains", "match", "eq", "neq", "gt", "gte", "lt", "lte",
+        ]),
+        AttributeRule::OnlyWith("isNull", "name"),
+        AttributeRule::OnlyWith("contains", "name"),
+        AttributeRule::OnlyWith("match", "name"),
+        AttributeRule::OnlyWith("eq", "name"),
+        AttributeRule::OnlyWith("neq", "name"),
+        AttributeRule::OnlyWith("gt", "name"),
+        AttributeRule::OnlyWith("gte", "name"),
+        AttributeRule::OnlyWith("lt", "name"),
+        AttributeRule::OnlyWith("lte", "name"),
+        AttributeRule::OnlyWithEither("ic", &["eq", "neq", "gt", "gte", "lt", "lte", "contains"]),
+    ],
 };
 
 const INCLUDE: TagProperties = TagProperties {
     name: "sp:include",
     detail: None,
-    documentation: Some(r#"
-includiert ein anderes bereits im System gespeichertes Template."#),
+    documentation: Some(
+        r#"
+includiert ein anderes bereits im System gespeichertes Template."#,
+    ),
     children: TagChildren::Scalar(SpTag::Argument),
+    attribute_rules: &[
+        AttributeRule::ExactlyOneOf(&["template", "anchor", "uri"]),
+        AttributeRule::OnlyOneOf(&["context", "module"]),
+        AttributeRule::OnlyWith("context", "uri"),
+        AttributeRule::OnlyWith("module", "uri"),
+    ],
 };
 
 const IO: TagProperties = TagProperties {
     name: "sp:io",
     detail: None,
-    documentation: Some(r#"
-IO-Tag"#),
+    documentation: Some(
+        r#"
+IO-Tag"#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("type"),
+    ],
 };
 
 const ITERATOR: TagProperties = TagProperties {
     name: "sp:iterator",
     detail: None,
-    documentation: Some(r#"
-Wird für den Aufbau von Wiederholfeldern verwendet."#),
+    documentation: Some(
+        r#"
+Wird für den Aufbau von Wiederholfeldern verwendet."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("collection"),
+    ],
 };
 
 const JSON: TagProperties = TagProperties {
@@ -255,14 +413,18 @@ const JSON: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[],
 };
 
 const LINKEDINFORMATION: TagProperties = TagProperties {
     name: "sp:linkedInformation",
     detail: None,
-    documentation: Some(r#"
-Diese Tag definiert einen Link eines Artikels auf einen Anderen Artikel. Das Besondere ist, dass der Artikel auf dem Verlinkt wird erst innerhalb dieses tags definiert wird. Dazu müssen alle Paramter wie parent, filename, usw. vorhanden sein. Mit dem Reques können dann schliesslich beide Artikel ubgedatet werden(oder auch erstellt)."#),
+    documentation: Some(
+        r#"
+Diese Tag definiert einen Link eines Artikels auf einen Anderen Artikel. Das Besondere ist, dass der Artikel auf dem Verlinkt wird erst innerhalb dieses tags definiert wird. Dazu müssen alle Paramter wie parent, filename, usw. vorhanden sein. Mit dem Reques können dann schliesslich beide Artikel ubgedatet werden(oder auch erstellt)."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[], // not documented
 };
 
 const LINKTREE: TagProperties = TagProperties {
@@ -270,6 +432,13 @@ const LINKTREE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Deprecated("attributes"),
+        AttributeRule::Required("name"),
+        AttributeRule::OnlyWith("sortsequences", "sortkeys"),
+        AttributeRule::OnlyWith("sortkeys", "sortsequences"), // OnlyBoth?
+        AttributeRule::OnlyWith("sorttypes", "sortkeys"),
+    ],
 };
 
 const LIVETREE: TagProperties = TagProperties {
@@ -277,6 +446,15 @@ const LIVETREE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::Required("rootElement"),
+        AttributeRule::Required("publisher"),
+        AttributeRule::Required("parentlink"),
+        AttributeRule::OnlyWith("sortsequences", "sortkeys"),
+        AttributeRule::OnlyWith("sortkeys", "sortsequences"), // OnlyBoth?
+        AttributeRule::OnlyWith("sorttypes", "sortkeys"),
+    ],
 };
 
 const LOG: TagProperties = TagProperties {
@@ -284,6 +462,9 @@ const LOG: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("level"),
+    ],
 };
 
 const LOGIN: TagProperties = TagProperties {
@@ -291,14 +472,23 @@ const LOGIN: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::ExactlyOneOf(&["session", "login", "password", "client"]),
+    ],
 };
 
 const LOOP: TagProperties = TagProperties {
     name: "sp:loop",
     detail: None,
-    documentation: Some(r#"
-Dient zur Ausgabe eines oder mehrerer Elemente."#),
+    documentation: Some(
+        r#"
+Dient zur Ausgabe eines oder mehrerer Elemente."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::ExactlyOneOf(&["collection", "list"]),
+        AttributeRule::OnlyWith("separator", "list"),
+    ],
 };
 
 const MAP: TagProperties = TagProperties {
@@ -306,30 +496,54 @@ const MAP: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::Required("action"),
+        // depending on the action, key or the value/expression/.. may or may not be required
+        AttributeRule::OnlyOneOf(&["value", "expression", "condition", "object"]), // or body
+        AttributeRule::OnlyWithEither("default", &["object", "expression"]),
+    ],
 };
 
 const OPTION: TagProperties = TagProperties {
     name: "sp:option",
     detail: None,
-    documentation: Some(r#"
-Option-Tag, für das Select Tag."#),
+    documentation: Some(
+        r#"
+Option-Tag, für das Select Tag."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[],
 };
 
 const PASSWORD: TagProperties = TagProperties {
     name: "sp:password",
     detail: None,
-    documentation: Some(r#"
-Password-Tag, erzeugt ein Passwordfeld."#),
+    documentation: Some(
+        r#"
+Password-Tag, erzeugt ein Passwordfeld."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[], // not documented
 };
 
 const PRINT: TagProperties = TagProperties {
     name: "sp:print",
     detail: None,
-    documentation: Some(r#"
-Dient zur Ausgabe eines Attributes"#),
+    documentation: Some(
+        r#"
+Dient zur Ausgabe eines Attributes"#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Deprecated("arg"),
+        AttributeRule::ExactlyOneOf(&["name", "text", "expression", "condition"]),
+        AttributeRule::OnlyWithEither("default", &["name", "expression"]),
+        AttributeRule::OnlyOneOf(&["convert", "encoding", "decoding", "encrypt", "decrypt"]),
+        AttributeRule::OnlyWithEither("cryptkey", &["encrypt", "decrypt"]),
+        AttributeRule::OnlyOneOf(&["dateformat", "decimalformat"]),
+        AttributeRule::OnlyWith("arg", "text"),
+    ],
 };
 
 const QUERYTREE: TagProperties = TagProperties {
@@ -337,14 +551,20 @@ const QUERYTREE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[], // not documented
 };
 
 const RADIO: TagProperties = TagProperties {
     name: "sp:radio",
     detail: None,
-    documentation: Some(r#"
-Radio Button-Tag, erzeugt einen RadioButton."#),
+    documentation: Some(
+        r#"
+Radio Button-Tag, erzeugt einen RadioButton."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+    ],
 };
 
 const RANGE: TagProperties = TagProperties {
@@ -352,14 +572,25 @@ const RANGE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::Required("collection"),
+        AttributeRule::Required("range"),
+    ],
 };
 
 const RETURN: TagProperties = TagProperties {
     name: "sp:return",
     detail: None,
-    documentation: Some(r#"
-Verlässt die SPML-Seite und setzt ggf. einen Rückgabewert für sp:include"#),
+    documentation: Some(
+        r#"
+Verlässt die SPML-Seite und setzt ggf. einen Rückgabewert für sp:include"#,
+    ),
     children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::ExactlyOneOf(&["value", "expression", "condition", "object"]), // or body
+        AttributeRule::OnlyWithEither("default", &["object", "expression"]),
+    ],
 };
 
 const SASS: TagProperties = TagProperties {
@@ -367,6 +598,11 @@ const SASS: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::Required("source"),
+        AttributeRule::Required("options"),
+    ],
 };
 
 const SCALEIMAGE: TagProperties = TagProperties {
@@ -374,46 +610,78 @@ const SCALEIMAGE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::AtleastOneOf(&["height", "width"]),
+        AttributeRule::Deprecated("scalesteps"),
+    ],
 };
 
 const SCOPE: TagProperties = TagProperties {
     name: "sp:scope",
     detail: None,
-    documentation: Some(r#"
-Setzt bereichsweise oder global den Scope für die folgenden Tags"#),
+    documentation: Some(
+        r#"
+Setzt bereichsweise oder global den Scope für die folgenden Tags"#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("scope"),
+    ],
 };
 
 const SEARCH: TagProperties = TagProperties {
     name: "sp:search",
     detail: None,
-    documentation: Some(r#"
-Findet die gewünschte Suche"#),
+    documentation: Some(
+        r#"
+Findet die gewünschte Suche"#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[], // not documented
 };
 
 const SELECT: TagProperties = TagProperties {
     name: "sp:select",
     detail: None,
-    documentation: Some(r#"
-Select-Tag, erzeugt den Rahmen einen Auswahlliste."#),
+    documentation: Some(
+        r#"
+Select-Tag, erzeugt den Rahmen einen Auswahlliste."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+    ],
 };
 
 const SET: TagProperties = TagProperties {
     name: "sp:set",
     detail: None,
-    documentation: Some(r#"
-Setzt ein Attribute"#),
+    documentation: Some(
+        r#"
+Setzt ein Attribute"#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::ExactlyOneOf(&["value", "expression", "condition", "object"]), // or body
+        AttributeRule::OnlyWithEither("default", &["object", "expression"]),
+        AttributeRule::OnlyOneOf(&["overwrite", "insert"]),
+    ],
 };
 
 const SORT: TagProperties = TagProperties {
     name: "sp:sort",
     detail: None,
-    documentation: Some(r#"
-Sortiert eine Liste"#),
+    documentation: Some(
+        r#"
+Sortiert eine Liste"#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::Required("collection"),
+    ],
 };
 
 const SUBINFORMATION: TagProperties = TagProperties {
@@ -421,6 +689,9 @@ const SUBINFORMATION: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+    ],
 };
 
 const TAGBODY: TagProperties = TagProperties {
@@ -428,22 +699,35 @@ const TAGBODY: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[],
 };
 
 const TEXT: TagProperties = TagProperties {
     name: "sp:text",
     detail: None,
-    documentation: Some(r#"
-Text-Tag, erzeugt ein Eingabefeld."#),
+    documentation: Some(
+        r#"
+Text-Tag, erzeugt ein Eingabefeld."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
+    ],
 };
 
 const TEXTAREA: TagProperties = TagProperties {
     name: "sp:textarea",
     detail: None,
-    documentation: Some(r#"
-Textarea-Tag, erzeugt einen Einabebereich."#),
+    documentation: Some(
+        r#"
+Textarea-Tag, erzeugt einen Einabebereich."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
+    ],
 };
 
 const TEXTIMAGE: TagProperties = TagProperties {
@@ -451,6 +735,11 @@ const TEXTIMAGE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::Required("text"),
+        AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
+    ],
 };
 
 const THROW: TagProperties = TagProperties {
@@ -458,46 +747,81 @@ const THROW: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[], // not documented
 };
 
 const TOGGLE: TagProperties = TagProperties {
     name: "sp:toggle",
     detail: None,
-    documentation: Some(r#"
-Toggle-Tag erzeugt einen toggle der einen einzigen boolischen Wert speichert"#),
+    documentation: Some(
+        r#"
+Toggle-Tag erzeugt einen toggle der einen einzigen boolischen Wert speichert"#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
+    ],
 };
 
 const UPLOAD: TagProperties = TagProperties {
     name: "sp:upload",
     detail: None,
-    documentation: Some(r#"
-Das Tag, erzeugt ein Eingabefeld zum Herunderladen von Dateien."#),
+    documentation: Some(
+        r#"
+Das Tag, erzeugt ein Eingabefeld zum Herunderladen von Dateien."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+    ],
 };
 
 const URL: TagProperties = TagProperties {
     name: "sp:url",
     detail: None,
-    documentation: Some(r#"
-Fügt den ContextPath vor die angegebene URL und hängt, falls nötig die Session ID an die URL."#),
+    documentation: Some(
+        r#"
+Fügt den ContextPath vor die angegebene URL und hängt, falls nötig die Session ID an die URL."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Deprecated("command"),
+        AttributeRule::Deprecated("information"),
+        AttributeRule::Deprecated("publisher"),
+        AttributeRule::Deprecated("absolute"),
+        AttributeRule::Deprecated("gui"),
+        AttributeRule::ExactlyOneOf(&["uri", "template", "command", "information"]),
+        AttributeRule::OnlyOneOf(&["context", "module"]),
+        AttributeRule::OnlyWith("context", "uri"),
+        AttributeRule::OnlyWith("module", "uri"),
+    ],
 };
 
 const WARNING: TagProperties = TagProperties {
     name: "sp:warning",
     detail: None,
-    documentation: Some(r#"
-Prüft, ob eine Warnung aufgetreten ist, markiert sie gegebenenfalls als gefangen und führt den innhalt des Tags aus."#),
+    documentation: Some(
+        r#"
+Prüft, ob eine Warnung aufgetreten ist, markiert sie gegebenenfalls als gefangen und führt den innhalt des Tags aus."#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("code"),
+    ],
 };
 
 const WORKLIST: TagProperties = TagProperties {
     name: "sp:worklist",
     detail: None,
-    documentation: Some(r#"
-Findet die gewünschte Workliste"#),
+    documentation: Some(
+        r#"
+Findet die gewünschte Workliste"#,
+    ),
     children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+    ],
 };
 
 const ZIP: TagProperties = TagProperties {
@@ -505,6 +829,7 @@ const ZIP: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attribute_rules: &[], // not documented
 };
 
 impl FromStr for SpTag {

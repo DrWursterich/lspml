@@ -34,17 +34,11 @@ fn validate_document(root: Node, text: &String, diagnositcs: &mut Vec<Diagnostic
             "page_header" | "import_header" | "taglib_header" | "text" | "comment" => continue,
             "ERROR" => diagnositcs.push(Diagnostic {
                 source: Some("lspml".to_string()),
-                message: "syntax error".to_string(),
-                range: Range {
-                    start: Position {
-                        line: node.start_position().row as u32,
-                        character: node.start_position().column as u32,
-                    },
-                    end: Position {
-                        line: node.end_position().row as u32,
-                        character: node.end_position().column as u32,
-                    },
-                },
+                message: format!(
+                    "unexpected \"{}\"",
+                    node.utf8_text(text.as_bytes()).unwrap()
+                ),
+                range: node_range(node),
                 severity: Some(DiagnosticSeverity::ERROR),
                 ..Default::default()
             }),
@@ -52,14 +46,14 @@ fn validate_document(root: Node, text: &String, diagnositcs: &mut Vec<Diagnostic
             | "style_tag" => validate_children(node, &text, diagnositcs)?,
             _ => {
                 let _ = &grammar::SpTag::from_str(node.kind())
-                    .and_then(|tag| validate(tag.properties(), node, &text, diagnositcs))?;
+                    .and_then(|tag| validate_tag(tag.properties(), node, &text, diagnositcs))?;
             }
         }
     }
     return Ok(());
 }
 
-fn validate(
+fn validate_tag(
     tag: grammar::TagProperties,
     node: Node,
     text: &String,
@@ -74,16 +68,7 @@ fn validate(
                     child.utf8_text(text.as_bytes()).unwrap()
                 ),
                 severity: Some(DiagnosticSeverity::ERROR),
-                range: Range {
-                    start: Position {
-                        line: child.start_position().row as u32,
-                        character: child.start_position().column as u32,
-                    },
-                    end: Position {
-                        line: child.end_position().row as u32,
-                        character: child.end_position().column as u32,
-                    },
-                },
+                range: node_range(child),
                 source: Some("lspml".to_string()),
                 ..Default::default()
             }),
@@ -101,16 +86,7 @@ fn validate(
                             child.child(0).unwrap().utf8_text(text.as_bytes()).unwrap()
                         ),
                         severity: Some(DiagnosticSeverity::WARNING),
-                        range: Range {
-                            start: Position {
-                                line: child.start_position().row as u32,
-                                character: child.start_position().column as u32,
-                            },
-                            end: Position {
-                                line: child.end_position().row as u32,
-                                character: child.end_position().column as u32,
-                            },
-                        },
+                        range: node_range(child),
                         source: Some("lspml".to_string()),
                         ..Default::default()
                     });
@@ -130,29 +106,135 @@ fn validate(
             kind if kind.ends_with("_tag") => {
                 let child_tag = &grammar::SpTag::from_str(kind).unwrap();
                 if can_have_child(&tag, child_tag) {
-                    validate(child_tag.properties(), child, text, diagnositcs)?;
+                    validate_tag(child_tag.properties(), child, text, diagnositcs)?;
                 } else {
                     diagnositcs.push(Diagnostic {
-                        message: format!("unexpected {} tag", kind),
+                        message: format!("unexpected {} tag", &kind[..kind.find("_tag").unwrap()]),
                         severity: Some(DiagnosticSeverity::WARNING),
-                        range: Range {
-                            start: Position {
-                                line: child.start_position().row as u32,
-                                character: child.start_position().column as u32,
-                            },
-                            end: Position {
-                                line: child.end_position().row as u32,
-                                character: child.end_position().column as u32,
-                            },
-                        },
+                        range: node_range(child),
                         source: Some("lspml".to_string()),
                         ..Default::default()
                     });
                 }
             }
-            kind => {
-                log::debug!("ignore child node {}", kind);
+            _ => validate_children(child, text, diagnositcs)?,
+        }
+    }
+    for rule in tag.attribute_rules {
+        match rule {
+            grammar::AttributeRule::Deprecated(name) if attributes.contains_key(*name) => {
+                diagnositcs.push(Diagnostic {
+                    message: format!("attribute {} is deprecated", name),
+                    severity: Some(DiagnosticSeverity::INFORMATION),
+                    range: node_range(node),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
             }
+            grammar::AttributeRule::AtleastOneOf(names)
+                if !names.iter().any(|name| attributes.contains_key(*name)) =>
+            {
+                diagnositcs.push(Diagnostic {
+                    message: format!(
+                        "requires atleast one of these attributes: {}",
+                        names.join(", ")
+                    ),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    range: node_range(node),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
+            grammar::AttributeRule::ExactlyOneOf(names) => {
+                let present: Vec<&str> = names
+                    .iter()
+                    .map(|name| *name)
+                    .filter(|name| attributes.contains_key(*name))
+                    .collect();
+                match present.len() {
+                    0 => {
+                        diagnositcs.push(Diagnostic {
+                            message: format!(
+                                "requires one of these attributes: {}",
+                                names.join(", ")
+                            ),
+                            severity: Some(DiagnosticSeverity::ERROR),
+                            range: node_range(node),
+                            source: Some("lspml".to_string()),
+                            ..Default::default()
+                        });
+                    }
+                    1 => {}
+                    _ => {
+                        diagnositcs.push(Diagnostic {
+                            message: format!(
+                                "requires only one of these attributes: {}",
+                                present.join(", ")
+                            ),
+                            severity: Some(DiagnosticSeverity::ERROR),
+                            range: node_range(node),
+                            source: Some("lspml".to_string()),
+                            ..Default::default()
+                        });
+                    }
+                }
+            }
+            grammar::AttributeRule::OnlyOneOf(names) => {
+                let present: Vec<&str> = names
+                    .iter()
+                    .map(|name| *name)
+                    .filter(|name| attributes.contains_key(*name))
+                    .collect();
+                if present.len() > 1 {
+                    diagnositcs.push(Diagnostic {
+                        message: format!(
+                            "can only have one of these attributes: {}",
+                            present.join(", ")
+                        ),
+                        severity: Some(DiagnosticSeverity::WARNING),
+                        range: node_range(node),
+                        source: Some("lspml".to_string()),
+                        ..Default::default()
+                    });
+                }
+            }
+            grammar::AttributeRule::OnlyWith(name1, name2)
+                if attributes.contains_key(*name1) && !attributes.contains_key(*name2) =>
+            {
+                diagnositcs.push(Diagnostic {
+                    message: format!("attribute {} is useless without attribute {}", name1, name2),
+                    severity: Some(DiagnosticSeverity::WARNING),
+                    range: node_range(node),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
+            grammar::AttributeRule::OnlyWithEither(name, names)
+                if attributes.contains_key(*name)
+                    && names.iter().any(|name| attributes.contains_key(*name)) =>
+            {
+                diagnositcs.push(Diagnostic {
+                    message: format!(
+                        "attribute {} is useless without one of these attributes: {}",
+                        name,
+                        names.join(", ")
+                    ),
+                    severity: Some(DiagnosticSeverity::WARNING),
+                    range: node_range(node),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
+            grammar::AttributeRule::Required(name) if !attributes.contains_key(*name) => {
+                diagnositcs.push(Diagnostic {
+                    message: format!("missing required attribute {}", name),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    range: node_range(node),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
+            _ => {}
         }
     }
     return Ok(());
@@ -176,16 +258,7 @@ fn validate_children(node: Node, text: &String, diagnositcs: &mut Vec<Diagnostic
                     child.utf8_text(text.as_bytes()).unwrap()
                 ),
                 severity: Some(DiagnosticSeverity::ERROR),
-                range: Range {
-                    start: Position {
-                        line: child.start_position().row as u32,
-                        character: child.start_position().column as u32,
-                    },
-                    end: Position {
-                        line: child.end_position().row as u32,
-                        character: child.end_position().column as u32,
-                    },
-                },
+                range: node_range(child),
                 source: Some("lspml".to_string()),
                 ..Default::default()
             }),
@@ -198,12 +271,23 @@ fn validate_children(node: Node, text: &String, diagnositcs: &mut Vec<Diagnostic
             }
             kind if kind.ends_with("_tag") => {
                 let child_tag = &grammar::SpTag::from_str(kind).unwrap();
-                validate(child_tag.properties(), child, text, diagnositcs)?;
+                validate_tag(child_tag.properties(), child, text, diagnositcs)?;
             }
-            kind => {
-                log::debug!("ignore child node {}", kind);
-            }
+            _ => validate_children(child, text, diagnositcs)?,
         }
     }
     return Ok(());
+}
+
+fn node_range(node: Node) -> Range {
+    return Range {
+        start: Position {
+            line: node.start_position().row as u32,
+            character: node.start_position().column as u32,
+        },
+        end: Position {
+            line: node.end_position().row as u32,
+            character: node.end_position().column as u32,
+        },
+    };
 }
