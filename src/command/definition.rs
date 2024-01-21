@@ -184,9 +184,6 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                                     (spt_imageeditor_tag
                                         (name_attribute
                                             (string) @attribute))
-                                    (spt_imp_tag
-                                        (name_attribute
-                                            (string) @attribute))
                                     (spt_iterator_tag
                                         (name_attribute
                                             (string) @attribute))
