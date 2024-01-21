@@ -45,7 +45,7 @@ fn validate_document(root: Node, text: &String, diagnositcs: &mut Vec<Diagnostic
             "html_tag" | "html_option_tag" | "html_void_tag" | "java_tag" | "script_tag"
             | "style_tag" => validate_children(node, &text, diagnositcs)?,
             _ => {
-                let _ = &grammar::SpTag::from_str(node.kind())
+                let _ = &grammar::Tag::from_str(node.kind())
                     .and_then(|tag| validate_tag(tag.properties(), node, &text, diagnositcs))?;
             }
         }
@@ -104,7 +104,7 @@ fn validate_tag(
                 }
             }
             kind if kind.ends_with("_tag") => {
-                let child_tag = &grammar::SpTag::from_str(kind).unwrap();
+                let child_tag = &grammar::Tag::from_str(kind).unwrap();
                 if can_have_child(&tag, child_tag) {
                     validate_tag(child_tag.properties(), child, text, diagnositcs)?;
                 } else {
@@ -240,7 +240,7 @@ fn validate_tag(
     return Ok(());
 }
 
-fn can_have_child(tag: &grammar::TagProperties, child: &grammar::SpTag) -> bool {
+fn can_have_child(tag: &grammar::TagProperties, child: &grammar::Tag) -> bool {
     return match &tag.children {
         grammar::TagChildren::Any => true,
         grammar::TagChildren::None => false,
@@ -270,7 +270,7 @@ fn validate_children(node: Node, text: &String, diagnositcs: &mut Vec<Diagnostic
                 validate_children(child, text, diagnositcs)?;
             }
             kind if kind.ends_with("_tag") => {
-                let child_tag = &grammar::SpTag::from_str(kind).unwrap();
+                let child_tag = &grammar::Tag::from_str(kind).unwrap();
                 validate_tag(child_tag.properties(), child, text, diagnositcs)?;
             }
             _ => validate_children(child, text, diagnositcs)?,

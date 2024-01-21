@@ -6,6 +6,7 @@ pub(crate) struct TagProperties {
     pub(crate) name: &'static str,
     pub(crate) detail: Option<&'static str>,
     pub(crate) documentation: Option<&'static str>,
+    // pub(crate) deprecated: bool,
     pub(crate) children: TagChildren,
     pub(crate) attribute_rules: &'static [AttributeRule],
 }
@@ -28,71 +29,96 @@ pub(crate) enum AttributeRule {
 pub(crate) enum TagChildren {
     Any,
     None,
-    Scalar(SpTag),
-    Vector(&'static [SpTag]),
+    Scalar(Tag),
+    Vector(&'static [Tag]),
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum SpTag {
-    Argument,
-    Attribute,
-    Barcode,
-    Break,
-    Calendarsheet,
-    Checkbox,
-    Code,
-    Collection,
-    Condition,
-    Diff,
-    Else,
-    Elseif,
-    Error,
-    Expire,
-    Filter,
-    For,
-    Form,
-    Hidden,
-    If,
-    Include,
-    Io,
-    Iterator,
-    Json,
-    Linktree,
-    LinkedInformation,
-    Livetree,
-    Log,
-    Login,
-    Loop,
-    Map,
-    Option,
-    Password,
-    Print,
-    Querytree,
-    Radio,
-    Range,
-    Return,
-    Sass,
-    Scaleimage,
-    Scope,
-    Search,
-    Select,
-    Set,
-    Sort,
-    Subinformation,
-    Tagbody,
-    Text,
-    Textarea,
-    Textimage,
-    Throw,
-    Toggle,
-    Upload,
-    Url,
-    Warning,
-    Worklist,
-    Zip,
+pub(crate) enum Tag {
+    SpArgument,
+    SpAttribute,
+    SpBarcode,
+    SpBreak,
+    SpCalendarsheet,
+    SpCheckbox,
+    SpCode,
+    SpCollection,
+    SpCondition,
+    SpDiff,
+    SpElse,
+    SpElseif,
+    SpError,
+    SpExpire,
+    SpFilter,
+    SpFor,
+    SpForm,
+    SpHidden,
+    SpIf,
+    SpInclude,
+    SpIo,
+    SpIterator,
+    SpJson,
+    SpLinktree,
+    SpLinkedInformation,
+    SpLivetree,
+    SpLog,
+    SpLogin,
+    SpLoop,
+    SpMap,
+    SpOption,
+    SpPassword,
+    SpPrint,
+    SpQuerytree,
+    SpRadio,
+    SpRange,
+    SpReturn,
+    SpSass,
+    SpScaleimage,
+    SpScope,
+    SpSearch,
+    SpSelect,
+    SpSet,
+    SpSort,
+    SpSubinformation,
+    SpTagbody,
+    SpText,
+    SpTextarea,
+    SpTextimage,
+    SpThrow,
+    SpToggle,
+    SpUpload,
+    SpUrl,
+    SpWarning,
+    SpWorklist,
+    SpZip,
+    SptCounter,
+    SptDate,
+    SptDiff,
+    SptEmail2img,
+    SptEncryptemail,
+    SptEscapeemail,
+    SptFormsolutions,
+    SptId2url,
+    SptIlink,
+    SptImageeditor,
+    SptImp,
+    SptIterator,
+    SptLink,
+    SptNumber,
+    SptPersonalization,
+    SptPrehtml,
+    SptSmarteditor,
+    SptSpml,
+    SptText,
+    SptTextarea,
+    SptTimestamp,
+    SptTinymce,
+    SptUpdown,
+    SptUpload,
+    SptWorklist,
 }
 
-const ARGUMENT: TagProperties = TagProperties {
+const SP_ARGUMENT: TagProperties = TagProperties {
     name: "sp:argument",
     detail: None,
     documentation: Some(
@@ -107,7 +133,7 @@ Setzt ein Argument für ein sp:include"#,
     ],
 };
 
-const ATTRIBUTE: TagProperties = TagProperties {
+const SP_ATTRIBUTE: TagProperties = TagProperties {
     name: "sp:attribute",
     detail: None,
     documentation: None,
@@ -118,7 +144,7 @@ const ATTRIBUTE: TagProperties = TagProperties {
     ],
 };
 
-const BARCODE: TagProperties = TagProperties {
+const SP_BARCODE: TagProperties = TagProperties {
     name: "sp:barcode",
     detail: None,
     documentation: None,
@@ -130,7 +156,7 @@ const BARCODE: TagProperties = TagProperties {
     ],
 };
 
-const BREAK: TagProperties = TagProperties {
+const SP_BREAK: TagProperties = TagProperties {
     name: "sp:break",
     detail: None,
     documentation: Some(
@@ -141,7 +167,7 @@ Beendet FOR- und ITERATE-Schleifen."#,
     attribute_rules: &[],
 };
 
-const CALENDARSHEET: TagProperties = TagProperties {
+const SP_CALENDARSHEET: TagProperties = TagProperties {
     name: "sp:calendarsheet",
     detail: None,
     documentation: Some(
@@ -158,7 +184,7 @@ CalendarSheet manage dates and objects"#,
     ],
 };
 
-const CHECKBOX: TagProperties = TagProperties {
+const SP_CHECKBOX: TagProperties = TagProperties {
     name: "sp:checkbox",
     detail: None,
     documentation: Some(
@@ -169,7 +195,7 @@ Check-Box-Tag, erzeugt eine checkBox."#,
     attribute_rules: &[AttributeRule::Required("name")],
 };
 
-const CODE: TagProperties = TagProperties {
+const SP_CODE: TagProperties = TagProperties {
     name: "sp:code",
     detail: None,
     documentation: Some(
@@ -180,7 +206,7 @@ Schreibt den bodyContent ohne dass dieser ausgeführt wird in die Ergebnis-Datei
     attribute_rules: &[],
 };
 
-const COLLECTION: TagProperties = TagProperties {
+const SP_COLLECTION: TagProperties = TagProperties {
     name: "sp:collection",
     detail: None,
     documentation: Some(
@@ -196,18 +222,18 @@ Collection tag offers certain operation that deal with a common collection. For 
     ],
 };
 
-const CONDITION: TagProperties = TagProperties {
+const SP_CONDITION: TagProperties = TagProperties {
     name: "sp:condition",
     detail: None,
     documentation: Some(
         r#"
 Umklammert einen if-else Konstrukt."#,
     ),
-    children: TagChildren::Vector(&[SpTag::If, SpTag::Else, SpTag::Elseif]),
+    children: TagChildren::Vector(&[Tag::SpIf, Tag::SpElse, Tag::SpElseif]),
     attribute_rules: &[],
 };
 
-const DIFF: TagProperties = TagProperties {
+const SP_DIFF: TagProperties = TagProperties {
     name: "sp:diff",
     detail: None,
     documentation: Some(
@@ -223,7 +249,7 @@ Vergleicht ein Attribute von zwei Versionen einer Information"#,
     ],
 };
 
-const ELSE: TagProperties = TagProperties {
+const SP_ELSE: TagProperties = TagProperties {
     name: "sp:else",
     detail: None,
     documentation: Some(
@@ -234,7 +260,7 @@ passendes else zu einem If innerhalb eines contitionTag."#,
     attribute_rules: &[],
 };
 
-const ELSEIF: TagProperties = TagProperties {
+const SP_ELSEIF: TagProperties = TagProperties {
     name: "sp:elseif",
     detail: None,
     documentation: Some(
@@ -260,7 +286,7 @@ ElseIf-Tag, schreibt Body wenn Bedingung ok ist und vorheriges if fehl schlug."#
     ],
 };
 
-const ERROR: TagProperties = TagProperties {
+const SP_ERROR: TagProperties = TagProperties {
     name: "sp:error",
     detail: None,
     documentation: Some(
@@ -271,7 +297,7 @@ Prüft ein Fehler aufgetreten ist, markiert ihn gegebenenfals als gefangen und f
     attribute_rules: &[AttributeRule::Required("code")],
 };
 
-const EXPIRE: TagProperties = TagProperties {
+const SP_EXPIRE: TagProperties = TagProperties {
     name: "sp:expire",
     detail: None,
     documentation: None,
@@ -279,7 +305,7 @@ const EXPIRE: TagProperties = TagProperties {
     attribute_rules: &[AttributeRule::Required("date")],
 };
 
-const FILTER: TagProperties = TagProperties {
+const SP_FILTER: TagProperties = TagProperties {
     name: "sp:filter",
     detail: None,
     documentation: Some(
@@ -290,13 +316,13 @@ Filtert eine Liste"#,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("collection"),
-        AttributeRule::OnlyWithEither("ic", &["filter"]),
+        AttributeRule::OnlyWith("ic", "filter"),
         AttributeRule::OnlyWithEither("type", &["from", "to"]),
         AttributeRule::OnlyWithEither("format", &["from", "to"]),
     ],
 };
 
-const FOR: TagProperties = TagProperties {
+const SP_FOR: TagProperties = TagProperties {
     name: "sp:for",
     detail: None,
     documentation: Some(
@@ -311,7 +337,7 @@ For-Tag, wiederholt solange wie angegeben."#,
     ],
 };
 
-const FORM: TagProperties = TagProperties {
+const SP_FORM: TagProperties = TagProperties {
     name: "sp:form",
     detail: None,
     documentation: Some(
@@ -326,7 +352,7 @@ Erzeugt ein HTML-Form-Tag mit einem angepassten Kommando"#,
     ],
 };
 
-const HIDDEN: TagProperties = TagProperties {
+const SP_HIDDEN: TagProperties = TagProperties {
     name: "sp:hidden",
     detail: None,
     documentation: Some(
@@ -340,7 +366,7 @@ Hidden-Tag, erzeugt ein Hiddenfeld."#,
     ],
 };
 
-const IF: TagProperties = TagProperties {
+const SP_IF: TagProperties = TagProperties {
     name: "sp:if",
     detail: None,
     documentation: Some(
@@ -366,14 +392,14 @@ If-Tag, schreibt Body wenn Bedingung ok ist."#,
     ],
 };
 
-const INCLUDE: TagProperties = TagProperties {
+const SP_INCLUDE: TagProperties = TagProperties {
     name: "sp:include",
     detail: None,
     documentation: Some(
         r#"
 includiert ein anderes bereits im System gespeichertes Template."#,
     ),
-    children: TagChildren::Scalar(SpTag::Argument),
+    children: TagChildren::Scalar(Tag::SpArgument),
     attribute_rules: &[
         AttributeRule::ExactlyOneOf(&["template", "anchor", "uri"]),
         AttributeRule::OnlyOneOf(&["context", "module"]),
@@ -382,7 +408,7 @@ includiert ein anderes bereits im System gespeichertes Template."#,
     ],
 };
 
-const IO: TagProperties = TagProperties {
+const SP_IO: TagProperties = TagProperties {
     name: "sp:io",
     detail: None,
     documentation: Some(
@@ -390,12 +416,10 @@ const IO: TagProperties = TagProperties {
 IO-Tag"#,
     ),
     children: TagChildren::Any,
-    attribute_rules: &[
-        AttributeRule::Required("type"),
-    ],
+    attribute_rules: &[AttributeRule::Required("type")],
 };
 
-const ITERATOR: TagProperties = TagProperties {
+const SP_ITERATOR: TagProperties = TagProperties {
     name: "sp:iterator",
     detail: None,
     documentation: Some(
@@ -403,12 +427,10 @@ const ITERATOR: TagProperties = TagProperties {
 Wird für den Aufbau von Wiederholfeldern verwendet."#,
     ),
     children: TagChildren::Any,
-    attribute_rules: &[
-        AttributeRule::Required("collection"),
-    ],
+    attribute_rules: &[AttributeRule::Required("collection")],
 };
 
-const JSON: TagProperties = TagProperties {
+const SP_JSON: TagProperties = TagProperties {
     name: "sp:json",
     detail: None,
     documentation: None,
@@ -416,7 +438,7 @@ const JSON: TagProperties = TagProperties {
     attribute_rules: &[],
 };
 
-const LINKEDINFORMATION: TagProperties = TagProperties {
+const SP_LINKEDINFORMATION: TagProperties = TagProperties {
     name: "sp:linkedInformation",
     detail: None,
     documentation: Some(
@@ -427,7 +449,7 @@ Diese Tag definiert einen Link eines Artikels auf einen Anderen Artikel. Das Bes
     attribute_rules: &[], // not documented
 };
 
-const LINKTREE: TagProperties = TagProperties {
+const SP_LINKTREE: TagProperties = TagProperties {
     name: "sp:linktree",
     detail: None,
     documentation: None,
@@ -441,7 +463,7 @@ const LINKTREE: TagProperties = TagProperties {
     ],
 };
 
-const LIVETREE: TagProperties = TagProperties {
+const SP_LIVETREE: TagProperties = TagProperties {
     name: "sp:livetree",
     detail: None,
     documentation: None,
@@ -457,27 +479,25 @@ const LIVETREE: TagProperties = TagProperties {
     ],
 };
 
-const LOG: TagProperties = TagProperties {
+const SP_LOG: TagProperties = TagProperties {
     name: "sp:log",
     detail: None,
     documentation: None,
     children: TagChildren::Any,
-    attribute_rules: &[
-        AttributeRule::Required("level"),
-    ],
+    attribute_rules: &[AttributeRule::Required("level")],
 };
 
-const LOGIN: TagProperties = TagProperties {
+const SP_LOGIN: TagProperties = TagProperties {
     name: "sp:login",
     detail: None,
     documentation: None,
     children: TagChildren::Any,
-    attribute_rules: &[
-        AttributeRule::ExactlyOneOf(&["session", "login", "password", "client"]),
-    ],
+    attribute_rules: &[AttributeRule::ExactlyOneOf(&[
+        "session", "login", "password", "client",
+    ])],
 };
 
-const LOOP: TagProperties = TagProperties {
+const SP_LOOP: TagProperties = TagProperties {
     name: "sp:loop",
     detail: None,
     documentation: Some(
@@ -491,7 +511,7 @@ Dient zur Ausgabe eines oder mehrerer Elemente."#,
     ],
 };
 
-const MAP: TagProperties = TagProperties {
+const SP_MAP: TagProperties = TagProperties {
     name: "sp:map",
     detail: None,
     documentation: None,
@@ -505,7 +525,7 @@ const MAP: TagProperties = TagProperties {
     ],
 };
 
-const OPTION: TagProperties = TagProperties {
+const SP_OPTION: TagProperties = TagProperties {
     name: "sp:option",
     detail: None,
     documentation: Some(
@@ -516,7 +536,7 @@ Option-Tag, für das Select Tag."#,
     attribute_rules: &[],
 };
 
-const PASSWORD: TagProperties = TagProperties {
+const SP_PASSWORD: TagProperties = TagProperties {
     name: "sp:password",
     detail: None,
     documentation: Some(
@@ -527,7 +547,7 @@ Password-Tag, erzeugt ein Passwordfeld."#,
     attribute_rules: &[], // not documented
 };
 
-const PRINT: TagProperties = TagProperties {
+const SP_PRINT: TagProperties = TagProperties {
     name: "sp:print",
     detail: None,
     documentation: Some(
@@ -546,7 +566,7 @@ Dient zur Ausgabe eines Attributes"#,
     ],
 };
 
-const QUERYTREE: TagProperties = TagProperties {
+const SP_QUERYTREE: TagProperties = TagProperties {
     name: "sp:querytree",
     detail: None,
     documentation: None,
@@ -554,7 +574,7 @@ const QUERYTREE: TagProperties = TagProperties {
     attribute_rules: &[], // not documented
 };
 
-const RADIO: TagProperties = TagProperties {
+const SP_RADIO: TagProperties = TagProperties {
     name: "sp:radio",
     detail: None,
     documentation: Some(
@@ -562,12 +582,10 @@ const RADIO: TagProperties = TagProperties {
 Radio Button-Tag, erzeugt einen RadioButton."#,
     ),
     children: TagChildren::Any,
-    attribute_rules: &[
-        AttributeRule::Required("name"),
-    ],
+    attribute_rules: &[AttributeRule::Required("name")],
 };
 
-const RANGE: TagProperties = TagProperties {
+const SP_RANGE: TagProperties = TagProperties {
     name: "sp:range",
     detail: None,
     documentation: None,
@@ -579,7 +597,7 @@ const RANGE: TagProperties = TagProperties {
     ],
 };
 
-const RETURN: TagProperties = TagProperties {
+const SP_RETURN: TagProperties = TagProperties {
     name: "sp:return",
     detail: None,
     documentation: Some(
@@ -593,7 +611,7 @@ Verlässt die SPML-Seite und setzt ggf. einen Rückgabewert für sp:include"#,
     ],
 };
 
-const SASS: TagProperties = TagProperties {
+const SP_SASS: TagProperties = TagProperties {
     name: "sp:sass",
     detail: None,
     documentation: None,
@@ -605,7 +623,7 @@ const SASS: TagProperties = TagProperties {
     ],
 };
 
-const SCALEIMAGE: TagProperties = TagProperties {
+const SP_SCALEIMAGE: TagProperties = TagProperties {
     name: "sp:scaleimage",
     detail: None,
     documentation: None,
@@ -617,7 +635,7 @@ const SCALEIMAGE: TagProperties = TagProperties {
     ],
 };
 
-const SCOPE: TagProperties = TagProperties {
+const SP_SCOPE: TagProperties = TagProperties {
     name: "sp:scope",
     detail: None,
     documentation: Some(
@@ -625,12 +643,10 @@ const SCOPE: TagProperties = TagProperties {
 Setzt bereichsweise oder global den Scope für die folgenden Tags"#,
     ),
     children: TagChildren::Any,
-    attribute_rules: &[
-        AttributeRule::Required("scope"),
-    ],
+    attribute_rules: &[AttributeRule::Required("scope")],
 };
 
-const SEARCH: TagProperties = TagProperties {
+const SP_SEARCH: TagProperties = TagProperties {
     name: "sp:search",
     detail: None,
     documentation: Some(
@@ -641,7 +657,7 @@ Findet die gewünschte Suche"#,
     attribute_rules: &[], // not documented
 };
 
-const SELECT: TagProperties = TagProperties {
+const SP_SELECT: TagProperties = TagProperties {
     name: "sp:select",
     detail: None,
     documentation: Some(
@@ -649,12 +665,10 @@ const SELECT: TagProperties = TagProperties {
 Select-Tag, erzeugt den Rahmen einen Auswahlliste."#,
     ),
     children: TagChildren::Any,
-    attribute_rules: &[
-        AttributeRule::Required("name"),
-    ],
+    attribute_rules: &[AttributeRule::Required("name")],
 };
 
-const SET: TagProperties = TagProperties {
+const SP_SET: TagProperties = TagProperties {
     name: "sp:set",
     detail: None,
     documentation: Some(
@@ -670,7 +684,7 @@ Setzt ein Attribute"#,
     ],
 };
 
-const SORT: TagProperties = TagProperties {
+const SP_SORT: TagProperties = TagProperties {
     name: "sp:sort",
     detail: None,
     documentation: Some(
@@ -684,17 +698,15 @@ Sortiert eine Liste"#,
     ],
 };
 
-const SUBINFORMATION: TagProperties = TagProperties {
+const SP_SUBINFORMATION: TagProperties = TagProperties {
     name: "sp:subinformation",
     detail: None,
     documentation: None,
     children: TagChildren::Any,
-    attribute_rules: &[
-        AttributeRule::Required("name"),
-    ],
+    attribute_rules: &[AttributeRule::Required("name")],
 };
 
-const TAGBODY: TagProperties = TagProperties {
+const SP_TAGBODY: TagProperties = TagProperties {
     name: "sp:tagbody",
     detail: None,
     documentation: None,
@@ -702,7 +714,7 @@ const TAGBODY: TagProperties = TagProperties {
     attribute_rules: &[],
 };
 
-const TEXT: TagProperties = TagProperties {
+const SP_TEXT: TagProperties = TagProperties {
     name: "sp:text",
     detail: None,
     documentation: Some(
@@ -716,7 +728,7 @@ Text-Tag, erzeugt ein Eingabefeld."#,
     ],
 };
 
-const TEXTAREA: TagProperties = TagProperties {
+const SP_TEXTAREA: TagProperties = TagProperties {
     name: "sp:textarea",
     detail: None,
     documentation: Some(
@@ -730,7 +742,7 @@ Textarea-Tag, erzeugt einen Einabebereich."#,
     ],
 };
 
-const TEXTIMAGE: TagProperties = TagProperties {
+const SP_TEXTIMAGE: TagProperties = TagProperties {
     name: "sp:textimage",
     detail: None,
     documentation: None,
@@ -742,7 +754,7 @@ const TEXTIMAGE: TagProperties = TagProperties {
     ],
 };
 
-const THROW: TagProperties = TagProperties {
+const SP_THROW: TagProperties = TagProperties {
     name: "sp:throw",
     detail: None,
     documentation: None,
@@ -750,7 +762,7 @@ const THROW: TagProperties = TagProperties {
     attribute_rules: &[], // not documented
 };
 
-const TOGGLE: TagProperties = TagProperties {
+const SP_TOGGLE: TagProperties = TagProperties {
     name: "sp:toggle",
     detail: None,
     documentation: Some(
@@ -764,7 +776,7 @@ Toggle-Tag erzeugt einen toggle der einen einzigen boolischen Wert speichert"#,
     ],
 };
 
-const UPLOAD: TagProperties = TagProperties {
+const SP_UPLOAD: TagProperties = TagProperties {
     name: "sp:upload",
     detail: None,
     documentation: Some(
@@ -772,12 +784,10 @@ const UPLOAD: TagProperties = TagProperties {
 Das Tag, erzeugt ein Eingabefeld zum Herunderladen von Dateien."#,
     ),
     children: TagChildren::Any,
-    attribute_rules: &[
-        AttributeRule::Required("name"),
-    ],
+    attribute_rules: &[AttributeRule::Required("name")],
 };
 
-const URL: TagProperties = TagProperties {
+const SP_URL: TagProperties = TagProperties {
     name: "sp:url",
     detail: None,
     documentation: Some(
@@ -798,7 +808,7 @@ Fügt den ContextPath vor die angegebene URL und hängt, falls nötig die Sessio
     ],
 };
 
-const WARNING: TagProperties = TagProperties {
+const SP_WARNING: TagProperties = TagProperties {
     name: "sp:warning",
     detail: None,
     documentation: Some(
@@ -806,12 +816,10 @@ const WARNING: TagProperties = TagProperties {
 Prüft, ob eine Warnung aufgetreten ist, markiert sie gegebenenfalls als gefangen und führt den innhalt des Tags aus."#,
     ),
     children: TagChildren::Any,
-    attribute_rules: &[
-        AttributeRule::Required("code"),
-    ],
+    attribute_rules: &[AttributeRule::Required("code")],
 };
 
-const WORKLIST: TagProperties = TagProperties {
+const SP_WORKLIST: TagProperties = TagProperties {
     name: "sp:worklist",
     detail: None,
     documentation: Some(
@@ -819,12 +827,10 @@ const WORKLIST: TagProperties = TagProperties {
 Findet die gewünschte Workliste"#,
     ),
     children: TagChildren::Any,
-    attribute_rules: &[
-        AttributeRule::Required("name"),
-    ],
+    attribute_rules: &[AttributeRule::Required("name")],
 };
 
-const ZIP: TagProperties = TagProperties {
+const SP_ZIP: TagProperties = TagProperties {
     name: "sp:zip",
     detail: None,
     documentation: None,
@@ -832,193 +838,618 @@ const ZIP: TagProperties = TagProperties {
     attribute_rules: &[], // not documented
 };
 
-impl FromStr for SpTag {
+// SPTTAGS:
+
+const SPT_COUNTER: TagProperties = TagProperties {
+    name: "spt:counter",
+    detail: None,
+    documentation: Some(
+        r#"
+Zählt Zugriffe auf publizierte Informationen"#,
+    ),
+    // deprecated: true,
+    children: TagChildren::None,
+    attribute_rules: &[AttributeRule::Required("name")],
+};
+
+const SPT_DATE: TagProperties = TagProperties {
+    name: "spt:date",
+    detail: None,
+    documentation: Some(
+        r#"
+Datums- und Uhrzeiteingabe mit Prüfung auf Gültigkeit"#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
+    ],
+};
+
+const SPT_DIFF: TagProperties = TagProperties {
+    name: "spt:diff",
+    detail: None,
+    documentation: Some(
+        r#"
+Vergleicht zwei Zeichenketten und zeigt die Unterschiede an"#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("from"),
+        AttributeRule::Required("to"),
+        AttributeRule::Required("style"),
+    ],
+};
+
+const SPT_EMAIL2IMG: TagProperties = TagProperties {
+    name: "spt:email2img",
+    detail: None,
+    documentation: Some(
+        r#"
+Ersetzt E-Mail-Adressen durch Bilder"#,
+    ),
+    // deprecated: true,
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::Required("object"),
+    ],
+};
+
+const SPT_ENCRYPTEMAIL: TagProperties = TagProperties {
+    name: "spt:encryptemail",
+    detail: None,
+    documentation: Some(
+        r#"
+Verschlüsselt Email-Adressen so, dass sie auch für Responsive-Design-Anforderungen verwendet werden können"#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::Required("object"),
+    ],
+};
+
+const SPT_ESCAPEEMAIL: TagProperties = TagProperties {
+    name: "spt:escapeemail",
+    detail: None,
+    documentation: Some(
+        r#"
+Ersetzt Email-Adressen durch Bilder"#,
+    ),
+    // deprecated: true,
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("object"),
+    ],
+};
+
+const SPT_FORMSOLUTIONS: TagProperties = TagProperties {
+    name: "spt:formsolutions",
+    detail: None,
+    documentation: Some(
+        r#"
+Erzeugt eine eindeutige Url auf PDF-Dokumente des Form-Solutions Formular Servers."#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+    ],
+};
+
+const SPT_ID2URL: TagProperties = TagProperties {
+    name: "spt:id2url",
+    detail: None,
+    documentation: Some(
+        r#"
+Durchsucht einen Text nach ID-Signaturen von Artikeln und ersetzt die IDs durch die URL des aktuellen Publikationsbereichs."#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::Required("object"),
+        AttributeRule::Required("querystring"),
+    ],
+};
+
+const SPT_ILINK: TagProperties = TagProperties {
+    name: "spt:ilink",
+    detail: None,
+    documentation: Some(
+        r#"
+Erzeugt einen Link auf das CMS"#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[],
+};
+
+const SPT_IMAGEEDITOR: TagProperties = TagProperties {
+    name: "spt:imageeditor",
+    detail: None,
+    documentation: Some(
+        r#"
+Erzeugt eine Bearbeitungsoberfläche für Bilder"#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[],
+};
+
+const SPT_IMP: TagProperties = TagProperties {
+    name: "spt:imp",
+    detail: None,
+    documentation: Some(
+        r#"
+Erzeugt einen <img src="...">-Tag für kleingerechnete, sowie aus Texten generierte Bilder"#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("image"),
+        AttributeRule::AtleastOneOf(&["height", "width"]),
+        AttributeRule::Deprecated("color"),
+        AttributeRule::Deprecated("excerpt"),
+        AttributeRule::Deprecated("font"),
+        AttributeRule::Deprecated("font_size"),
+        AttributeRule::Deprecated("font_weight"),
+        AttributeRule::Deprecated("manipulate"),
+        AttributeRule::Deprecated("paddingcolor"),
+        AttributeRule::Deprecated("text_transform"),
+        AttributeRule::Deprecated("transform"),
+        AttributeRule::Deprecated("urlonly"),
+    ],
+};
+
+const SPT_ITERATOR: TagProperties = TagProperties {
+    name: "spt:iterator",
+    detail: None,
+    documentation: Some(
+        r#"
+Erzeugt Wiederholfelder"#,
+    ),
+    children: TagChildren::Any,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+    ],
+};
+
+const SPT_LINK: TagProperties = TagProperties {
+    name: "spt:link",
+    detail: None,
+    documentation: Some(
+        r#"
+Erzeugt Links auf Informationen und bindet Bildmedien ein."#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
+        AttributeRule::OnlyWith("filterattribute", "filter"),
+        AttributeRule::OnlyWith("filteric", "filter"),
+        AttributeRule::OnlyWith("filterinvert", "filter"),
+        AttributeRule::OnlyWith("filtermode", "filter"),
+    ],
+};
+
+const SPT_NUMBER: TagProperties = TagProperties {
+    name: "spt:number",
+    detail: None,
+    documentation: Some(
+        r#"
+Zahleneingabe mit Prüfung auf Gültigkeit"#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
+    ],
+};
+
+const SPT_PERSONALIZATION: TagProperties = TagProperties {
+    name: "spt:personalization",
+    detail: None,
+    documentation: Some(
+        r#"
+Definiert personalisierte Bereiche"#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[],
+};
+
+const SPT_PREHTML: TagProperties = TagProperties {
+    name: "spt:prehtml",
+    detail: None,
+    documentation: Some(
+        r#"
+HTML-Code nachbearbeiten."#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::Required("object"),
+    ],
+};
+
+const SPT_SMARTEDITOR: TagProperties = TagProperties {
+    name: "spt:smarteditor",
+    detail: None,
+    documentation: Some(
+        r#"
+Integriert den WYSIWYG-SmartEditor ins CMS"#,
+    ),
+    // deprecated: true,
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+    ],
+};
+
+const SPT_SPML: TagProperties = TagProperties {
+    name: "spt:spml",
+    detail: None,
+    documentation: Some(
+        r#"
+schreibt den Header für SPML-Live Seiten"#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[],
+};
+
+const SPT_TEXT: TagProperties = TagProperties {
+    name: "spt:text",
+    detail: None,
+    documentation: Some(
+        r#"
+Einzeiliges Textfeld, das Versionierung unterstützt"#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
+    ],
+};
+
+const SPT_TEXTAREA: TagProperties = TagProperties {
+    name: "spt:textarea",
+    detail: None,
+    documentation: Some(
+        r#"
+Erzeugt ein mehrzeiliges Textfeld, das Versionierung unterstützt"#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
+    ],
+};
+
+const SPT_TIMESTAMP: TagProperties = TagProperties {
+    name: "spt:timestamp",
+    detail: None,
+    documentation: Some(
+        r#"
+Zeitstempel in ein Eingabefeld schreiben"#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("connect"),
+    ],
+};
+
+const SPT_TINYMCE: TagProperties = TagProperties {
+    name: "spt:tinymce",
+    detail: None,
+    documentation: Some(
+        r#"
+Integriert einen Editor"#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
+    ],
+};
+
+const SPT_UPDOWN: TagProperties = TagProperties {
+    name: "spt:updown",
+    detail: None,
+    documentation: Some(
+        r#"
+Zahlenfeld, das per Klick auf- und abwärts gezählt werden kann"#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+    ],
+};
+
+const SPT_UPLOAD: TagProperties = TagProperties {
+    name: "spt:upload",
+    detail: None,
+    documentation: Some(
+        r#"
+Upload von Dateien"#,
+    ),
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+    ],
+};
+
+const SPT_WORKLIST: TagProperties = TagProperties {
+    name: "spt:worklist",
+    detail: None,
+    documentation: Some(
+        r#"
+Workflow Management einbinden"#,
+    ),
+    // deprecated: true,
+    children: TagChildren::None,
+    attribute_rules: &[
+        AttributeRule::Required("command"),
+    ],
+};
+
+impl FromStr for Tag {
     type Err = Error;
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         return match string {
-            "argument_tag" => Ok(SpTag::Argument),
-            "attribute_tag" => Ok(SpTag::Attribute),
-            "barcode_tag" => Ok(SpTag::Barcode),
-            "break_tag" => Ok(SpTag::Break),
-            "calendarsheet_tag" => Ok(SpTag::Calendarsheet),
-            "checkbox_tag" => Ok(SpTag::Checkbox),
-            "code_tag" => Ok(SpTag::Code),
-            "collection_tag" => Ok(SpTag::Collection),
-            "condition_tag" => Ok(SpTag::Condition),
-            "diff_tag" => Ok(SpTag::Diff),
-            "else_tag" => Ok(SpTag::Else),
-            "elseif_tag" => Ok(SpTag::Elseif),
-            "error_tag" => Ok(SpTag::Error),
-            "expire_tag" => Ok(SpTag::Expire),
-            "filter_tag" => Ok(SpTag::Filter),
-            "for_tag" => Ok(SpTag::For),
-            "form_tag" => Ok(SpTag::Form),
-            "hidden_tag" => Ok(SpTag::Hidden),
-            "if_tag" => Ok(SpTag::If),
-            "include_tag" => Ok(SpTag::Include),
-            "io_tag" => Ok(SpTag::Io),
-            "iterator_tag" => Ok(SpTag::Iterator),
-            "json_tag" => Ok(SpTag::Json),
-            "linktree_tag" => Ok(SpTag::Linktree),
-            "linkedInformation_tag" => Ok(SpTag::LinkedInformation),
-            "livetree_tag" => Ok(SpTag::Livetree),
-            "log_tag" => Ok(SpTag::Log),
-            "login_tag" => Ok(SpTag::Login),
-            "loop_tag" => Ok(SpTag::Loop),
-            "map_tag" => Ok(SpTag::Map),
-            "option_tag" => Ok(SpTag::Option),
-            "password_tag" => Ok(SpTag::Password),
-            "print_tag" => Ok(SpTag::Print),
-            "querytree_tag" => Ok(SpTag::Querytree),
-            "radio_tag" => Ok(SpTag::Radio),
-            "range_tag" => Ok(SpTag::Range),
-            "return_tag" => Ok(SpTag::Return),
-            "sass_tag" => Ok(SpTag::Sass),
-            "scaleimage_tag" => Ok(SpTag::Scaleimage),
-            "scope_tag" => Ok(SpTag::Scope),
-            "search_tag" => Ok(SpTag::Search),
-            "select_tag" => Ok(SpTag::Select),
-            "set_tag" => Ok(SpTag::Set),
-            "sort_tag" => Ok(SpTag::Sort),
-            "subinformation_tag" => Ok(SpTag::Subinformation),
-            "tagbody_tag" => Ok(SpTag::Tagbody),
-            "text_tag" => Ok(SpTag::Text),
-            "textarea_tag" => Ok(SpTag::Textarea),
-            "textimage_tag" => Ok(SpTag::Textimage),
-            "throw_tag" => Ok(SpTag::Throw),
-            "toggle_tag" => Ok(SpTag::Toggle),
-            "upload_tag" => Ok(SpTag::Upload),
-            "url_tag" => Ok(SpTag::Url),
-            "warning_tag" => Ok(SpTag::Warning),
-            "worklist_tag" => Ok(SpTag::Worklist),
-            "zip_tag" => Ok(SpTag::Zip),
+            "argument_tag" => Ok(Tag::SpArgument),
+            "attribute_tag" => Ok(Tag::SpAttribute),
+            "barcode_tag" => Ok(Tag::SpBarcode),
+            "break_tag" => Ok(Tag::SpBreak),
+            "calendarsheet_tag" => Ok(Tag::SpCalendarsheet),
+            "checkbox_tag" => Ok(Tag::SpCheckbox),
+            "code_tag" => Ok(Tag::SpCode),
+            "collection_tag" => Ok(Tag::SpCollection),
+            "condition_tag" => Ok(Tag::SpCondition),
+            "diff_tag" => Ok(Tag::SpDiff),
+            "else_tag" => Ok(Tag::SpElse),
+            "elseif_tag" => Ok(Tag::SpElseif),
+            "error_tag" => Ok(Tag::SpError),
+            "expire_tag" => Ok(Tag::SpExpire),
+            "filter_tag" => Ok(Tag::SpFilter),
+            "for_tag" => Ok(Tag::SpFor),
+            "form_tag" => Ok(Tag::SpForm),
+            "hidden_tag" => Ok(Tag::SpHidden),
+            "if_tag" => Ok(Tag::SpIf),
+            "include_tag" => Ok(Tag::SpInclude),
+            "io_tag" => Ok(Tag::SpIo),
+            "iterator_tag" => Ok(Tag::SpIterator),
+            "json_tag" => Ok(Tag::SpJson),
+            "linktree_tag" => Ok(Tag::SpLinktree),
+            "linkedInformation_tag" => Ok(Tag::SpLinkedInformation),
+            "livetree_tag" => Ok(Tag::SpLivetree),
+            "log_tag" => Ok(Tag::SpLog),
+            "login_tag" => Ok(Tag::SpLogin),
+            "loop_tag" => Ok(Tag::SpLoop),
+            "map_tag" => Ok(Tag::SpMap),
+            "option_tag" => Ok(Tag::SpOption),
+            "password_tag" => Ok(Tag::SpPassword),
+            "print_tag" => Ok(Tag::SpPrint),
+            "querytree_tag" => Ok(Tag::SpQuerytree),
+            "radio_tag" => Ok(Tag::SpRadio),
+            "range_tag" => Ok(Tag::SpRange),
+            "return_tag" => Ok(Tag::SpReturn),
+            "sass_tag" => Ok(Tag::SpSass),
+            "scaleimage_tag" => Ok(Tag::SpScaleimage),
+            "scope_tag" => Ok(Tag::SpScope),
+            "search_tag" => Ok(Tag::SpSearch),
+            "select_tag" => Ok(Tag::SpSelect),
+            "set_tag" => Ok(Tag::SpSet),
+            "sort_tag" => Ok(Tag::SpSort),
+            "subinformation_tag" => Ok(Tag::SpSubinformation),
+            "tagbody_tag" => Ok(Tag::SpTagbody),
+            "text_tag" => Ok(Tag::SpText),
+            "textarea_tag" => Ok(Tag::SpTextarea),
+            "textimage_tag" => Ok(Tag::SpTextimage),
+            "throw_tag" => Ok(Tag::SpThrow),
+            "toggle_tag" => Ok(Tag::SpToggle),
+            "upload_tag" => Ok(Tag::SpUpload),
+            "url_tag" => Ok(Tag::SpUrl),
+            "warning_tag" => Ok(Tag::SpWarning),
+            "worklist_tag" => Ok(Tag::SpWorklist),
+            "zip_tag" => Ok(Tag::SpZip),
+            "spt_counter_tag" => Ok(Tag::SptCounter),
+            "spt_date_tag" => Ok(Tag::SptDate),
+            "spt_diff_tag" => Ok(Tag::SptDiff),
+            "spt_email2img_tag" => Ok(Tag::SptEmail2img),
+            "spt_encryptemail_tag" => Ok(Tag::SptEncryptemail),
+            "spt_escapeemail_tag" => Ok(Tag::SptEscapeemail),
+            "spt_formsolutions_tag" => Ok(Tag::SptFormsolutions),
+            "spt_id2url_tag" => Ok(Tag::SptId2url),
+            "spt_ilink_tag" => Ok(Tag::SptIlink),
+            "spt_imageeditor_tag" => Ok(Tag::SptImageeditor),
+            "spt_imp_tag" => Ok(Tag::SptImp),
+            "spt_iterator_tag" => Ok(Tag::SptIterator),
+            "spt_link_tag" => Ok(Tag::SptLink),
+            "spt_number_tag" => Ok(Tag::SptNumber),
+            "spt_personalization_tag" => Ok(Tag::SptPersonalization),
+            "spt_prehtml_tag" => Ok(Tag::SptPrehtml),
+            "spt_smarteditor_tag" => Ok(Tag::SptSmarteditor),
+            "spt_spml_tag" => Ok(Tag::SptSpml),
+            "spt_text_tag" => Ok(Tag::SptText),
+            "spt_textarea_tag" => Ok(Tag::SptTextarea),
+            "spt_timestamp_tag" => Ok(Tag::SptTimestamp),
+            "spt_tinymce_tag" => Ok(Tag::SptTinymce),
+            "spt_updown_tag" => Ok(Tag::SptUpdown),
+            "spt_upload_tag" => Ok(Tag::SptUpload),
+            "spt_worklist_tag" => Ok(Tag::SptWorklist),
             tag => Err(anyhow::anyhow!("not a valid tag: \"{}\"", tag)),
         };
     }
 }
 
-impl SpTag {
+impl Tag {
     pub fn properties(&self) -> TagProperties {
         return match self {
-            SpTag::Argument => ARGUMENT,
-            SpTag::Attribute => ATTRIBUTE,
-            SpTag::Barcode => BARCODE,
-            SpTag::Break => BREAK,
-            SpTag::Calendarsheet => CALENDARSHEET,
-            SpTag::Checkbox => CHECKBOX,
-            SpTag::Code => CODE,
-            SpTag::Collection => COLLECTION,
-            SpTag::Condition => CONDITION,
-            SpTag::Diff => DIFF,
-            SpTag::Else => ELSE,
-            SpTag::Elseif => ELSEIF,
-            SpTag::Error => ERROR,
-            SpTag::Expire => EXPIRE,
-            SpTag::Filter => FILTER,
-            SpTag::For => FOR,
-            SpTag::Form => FORM,
-            SpTag::Hidden => HIDDEN,
-            SpTag::If => IF,
-            SpTag::Include => INCLUDE,
-            SpTag::Io => IO,
-            SpTag::Iterator => ITERATOR,
-            SpTag::Json => JSON,
-            SpTag::Linktree => LINKTREE,
-            SpTag::LinkedInformation => LINKEDINFORMATION,
-            SpTag::Livetree => LIVETREE,
-            SpTag::Log => LOG,
-            SpTag::Login => LOGIN,
-            SpTag::Loop => LOOP,
-            SpTag::Map => MAP,
-            SpTag::Option => OPTION,
-            SpTag::Password => PASSWORD,
-            SpTag::Print => PRINT,
-            SpTag::Querytree => QUERYTREE,
-            SpTag::Radio => RADIO,
-            SpTag::Range => RANGE,
-            SpTag::Return => RETURN,
-            SpTag::Sass => SASS,
-            SpTag::Scaleimage => SCALEIMAGE,
-            SpTag::Scope => SCOPE,
-            SpTag::Search => SEARCH,
-            SpTag::Select => SELECT,
-            SpTag::Set => SET,
-            SpTag::Sort => SORT,
-            SpTag::Subinformation => SUBINFORMATION,
-            SpTag::Tagbody => TAGBODY,
-            SpTag::Text => TEXT,
-            SpTag::Textarea => TEXTAREA,
-            SpTag::Textimage => TEXTIMAGE,
-            SpTag::Throw => THROW,
-            SpTag::Toggle => TOGGLE,
-            SpTag::Upload => UPLOAD,
-            SpTag::Url => URL,
-            SpTag::Warning => WARNING,
-            SpTag::Worklist => WORKLIST,
-            SpTag::Zip => ZIP,
+            Tag::SpArgument => SP_ARGUMENT,
+            Tag::SpAttribute => SP_ATTRIBUTE,
+            Tag::SpBarcode => SP_BARCODE,
+            Tag::SpBreak => SP_BREAK,
+            Tag::SpCalendarsheet => SP_CALENDARSHEET,
+            Tag::SpCheckbox => SP_CHECKBOX,
+            Tag::SpCode => SP_CODE,
+            Tag::SpCollection => SP_COLLECTION,
+            Tag::SpCondition => SP_CONDITION,
+            Tag::SpDiff => SP_DIFF,
+            Tag::SpElse => SP_ELSE,
+            Tag::SpElseif => SP_ELSEIF,
+            Tag::SpError => SP_ERROR,
+            Tag::SpExpire => SP_EXPIRE,
+            Tag::SpFilter => SP_FILTER,
+            Tag::SpFor => SP_FOR,
+            Tag::SpForm => SP_FORM,
+            Tag::SpHidden => SP_HIDDEN,
+            Tag::SpIf => SP_IF,
+            Tag::SpInclude => SP_INCLUDE,
+            Tag::SpIo => SP_IO,
+            Tag::SpIterator => SP_ITERATOR,
+            Tag::SpJson => SP_JSON,
+            Tag::SpLinktree => SP_LINKTREE,
+            Tag::SpLinkedInformation => SP_LINKEDINFORMATION,
+            Tag::SpLivetree => SP_LIVETREE,
+            Tag::SpLog => SP_LOG,
+            Tag::SpLogin => SP_LOGIN,
+            Tag::SpLoop => SP_LOOP,
+            Tag::SpMap => SP_MAP,
+            Tag::SpOption => SP_OPTION,
+            Tag::SpPassword => SP_PASSWORD,
+            Tag::SpPrint => SP_PRINT,
+            Tag::SpQuerytree => SP_QUERYTREE,
+            Tag::SpRadio => SP_RADIO,
+            Tag::SpRange => SP_RANGE,
+            Tag::SpReturn => SP_RETURN,
+            Tag::SpSass => SP_SASS,
+            Tag::SpScaleimage => SP_SCALEIMAGE,
+            Tag::SpScope => SP_SCOPE,
+            Tag::SpSearch => SP_SEARCH,
+            Tag::SpSelect => SP_SELECT,
+            Tag::SpSet => SP_SET,
+            Tag::SpSort => SP_SORT,
+            Tag::SpSubinformation => SP_SUBINFORMATION,
+            Tag::SpTagbody => SP_TAGBODY,
+            Tag::SpText => SP_TEXT,
+            Tag::SpTextarea => SP_TEXTAREA,
+            Tag::SpTextimage => SP_TEXTIMAGE,
+            Tag::SpThrow => SP_THROW,
+            Tag::SpToggle => SP_TOGGLE,
+            Tag::SpUpload => SP_UPLOAD,
+            Tag::SpUrl => SP_URL,
+            Tag::SpWarning => SP_WARNING,
+            Tag::SpWorklist => SP_WORKLIST,
+            Tag::SpZip => SP_ZIP,
+            Tag::SptCounter => SPT_COUNTER,
+            Tag::SptDate => SPT_DATE,
+            Tag::SptDiff => SPT_DIFF,
+            Tag::SptEmail2img => SPT_EMAIL2IMG,
+            Tag::SptEncryptemail => SPT_ENCRYPTEMAIL,
+            Tag::SptEscapeemail => SPT_ESCAPEEMAIL,
+            Tag::SptFormsolutions => SPT_FORMSOLUTIONS,
+            Tag::SptId2url => SPT_ID2URL,
+            Tag::SptIlink => SPT_ILINK,
+            Tag::SptImageeditor => SPT_IMAGEEDITOR,
+            Tag::SptImp => SPT_IMP,
+            Tag::SptIterator => SPT_ITERATOR,
+            Tag::SptLink => SPT_LINK,
+            Tag::SptNumber => SPT_NUMBER,
+            Tag::SptPersonalization => SPT_PERSONALIZATION,
+            Tag::SptPrehtml => SPT_PREHTML,
+            Tag::SptSmarteditor => SPT_SMARTEDITOR,
+            Tag::SptSpml => SPT_SPML,
+            Tag::SptText => SPT_TEXT,
+            Tag::SptTextarea => SPT_TEXTAREA,
+            Tag::SptTimestamp => SPT_TIMESTAMP,
+            Tag::SptTinymce => SPT_TINYMCE,
+            Tag::SptUpdown => SPT_UPDOWN,
+            Tag::SptUpload => SPT_UPLOAD,
+            Tag::SptWorklist => SPT_WORKLIST,
         };
     }
 
-    pub fn iter() -> Iter<'static, SpTag> {
-        static SP_TAGS: [SpTag; 56] = [
-            SpTag::Argument,
-            SpTag::Attribute,
-            SpTag::Barcode,
-            SpTag::Break,
-            SpTag::Calendarsheet,
-            SpTag::Checkbox,
-            SpTag::Code,
-            SpTag::Collection,
-            SpTag::Condition,
-            SpTag::Diff,
-            SpTag::Else,
-            SpTag::Elseif,
-            SpTag::Error,
-            SpTag::Expire,
-            SpTag::Filter,
-            SpTag::For,
-            SpTag::Form,
-            SpTag::Hidden,
-            SpTag::If,
-            SpTag::Include,
-            SpTag::Io,
-            SpTag::Iterator,
-            SpTag::Json,
-            SpTag::Linktree,
-            SpTag::LinkedInformation,
-            SpTag::Livetree,
-            SpTag::Log,
-            SpTag::Login,
-            SpTag::Loop,
-            SpTag::Map,
-            SpTag::Option,
-            SpTag::Password,
-            SpTag::Print,
-            SpTag::Querytree,
-            SpTag::Radio,
-            SpTag::Range,
-            SpTag::Return,
-            SpTag::Sass,
-            SpTag::Scaleimage,
-            SpTag::Scope,
-            SpTag::Search,
-            SpTag::Select,
-            SpTag::Set,
-            SpTag::Sort,
-            SpTag::Subinformation,
-            SpTag::Tagbody,
-            SpTag::Text,
-            SpTag::Textarea,
-            SpTag::Textimage,
-            SpTag::Throw,
-            SpTag::Toggle,
-            SpTag::Upload,
-            SpTag::Url,
-            SpTag::Warning,
-            SpTag::Worklist,
-            SpTag::Zip,
+    pub fn iter() -> Iter<'static, Tag> {
+        static TAGS: [Tag; 81] = [
+            Tag::SpArgument,
+            Tag::SpAttribute,
+            Tag::SpBarcode,
+            Tag::SpBreak,
+            Tag::SpCalendarsheet,
+            Tag::SpCheckbox,
+            Tag::SpCode,
+            Tag::SpCollection,
+            Tag::SpCondition,
+            Tag::SpDiff,
+            Tag::SpElse,
+            Tag::SpElseif,
+            Tag::SpError,
+            Tag::SpExpire,
+            Tag::SpFilter,
+            Tag::SpFor,
+            Tag::SpForm,
+            Tag::SpHidden,
+            Tag::SpIf,
+            Tag::SpInclude,
+            Tag::SpIo,
+            Tag::SpIterator,
+            Tag::SpJson,
+            Tag::SpLinktree,
+            Tag::SpLinkedInformation,
+            Tag::SpLivetree,
+            Tag::SpLog,
+            Tag::SpLogin,
+            Tag::SpLoop,
+            Tag::SpMap,
+            Tag::SpOption,
+            Tag::SpPassword,
+            Tag::SpPrint,
+            Tag::SpQuerytree,
+            Tag::SpRadio,
+            Tag::SpRange,
+            Tag::SpReturn,
+            Tag::SpSass,
+            Tag::SpScaleimage,
+            Tag::SpScope,
+            Tag::SpSearch,
+            Tag::SpSelect,
+            Tag::SpSet,
+            Tag::SpSort,
+            Tag::SpSubinformation,
+            Tag::SpTagbody,
+            Tag::SpText,
+            Tag::SpTextarea,
+            Tag::SpTextimage,
+            Tag::SpThrow,
+            Tag::SpToggle,
+            Tag::SpUpload,
+            Tag::SpUrl,
+            Tag::SpWarning,
+            Tag::SpWorklist,
+            Tag::SpZip,
+            Tag::SptCounter,
+            Tag::SptDate,
+            Tag::SptDiff,
+            Tag::SptEmail2img,
+            Tag::SptEncryptemail,
+            Tag::SptEscapeemail,
+            Tag::SptFormsolutions,
+            Tag::SptId2url,
+            Tag::SptIlink,
+            Tag::SptImageeditor,
+            Tag::SptImp,
+            Tag::SptIterator,
+            Tag::SptLink,
+            Tag::SptNumber,
+            Tag::SptPersonalization,
+            Tag::SptPrehtml,
+            Tag::SptSmarteditor,
+            Tag::SptSpml,
+            Tag::SptText,
+            Tag::SptTextarea,
+            Tag::SptTimestamp,
+            Tag::SptTinymce,
+            Tag::SptUpdown,
+            Tag::SptUpload,
+            Tag::SptWorklist,
         ];
-        return SP_TAGS.iter();
+        return TAGS.iter();
     }
 }

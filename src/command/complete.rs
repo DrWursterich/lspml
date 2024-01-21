@@ -34,7 +34,7 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
             },
         )?;
     return match node.kind() {
-        "text" | "document" => Ok(grammar::SpTag::iter()
+        "text" | "document" => Ok(grammar::Tag::iter()
             .map(|tag| tag.properties())
             .map(|properties| CompletionItem {
                 kind: Some(CompletionItemKind::METHOD),
@@ -53,11 +53,11 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
         "include_tag" => match previous.map(|p| p.kind()) {
             Some(">") | Some("argument_tag") => Ok(vec![CompletionItem {
                 kind: Some(CompletionItemKind::METHOD),
-                detail: grammar::SpTag::Argument
+                detail: grammar::Tag::SpArgument
                     .properties()
                     .detail
                     .map(|detail| detail.to_string()),
-                documentation: grammar::SpTag::Argument
+                documentation: grammar::Tag::SpArgument
                     .properties()
                     .documentation
                     .map(|detail| {
@@ -68,7 +68,7 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
                     }),
                 insert_text: Some(format!(
                     "<{}",
-                    grammar::SpTag::Argument.properties().name.to_string()
+                    grammar::Tag::SpArgument.properties().name.to_string()
                 )),
                 insert_text_mode: Some(InsertTextMode::AS_IS),
                 ..Default::default()

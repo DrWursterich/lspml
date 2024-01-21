@@ -30,91 +30,120 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
     })?;
     return Ok((match node.kind() {
         "argument_tag_open" | "argument_tag_close" => {
-            grammar::SpTag::Argument.properties().documentation
+            grammar::Tag::SpArgument.properties().documentation
         }
-        "attribute_tag_open" => grammar::SpTag::Attribute.properties().documentation,
-        "barcode_tag_open" => grammar::SpTag::Barcode.properties().documentation,
-        "break_tag_open" => grammar::SpTag::Break.properties().documentation,
+        "attribute_tag_open" => grammar::Tag::SpAttribute.properties().documentation,
+        "barcode_tag_open" => grammar::Tag::SpBarcode.properties().documentation,
+        "break_tag_open" => grammar::Tag::SpBreak.properties().documentation,
         "calendarsheet_tag_open" | "calendarsheet_tag_close" => {
-            grammar::SpTag::Calendarsheet.properties().documentation
+            grammar::Tag::SpCalendarsheet.properties().documentation
         }
         "checkbox_tag_open" | "checkbox_tag_close" => {
-            grammar::SpTag::Checkbox.properties().documentation
+            grammar::Tag::SpCheckbox.properties().documentation
         }
-        "code_tag_open" | "code_tag_close" => grammar::SpTag::Code.properties().documentation,
+        "code_tag_open" | "code_tag_close" => grammar::Tag::SpCode.properties().documentation,
         "collection_tag_open" | "collection_tag_close" => {
-            grammar::SpTag::Collection.properties().documentation
+            grammar::Tag::SpCollection.properties().documentation
         }
         "condition_tag_open" | "condition_tag_close" => {
-            grammar::SpTag::Condition.properties().documentation
+            grammar::Tag::SpCondition.properties().documentation
         }
-        "diff_tag_open" | "diff_tag_close" => grammar::SpTag::Diff.properties().documentation,
-        "else_tag_open" | "else_tag_close" => grammar::SpTag::Else.properties().documentation,
-        "elseif_tag_open" | "elseif_tag_close" => grammar::SpTag::Elseif.properties().documentation,
-        "error_tag_open" | "error_tag_close" => grammar::SpTag::Error.properties().documentation,
-        "expire_tag_open" | "expire_tag_close" => grammar::SpTag::Expire.properties().documentation,
-        "filter_tag_open" | "filter_tag_close" => grammar::SpTag::Filter.properties().documentation,
-        "for_tag_open" | "for_tag_close" => grammar::SpTag::For.properties().documentation,
-        "form_tag_open" | "form_tag_close" => grammar::SpTag::Form.properties().documentation,
-        "hidden_tag_open" | "hidden_tag_close" => grammar::SpTag::Hidden.properties().documentation,
-        "if_tag_open" | "if_tag_close" => grammar::SpTag::If.properties().documentation,
+        "diff_tag_open" | "diff_tag_close" => grammar::Tag::SpDiff.properties().documentation,
+        "else_tag_open" | "else_tag_close" => grammar::Tag::SpElse.properties().documentation,
+        "elseif_tag_open" | "elseif_tag_close" => grammar::Tag::SpElseif.properties().documentation,
+        "error_tag_open" | "error_tag_close" => grammar::Tag::SpError.properties().documentation,
+        "expire_tag_open" | "expire_tag_close" => grammar::Tag::SpExpire.properties().documentation,
+        "filter_tag_open" | "filter_tag_close" => grammar::Tag::SpFilter.properties().documentation,
+        "for_tag_open" | "for_tag_close" => grammar::Tag::SpFor.properties().documentation,
+        "form_tag_open" | "form_tag_close" => grammar::Tag::SpForm.properties().documentation,
+        "hidden_tag_open" | "hidden_tag_close" => grammar::Tag::SpHidden.properties().documentation,
+        "if_tag_open" | "if_tag_close" => grammar::Tag::SpIf.properties().documentation,
         "include_tag_open" | "include_tag_close" => {
-            grammar::SpTag::Include.properties().documentation
+            grammar::Tag::SpInclude.properties().documentation
         }
-        "io_tag_open" | "io_tag_close" => grammar::SpTag::Io.properties().documentation,
+        "io_tag_open" | "io_tag_close" => grammar::Tag::SpIo.properties().documentation,
         "iterator_tag_open" | "iterator_tag_close" => {
-            grammar::SpTag::Iterator.properties().documentation
+            grammar::Tag::SpIterator.properties().documentation
         }
-        "json_tag_open" | "json_tag_close" => grammar::SpTag::Json.properties().documentation,
+        "json_tag_open" | "json_tag_close" => grammar::Tag::SpJson.properties().documentation,
         "linktree_tag_open" | "linktree_tag_close" => {
-            grammar::SpTag::Linktree.properties().documentation
+            grammar::Tag::SpLinktree.properties().documentation
         }
         "linkedinformation_tag_open" | "linkedinformation_tag_close" => {
-            grammar::SpTag::LinkedInformation.properties().documentation
+            grammar::Tag::SpLinkedInformation.properties().documentation
         }
-        "livetree_tag_open" => grammar::SpTag::Livetree.properties().documentation,
-        "log_tag_open" | "log_tag_close" => grammar::SpTag::Log.properties().documentation,
-        "login_tag_open" => grammar::SpTag::Login.properties().documentation,
-        "loop_tag_open" | "loop_tag_close" => grammar::SpTag::Loop.properties().documentation,
-        "map_tag_open" | "map_tag_close" => grammar::SpTag::Map.properties().documentation,
-        "option_tag_open" | "option_tag_close" => grammar::SpTag::Option.properties().documentation,
+        "livetree_tag_open" => grammar::Tag::SpLivetree.properties().documentation,
+        "log_tag_open" | "log_tag_close" => grammar::Tag::SpLog.properties().documentation,
+        "login_tag_open" => grammar::Tag::SpLogin.properties().documentation,
+        "loop_tag_open" | "loop_tag_close" => grammar::Tag::SpLoop.properties().documentation,
+        "map_tag_open" | "map_tag_close" => grammar::Tag::SpMap.properties().documentation,
+        "option_tag_open" | "option_tag_close" => grammar::Tag::SpOption.properties().documentation,
         "password_tag_open" | "password_tag_close" => {
-            grammar::SpTag::Password.properties().documentation
+            grammar::Tag::SpPassword.properties().documentation
         }
-        "print_tag_open" | "print_tag_close" => grammar::SpTag::Print.properties().documentation,
+        "print_tag_open" | "print_tag_close" => grammar::Tag::SpPrint.properties().documentation,
         "querytree_tag_open" | "querytree_tag_close" => {
-            grammar::SpTag::Querytree.properties().documentation
+            grammar::Tag::SpQuerytree.properties().documentation
         }
-        "radio_tag_open" | "radio_tag_close" => grammar::SpTag::Radio.properties().documentation,
-        "range_tag_open" | "range_tag_close" => grammar::SpTag::Range.properties().documentation,
-        "return_tag_open" | "return_tag_close" => grammar::SpTag::Return.properties().documentation,
-        "sass_tag_open" | "sass_tag_close" => grammar::SpTag::Sass.properties().documentation,
-        "scaleimage_tag_open" => grammar::SpTag::Scaleimage.properties().documentation,
-        "scope_tag_open" | "scope_tag_close" => grammar::SpTag::Scope.properties().documentation,
-        "search_tag_open" | "search_tag_close" => grammar::SpTag::Search.properties().documentation,
-        "select_tag_open" | "select_tag_close" => grammar::SpTag::Select.properties().documentation,
-        "set_tag_open" | "set_tag_close" => grammar::SpTag::Set.properties().documentation,
-        "sort_tag_open" | "sort_tag_close" => grammar::SpTag::Sort.properties().documentation,
+        "radio_tag_open" | "radio_tag_close" => grammar::Tag::SpRadio.properties().documentation,
+        "range_tag_open" | "range_tag_close" => grammar::Tag::SpRange.properties().documentation,
+        "return_tag_open" | "return_tag_close" => grammar::Tag::SpReturn.properties().documentation,
+        "sass_tag_open" | "sass_tag_close" => grammar::Tag::SpSass.properties().documentation,
+        "scaleimage_tag_open" => grammar::Tag::SpScaleimage.properties().documentation,
+        "scope_tag_open" | "scope_tag_close" => grammar::Tag::SpScope.properties().documentation,
+        "search_tag_open" | "search_tag_close" => grammar::Tag::SpSearch.properties().documentation,
+        "select_tag_open" | "select_tag_close" => grammar::Tag::SpSelect.properties().documentation,
+        "set_tag_open" | "set_tag_close" => grammar::Tag::SpSet.properties().documentation,
+        "sort_tag_open" | "sort_tag_close" => grammar::Tag::SpSort.properties().documentation,
         "subinformation_tag_open" | "subinformation_tag_close" => {
-            grammar::SpTag::Subinformation.properties().documentation
+            grammar::Tag::SpSubinformation.properties().documentation
         }
-        "tagbody_tag_open" => grammar::SpTag::Tagbody.properties().documentation,
-        "text_tag_open" | "text_tag_close" => grammar::SpTag::Text.properties().documentation,
+        "tagbody_tag_open" => grammar::Tag::SpTagbody.properties().documentation,
+        "text_tag_open" | "text_tag_close" => grammar::Tag::SpText.properties().documentation,
         "textarea_tag_open" | "textarea_tag_close" => {
-            grammar::SpTag::Textarea.properties().documentation
+            grammar::Tag::SpTextarea.properties().documentation
         }
-        "textimage_tag_open" => grammar::SpTag::Textimage.properties().documentation,
-        "throw_tag_open" => grammar::SpTag::Throw.properties().documentation,
-        "toggle_tag_open" | "toggle_tag_close" => grammar::SpTag::Toggle.properties().documentation,
-        "upload_tag_open" | "upload_tag_close" => grammar::SpTag::Upload.properties().documentation,
-        "url_tag_open" | "url_tag_close" => grammar::SpTag::Url.properties().documentation,
+        "textimage_tag_open" => grammar::Tag::SpTextimage.properties().documentation,
+        "throw_tag_open" => grammar::Tag::SpThrow.properties().documentation,
+        "toggle_tag_open" | "toggle_tag_close" => grammar::Tag::SpToggle.properties().documentation,
+        "upload_tag_open" | "upload_tag_close" => grammar::Tag::SpUpload.properties().documentation,
+        "url_tag_open" | "url_tag_close" => grammar::Tag::SpUrl.properties().documentation,
         "warning_tag_open" | "warning_tag_close" => {
-            grammar::SpTag::Warning.properties().documentation
+            grammar::Tag::SpWarning.properties().documentation
         }
         "worklist_tag_open" | "worklist_tag_close" => {
-            grammar::SpTag::Worklist.properties().documentation
+            grammar::Tag::SpWorklist.properties().documentation
         }
-        "zip_tag_open" | "zip_tag_close" => grammar::SpTag::Zip.properties().documentation,
+        "zip_tag_open" | "zip_tag_close" => grammar::Tag::SpZip.properties().documentation,
+        "spt_counter_tag_open" => grammar::Tag::SptCounter.properties().documentation,
+        "spt_date_tag_open" => grammar::Tag::SptDate.properties().documentation,
+        "spt_diff_tag_open" => grammar::Tag::SptDiff.properties().documentation,
+        "spt_email2img_tag_open" => grammar::Tag::SptEmail2img.properties().documentation,
+        "spt_encryptemail_tag_open" => grammar::Tag::SptEncryptemail.properties().documentation,
+        "spt_escapeemail_tag_open" => grammar::Tag::SptEscapeemail.properties().documentation,
+        "spt_formsolutions_tag_open" => grammar::Tag::SptFormsolutions.properties().documentation,
+        "spt_id2url_tag_open" => grammar::Tag::SptId2url.properties().documentation,
+        "spt_ilink_tag_open" => grammar::Tag::SptIlink.properties().documentation,
+        "spt_imageeditor_tag_open" => grammar::Tag::SptImageeditor.properties().documentation,
+        "spt_imp_tag_open" => grammar::Tag::SptImp.properties().documentation,
+        "spt_iterator_tag_open" | "spt_iterator_tag_close" => {
+            grammar::Tag::SptIterator.properties().documentation
+        }
+        "spt_link_tag_open" => grammar::Tag::SptLink.properties().documentation,
+        "spt_number_tag_open" => grammar::Tag::SptNumber.properties().documentation,
+        "spt_personalization_tag_open" => {
+            grammar::Tag::SptPersonalization.properties().documentation
+        }
+        "spt_prehtml_tag_open" => grammar::Tag::SptPrehtml.properties().documentation,
+        "spt_smarteditor_tag_open" => grammar::Tag::SptSmarteditor.properties().documentation,
+        "spt_spml_tag_open" => grammar::Tag::SptSpml.properties().documentation,
+        "spt_text_tag_open" => grammar::Tag::SptText.properties().documentation,
+        "spt_textarea_tag_open" => grammar::Tag::SptTextarea.properties().documentation,
+        "spt_timestamp_tag_open" => grammar::Tag::SptTimestamp.properties().documentation,
+        "spt_tinymce_tag_open" => grammar::Tag::SptTinymce.properties().documentation,
+        "spt_updown_tag_open" => grammar::Tag::SptUpdown.properties().documentation,
+        "spt_upload_tag_open" => grammar::Tag::SptUpload.properties().documentation,
+        "spt_worklist_tag_open" => grammar::Tag::SptWorklist.properties().documentation,
         kind => {
             log::info!("no hover information about {}", kind);
             return Ok(None);

@@ -160,6 +160,69 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                                     (zip_tag
                                         (name_attribute
                                             (string) @attribute))
+                                    (spt_counter_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_date_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_email2img_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_encryptemail_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_escapeemail_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_formsolutions_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_id2url_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_imageeditor_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_imp_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_iterator_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_link_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_number_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_personalization_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_prehtml_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_smarteditor_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_text_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_textarea_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_timestamp_tag
+                                        (connect_attribute
+                                            (string) @attribute))
+                                    (spt_tinymce_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_updown_tag
+                                        (name_attribute
+                                            (string) @attribute))
+                                    (spt_upload_tag
+                                        (name_attribute
+                                            (string) @attribute))
                                 ]
                                 (.eq? @attribute "\"{variable}\"")
                             )"#
