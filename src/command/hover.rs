@@ -3,6 +3,7 @@ use crate::document_store;
 use crate::grammar;
 use crate::parser;
 use lsp_types::{Hover, HoverContents, HoverParams, MarkupContent, MarkupKind};
+use std::str::FromStr;
 
 pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
     let text_params = params.text_document_position_params;
@@ -28,6 +29,7 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
         ),
         code: ResponseErrorCode::RequestFailed,
     })?;
+    log::trace!("searching hover for {node:?}");
     return Ok((match node.kind() {
         "argument_tag_open" | "argument_tag_close" => {
             grammar::Tag::SpArgument.properties().documentation
@@ -144,8 +146,33 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
         "spt_updown_tag_open" => grammar::Tag::SptUpdown.properties().documentation,
         "spt_upload_tag_open" => grammar::Tag::SptUpload.properties().documentation,
         "spt_worklist_tag_open" => grammar::Tag::SptWorklist.properties().documentation,
+        kind if node.parent().unwrap().kind().ends_with("_attribute") => {
+            match grammar::Tag::from_str(node.parent().unwrap().parent().unwrap().kind())
+                .unwrap()
+                .properties()
+                .attributes
+            {
+                grammar::TagAttributes::These(attributes)
+                | grammar::TagAttributes::TheseAndDynamic(attributes) => {
+                    let attribute_name = &node.parent().unwrap().kind()[.."_attribute".len() - 2];
+                    log::trace!(
+                        "searching for attribute \"{}\" in {}",
+                        attribute_name,
+                        node.parent().unwrap().parent().unwrap().kind()
+                    );
+                    attributes
+                        .iter()
+                        .find(|attribute| attribute.name == attribute_name)
+                        .and_then(|attribute| attribute.documentation)
+                }
+                grammar::TagAttributes::OnlyDynamic | grammar::TagAttributes::None => {
+                    log::info!("no hover information about attribute \"{}\"", kind);
+                    return Ok(None);
+                }
+            }
+        }
         kind => {
-            log::info!("no hover information about {}", kind);
+            log::info!("no hover information about node \"{}\"", kind);
             return Ok(None);
         }
     })

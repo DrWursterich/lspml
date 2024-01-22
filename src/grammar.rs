@@ -8,7 +8,23 @@ pub(crate) struct TagProperties {
     pub(crate) documentation: Option<&'static str>,
     // pub(crate) deprecated: bool,
     pub(crate) children: TagChildren,
+    pub(crate) attributes: TagAttributes,
     pub(crate) attribute_rules: &'static [AttributeRule],
+}
+
+#[derive(Debug)]
+pub(crate) enum TagAttributes {
+    None,
+    OnlyDynamic,
+    These(&'static [TagAttribute]),
+    TheseAndDynamic(&'static [TagAttribute]),
+}
+
+#[derive(Debug)]
+pub(crate) struct TagAttribute {
+    pub(crate) name: &'static str,
+    pub(crate) detail: Option<&'static str>,
+    pub(crate) documentation: Option<&'static str>,
 }
 
 #[derive(Debug)]
@@ -22,6 +38,7 @@ pub(crate) enum AttributeRule {
     Required(&'static str),
     // TODO:
     // OnlyIfAttributeHasValue
+    // Renamed
     // Body?!?
 }
 
@@ -126,6 +143,59 @@ const SP_ARGUMENT: TagProperties = TagProperties {
 Setzt ein Argument für ein sp:include"#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::These(
+        &[
+            TagAttribute {
+                name: "condition",
+                detail: None,
+                documentation: Some(
+                    r#"
+Die Condition wird ausgewertet und als Bedingung in das Argument geschrieben."#),
+            },
+            TagAttribute {
+                name: "default",
+                detail: None,
+                documentation: Some(
+                    r#"
+Der Text, der verwendet wird, wenn die Inhalte von `value`, `expression` und body leer sind."#),
+            },
+            TagAttribute {
+                name: "expression",
+                detail: None,
+                documentation: Some(
+                    r#"
+Die Expression wird ausgewertet und als Wert in das Argument geschrieben."#),
+            },
+            TagAttribute {
+                name: "locale",
+                detail: None,
+                documentation: Some(
+                    r#"
+Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen Variablen."#),
+            },
+            TagAttribute {
+                name: "name",
+                detail: None,
+                documentation: Some(
+                    r#"
+Name des Arguments."#),
+            },
+            TagAttribute {
+                name: "object",
+                detail: None,
+                documentation: Some(
+                    r#"
+Evaluiert das Attribut und setzt den evaluierten Wert. Im Gegensatz zu `value` wird hier das Object gespeichert und nicht der Text."#),
+            },
+            TagAttribute {
+                name: "value",
+                detail: None,
+                documentation: Some(
+                    r#"
+Zu setzender Wert. Dieser wird immer als Zeichenkette ausgewertet."#),
+            }
+        ]
+    ),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::ExactlyOneOf(&["value", "expression", "condition", "object"]), // or body
@@ -138,6 +208,7 @@ const SP_ATTRIBUTE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Deprecated("name"),
         AttributeRule::ExactlyOneOf(&["name", "text", "object", "dynamics"]),
@@ -149,6 +220,7 @@ const SP_BARCODE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("text"),
@@ -164,6 +236,7 @@ const SP_BREAK: TagProperties = TagProperties {
 Beendet FOR- und ITERATE-Schleifen."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[],
 };
 
@@ -175,6 +248,7 @@ const SP_CALENDARSHEET: TagProperties = TagProperties {
 CalendarSheet manage dates and objects"#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("action"),
@@ -192,6 +266,7 @@ const SP_CHECKBOX: TagProperties = TagProperties {
 Check-Box-Tag, erzeugt eine checkBox."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[AttributeRule::Required("name")],
 };
 
@@ -203,6 +278,7 @@ const SP_CODE: TagProperties = TagProperties {
 Schreibt den bodyContent ohne dass dieser ausgeführt wird in die Ergebnis-Datei."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[],
 };
 
@@ -214,6 +290,7 @@ const SP_COLLECTION: TagProperties = TagProperties {
 Collection tag offers certain operation that deal with a common collection. For further description see the javadoc of the class com.sitepark.ies.taglib.core.CollectionTag."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::ExactlyOneOf(&["action", "query"]),
@@ -230,6 +307,7 @@ const SP_CONDITION: TagProperties = TagProperties {
 Umklammert einen if-else Konstrukt."#,
     ),
     children: TagChildren::Vector(&[Tag::SpIf, Tag::SpElse, Tag::SpElseif]),
+    attributes: TagAttributes::None,
     attribute_rules: &[],
 };
 
@@ -241,6 +319,7 @@ const SP_DIFF: TagProperties = TagProperties {
 Vergleicht ein Attribute von zwei Versionen einer Information"#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("from"),
@@ -257,6 +336,7 @@ const SP_ELSE: TagProperties = TagProperties {
 passendes else zu einem If innerhalb eines contitionTag."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[],
 };
 
@@ -268,6 +348,7 @@ const SP_ELSEIF: TagProperties = TagProperties {
 ElseIf-Tag, schreibt Body wenn Bedingung ok ist und vorheriges if fehl schlug."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::ExactlyOneOf(&["name", "condition"]),
         AttributeRule::OnlyOneOf(&[
@@ -294,6 +375,7 @@ const SP_ERROR: TagProperties = TagProperties {
 Prüft ein Fehler aufgetreten ist, markiert ihn gegebenenfals als gefangen und führt den innhalt des Tags aus."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[AttributeRule::Required("code")],
 };
 
@@ -302,6 +384,7 @@ const SP_EXPIRE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[AttributeRule::Required("date")],
 };
 
@@ -313,6 +396,7 @@ const SP_FILTER: TagProperties = TagProperties {
 Filtert eine Liste"#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("collection"),
@@ -330,6 +414,7 @@ const SP_FOR: TagProperties = TagProperties {
 For-Tag, wiederholt solange wie angegeben."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("index"),
         AttributeRule::Required("from"),
@@ -345,6 +430,7 @@ const SP_FORM: TagProperties = TagProperties {
 Erzeugt ein HTML-Form-Tag mit einem angepassten Kommando"#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Deprecated("command"),
         AttributeRule::OnlyOneOf(&["uri", "template"]),
@@ -360,6 +446,7 @@ const SP_HIDDEN: TagProperties = TagProperties {
 Hidden-Tag, erzeugt ein Hiddenfeld."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::ExactlyOneOf(&["value", "fixvalue"]),
@@ -374,6 +461,7 @@ const SP_IF: TagProperties = TagProperties {
 If-Tag, schreibt Body wenn Bedingung ok ist."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::ExactlyOneOf(&["name", "condition"]),
         AttributeRule::OnlyOneOf(&[
@@ -400,6 +488,61 @@ const SP_INCLUDE: TagProperties = TagProperties {
 includiert ein anderes bereits im System gespeichertes Template."#,
     ),
     children: TagChildren::Scalar(Tag::SpArgument),
+    attributes: TagAttributes::These(
+        &[
+            TagAttribute {
+                name: "anchor",
+                detail: None,
+                documentation: Some(
+                    r#"
+Anchor-Name des zu includenden Templates."#),
+            },
+            TagAttribute {
+                name: "arguments",
+                detail: None,
+                documentation: Some(
+                    r#"
+Mit diesem Attribut können Argumente in Form einer Map übergeben, die mit `system.arguments` in der includierten SPML-Datei wieder ausgelesen werden können. Zusätzlich kann noch `sp:argument` verwendet werden. Mit diesem Tag werden ggf. Argumente der Map überschrieben."#),
+            },
+            TagAttribute {
+                name: "context",
+                detail: None,
+                documentation: Some(
+                    r#"
+SPML-Seiten sind immer Teil einer Webapplikation. Die mit dem Attribut `uri` angegebene SPML-Seite bezieht sich immer auf die aktuelle Webapplikation. Soll eine Seite einer anderen Webapplikation eingebunden werden, so wird mit diesem Attribut der Context der Webapplikation angegeben. Da sich der Context einer Webapplikation ändern kann, ist in den meisten Fällen die Verwendung des Attributes `module` zu empfehlen, da hier die ID der Webapplikation angegeben wird."#),
+            },
+            TagAttribute {
+                name: "mode",
+                detail: None,
+                documentation: Some(
+                    r#"
+Mit diesem Attribut kann angegeben werden, in welchem Modus die includete SPML-Seite oder das includete Template ausgeführt werden soll.
+- __in__ Führt das Template oder die SPML-Seite im In-Modus aus.
+- __out__ Führt das Template oder die SPML-Seite im Out-Modus aus."#),
+            },
+            TagAttribute {
+                name: "module",
+                detail: None,
+                documentation: Some(
+                    r#"
+SPML-Seiten sind immer Teil einer Webapplikation. Die mit dem Attribut `uri` angegebenen SPML-Seite bezieht sich immer auf die aktuelle Webapplikation. Soll eine Seite einer anderen Webapplikation eingebunden werden, so wird mit diesem Attribut die ID der Webapplikation angegeben. Dieses Attribut ist dem Attribut `context` vorzuziehen, da sich der Context einer Webapplikation ändern kann."#),
+            },
+            TagAttribute {
+                name: "return",
+                detail: None,
+                documentation: Some(
+                    r#"
+Mit diesem Attribut wird der Name der Variable definiert, in der der Rückgabe-Wert des inkludierten Templates abgelegt wird. Inkludierte Templates können sp:return verwenden um Rückgabe-Werte zu definieren. (Siehe auch Eigene Funktionen)"#),
+            },
+            TagAttribute {
+                name: "template",
+                detail: None,
+                documentation: Some(
+                    r#"
+Zu includendes Template (Variable mit einer Template-ID)."#),
+            }
+        ]
+    ),
     attribute_rules: &[
         AttributeRule::ExactlyOneOf(&["template", "anchor", "uri"]),
         AttributeRule::OnlyOneOf(&["context", "module"]),
@@ -416,6 +559,7 @@ const SP_IO: TagProperties = TagProperties {
 IO-Tag"#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[AttributeRule::Required("type")],
 };
 
@@ -427,6 +571,7 @@ const SP_ITERATOR: TagProperties = TagProperties {
 Wird für den Aufbau von Wiederholfeldern verwendet."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[AttributeRule::Required("collection")],
 };
 
@@ -435,6 +580,7 @@ const SP_JSON: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[],
 };
 
@@ -446,6 +592,7 @@ const SP_LINKEDINFORMATION: TagProperties = TagProperties {
 Diese Tag definiert einen Link eines Artikels auf einen Anderen Artikel. Das Besondere ist, dass der Artikel auf dem Verlinkt wird erst innerhalb dieses tags definiert wird. Dazu müssen alle Paramter wie parent, filename, usw. vorhanden sein. Mit dem Reques können dann schliesslich beide Artikel ubgedatet werden(oder auch erstellt)."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[], // not documented
 };
 
@@ -454,6 +601,7 @@ const SP_LINKTREE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Deprecated("attributes"),
         AttributeRule::Required("name"),
@@ -468,6 +616,7 @@ const SP_LIVETREE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("rootElement"),
@@ -484,6 +633,7 @@ const SP_LOG: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[AttributeRule::Required("level")],
 };
 
@@ -492,6 +642,7 @@ const SP_LOGIN: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[AttributeRule::ExactlyOneOf(&[
         "session", "login", "password", "client",
     ])],
@@ -505,6 +656,7 @@ const SP_LOOP: TagProperties = TagProperties {
 Dient zur Ausgabe eines oder mehrerer Elemente."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::ExactlyOneOf(&["collection", "list"]),
         AttributeRule::OnlyWith("separator", "list"),
@@ -516,6 +668,7 @@ const SP_MAP: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("action"),
@@ -533,6 +686,7 @@ const SP_OPTION: TagProperties = TagProperties {
 Option-Tag, für das Select Tag."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[],
 };
 
@@ -544,6 +698,7 @@ const SP_PASSWORD: TagProperties = TagProperties {
 Password-Tag, erzeugt ein Passwordfeld."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[], // not documented
 };
 
@@ -555,6 +710,7 @@ const SP_PRINT: TagProperties = TagProperties {
 Dient zur Ausgabe eines Attributes"#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Deprecated("arg"),
         AttributeRule::ExactlyOneOf(&["name", "text", "expression", "condition"]),
@@ -571,6 +727,7 @@ const SP_QUERYTREE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[], // not documented
 };
 
@@ -582,6 +739,7 @@ const SP_RADIO: TagProperties = TagProperties {
 Radio Button-Tag, erzeugt einen RadioButton."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[AttributeRule::Required("name")],
 };
 
@@ -590,6 +748,7 @@ const SP_RANGE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("collection"),
@@ -605,6 +764,7 @@ const SP_RETURN: TagProperties = TagProperties {
 Verlässt die SPML-Seite und setzt ggf. einen Rückgabewert für sp:include"#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::ExactlyOneOf(&["value", "expression", "condition", "object"]), // or body
         AttributeRule::OnlyWithEither("default", &["object", "expression"]),
@@ -616,6 +776,7 @@ const SP_SASS: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("source"),
@@ -628,6 +789,7 @@ const SP_SCALEIMAGE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::AtleastOneOf(&["height", "width"]),
@@ -643,6 +805,7 @@ const SP_SCOPE: TagProperties = TagProperties {
 Setzt bereichsweise oder global den Scope für die folgenden Tags"#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[AttributeRule::Required("scope")],
 };
 
@@ -654,6 +817,7 @@ const SP_SEARCH: TagProperties = TagProperties {
 Findet die gewünschte Suche"#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[], // not documented
 };
 
@@ -665,6 +829,7 @@ const SP_SELECT: TagProperties = TagProperties {
 Select-Tag, erzeugt den Rahmen einen Auswahlliste."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[AttributeRule::Required("name")],
 };
 
@@ -676,6 +841,7 @@ const SP_SET: TagProperties = TagProperties {
 Setzt ein Attribute"#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::ExactlyOneOf(&["value", "expression", "condition", "object"]), // or body
@@ -692,6 +858,7 @@ const SP_SORT: TagProperties = TagProperties {
 Sortiert eine Liste"#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("collection"),
@@ -703,6 +870,7 @@ const SP_SUBINFORMATION: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[AttributeRule::Required("name")],
 };
 
@@ -711,6 +879,7 @@ const SP_TAGBODY: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[],
 };
 
@@ -722,6 +891,7 @@ const SP_TEXT: TagProperties = TagProperties {
 Text-Tag, erzeugt ein Eingabefeld."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
@@ -736,6 +906,7 @@ const SP_TEXTAREA: TagProperties = TagProperties {
 Textarea-Tag, erzeugt einen Einabebereich."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
@@ -747,6 +918,7 @@ const SP_TEXTIMAGE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("text"),
@@ -759,6 +931,7 @@ const SP_THROW: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[], // not documented
 };
 
@@ -770,6 +943,7 @@ const SP_TOGGLE: TagProperties = TagProperties {
 Toggle-Tag erzeugt einen toggle der einen einzigen boolischen Wert speichert"#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
@@ -784,6 +958,7 @@ const SP_UPLOAD: TagProperties = TagProperties {
 Das Tag, erzeugt ein Eingabefeld zum Herunderladen von Dateien."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[AttributeRule::Required("name")],
 };
 
@@ -795,6 +970,7 @@ const SP_URL: TagProperties = TagProperties {
 Fügt den ContextPath vor die angegebene URL und hängt, falls nötig die Session ID an die URL."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Deprecated("command"),
         AttributeRule::Deprecated("information"),
@@ -816,6 +992,7 @@ const SP_WARNING: TagProperties = TagProperties {
 Prüft, ob eine Warnung aufgetreten ist, markiert sie gegebenenfalls als gefangen und führt den innhalt des Tags aus."#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[AttributeRule::Required("code")],
 };
 
@@ -827,6 +1004,7 @@ const SP_WORKLIST: TagProperties = TagProperties {
 Findet die gewünschte Workliste"#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[AttributeRule::Required("name")],
 };
 
@@ -835,6 +1013,7 @@ const SP_ZIP: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[], // not documented
 };
 
@@ -849,6 +1028,7 @@ Zählt Zugriffe auf publizierte Informationen"#,
     ),
     // deprecated: true,
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[AttributeRule::Required("name")],
 };
 
@@ -860,6 +1040,7 @@ const SPT_DATE: TagProperties = TagProperties {
 Datums- und Uhrzeiteingabe mit Prüfung auf Gültigkeit"#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
@@ -874,6 +1055,7 @@ const SPT_DIFF: TagProperties = TagProperties {
 Vergleicht zwei Zeichenketten und zeigt die Unterschiede an"#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("from"),
         AttributeRule::Required("to"),
@@ -890,6 +1072,7 @@ Ersetzt E-Mail-Adressen durch Bilder"#,
     ),
     // deprecated: true,
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("object"),
@@ -904,6 +1087,7 @@ const SPT_ENCRYPTEMAIL: TagProperties = TagProperties {
 Verschlüsselt Email-Adressen so, dass sie auch für Responsive-Design-Anforderungen verwendet werden können"#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("object"),
@@ -919,6 +1103,7 @@ Ersetzt Email-Adressen durch Bilder"#,
     ),
     // deprecated: true,
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("object"),
     ],
@@ -932,6 +1117,7 @@ const SPT_FORMSOLUTIONS: TagProperties = TagProperties {
 Erzeugt eine eindeutige Url auf PDF-Dokumente des Form-Solutions Formular Servers."#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
     ],
@@ -945,6 +1131,7 @@ const SPT_ID2URL: TagProperties = TagProperties {
 Durchsucht einen Text nach ID-Signaturen von Artikeln und ersetzt die IDs durch die URL des aktuellen Publikationsbereichs."#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("object"),
@@ -960,6 +1147,7 @@ const SPT_ILINK: TagProperties = TagProperties {
 Erzeugt einen Link auf das CMS"#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[],
 };
 
@@ -971,6 +1159,7 @@ const SPT_IMAGEEDITOR: TagProperties = TagProperties {
 Erzeugt eine Bearbeitungsoberfläche für Bilder"#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[],
 };
 
@@ -982,6 +1171,7 @@ const SPT_IMP: TagProperties = TagProperties {
 Erzeugt einen <img src="...">-Tag für kleingerechnete, sowie aus Texten generierte Bilder"#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("image"),
         AttributeRule::AtleastOneOf(&["height", "width"]),
@@ -1006,6 +1196,7 @@ const SPT_ITERATOR: TagProperties = TagProperties {
 Erzeugt Wiederholfelder"#,
     ),
     children: TagChildren::Any,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
     ],
@@ -1019,6 +1210,7 @@ const SPT_LINK: TagProperties = TagProperties {
 Erzeugt Links auf Informationen und bindet Bildmedien ein."#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
@@ -1037,6 +1229,7 @@ const SPT_NUMBER: TagProperties = TagProperties {
 Zahleneingabe mit Prüfung auf Gültigkeit"#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
@@ -1051,6 +1244,7 @@ const SPT_PERSONALIZATION: TagProperties = TagProperties {
 Definiert personalisierte Bereiche"#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[],
 };
 
@@ -1062,6 +1256,7 @@ const SPT_PREHTML: TagProperties = TagProperties {
 HTML-Code nachbearbeiten."#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("object"),
@@ -1077,6 +1272,7 @@ Integriert den WYSIWYG-SmartEditor ins CMS"#,
     ),
     // deprecated: true,
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
     ],
@@ -1090,6 +1286,7 @@ const SPT_SPML: TagProperties = TagProperties {
 schreibt den Header für SPML-Live Seiten"#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[],
 };
 
@@ -1101,6 +1298,7 @@ const SPT_TEXT: TagProperties = TagProperties {
 Einzeiliges Textfeld, das Versionierung unterstützt"#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
@@ -1115,6 +1313,7 @@ const SPT_TEXTAREA: TagProperties = TagProperties {
 Erzeugt ein mehrzeiliges Textfeld, das Versionierung unterstützt"#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
@@ -1129,6 +1328,7 @@ const SPT_TIMESTAMP: TagProperties = TagProperties {
 Zeitstempel in ein Eingabefeld schreiben"#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("connect"),
     ],
@@ -1142,6 +1342,7 @@ const SPT_TINYMCE: TagProperties = TagProperties {
 Integriert einen Editor"#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
@@ -1156,6 +1357,7 @@ const SPT_UPDOWN: TagProperties = TagProperties {
 Zahlenfeld, das per Klick auf- und abwärts gezählt werden kann"#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
     ],
@@ -1169,6 +1371,7 @@ const SPT_UPLOAD: TagProperties = TagProperties {
 Upload von Dateien"#,
     ),
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("name"),
     ],
@@ -1183,6 +1386,7 @@ Workflow Management einbinden"#,
     ),
     // deprecated: true,
     children: TagChildren::None,
+    attributes: TagAttributes::None,
     attribute_rules: &[
         AttributeRule::Required("command"),
     ],

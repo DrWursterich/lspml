@@ -19,8 +19,8 @@ pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnos
                 };
             }),
     }?;
-    let root = document.tree.root_node();
     let mut diagnositcs: Vec<Diagnostic> = Vec::new();
+    let root = document.tree.root_node();
     validate_document(root, &document.text, &mut diagnositcs).map_err(|err| LsError {
         message: format!("failed to validate document: {}", err),
         code: ResponseErrorCode::RequestFailed,
@@ -31,7 +31,8 @@ pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnos
 fn validate_document(root: Node, text: &String, diagnositcs: &mut Vec<Diagnostic>) -> Result<()> {
     for node in root.children(&mut root.walk()) {
         match node.kind() {
-            "page_header" | "import_header" | "taglib_header" | "text" | "comment" => continue,
+            "page_header" | "import_header" | "taglib_header" | "html_doctype" | "text"
+            | "comment" => continue,
             "ERROR" => diagnositcs.push(Diagnostic {
                 source: Some("lspml".to_string()),
                 message: format!(
@@ -42,8 +43,8 @@ fn validate_document(root: Node, text: &String, diagnositcs: &mut Vec<Diagnostic
                 severity: Some(DiagnosticSeverity::ERROR),
                 ..Default::default()
             }),
-            "html_tag" | "html_option_tag" | "html_void_tag" | "java_tag" | "script_tag"
-            | "style_tag" => validate_children(node, &text, diagnositcs)?,
+            "html_tag" | "html_option_tag" | "html_void_tag" | "xml_comment" | "java_tag"
+            | "script_tag" | "style_tag" => validate_children(node, &text, diagnositcs)?,
             _ => {
                 let _ = &grammar::Tag::from_str(node.kind())
                     .and_then(|tag| validate_tag(tag.properties(), node, &text, diagnositcs))?;

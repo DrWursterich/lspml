@@ -5,9 +5,9 @@ A proof-of-concept language server for the sitepark markup language (spml).
 ## features
 
 - go to definition for variables and `<sp:include>` tags
-- hover for documentation of most tags
+- hover for documentation of most tags and some attributes
 - diagnostics on syntax errors and duplicate/required/deprecated attributes
-- completion for tags (extremly rudimentary)
+- completion for tags and attributes (implemented very sparse)
 
 ## commandline
 
