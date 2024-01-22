@@ -36,6 +36,7 @@ pub(crate) enum AttributeRule {
     OnlyWith(&'static str, &'static str),
     OnlyWithEither(&'static str, &'static [&'static str]),
     Required(&'static str),
+    UriExists(&'static str, &'static str),
     // TODO:
     // OnlyIfAttributeHasValue
     // Renamed
@@ -555,6 +556,7 @@ URI einer Seite die includiert werden soll. Dieser muss in der gleichen Webappli
         AttributeRule::OnlyOneOf(&["context", "module"]),
         AttributeRule::OnlyWith("context", "uri"),
         AttributeRule::OnlyWith("module", "uri"),
+        AttributeRule::UriExists("uri", "module")
     ],
 };
 

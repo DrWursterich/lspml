@@ -1,9 +1,10 @@
 use super::{LsError, ResponseErrorCode};
 use crate::document_store;
 use crate::grammar;
+use crate::project;
 use anyhow::Result;
 use lsp_types::{Diagnostic, DiagnosticSeverity, DocumentDiagnosticParams, Position, Range};
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, path::Path, str::FromStr};
 use tree_sitter::Node;
 
 pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnostic>, LsError> {
@@ -19,16 +20,25 @@ pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnos
                 };
             }),
     }?;
+    let working_directory = project::get_working_directory(&params.text_document.uri)
+        .expect("cannot determine module - requires path to be <module>/src/main/webapp/");
     let mut diagnositcs: Vec<Diagnostic> = Vec::new();
     let root = document.tree.root_node();
-    validate_document(root, &document.text, &mut diagnositcs).map_err(|err| LsError {
-        message: format!("failed to validate document: {}", err),
-        code: ResponseErrorCode::RequestFailed,
-    })?;
+    validate_document(root, &document.text, &mut diagnositcs, &working_directory).map_err(
+        |err| LsError {
+            message: format!("failed to validate document: {}", err),
+            code: ResponseErrorCode::RequestFailed,
+        },
+    )?;
     return Ok(diagnositcs);
 }
 
-fn validate_document(root: Node, text: &String, diagnositcs: &mut Vec<Diagnostic>) -> Result<()> {
+fn validate_document(
+    root: Node,
+    text: &String,
+    diagnositcs: &mut Vec<Diagnostic>,
+    working_directory: &project::WorkingDirectory,
+) -> Result<()> {
     for node in root.children(&mut root.walk()) {
         match node.kind() {
             "page_header" | "import_header" | "taglib_header" | "html_doctype" | "text"
@@ -44,10 +54,19 @@ fn validate_document(root: Node, text: &String, diagnositcs: &mut Vec<Diagnostic
                 ..Default::default()
             }),
             "html_tag" | "html_option_tag" | "html_void_tag" | "xml_comment" | "java_tag"
-            | "script_tag" | "style_tag" => validate_children(node, &text, diagnositcs)?,
+            | "script_tag" | "style_tag" => {
+                validate_children(node, &text, diagnositcs, working_directory)?
+            }
             _ => {
-                let _ = &grammar::Tag::from_str(node.kind())
-                    .and_then(|tag| validate_tag(tag.properties(), node, &text, diagnositcs))?;
+                let _ = &grammar::Tag::from_str(node.kind()).and_then(|tag| {
+                    validate_tag(
+                        tag.properties(),
+                        node,
+                        &text,
+                        diagnositcs,
+                        working_directory,
+                    )
+                })?;
             }
         }
     }
@@ -59,6 +78,7 @@ fn validate_tag(
     node: Node,
     text: &String,
     diagnositcs: &mut Vec<Diagnostic>,
+    working_directory: &project::WorkingDirectory,
 ) -> Result<()> {
     let mut attributes: HashMap<String, String> = HashMap::new();
     for child in node.children(&mut node.walk()) {
@@ -77,7 +97,7 @@ fn validate_tag(
                 // TODO: what tags can/cannot have text?
             }
             "html_tag" | "html_option_tag" | "html_void_tag" | "java_tag" | "script_tag"
-            | "style_tag" => validate_children(child, text, diagnositcs)?,
+            | "style_tag" => validate_children(child, text, diagnositcs, working_directory)?,
             kind if kind.ends_with("_attribute") => {
                 let attribute = &kind[..kind.find("_attribute").unwrap()].to_string();
                 if attributes.contains_key(attribute) {
@@ -93,21 +113,27 @@ fn validate_tag(
                     });
                 } else {
                     let quoted_value = child
-                        .child(0)
+                        .child(2)
                         .unwrap()
                         .utf8_text(text.as_bytes())
                         .unwrap()
                         .to_string();
                     attributes.insert(
                         attribute.to_string(),
-                        quoted_value[1..quoted_value.len()].to_string(),
+                        quoted_value[1..quoted_value.len() - 1].to_string(),
                     );
                 }
             }
             kind if kind.ends_with("_tag") => {
                 let child_tag = &grammar::Tag::from_str(kind).unwrap();
                 if can_have_child(&tag, child_tag) {
-                    validate_tag(child_tag.properties(), child, text, diagnositcs)?;
+                    validate_tag(
+                        child_tag.properties(),
+                        child,
+                        text,
+                        diagnositcs,
+                        working_directory,
+                    )?;
                 } else {
                     diagnositcs.push(Diagnostic {
                         message: format!("unexpected {} tag", &kind[..kind.find("_tag").unwrap()]),
@@ -118,7 +144,7 @@ fn validate_tag(
                     });
                 }
             }
-            _ => validate_children(child, text, diagnositcs)?,
+            _ => validate_children(child, text, diagnositcs, working_directory)?,
         }
     }
     for rule in tag.attribute_rules {
@@ -235,6 +261,28 @@ fn validate_tag(
                     ..Default::default()
                 });
             }
+            grammar::AttributeRule::UriExists(uri_name, module_name) => {
+                if let Some(uri) = attributes.get(*uri_name) {
+                    let module = match attributes.get(*module_name).map(|str| str.as_str()) {
+                        Some("${module.id}") | None => working_directory.module.as_str(),
+                        Some(module) => module,
+                    };
+                    let file = format!(
+                        "{}{}/src/main/webapp{}",
+                        working_directory.path, module, uri
+                    );
+                    if !Path::new(&file).exists() {
+                        diagnositcs.push(Diagnostic {
+                            message: format!("included file {} does not exist", file),
+                            severity: Some(DiagnosticSeverity::ERROR),
+                            range: node_range(node),
+                            source: Some("lspml".to_string()),
+                            ..Default::default()
+                        });
+                    }
+                    // else check if arguments are ok?
+                }
+            }
             _ => {}
         }
     }
@@ -250,7 +298,12 @@ fn can_have_child(tag: &grammar::TagProperties, child: &grammar::Tag) -> bool {
     };
 }
 
-fn validate_children(node: Node, text: &String, diagnositcs: &mut Vec<Diagnostic>) -> Result<()> {
+fn validate_children(
+    node: Node,
+    text: &String,
+    diagnositcs: &mut Vec<Diagnostic>,
+    working_directory: &project::WorkingDirectory,
+) -> Result<()> {
     for child in node.children(&mut node.walk()) {
         match child.kind() {
             "ERROR" => diagnositcs.push(Diagnostic {
@@ -268,13 +321,19 @@ fn validate_children(node: Node, text: &String, diagnositcs: &mut Vec<Diagnostic
             }
             "html_tag" | "html_option_tag" | "html_void_tag" | "java_tag" | "script_tag"
             | "style_tag" => {
-                validate_children(child, text, diagnositcs)?;
+                validate_children(child, text, diagnositcs, working_directory)?;
             }
             kind if kind.ends_with("_tag") => {
                 let child_tag = &grammar::Tag::from_str(kind).unwrap();
-                validate_tag(child_tag.properties(), child, text, diagnositcs)?;
+                validate_tag(
+                    child_tag.properties(),
+                    child,
+                    text,
+                    diagnositcs,
+                    working_directory,
+                )?;
             }
-            _ => validate_children(child, text, diagnositcs)?,
+            _ => validate_children(child, text, diagnositcs, working_directory)?,
         }
     }
     return Ok(());
