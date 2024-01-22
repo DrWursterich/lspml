@@ -540,6 +540,13 @@ Mit diesem Attribut wird der Name der Variable definiert, in der der Rückgabe-W
                 documentation: Some(
                     r#"
 Zu includendes Template (Variable mit einer Template-ID)."#),
+            },
+            TagAttribute {
+                name: "uri",
+                detail: None,
+                documentation: Some(
+                    r#"
+URI einer Seite die includiert werden soll. Dieser muss in der gleichen Webapplikation liegen. Weiterhin kann mit dem `context`-Attribut oder dem module-Attribut eine andere Webapplikation angegeben werden, deren Seite includiert werden soll."#),
             }
         ]
     ),

@@ -212,7 +212,7 @@ fn validate_tag(
             }
             grammar::AttributeRule::OnlyWithEither(name, names)
                 if attributes.contains_key(*name)
-                    && names.iter().any(|name| attributes.contains_key(*name)) =>
+                    && !names.iter().any(|name| attributes.contains_key(*name)) =>
             {
                 diagnositcs.push(Diagnostic {
                     message: format!(

@@ -272,7 +272,7 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                             p.children(&mut document.tree.walk())
                                 .find(|node| node.kind() == "module_attribute")
                         })
-                        .and_then(|attribute| attribute.child(1))
+                        .and_then(|attribute| attribute.child(2))
                         .map(|node| node.utf8_text(document.text.as_bytes()))
                     {
                         Some(Ok("\"${module.id}\"")) | None => {

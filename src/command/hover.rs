@@ -154,7 +154,8 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
             {
                 grammar::TagAttributes::These(attributes)
                 | grammar::TagAttributes::TheseAndDynamic(attributes) => {
-                    let attribute_name = &node.parent().unwrap().kind()[.."_attribute".len() - 2];
+                    let kind = &node.parent().unwrap().kind();
+                    let attribute_name = &kind[..kind.len() - "_attribute".len()];
                     log::trace!(
                         "searching for attribute \"{}\" in {}",
                         attribute_name,
