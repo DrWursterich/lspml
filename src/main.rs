@@ -12,8 +12,8 @@ use structured_logger::Builder;
 mod command;
 mod document_store;
 mod grammar;
+mod modules;
 mod parser;
-mod project;
 
 #[derive(Parser, Debug)]
 #[clap(name = "lspml")]
@@ -22,6 +22,8 @@ struct CommandLineOpts {
     log_file: Option<String>,
     #[clap(long, default_value = "INFO")]
     log_level: String,
+    #[clap(long)]
+    modules_file: Option<String>,
 }
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
@@ -38,7 +40,11 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         )
         .init();
     log::info!("lspml starting...");
-    log::trace!("commandline opts: {:?}", &opts);
+    log::trace!("commandline opts: {:?}", opts);
+    match opts.modules_file {
+        Some(file) => modules::init_module_mappings_from_file(&file),
+        None => modules::init_empty_module_mappings(),
+    }?;
 
     let (connection, io_threads) = Connection::stdio();
     let server_capabilities = serde_json::to_value(&ServerCapabilities {

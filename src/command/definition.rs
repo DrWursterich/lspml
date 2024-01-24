@@ -1,7 +1,7 @@
 use super::{LsError, ResponseErrorCode};
 use crate::document_store;
 use crate::parser;
-use crate::project;
+use crate::modules;
 use lsp_types::{GotoDefinitionParams, Location, Position, Range, Url};
 use std::path::Path;
 use tree_sitter::{Query, QueryCursor};
@@ -36,8 +36,6 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
         ),
         code: ResponseErrorCode::RequestFailed,
     })?;
-    let working_directory = project::get_working_directory(&text_params.text_document.uri)
-        .expect("cannot determine module - requires path to be <module>/src/main/webapp/");
     return match node.kind() {
         // if string is not evaluated ....
         "string" => match node.parent().map(|p| p.kind()) {
@@ -276,9 +274,12 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                         .map(|node| node.utf8_text(document.text.as_bytes()))
                     {
                         Some(Ok("\"${module.id}\"")) | None => {
-                            Some(working_directory.module.as_str())
+                            text_params.text_document.uri
+                            .to_file_path()
+                            .ok()
+                            .and_then(|file| modules::find_module_for_file(file.as_path()))
                         }
-                        Some(Ok(module)) => Some(&module[1..module.len() - 1]),
+                        Some(Ok(module)) => modules::find_module_by_name(&module[1..module.len() - 1]),
                         Some(Err(err)) => {
                             log::error!(
                                 "error while reading include_tag module_attribute text {}",
@@ -294,11 +295,7 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                         }
                     }
                     .and_then(|include_module| {
-                        // .unwrap_or(working_directory.module.as_str());
-                        let mut file = working_directory.path;
-                        file.push_str(&include_module);
-                        file.push_str("/src/main/webapp");
-                        file.push_str(&path[1..path.len() - 1]);
+                        let file = include_module.path + &path[1..path.len() - 1];
                         if !Path::new(&file).exists() {
                             log::info!("included file {} does not exist", file);
                             return None;

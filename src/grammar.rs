@@ -144,59 +144,64 @@ const SP_ARGUMENT: TagProperties = TagProperties {
 Setzt ein Argument für ein sp:include"#,
     ),
     children: TagChildren::Any,
-    attributes: TagAttributes::These(
-        &[
-            TagAttribute {
-                name: "condition",
-                detail: None,
-                documentation: Some(
-                    r#"
-Die Condition wird ausgewertet und als Bedingung in das Argument geschrieben."#),
-            },
-            TagAttribute {
-                name: "default",
-                detail: None,
-                documentation: Some(
-                    r#"
-Der Text, der verwendet wird, wenn die Inhalte von `value`, `expression` und body leer sind."#),
-            },
-            TagAttribute {
-                name: "expression",
-                detail: None,
-                documentation: Some(
-                    r#"
-Die Expression wird ausgewertet und als Wert in das Argument geschrieben."#),
-            },
-            TagAttribute {
-                name: "locale",
-                detail: None,
-                documentation: Some(
-                    r#"
-Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen Variablen."#),
-            },
-            TagAttribute {
-                name: "name",
-                detail: None,
-                documentation: Some(
-                    r#"
-Name des Arguments."#),
-            },
-            TagAttribute {
-                name: "object",
-                detail: None,
-                documentation: Some(
-                    r#"
-Evaluiert das Attribut und setzt den evaluierten Wert. Im Gegensatz zu `value` wird hier das Object gespeichert und nicht der Text."#),
-            },
-            TagAttribute {
-                name: "value",
-                detail: None,
-                documentation: Some(
-                    r#"
-Zu setzender Wert. Dieser wird immer als Zeichenkette ausgewertet."#),
-            }
-        ]
-    ),
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "condition",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Condition wird ausgewertet und als Bedingung in das Argument geschrieben."#,
+            ),
+        },
+        TagAttribute {
+            name: "default",
+            detail: None,
+            documentation: Some(
+                r#"
+Der Text, der verwendet wird, wenn die Inhalte von `value`, `expression` und body leer sind."#,
+            ),
+        },
+        TagAttribute {
+            name: "expression",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Expression wird ausgewertet und als Wert in das Argument geschrieben."#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen Variablen."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Name des Arguments."#,
+            ),
+        },
+        TagAttribute {
+            name: "object",
+            detail: None,
+            documentation: Some(
+                r#"
+Evaluiert das Attribut und setzt den evaluierten Wert. Im Gegensatz zu `value` wird hier das Object gespeichert und nicht der Text."#,
+            ),
+        },
+        TagAttribute {
+            name: "value",
+            detail: None,
+            documentation: Some(
+                r#"
+Zu setzender Wert. Dieser wird immer als Zeichenkette ausgewertet."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::ExactlyOneOf(&["value", "expression", "condition", "object"]), // or body
@@ -489,74 +494,80 @@ const SP_INCLUDE: TagProperties = TagProperties {
 includiert ein anderes bereits im System gespeichertes Template."#,
     ),
     children: TagChildren::Scalar(Tag::SpArgument),
-    attributes: TagAttributes::These(
-        &[
-            TagAttribute {
-                name: "anchor",
-                detail: None,
-                documentation: Some(
-                    r#"
-Anchor-Name des zu includenden Templates."#),
-            },
-            TagAttribute {
-                name: "arguments",
-                detail: None,
-                documentation: Some(
-                    r#"
-Mit diesem Attribut können Argumente in Form einer Map übergeben, die mit `system.arguments` in der includierten SPML-Datei wieder ausgelesen werden können. Zusätzlich kann noch `sp:argument` verwendet werden. Mit diesem Tag werden ggf. Argumente der Map überschrieben."#),
-            },
-            TagAttribute {
-                name: "context",
-                detail: None,
-                documentation: Some(
-                    r#"
-SPML-Seiten sind immer Teil einer Webapplikation. Die mit dem Attribut `uri` angegebene SPML-Seite bezieht sich immer auf die aktuelle Webapplikation. Soll eine Seite einer anderen Webapplikation eingebunden werden, so wird mit diesem Attribut der Context der Webapplikation angegeben. Da sich der Context einer Webapplikation ändern kann, ist in den meisten Fällen die Verwendung des Attributes `module` zu empfehlen, da hier die ID der Webapplikation angegeben wird."#),
-            },
-            TagAttribute {
-                name: "mode",
-                detail: None,
-                documentation: Some(
-                    r#"
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "anchor",
+            detail: None,
+            documentation: Some(
+                r#"
+Anchor-Name des zu includenden Templates."#,
+            ),
+        },
+        TagAttribute {
+            name: "arguments",
+            detail: None,
+            documentation: Some(
+                r#"
+Mit diesem Attribut können Argumente in Form einer Map übergeben, die mit `system.arguments` in der includierten SPML-Datei wieder ausgelesen werden können. Zusätzlich kann noch `sp:argument` verwendet werden. Mit diesem Tag werden ggf. Argumente der Map überschrieben."#,
+            ),
+        },
+        TagAttribute {
+            name: "context",
+            detail: None,
+            documentation: Some(
+                r#"
+SPML-Seiten sind immer Teil einer Webapplikation. Die mit dem Attribut `uri` angegebene SPML-Seite bezieht sich immer auf die aktuelle Webapplikation. Soll eine Seite einer anderen Webapplikation eingebunden werden, so wird mit diesem Attribut der Context der Webapplikation angegeben. Da sich der Context einer Webapplikation ändern kann, ist in den meisten Fällen die Verwendung des Attributes `module` zu empfehlen, da hier die ID der Webapplikation angegeben wird."#,
+            ),
+        },
+        TagAttribute {
+            name: "mode",
+            detail: None,
+            documentation: Some(
+                r#"
 Mit diesem Attribut kann angegeben werden, in welchem Modus die includete SPML-Seite oder das includete Template ausgeführt werden soll.
 - __in__ Führt das Template oder die SPML-Seite im In-Modus aus.
-- __out__ Führt das Template oder die SPML-Seite im Out-Modus aus."#),
-            },
-            TagAttribute {
-                name: "module",
-                detail: None,
-                documentation: Some(
-                    r#"
-SPML-Seiten sind immer Teil einer Webapplikation. Die mit dem Attribut `uri` angegebenen SPML-Seite bezieht sich immer auf die aktuelle Webapplikation. Soll eine Seite einer anderen Webapplikation eingebunden werden, so wird mit diesem Attribut die ID der Webapplikation angegeben. Dieses Attribut ist dem Attribut `context` vorzuziehen, da sich der Context einer Webapplikation ändern kann."#),
-            },
-            TagAttribute {
-                name: "return",
-                detail: None,
-                documentation: Some(
-                    r#"
-Mit diesem Attribut wird der Name der Variable definiert, in der der Rückgabe-Wert des inkludierten Templates abgelegt wird. Inkludierte Templates können sp:return verwenden um Rückgabe-Werte zu definieren. (Siehe auch Eigene Funktionen)"#),
-            },
-            TagAttribute {
-                name: "template",
-                detail: None,
-                documentation: Some(
-                    r#"
-Zu includendes Template (Variable mit einer Template-ID)."#),
-            },
-            TagAttribute {
-                name: "uri",
-                detail: None,
-                documentation: Some(
-                    r#"
-URI einer Seite die includiert werden soll. Dieser muss in der gleichen Webapplikation liegen. Weiterhin kann mit dem `context`-Attribut oder dem module-Attribut eine andere Webapplikation angegeben werden, deren Seite includiert werden soll."#),
-            }
-        ]
-    ),
+- __out__ Führt das Template oder die SPML-Seite im Out-Modus aus."#,
+            ),
+        },
+        TagAttribute {
+            name: "module",
+            detail: None,
+            documentation: Some(
+                r#"
+SPML-Seiten sind immer Teil einer Webapplikation. Die mit dem Attribut `uri` angegebenen SPML-Seite bezieht sich immer auf die aktuelle Webapplikation. Soll eine Seite einer anderen Webapplikation eingebunden werden, so wird mit diesem Attribut die ID der Webapplikation angegeben. Dieses Attribut ist dem Attribut `context` vorzuziehen, da sich der Context einer Webapplikation ändern kann."#,
+            ),
+        },
+        TagAttribute {
+            name: "return",
+            detail: None,
+            documentation: Some(
+                r#"
+Mit diesem Attribut wird der Name der Variable definiert, in der der Rückgabe-Wert des inkludierten Templates abgelegt wird. Inkludierte Templates können sp:return verwenden um Rückgabe-Werte zu definieren. (Siehe auch Eigene Funktionen)"#,
+            ),
+        },
+        TagAttribute {
+            name: "template",
+            detail: None,
+            documentation: Some(
+                r#"
+Zu includendes Template (Variable mit einer Template-ID)."#,
+            ),
+        },
+        TagAttribute {
+            name: "uri",
+            detail: None,
+            documentation: Some(
+                r#"
+URI einer Seite die includiert werden soll. Dieser muss in der gleichen Webapplikation liegen. Weiterhin kann mit dem `context`-Attribut oder dem module-Attribut eine andere Webapplikation angegeben werden, deren Seite includiert werden soll."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::ExactlyOneOf(&["template", "anchor", "uri"]),
         AttributeRule::OnlyOneOf(&["context", "module"]),
         AttributeRule::OnlyWith("context", "uri"),
         AttributeRule::OnlyWith("module", "uri"),
-        AttributeRule::UriExists("uri", "module")
+        AttributeRule::UriExists("uri", "module"),
     ],
 };
 
@@ -1113,9 +1124,7 @@ Ersetzt Email-Adressen durch Bilder"#,
     // deprecated: true,
     children: TagChildren::None,
     attributes: TagAttributes::None,
-    attribute_rules: &[
-        AttributeRule::Required("object"),
-    ],
+    attribute_rules: &[AttributeRule::Required("object")],
 };
 
 const SPT_FORMSOLUTIONS: TagProperties = TagProperties {
@@ -1127,9 +1136,7 @@ Erzeugt eine eindeutige Url auf PDF-Dokumente des Form-Solutions Formular Server
     ),
     children: TagChildren::None,
     attributes: TagAttributes::None,
-    attribute_rules: &[
-        AttributeRule::Required("name"),
-    ],
+    attribute_rules: &[AttributeRule::Required("name")],
 };
 
 const SPT_ID2URL: TagProperties = TagProperties {
@@ -1206,9 +1213,7 @@ Erzeugt Wiederholfelder"#,
     ),
     children: TagChildren::Any,
     attributes: TagAttributes::None,
-    attribute_rules: &[
-        AttributeRule::Required("name"),
-    ],
+    attribute_rules: &[AttributeRule::Required("name")],
 };
 
 const SPT_LINK: TagProperties = TagProperties {
@@ -1282,9 +1287,7 @@ Integriert den WYSIWYG-SmartEditor ins CMS"#,
     // deprecated: true,
     children: TagChildren::None,
     attributes: TagAttributes::None,
-    attribute_rules: &[
-        AttributeRule::Required("name"),
-    ],
+    attribute_rules: &[AttributeRule::Required("name")],
 };
 
 const SPT_SPML: TagProperties = TagProperties {
@@ -1338,9 +1341,7 @@ Zeitstempel in ein Eingabefeld schreiben"#,
     ),
     children: TagChildren::None,
     attributes: TagAttributes::None,
-    attribute_rules: &[
-        AttributeRule::Required("connect"),
-    ],
+    attribute_rules: &[AttributeRule::Required("connect")],
 };
 
 const SPT_TINYMCE: TagProperties = TagProperties {
@@ -1367,9 +1368,7 @@ Zahlenfeld, das per Klick auf- und abwärts gezählt werden kann"#,
     ),
     children: TagChildren::None,
     attributes: TagAttributes::None,
-    attribute_rules: &[
-        AttributeRule::Required("name"),
-    ],
+    attribute_rules: &[AttributeRule::Required("name")],
 };
 
 const SPT_UPLOAD: TagProperties = TagProperties {
@@ -1381,9 +1380,7 @@ Upload von Dateien"#,
     ),
     children: TagChildren::None,
     attributes: TagAttributes::None,
-    attribute_rules: &[
-        AttributeRule::Required("name"),
-    ],
+    attribute_rules: &[AttributeRule::Required("name")],
 };
 
 const SPT_WORKLIST: TagProperties = TagProperties {
@@ -1396,9 +1393,7 @@ Workflow Management einbinden"#,
     // deprecated: true,
     children: TagChildren::None,
     attributes: TagAttributes::None,
-    attribute_rules: &[
-        AttributeRule::Required("command"),
-    ],
+    attribute_rules: &[AttributeRule::Required("command")],
 };
 
 impl FromStr for Tag {

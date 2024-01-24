@@ -16,8 +16,21 @@ Usage: lspml [OPTIONS]
 
 Options:
       --log-file <LOG_FILE>
-      --log-level <LOG_LEVEL>  [default: INFO]
-  -h, --help                   Print help
+      --log-level <LOG_LEVEL>        [default: INFO]
+      --modules-file <MODULES_FILE>
+  -h, --help                         Print help
+```
+
+The `modules-file` is a `json` file, in which module names can be mapped to local repositories like so:
+```json
+{
+	"test-module": {
+		"path": "/path/to/this/repo/lspml/test-spml/test-module/src/main/webapp/"
+	},
+	"sitekit-module": {
+		"path": "/path/to/this/repo/lspml/test-spml/sitekit-module/src/main/webapp/"
+	}
+}
 ```
 
 ## build
