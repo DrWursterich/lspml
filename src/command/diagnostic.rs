@@ -93,13 +93,15 @@ fn validate_tag(
             "html_tag" | "html_option_tag" | "html_void_tag" | "java_tag" | "script_tag"
             | "style_tag" => validate_children(child, text, diagnositcs, file)?,
             kind if kind.ends_with("_attribute") => {
-                let attribute = &kind[..kind.find("_attribute").unwrap()].to_string();
-                if attributes.contains_key(attribute) {
+                let attribute = child
+                    .child(0)
+                    .unwrap()
+                    .utf8_text(text.as_bytes())
+                    .unwrap()
+                    .to_string();
+                if attributes.contains_key(&attribute) {
                     diagnositcs.push(Diagnostic {
-                        message: format!(
-                            "duplicate {} attribute",
-                            child.child(0).unwrap().utf8_text(text.as_bytes()).unwrap()
-                        ),
+                        message: format!("duplicate {} attribute", attribute),
                         severity: Some(DiagnosticSeverity::WARNING),
                         range: node_range(child),
                         source: Some("lspml".to_string()),
@@ -113,7 +115,7 @@ fn validate_tag(
                         .unwrap()
                         .to_string();
                     attributes.insert(
-                        attribute.to_string(),
+                        attribute,
                         quoted_value[1..quoted_value.len() - 1].to_string(),
                     );
                 }
