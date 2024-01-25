@@ -214,7 +214,40 @@ const SP_ATTRIBUTE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "dynamics",
+            detail: None,
+            documentation: Some(
+                r#"
+Evaluierung aller dynamischen Attribute."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Name des Attributes, das als Objekt evaluiert werden soll."#,
+            ),
+        },
+        TagAttribute {
+            name: "object",
+            detail: None,
+            documentation: Some(
+                r#"
+Name des Attributes, das als Objekt evaluiert werden soll."#,
+            ),
+        },
+        TagAttribute {
+            name: "text",
+            detail: None,
+            documentation: Some(
+                r#"
+Text der evaluiert werden soll. Dies ist funktional identisch mit `name`"#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Deprecated("name"),
         AttributeRule::ExactlyOneOf(&["name", "text", "object", "dynamics"]),
@@ -226,7 +259,56 @@ const SP_BARCODE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "height",
+            detail: None,
+            documentation: Some(
+                r#"
+Höhe des Bildes."#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachigen Variablen."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Name der Variable für den Zugriff auf das Ergebnis-Object. Je nach Angegebenen Typ. Mögliche Objekte sind: `QRCode`."#,
+            ),
+        },
+        TagAttribute {
+            name: "scope",
+            detail: None,
+            documentation: Some(
+                r#"
+Gültigkeitsbereich, in dem die Variable definiert ist. Möglich sind `page` und `request`."#,
+            ),
+        },
+        TagAttribute {
+            name: "text",
+            detail: None,
+            documentation: Some(
+                r#"
+Text aus dem der Barcode generiert werden soll."#,
+            ),
+        },
+        TagAttribute {
+            name: "type",
+            detail: None,
+            documentation: Some(
+                r#"
+Zu erzeugender Barcode-Typ. Unterstütz wird z.Z. nur `qrcode`"#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("text"),
@@ -254,7 +336,80 @@ const SP_CALENDARSHEET: TagProperties = TagProperties {
 CalendarSheet manage dates and objects"#,
     ),
     children: TagChildren::Any,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "action",
+            detail: None,
+            documentation: Some(
+                r#"
+Aktion, die ausgeführt werden soll. Es existieren die Aktionen `add`, `clear` und `new`."#,
+            ),
+        },
+        TagAttribute {
+            name: "date",
+            detail: None,
+            documentation: Some(
+                r#"
+Zu setzender Wert. Hiermit kann direkt ein einzelnes Datum angegeben werden. Über die Attribute `value` bzw. `object` kann die zugehörige Referenz angegeben werden."#,
+            ),
+        },
+        TagAttribute {
+            name: "from",
+            detail: None,
+            documentation: Some(
+                r#"
+Über diesen Parameter wird der zeitliche Rahmen des CalendarSheets festgelegt."#,
+            ),
+        },
+        TagAttribute {
+            name: "mode",
+            detail: None,
+            documentation: Some(
+                r#"
+Über diesen Parameter wird Modus angegeben, mit dem ein Termin eingefügt werden soll. Gültige Werte sind: `allDays` (alle Tage einfügen), `startDays` (nur den Start-Tag, sofern dieser innerhalb des angegebenen Zeitraums liegt einfügen) und `firstDays` (den ersten gültigen Tag einfügen)"#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Name über den das `CalendarSheet` angesprochen werden kann."#,
+            ),
+        },
+        TagAttribute {
+            name: "object",
+            detail: None,
+            documentation: Some(
+                r#"
+Evaluiert das Attribut und setzt das entsprechende `CalendarInformation`-Objekt. Im Gegensatz zu `value` wird hier das Objekt direkt erwartet und nicht der Text. Das Element, zu dem das CalendarInformation gehört (`root`) wird automatisch als Referenz verwendet."#,
+            ),
+        },
+        TagAttribute {
+            name: "scope",
+            detail: None,
+            documentation: Some(
+                r#"
+Namensraum, in dem die Variable definiert ist. Für diesen Tag ist der Page- und Request-Scope möglich (`page`, `request`)."#,
+            ),
+        },
+        TagAttribute {
+            name: "to",
+            detail: None,
+            documentation: Some(
+                r#"
+Über diesen Parameter wird der zeitliche Rahmen des `CalendarSheets` festgelegt."#,
+            ),
+        },
+        TagAttribute {
+            name: "value",
+            detail: None,
+            documentation: Some(
+                r#"
+Zu setzendes `CalendarInformation`-Objekt. Dieser wird immer als Zeichenkette ausgewertet. Das Element, zu dem das `CalendarInformation` gehört (`root`) wird automatisch als Referenz verwendet."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("action"),
@@ -272,7 +427,64 @@ const SP_CHECKBOX: TagProperties = TagProperties {
 Check-Box-Tag, erzeugt eine checkBox."#,
     ),
     children: TagChildren::Any,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "checked",
+            detail: None,
+            documentation: Some(
+                r#"
+Gibt an, ob der Radio-Button per default gechecked werden soll. Diese Einstellung gibt es nur so lange, bis eine Auswahl durch den Bearbeiter vorgenommen und gespeichert wurde."#,
+            ),
+        },
+        TagAttribute {
+            name: "disabled",
+            detail: None,
+            documentation: Some(
+                r#"
+HTML-Attribut (`true`, `false`)."#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Bestimmt den Namen des Feldes."#,
+            ),
+        },
+        TagAttribute {
+            name: "readonly",
+            detail: None,
+            documentation: Some(
+                r#"
+HTML-Attribut (`true`, `false`)."#,
+            ),
+        },
+        TagAttribute {
+            name: "type",
+            detail: None,
+            documentation: Some(
+                r#"
+Der Typ des Eingabefeldes."#,
+            ),
+        },
+        TagAttribute {
+            name: "value",
+            detail: None,
+            documentation: Some(
+                r#"
+Setzt einen zu übertragenen Wert dieser Checkbox"#,
+            ),
+        },
+    ]),
     attribute_rules: &[AttributeRule::Required("name")],
 };
 
@@ -296,7 +508,119 @@ const SP_COLLECTION: TagProperties = TagProperties {
 Collection tag offers certain operation that deal with a common collection. For further description see the javadoc of the class com.sitepark.ies.taglib.core.CollectionTag."#,
     ),
     children: TagChildren::Any,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "action",
+            detail: None,
+            documentation: Some(
+                r#"
+Aktion, die ausgeführt werden soll. Es existieren die Aktionen `add`, `addAll`, `remove`, `clear`, `new`, `replace`, `removeFirst`, `removeLast` und `unique`.
+- `add` Fügt ein Element am Ende der Liste ein. Ist ein `index` angegeben, so wird das Element an dieser Position eingefügt. Das ursprüngliche Elemente und alle nachfolgenden Elemente werden eine Position weiter geschoben.
+- `addNotEmpty` Fügt ein Element am Ende der Liste ein, wenn der Wert nicht `null` oder ein Leerstring ist. Ist ein `index` angegeben, so wird das Element an dieser Position eingefügt. Das ursprüngliche Elemente und alle nachfolgenden Elemente werden eine Position weiter geschoben.
+- `addAll` Mit dieser Aktion können mehrere Elemente der Liste hinzugefügt werden. Dazu muss `object` vom Typ `Collection` sein.
+- `remove` Löscht ein Element aus der Liste. Ist `index` angegeben, wird das Element an der Index-Position gelöscht und alle nachfolgenden Elemente rutschen eine Position nach oben. Ist `object` bzw. `value` angegeben, wird das Element in der Liste gesucht und gelöscht.
+- `clear` Löscht alle Elemente aus der Liste.
+- `new` Erzeugt eine neue leere Liste.
+- `replace` Ersetzt ein Element der Liste. `index` gibt hierbei die Position des Elements an, das durch `object` bzw. `value` ersetzt werden soll.
+- `removeFirst` Löscht das erste Element der Liste.
+- `removeLast` Löscht das letzte Element der Liste.
+- `unique` Entfernt alle mehrfach vorkommenden Elemente aus der Liste.
+- `insert` Fügt ein Element ein und verschiebt alle nachfolgenden Elemente um eine Position. Wenn in eine Position eingefügt wird, die noch nicht belegt ist, wird das delta mit `null` aufgefüllt."#,
+            ),
+        },
+        TagAttribute {
+            name: "condition",
+            detail: None,
+            documentation: Some(
+                r#"
+Die `Condition` wird ausgewertet und als Bedingung in die Variable geschrieben."#,
+            ),
+        },
+        TagAttribute {
+            name: "default",
+            detail: None,
+            documentation: Some(
+                r#"
+Der Text, der verwendet wird, wenn die Inhalte von `value`, `expression` und body leer sind."#,
+            ),
+        },
+        TagAttribute {
+            name: "expression",
+            detail: None,
+            documentation: Some(
+                r#"
+Die `Expression` wird ausgewertet und als Wert in die Variable geschrieben."#,
+            ),
+        },
+        TagAttribute {
+            name: "index",
+            detail: None,
+            documentation: Some(
+                r#"
+Listen-Position mit der eine Aktion ausgeführt werden soll."#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachigen Variablen."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Name der Liste."#,
+            ),
+        },
+        TagAttribute {
+            name: "object",
+            detail: None,
+            documentation: Some(
+                r#"
+Ein `Objekt` das mit der Liste verarbeitet werden soll. Ist `object` vom Typ `QueryInformation`, so gilt das gleiche wie beim Attribut `query`."#,
+            ),
+        },
+        TagAttribute {
+            name: "publisher",
+            detail: None,
+            documentation: Some(
+                r#"
+Wird der Collection-Tag in Verbindung mit Suchabfragen verwendet (durch `query` oder `object`), ist ein Publikationsbereich erforderlich, mit der die Suchabfrage ausgeführt werden soll. Mit diesem Attribut können ein oder mehrere Publikationsbereiche angegeben werden (durch Kommata getrennt). Entweder werden die Publikationsbereiche durch ihren Anchor angegeben, oder folgende Schlüsselwörter verwendet:
+- `current` Der aktuelle Publikationsbereich. Dieser steht im `out`- und `preview`-Modus als default-Wert zur Verfügung.
+- `ignore` Ignoriert die Publikationsbereiche und liefert die Treffer unabhängig davon, ob sie publiziert sind oder nicht.
+- `all` Liefert die Treffer, wenn sie in irgendeinem der dem Mandanten zugewiesenen Publikationsbereiche publiziert sind.
+- `auto` Entspricht im `out`- und `preview`-Modus dem Schlüsselwort `current` und im `in`-Modus `ignore`."#,
+            ),
+        },
+        TagAttribute {
+            name: "query",
+            detail: None,
+            documentation: Some(
+                r#"
+Fügt in die Collection die Ergebnisse der übergebenen Suchabfrage ein. Ist dieses Attibut gesetzt, ist kein `action` nötig. Die Aktion entspricht einem `addAll`. Es kann jedoch eine andere Aktion angegeben werden."#,
+            ),
+        },
+        TagAttribute {
+            name: "scope",
+            detail: None,
+            documentation: Some(
+                r#"
+Namensraum, in dem die Variable definiert ist. Für diesen Tag ist der Page- und Request-Scope möglich (`page`, `request`)."#,
+            ),
+        },
+        TagAttribute {
+            name: "value",
+            detail: None,
+            documentation: Some(
+                r#"
+Ein Text, der mit der Liste verarbeitet werden soll."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::ExactlyOneOf(&["action", "query"]),
@@ -325,7 +649,48 @@ const SP_DIFF: TagProperties = TagProperties {
 Vergleicht ein Attribute von zwei Versionen einer Information"#,
     ),
     children: TagChildren::Any,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "from",
+            detail: None,
+            documentation: Some(
+                r#"
+Text der Verglichen werden soll. Wörter die hier enthalten und in to nicht mehr enthalten sind, werden als 'gelöscht' markiert."#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachigen Variablen."#,
+            ),
+        },
+        TagAttribute {
+            name: "lookup",
+            detail: None,
+            documentation: Some(
+                r#"
+Gibt an, ob bei der der Auflösung von mehrsprachigen Variablen mit der, durch locale angegebenen Sprache auch ein Lookup ausgeführt werden soll."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Name der Liste, in die das Ergebnis gespeichert wird. Die Liste enthält `DiffChunk`-Objekte."#,
+            ),
+        },
+        TagAttribute {
+            name: "to",
+            detail: None,
+            documentation: Some(
+                r#"
+Text der Verglichen werden soll. Wörter die hier enthalten und in from nicht enthalten sind werden als 'neu' markiert."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("from"),
@@ -354,7 +719,104 @@ const SP_ELSEIF: TagProperties = TagProperties {
 ElseIf-Tag, schreibt Body wenn Bedingung ok ist und vorheriges if fehl schlug."#,
     ),
     children: TagChildren::Any,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "condition",
+            detail: None,
+            documentation: Some(
+                r#"
+Es wird eine Condition erwartet, die den Wert `true` oder `false` zurückliefert."#,
+            ),
+        },
+        TagAttribute {
+            name: "eq",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Bedingung ist erfüllt, wenn die Variable in `name` gleich der Variable in `eq` ist."#,
+            ),
+        },
+        TagAttribute {
+            name: "gt",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Bedingung ist erfüllt, wenn die Variable in `name` größer als der Variable in `gt` ist."#,
+            ),
+        },
+        TagAttribute {
+            name: "gte",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Bedingung ist erfüllt, wenn die Variable in `name` größer oder gleich der Variable in `gte` ist."#,
+            ),
+        },
+        TagAttribute {
+            name: "ic",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Auswertung soll "ignore case" durchgeführt werden. Bezieht sich auf `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, und `contains`."#,
+            ),
+        },
+        TagAttribute {
+            name: "iNull",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Bedingung ist erfüllt, wenn die Variable in `name` leer oder nicht vorhanden ist und `isNull` den Wert `true` hat. Wenn `isNull` den Wert `false` hat, ist die Bedingungen erfüllt, wenn die Variable in `name` nicht leer ist."#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen Variablen."#,
+            ),
+        },
+        TagAttribute {
+            name: "lt",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Bedingung ist erfüllt, wenn die Variable in `name` kleiner als in der Variable in `lte` ist."#
+            ),
+        },
+        TagAttribute {
+            name: "lte",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Bedingung ist erfüllt, wenn die Variable in `name` kleiner oder gleich der Variable in `lte` ist."#,
+            ),
+        },
+        TagAttribute {
+            name: "match",
+            detail: None,
+            documentation: Some(
+                r#"
+Regulärer Ausdruck, der in der Variablen enthalten sein soll."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Variablenname eines Objektes das verglichen werden soll."#,
+            ),
+        },
+        TagAttribute {
+            name: "neq",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Bedingung ist erfüllt, wenn die Variable in `name` ungleich der Variable in `neq` ist."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::ExactlyOneOf(&["name", "condition"]),
         AttributeRule::OnlyOneOf(&[
@@ -381,7 +843,16 @@ const SP_ERROR: TagProperties = TagProperties {
 Prüft ein Fehler aufgetreten ist, markiert ihn gegebenenfals als gefangen und führt den innhalt des Tags aus."#,
     ),
     children: TagChildren::Any,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "code",
+            detail: None,
+            documentation: Some(
+                r#"
+Zu prüfender Error-Code."#,
+            ),
+        },
+    ]),
     attribute_rules: &[AttributeRule::Required("code")],
 };
 
@@ -390,7 +861,16 @@ const SP_EXPIRE: TagProperties = TagProperties {
     detail: None,
     documentation: None,
     children: TagChildren::Any,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "date",
+            detail: None,
+            documentation: Some(
+                r#"
+Long-Wert mit dem Unix-Timestamp des gewünschten Datums"#,
+            ),
+        },
+    ]),
     attribute_rules: &[AttributeRule::Required("date")],
 };
 
@@ -402,7 +882,126 @@ const SP_FILTER: TagProperties = TagProperties {
 Filtert eine Liste"#,
     ),
     children: TagChildren::Any,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "attribute",
+            detail: None,
+            documentation: Some(
+                r#"
+Attribut, auf das der Filter angewendet werden soll."#,
+            ),
+        },
+        TagAttribute {
+            name: "collection",
+            detail: None,
+            documentation: Some(
+                r#"
+Name der zu filternden Liste."#,
+            ),
+        },
+        TagAttribute {
+            name: "filter",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Filterdefinition für die Filtertypen Wildcard und regulärer Ausdruck. Der mit dem Attribut `mode` angegebene Modus wird verwendet. Ohne Angabe eines Modus wird `simple` verwendet."#,
+            ),
+        },
+        TagAttribute {
+            name: "format",
+            detail: None,
+            documentation: Some(
+                r#"
+Das Format des Datums, wenn die `from` und `to` Werte als Datum interpretiert werden sollen."#,
+            ),
+        },
+        TagAttribute {
+            name: "from",
+            detail: None,
+            documentation: Some(
+                r#"
+Der Wert für den Beginn eines Bereiches, z.B. "Aa" oder "100". Ob der Wert als Text, Zahl oder Datum interpretiert wird, kann mit dem Attribut `type` angegeben werden."#,
+            ),
+        },
+        TagAttribute {
+            name: "ic",
+            detail: None,
+            documentation: Some(
+                r#"
+Ist Ignore-Case auf `true` gesetzt, wird eine Groß- und Kleinschreibung nicht berücksichtigt. Dieses Attribut gilt nur für die Filtertypen Wildcard und regulärer Ausdruck."#,
+            ),
+        },
+        TagAttribute {
+            name: "invert",
+            detail: None,
+            documentation: Some(
+                r#"
+Invertiert die Logik des Filters. Alle Elemente die normalerweise herausgefiltert würden, bilden die Filterergebnisse."#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen Variablen."#,
+            ),
+        },
+        TagAttribute {
+            name: "mode",
+            detail: None,
+            documentation: Some(
+                r#"
+Auswahl des Filter-Mechanismus.  
+__simple (Wildcard-Filter)__
+Der Filter kann die Wildcards `*` für beliebige Zeichen und `?` für ein beliebiges Zeichen enthalten. So würde eine wie folgt gefilterte Liste nur Elemente enthalten, die mit a beginnen.
+```regex
+a*
+```
+__regex (Reguläre Ausdrücke)__
+Für komplexe Filter stehen Reguläre Ausdrücke (POSIX) zur Verfügung. So würde im regex-Filtermode eine mit
+```regex
+[a-dA-D].*
+```
+gefilterte Liste nur Elemente enthalten, die mit dem Buchstaben A, a, B, b, C, c, d oder D beginnen."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Name der gefilterten Liste."#,
+            ),
+        },
+        TagAttribute {
+            name: "scope",
+            detail: None,
+            documentation: Some(
+                r#"
+Gültigkeitsbereich, in dem die Variable definiert ist. Möglich sind: `page`|`request`|`session`."#,
+            ),
+        },
+        TagAttribute {
+            name: "to",
+            detail: None,
+            documentation: Some(
+                r#"
+Der Wert für das Ende eines Bereiches, z.B. "Zz" oder "999". Ob der Wert als Text, Zahl oder Datum interpretiert wird, kann mit dem Attribut `type` angegeben werden."#,
+            ),
+        },
+        TagAttribute {
+            name: "type",
+            detail: None,
+            documentation: Some(
+                r#"
+Der Typ für die from und to Attribute: `number`, `text`, `date`.
+- `number` Das Element oder Attribut wird als Zahl interpretiert. Es wird nicht herausgefiltert wenn es innerhalb des Zahlenbereiches liegt, der mit `from` und `to` definiert wurde.
+- `text` Das Element oder Attribut wird als Text interpretiert. Es wird nicht herausgefiltert wenn der Text mit den Zeichen beginnt, die in dem mit `from` und `to` definierten Bereich liegen.
+- `date` Das Element oder Attribut wird als Datum interpretiert. Es wird nicht herausgefiltert wenn es innerhalb des Datumbereiches liegt, der mit `from` und `to` definiert wurde."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("collection"),
@@ -420,7 +1019,56 @@ const SP_FOR: TagProperties = TagProperties {
 For-Tag, wiederholt solange wie angegeben."#,
     ),
     children: TagChildren::Any,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "condition",
+            detail: None,
+            documentation: Some(
+                r#"
+Die For-Schleife wird solange durchlaufen, bis die Bedingung `false` ergibt"#,
+            ),
+        },
+        TagAttribute {
+            name: "from",
+            detail: None,
+            documentation: Some(
+                r#"
+Startwert des Zählers"#,
+            ),
+        },
+        TagAttribute {
+            name: "index",
+            detail: None,
+            documentation: Some(
+                r#"
+Name der Variable, die den aktuellen Zählerstand enthält"#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachigen Variablen "#,
+            ),
+        },
+        TagAttribute {
+            name: "step",
+            detail: None,
+            documentation: Some(
+                r#"
+Schrittweite, in der gezählt werden soll. `step` kann für einen Rückwärtszähler negativ sein"#,
+            ),
+        },
+        TagAttribute {
+            name: "to",
+            detail: None,
+            documentation: Some(
+                r#"
+Endwert des Zählers"#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("index"),
         AttributeRule::Required("from"),
@@ -436,7 +1084,109 @@ const SP_FORM: TagProperties = TagProperties {
 Erzeugt ein HTML-Form-Tag mit einem angepassten Kommando"#,
     ),
     children: TagChildren::Any,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "command",
+            detail: None,
+            documentation: Some(
+                r#"
+__Deprecated__. *Dieses Attribut ist veraltet und wird in zukünftigen Versionen nicht mehr unterstüzt werden. Kommandos wurden in der Version 2.0 zugunsten einer flexibleren Lösung abgeschafft. Ein Kommando bestand aus einem Template mit einem optionalen Handler. Für jede Template-Handler-Kombination musste ein eigenes Kommando angelegt werden. Diese Verbindung wurde aufgebrochen und durch zwei neue Attribute `template` und `handler` ersetzt. Um einen Handler aufzurufen und anschließend ein Template auszuführen, ist nun die Definition eines Kommandos nicht mehr nötig. Um einen Handler aufzurufen und anschließend ein Template auszuführen, verwenden Sie die beiden Attribute `handler` und `template`. Um einen Handler aufzurufen und anschließend eine SPML-Seite auszuführen, verwenden Sie die Attribute `handler` und `uri`.*  
+Existierendes Command. Muss im GUI definiert worden sein."#,
+            ),
+        },
+        TagAttribute {
+            name: "context",
+            detail: None,
+            documentation: Some(
+                r#"
+SPML-Seiten sind immer Teil einer Webapplikation. Jede Webapplikation besitzt einen Context-Pfad mit dem die URL beginnt (Es existert auch ein ROOT-Context-Pfad (`/`)). Soll die URL einer Seite herausgeschrieben werden, die in einer anderen Webapplikation liegt, so wird mit diesem Attribut der Context-Pfad angegeben. Context-Pfade von Webapplikationen können sich ändern. Damit bei solchen Änderungen auch die URL richtig generiert wird, sollte in den meisten Fällen das Attribut `module` verwendet werden."#,
+            ),
+        },
+        TagAttribute {
+            name: "enctype",
+            detail: None,
+            documentation: Some(
+                r#"
+Bestimmt den Typ der zu übertragenden Daten:
+- `text/plain` `text/plain` ist die default Einstellung.
+- `multipart/form-data` Für Datei-Uploads muss `multipart/form-data` angegeben werden."#,
+            ),
+        },
+        TagAttribute {
+            name: "handler",
+            detail: None,
+            documentation: Some(
+                r#"
+Handler, an den das Formular gesendet werden soll. Handler werden vor der, mit `uri` oder `template` angegebenen Seite ausgeführt."#,
+            ),
+        },
+        TagAttribute {
+            name: "id",
+            detail: None,
+            documentation: Some(
+                r#"
+Optionale id für den erzeugten HTML-Form-Tag. Ist dieses Attribut nicht gesetzt, wird automatisch eine ID generiert"#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachiger Variablen."#,
+            ),
+        },
+        TagAttribute {
+            name: "method",
+            detail: None,
+            documentation: Some(
+                r#"
+Bestimmt die Übertragungsmethode: get oder post. Bei get werden die Parameter offen über die aufzurufende URL übermittelt, bei post verborgen im HTTP-Protokoll. Für Datei-Uploads ist post Pflicht."#,
+            ),
+        },
+        TagAttribute {
+            name: "module",
+            detail: None,
+            documentation: Some(
+                r#"
+SPML-Seiten sind immer Teil einer Webapplikation. Jede Webapplikation besitzt einen Context-Pfad mit dem die URL beginnt (Es existert auch ein ROOT-Context-Pfad (`/`)). Soll das Formular an eine Seite gesendet werden, die in einer anderen Webapplikation liegt, so wird mit diesem Attribut die ID dieser Webapplikation angegeben."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Optionaler Name für das erzeugte Formular."#,
+            ),
+        },
+        TagAttribute {
+            name: "nameencoding",
+            detail: None,
+            documentation: Some(
+                r#"
+Die innerhalb von sp:form liegenden Input-Tags (`sp:text`, `spt:text`, `sp:checkbox`, ...) erhalten vom IES generierte Feldnamen, die unter Umständen (wenn sie z.B. innerhalb von `sp:iterator` liegen) Sonderzeichen wie eckige Klammern (`[`, `]`) enthalten können. Beim Aufbau von Live-Seiten, die in PHP eingebettet sind, wird das Formular an PHP-Seiten gesendet. Da Request-Parameternamen mit Sonderzeichen von PHP nicht richtig ausgewertet werden, ist es mit diesem Attribut möglich, die Formularfeldnamen zu encoden, damit keine Sonderzeichen mehr enthalten sind. Vom IES unterstüzte Encodings für Feldnamen sind:
+- `escff` *(default)* Wandelt nur die Zeichen des Feldnamens um, die zu Fehlern führen können z.B. Eckige Klammern (`[]`). Beispiel: Aus `sp_iterator[1].sp_body` wird `escff:sp_iterator:5b:1:5d::2e:sp_body.` Dieses Encoding ist kein Standard-Encoding, sondern eine proprietäre Entwicklung von Sitepark.
+- `hex` Wandelt jedes Zeichen des Feldnamens in den entsprechenden Hex-Wert um. Beispiel: Aus `sp_body` wird "hex:73705f626f6479""#,
+            ),
+        },
+        TagAttribute {
+            name: "template",
+            detail: None,
+            documentation: Some(
+                r#"
+Template, an das das Formular gesendet werden soll. Dieses Attribut sollte nur für Umstellungen von Live-Seiten verwendet werden, die sich durch den Wegfall der Kommandos ergeben. Prinzipiell sollten Live-Seiten und Webapplikationen gemeinhin nicht mit Templates, sondern mit SPML-Seite realisiert werden."#,
+            ),
+        },
+        TagAttribute {
+            name: "uri",
+            detail: None,
+            documentation: Some(
+                r#"
+Dies kann ein beliebiger Pfad zu einer Seite sein. sp:form sorgt dafür, dass alle Session-Informationen mitgesendet werden, sodass die Session nicht verloren geht. Wird bei SPML-Seiten weder das Attribut `uri` noch `template` angegeben, so wird die aktuelle URL angesprochen."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Deprecated("command"),
         AttributeRule::OnlyOneOf(&["uri", "template"]),
@@ -467,7 +1217,104 @@ const SP_IF: TagProperties = TagProperties {
 If-Tag, schreibt Body wenn Bedingung ok ist."#,
     ),
     children: TagChildren::Any,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "condition",
+            detail: None,
+            documentation: Some(
+                r#"
+Es wird eine Condition erwartet, die den Wert `true` oder `false` zurückliefert."#,
+            ),
+        },
+        TagAttribute {
+            name: "eq",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Bedingung ist erfüllt, wenn die Variable in `name` gleich der Variable in `eq` ist."#,
+            ),
+        },
+        TagAttribute {
+            name: "gt",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Bedingung ist erfüllt, wenn die Variable in `name` größer als der Variable in `gt` ist."#,
+            ),
+        },
+        TagAttribute {
+            name: "gte",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Bedingung ist erfüllt, wenn die Variable in `name` größer oder gleich der Variable in `gte` ist."#,
+            ),
+        },
+        TagAttribute {
+            name: "ic",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Auswertung soll "ignore case" durchgeführt werden. Bezieht sich auf `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, und `contains`."#,
+            ),
+        },
+        TagAttribute {
+            name: "iNull",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Bedingung ist erfüllt, wenn die Variable in `name` leer oder nicht vorhanden ist und `isNull` den Wert `true` hat. Wenn `isNull` den Wert `false` hat, ist die Bedingungen erfüllt, wenn die Variable in `name` nicht leer ist."#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen Variablen."#,
+            ),
+        },
+        TagAttribute {
+            name: "lt",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Bedingung ist erfüllt, wenn die Variable in `name` kleiner als in der Variable in `lte` ist."#
+            ),
+        },
+        TagAttribute {
+            name: "lte",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Bedingung ist erfüllt, wenn die Variable in `name` kleiner oder gleich der Variable in `lte` ist."#,
+            ),
+        },
+        TagAttribute {
+            name: "match",
+            detail: None,
+            documentation: Some(
+                r#"
+Regulärer Ausdruck, der in der Variablen enthalten sein soll."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Variablenname eines Objektes das verglichen werden soll."#,
+            ),
+        },
+        TagAttribute {
+            name: "neq",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Bedingung ist erfüllt, wenn die Variable in `name` ungleich der Variable in `neq` ist."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::ExactlyOneOf(&["name", "condition"]),
         AttributeRule::OnlyOneOf(&[
@@ -525,8 +1372,8 @@ SPML-Seiten sind immer Teil einer Webapplikation. Die mit dem Attribut `uri` ang
             documentation: Some(
                 r#"
 Mit diesem Attribut kann angegeben werden, in welchem Modus die includete SPML-Seite oder das includete Template ausgeführt werden soll.
-- __in__ Führt das Template oder die SPML-Seite im In-Modus aus.
-- __out__ Führt das Template oder die SPML-Seite im Out-Modus aus."#,
+- `in` Führt das Template oder die SPML-Seite im In-Modus aus.
+- `out` Führt das Template oder die SPML-Seite im Out-Modus aus."#,
             ),
         },
         TagAttribute {
