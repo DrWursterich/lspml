@@ -29,7 +29,6 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
         ),
         code: ResponseErrorCode::RequestFailed,
     })?;
-    log::trace!("searching hover for {node:?}");
     return Ok((match node.kind() {
         "argument_tag_open" | "argument_tag_close" => {
             grammar::Tag::SpArgument.properties().documentation
@@ -146,35 +145,30 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
         "spt_updown_tag_open" => grammar::Tag::SptUpdown.properties().documentation,
         "spt_upload_tag_open" => grammar::Tag::SptUpload.properties().documentation,
         "spt_worklist_tag_open" => grammar::Tag::SptWorklist.properties().documentation,
-        kind if node.parent().unwrap().kind().ends_with("_attribute") => {
-            match grammar::Tag::from_str(node.parent().unwrap().parent().unwrap().kind())
-                .unwrap()
-                .properties()
-                .attributes
+        kind => match node.parent() {
+            Some(parent) if parent.kind().ends_with("_attribute") => match parent
+                .parent()
+                .and_then(|parent| grammar::Tag::from_str(parent.kind()).ok())
+                .map(|tag| tag.properties().attributes)
             {
-                grammar::TagAttributes::These(attributes) => {
-                    let kind = &node.parent().unwrap().kind();
+                Some(grammar::TagAttributes::These(attributes)) => {
+                    let kind = &parent.kind();
                     let attribute_name = &kind[..kind.len() - "_attribute".len()];
-                    log::trace!(
-                        "searching for attribute \"{}\" in {}",
-                        attribute_name,
-                        node.parent().unwrap().parent().unwrap().kind()
-                    );
                     attributes
                         .iter()
                         .find(|attribute| attribute.name == attribute_name)
                         .and_then(|attribute| attribute.documentation)
                 }
-                grammar::TagAttributes::None => {
-                    log::info!("no hover information about attribute \"{}\"", kind);
+                _ => {
+                    log::info!("no hover information about node \"{}\"", kind);
                     return Ok(None);
                 }
+            },
+            _ => {
+                log::info!("no hover information about node \"{}\"", kind);
+                return Ok(None);
             }
-        }
-        kind => {
-            log::info!("no hover information about node \"{}\"", kind);
-            return Ok(None);
-        }
+        },
     })
     .map(|doc| Hover {
         contents: HoverContents::Markup(MarkupContent {

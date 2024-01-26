@@ -181,9 +181,21 @@ fn search_completions_in_tag(
                 position = TagParsePosition::Attributes;
                 let quoted_value = child
                     .child(0)
-                    .unwrap()
+                    .expect(
+                        format!(
+                            "attribute {:?} of {:?} did not have a attribute-value child",
+                            child, node
+                        )
+                        .as_str(),
+                    )
                     .utf8_text(text.as_bytes())
-                    .unwrap()
+                    .expect(
+                        format!(
+                            "attribute-value in {:?} of {:?} did not contain text",
+                            child, node
+                        )
+                        .as_str(),
+                    )
                     .to_string();
                 attributes.insert(
                     kind[..kind.find("_attribute").unwrap()].to_string(),

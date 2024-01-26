@@ -3653,7 +3653,7 @@ Name der Variable in der der Zugriffswert gespeichert wird."#,
             ),
         },
         TagAttribute {
-                name: "varName",
+            name: "varName",
             detail: None,
             documentation: Some(
                 r#"
@@ -3686,73 +3686,73 @@ Datums- und Uhrzeiteingabe mit Prüfung auf Gültigkeit"#,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
-                name: "disabled",
-                detail: None,
-                documentation: Some(
+            name: "disabled",
+            detail: None,
+            documentation: Some(
                 r#"
 HTML-Attribut (`true`, `false`)."#,
             ),
         },
         TagAttribute {
-                name: "fixvalue",
-                detail: None,
-                documentation: Some(
+            name: "fixvalue",
+            detail: None,
+            documentation: Some(
                 r#"
 Überschreibt jeden vorhandenen Inhalt der mit `name` bestimmten Variablen mit dem durch `fixvalue` angegebenen Wert."#,
             ),
         },
         TagAttribute {
-                name: "locale",
-                detail: None,
-                documentation: Some(
+            name: "locale",
+            detail: None,
+            documentation: Some(
                 r#"
 Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
             ),
         },
         TagAttribute {
-                name: "name",
-                detail: None,
-                documentation: Some(
+            name: "name",
+            detail: None,
+            documentation: Some(
                 r#"
 Bestimmt den Namen des Feldes."#,
             ),
         },
         TagAttribute {
-                name: "nowButton",
-                detail: None,
-                documentation: Some(
+            name: "nowButton",
+            detail: None,
+            documentation: Some(
                 r#"
 Zeigt bei true eine Schaltfläche zum setzen des aktuellen Zeitpunkts an"#,
             ),
         },
         TagAttribute {
-                name: "placeholder",
-                detail: None,
-                documentation: Some(
+            name: "placeholder",
+            detail: None,
+            documentation: Some(
                 r#"
 Muss ein Datum sind und wird als Placeholder eingesetzt"#,
             ),
         },
         TagAttribute {
-                name: "readonly",
-                detail: None,
-                documentation: Some(
+            name: "readonly",
+            detail: None,
+            documentation: Some(
                 r#"
 HTML-Attribut (`true`, `false`)."#,
             ),
         },
         TagAttribute {
-                name: "size",
-                detail: None,
-                documentation: Some(
+            name: "size",
+            detail: None,
+            documentation: Some(
                 r#"
 `'size'`-Wert des generierten input-Tags."#,
             ),
         },
         TagAttribute {
             name: "type",
-                detail: None,
-                documentation: Some(
+            detail: None,
+            documentation: Some(
                 r#"
 Der Typ des Eingabefeldes.
 - `date` Einfaches Eingabefeld im Format `TT.MM.JJJJ`
@@ -3760,9 +3760,9 @@ Der Typ des Eingabefeldes.
             ),
         },
         TagAttribute {
-                name: "value",
-                detail: None,
-                documentation: Some(
+            name: "value",
+            detail: None,
+            documentation: Some(
                 r#"
 Vorgabetext für das erzeugte Eingabefeld. Ohne bzw. mit einem leeren `value`-Attribut wird in der Eingabe das aktuelle Datum angezeigt. Soll das Eingabefeld leer bleiben, muss als `value` ein Leerzeichen (`" "`) angegeben werden."#,
             ),
@@ -3789,7 +3789,7 @@ Vergleicht zwei Zeichenketten und zeigt die Unterschiede an"#,
             documentation: Some(
                 r#"
 Text der verglichen werden soll. Wörter die hier enthalten und in `to` nicht mehr enthalten sind, werden als 'gelöscht' markiert."#,
-        ),
+            ),
         },
         TagAttribute {
             name: "style",
@@ -3797,7 +3797,7 @@ Text der verglichen werden soll. Wörter die hier enthalten und in `to` nicht me
             documentation: Some(
                 r#"
 CSS Styleangaben, die noch in den umschließenden div-Tag eingetragen werden."#,
-        ),
+            ),
         },
         TagAttribute {
             name: "to",
@@ -3826,149 +3826,149 @@ Ersetzt E-Mail-Adressen durch Bilder"#,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
-                name: "alt",
-                detail: None,
-                documentation: Some(
+            name: "alt",
+            detail: None,
+            documentation: Some(
                 r#"
 Alternativtext der in die `alt`-Attribute der `<img>`-Tags eingetragen wird."#,
             ),
         },
         TagAttribute {
-                name: "bgcolor",
-                detail: None,
-                documentation: Some(
+            name: "bgcolor",
+            detail: None,
+            documentation: Some(
                 r#"
 Hintergrundfarbe, die für den E-Mail-Text in dem generierten Bild verwendet werden soll."#,
             ),
         },
         TagAttribute {
-                name: "bgcolor2",
-                detail: None,
-                documentation: Some(
+            name: "bgcolor2",
+            detail: None,
+            documentation: Some(
                 r#"
 Hintergrundfarbe, die für den E-Mail-Text in dem generierten Bild für das Mailformular verwendet werden soll."#,
             ),
         },
         TagAttribute {
-                name: "color",
-                detail: None,
-                documentation: Some(
+            name: "color",
+            detail: None,
+            documentation: Some(
                 r#"
 Schriftfarbe, die für den E-Mail-Text in dem generierten Bild verwendet werden soll."#,
             ),
         },
         TagAttribute {
-                name: "color2",
-                detail: None,
-                documentation: Some(
+            name: "color2",
+            detail: None,
+            documentation: Some(
                 r#"
 Schriftfarbe, die für den E-Mail-Text in dem generierten Bild für das Mailformular verwendet werden soll."#,
             ),
         },
         TagAttribute {
-                name: "font",
-                detail: None,
-                documentation: Some(
+            name: "font",
+            detail: None,
+            documentation: Some(
                 r#"
 Schriftart, die für den E-Mail-Text in dem generierten Bild verwendet werden soll.
 In der Standardinstallalation enthaltene Fonts sind: `Arial` `Lucida` `Verdana` `Futura`"#,
             ),
         },
         TagAttribute {
-                name: "font2",
-                detail: None,
-                documentation: Some(
+            name: "font2",
+            detail: None,
+            documentation: Some(
                 r#"
 Schriftart, die für den E-Mail-Text in dem generierten Bild für das Mailformular verwendet werden soll.
 In der Standardinstallalation enthaltene Fonts sind: `Arial` `Lucida` `Verdana` `Futura`"#,
             ),
         },
         TagAttribute {
-                name: "fontsize",
-                detail: None,
-                documentation: Some(
+            name: "fontsize",
+            detail: None,
+            documentation: Some(
                 r#"
 Schriftgröße, die für den E-Mail-Text in dem generierten Bild verwendet werden soll."#,
             ),
         },
         TagAttribute {
-                name: "fontsize2",
-                detail: None,
-                documentation: Some(
+            name: "fontsize2",
+            detail: None,
+            documentation: Some(
                 r#"
 Schriftgröße, die für den E-Mail-Text in dem generierten Bild für das Mailformular verwendet werden soll."#,
             ),
         },
         TagAttribute {
-                name: "fontweight",
-                detail: None,
-                documentation: Some(
+            name: "fontweight",
+            detail: None,
+            documentation: Some(
                 r#"
 Schriftstyle, die für den E-Mail-Text in dem generierten Bild verwendet werden soll.
 Mögliche Werte sind: `plain` `bold` `italic`"#,
             ),
         },
         TagAttribute {
-                name: "fontweight2",
-                detail: None,
-                documentation: Some(
+            name: "fontweight2",
+            detail: None,
+            documentation: Some(
                 r#"
 Schriftstyle, die für den E-Mail-Text in dem generierten Bild für das Mailformular verwendet werden soll.
 Mögliche Werte sind: `plain` `bold` `italic`"#,
             ),
         },
         TagAttribute {
-                name: "form",
-                detail: None,
-                documentation: Some(
+            name: "form",
+            detail: None,
+            documentation: Some(
                 r#"
 Artikel, der das Kontaktformular bereitstellt."#,
             ),
         },
         TagAttribute {
-                name: "linkcolor",
-                detail: None,
-                documentation: Some(
+            name: "linkcolor",
+            detail: None,
+            documentation: Some(
                 r#"
 Schriftfarbe, die für den E-Mail-Text in dem generierten und verlinkten Bild verwendet werden soll."#,
             ),
         },
         TagAttribute {
-                name: "name",
-                detail: None,
-                documentation: Some(
+            name: "name",
+            detail: None,
+            documentation: Some(
                 r#"
 Variable, in der der ersetzte Text abgelegt wird."#,
             ),
         },
         TagAttribute {
-                name: "object",
-                detail: None,
-                documentation: Some(
+            name: "object",
+            detail: None,
+            documentation: Some(
                 r#"
 Objekt das den zu ersetzenden Text enhält."#,
             ),
         },
         TagAttribute {
-                name: "onclick",
-                detail: None,
-                documentation: Some(
+            name: "onclick",
+            detail: None,
+            documentation: Some(
                 r#"
 JavaScript-Funktion die nach dem Klick auf eine E-Mail-Adresse ausgeführt werden soll."#,
             ),
         },
         TagAttribute {
-                name: "popupheight",
-                detail: None,
-                documentation: Some(
+            name: "popupheight",
+            detail: None,
+            documentation: Some(
                 r#"
 Höhe des Popup-Fensters für das Kontaktformular."#,
             ),
         },
         TagAttribute {
-                name: "popupwidth",
-                detail: None,
-                documentation: Some(
+            name: "popupwidth",
+            detail: None,
+            documentation: Some(
                 r#"
 Breite des Popup-Fensters für das Kontaktformular."#,
             ),
@@ -4035,7 +4035,7 @@ Objekt das den zu ersetzenden Text enhält."#,
             documentation: Some(
                 r#"
 Höhe des Popup-Fensters für das Kontaktformular."#,
-        ),
+            ),
         },
         TagAttribute {
             name: "popupwidth",
@@ -4043,7 +4043,7 @@ Höhe des Popup-Fensters für das Kontaktformular."#,
             documentation: Some(
                 r#"
 Breite des Popup-Fensters für das Kontaktformular."#,
-        ),
+            ),
         },
         TagAttribute {
             name: "urlparam",
@@ -4071,99 +4071,99 @@ Ersetzt Email-Adressen durch Bilder"#,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
-                name: "alt",
-                detail: None,
-                documentation: Some(
+            name: "alt",
+            detail: None,
+            documentation: Some(
                 r#"
 Alternativtext der in die `alt`-Attribute der `<img>`-Tags eingetragen wird."#,
             ),
         },
         TagAttribute {
-                name: "bgcolor",
-                detail: None,
-                documentation: Some(
+            name: "bgcolor",
+            detail: None,
+            documentation: Some(
                 r#"
 Hintergrundfarbe, die für den E-Mail-Text in dem generierten Bild verwendet werden soll."#,
             ),
         },
         TagAttribute {
-                name: "color",
-                detail: None,
-                documentation: Some(
+            name: "color",
+            detail: None,
+            documentation: Some(
                 r#"
 Schriftfarbe, die für den E-Mail-Text in dem generierten Bild verwendet werden soll."#,
             ),
         },
         TagAttribute {
-                name: "font",
-                detail: None,
-                documentation: Some(
+            name: "font",
+            detail: None,
+            documentation: Some(
                 r#"
 Schriftart, die für den E-Mail-Text in dem generierten Bild verwendet werden soll.
 In der Standardinstallalation enthaltene Fonts sind: `Arial` `Lucida` `Verdana` `Futura`"#,
             ),
         },
         TagAttribute {
-                name: "fontsize",
-                detail: None,
-                documentation: Some(
+            name: "fontsize",
+            detail: None,
+            documentation: Some(
                 r#"
 Schriftgröße, die für den E-Mail-Text in dem generierten Bild verwendet werden soll."#,
             ),
         },
         TagAttribute {
-                name: "fontweight",
-                detail: None,
-                documentation: Some(
+            name: "fontweight",
+            detail: None,
+            documentation: Some(
                 r#"
 Schriftstyle, die für den E-Mail-Text in dem generierten Bild verwendet werden soll.
 Mögliche Werte sind: `plain` `bold` `italic`"#,
             ),
         },
         TagAttribute {
-                name: "form",
-                detail: None,
-                documentation: Some(
+            name: "form",
+            detail: None,
+            documentation: Some(
                 r#"
 Artikel, der das Kontaktformular bereitstellt."#,
             ),
         },
         TagAttribute {
-                name: "name",
-                detail: None,
-                documentation: Some(
+            name: "name",
+            detail: None,
+            documentation: Some(
                 r#"
 Variable, in der der ersetzte Text abgelegt wird."#,
             ),
         },
         TagAttribute {
-                name: "object",
-                detail: None,
-                documentation: Some(
+            name: "object",
+            detail: None,
+            documentation: Some(
                 r#"
 Objekt das den zu ersetzenden Text enhält."#,
             ),
         },
         TagAttribute {
-                name: "onclick",
-                detail: None,
-                documentation: Some(
+            name: "onclick",
+            detail: None,
+            documentation: Some(
                 r#"
 JavaScript-Funktion die nach dem Klick auf eine E-Mail-Adresse ausgeführt werden soll."#,
             ),
         },
         TagAttribute {
-                name: "popupheight",
-                detail: None,
-                documentation: Some(
+            name: "popupheight",
+            detail: None,
+            documentation: Some(
                 r#"
 Höhe des Popup-Fensters für das Kontaktformular."#,
             ),
         },
         TagAttribute {
-                name: "popupwidth",
-                detail: None,
-                documentation: Some(
+            name: "popupwidth",
+            detail: None,
+            documentation: Some(
                 r#"
 Breite des Popup-Fensters für das Kontaktformular."#,
             ),
@@ -4198,9 +4198,9 @@ Diese Attribut bestimmt die Mehrsprachigkeit der Variable."#,
             ),
         },
         TagAttribute {
-                name: "name",
-                detail: None,
-                documentation: Some(
+            name: "name",
+            detail: None,
+            documentation: Some(
                 r#"
 Name der Variable, unter der die Verknüpfung in die Datenbank geschrieben wird."#,
             ),
@@ -4359,7 +4359,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
             documentation: Some(
                 r#"
 Bestimmt den Namen des Feldes."#,
-        ),
+            ),
         },
         TagAttribute {
             name: "object",
@@ -4367,7 +4367,7 @@ Bestimmt den Namen des Feldes."#,
             documentation: Some(
                 r#"
 Referenz zu einem Bild. Wenn eine Referenz zu einem Bild übergeben wird, ist der ImageEditor im Read-Only Modus."#,
-        ),
+            ),
         },
         TagAttribute {
             name: "width",
@@ -4391,34 +4391,34 @@ Erzeugt einen <img src="...">-Tag für kleingerechnete, sowie aus Texten generie
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
-                name: "alt",
-                detail: None,
-                documentation: Some(
+            name: "alt",
+            detail: None,
+            documentation: Some(
                 r#"
 Der Alternativtext für Bilder. Die Ausgabe erfolgt automatisch mit `encoding=ascii,html`, so dass Anführungszeichen im Alternativtext nicht zu Fehlern führen."#,
             ),
         },
         TagAttribute {
-                name: "background",
-                detail: None,
-                documentation: Some(
+            name: "background",
+            detail: None,
+            documentation: Some(
                 r#"
 Die Farbe des Hintergrunds kann durch Hexadezimalwerte gesetzt werden (z.B. `e3a383`). Für Thumbnails wird hiermit die Farbe des `padding`-Rahmens bestimmt. Für Textbilder wird hiermit die Hindergrundfarbe des Bildes gesetzt."#,
             ),
         },
         TagAttribute {
-                name: "color",
-                detail: None,
-                documentation: Some(
+            name: "color",
+            detail: None,
+            documentation: Some(
                 r#"
 __Deprecated__. *Dieses Attribut ist veraltet und es sollte das Attribut fontcolor verwendet werden.*
 Die Farbe der Schrift. Beispielsweise `AA00DD` oder `ff77ff`"#,
             ),
         },
         TagAttribute {
-                name: "excerpt",
-                detail: None,
-                documentation: Some(
+            name: "excerpt",
+            detail: None,
+            documentation: Some(
                 r#"
 __Deprecated__. *Dieses Attribut wird nicht mehr unterstützt.*
 Diese Option schneidet einen Ausschnitt eines größeren Bildes aus. Die ersten beiden Zahlen geben die linke obere Ecke des Ausschnittes an, die letzteren beiden die untere rechte Ecke. Mögliche Werte sind x0,y0,x1,y1 z.B. 100,100,300,200. Dieser Ausschnitt wird entsprechend der Optionen `height` und `width` noch verkleinert oder vergrößert. Hierbei wird gegebenenfalls ein Rand erzeugt, sprich die Option `padding=yes` ist automatisch gesetzt, falls nicht `padding=fit` gesetzt ist.
@@ -4429,16 +4429,16 @@ Mit northwest, northeast, southwest oder southeast wird ein in der jeweiligen Hi
             ),
         },
         TagAttribute {
-                name: "font",
-                detail: None,
-                documentation: Some(
+            name: "font",
+            detail: None,
+            documentation: Some(
                 r#"
 __Deprecated__. *Dieses Attribut ist veraltet und es sollte das Attribut fontname verwendet werden.*
 Der Font (z.B. `Arial`)"#,
             ),
         },
         TagAttribute {
-                name: "font-size",
+            name: "font-size",
             detail: None,
             documentation: Some(
                 r#"
@@ -4447,7 +4447,7 @@ Punkt-Größe des zu verwendenden Fonts (z.b.: `12`) "#,
             ),
         },
         TagAttribute {
-                name: "font-weight",
+            name: "font-weight",
             detail: None,
             documentation: Some(
                 r#"
@@ -4456,90 +4456,90 @@ Die Dicke (Wichtung) des angegebenen Fonts (z.b.: `bold`, `200` oder `900`)."#,
             ),
         },
         TagAttribute {
-                name: "fontcolor",
-                detail: None,
-                documentation: Some(
+            name: "fontcolor",
+            detail: None,
+            documentation: Some(
                 r#"
 Die Farbe der Schrift. Beispielsweise `AA00DD` oder `ff77ff`"#,
             ),
         },
         TagAttribute {
-                name: "fontname",
-                detail: None,
-                documentation: Some(
+            name: "fontname",
+            detail: None,
+            documentation: Some(
                 r#"
 Der Font (z.B. `Arial`)"#,
             ),
         },
         TagAttribute {
-                name: "fontsize",
-                detail: None,
-                documentation: Some(
+            name: "fontsize",
+            detail: None,
+            documentation: Some(
                 r#"
 Punkt-Größe des zu verwendenden Fonts (z.b.: `12`) "#,
             ),
         },
         TagAttribute {
-                name: "fontweight",
-                detail: None,
-                documentation: Some(
+            name: "fontweight",
+            detail: None,
+            documentation: Some(
                 r#"
 Die Dicke (Wichtung) des angegebenen Fonts (z.b.: `bold`, `200` oder `900`)."#,
             ),
         },
         TagAttribute {
-                name: "format",
-                detail: None,
-                documentation: Some(
+            name: "format",
+            detail: None,
+            documentation: Some(
                 r#"
 Die Formate `png` und `jpeg` können für Thumbnails verwendet werden"#,
             ),
         },
         TagAttribute {
-                name: "gravity",
-                detail: None,
-                documentation: Some(
+            name: "gravity",
+            detail: None,
+            documentation: Some(
                 r#"
 Mit den Werten `n`, `w`, `e`, `s`, `nw`, `ne`, `sw`, `se` oder `Center`, `North`, `South`, `NorthEast` etc. kann die gewünschte Position des Textes im umgebenen Rahmen ausgerichtet werden. `West` ist der Standardwert. Das heißt alle Texte beginnen links auf mittlerer Höhe."#,
             ),
         },
         TagAttribute {
-                name: "height",
-                detail: None,
-                documentation: Some(
+            name: "height",
+            detail: None,
+            documentation: Some(
                 r#"
 Die gewünschte Bildhöhe z.B. `100`. Die Breite wird unter Beibehaltung des Seiten-Verhältnisses des Originalbildes oder des gewählten Ausschnittes berechnet. Bei gesetzter Höhe ist daher die Option `padding` zwingend auf `no` gesetzt."#,
             ),
         },
         TagAttribute {
-                name: "image",
-                detail: None,
-                documentation: Some(
+            name: "image",
+            detail: None,
+            documentation: Some(
                 r#"
 Bild-Object, das mit dem `spt:imp`-Tag verarbeitet werden soll."#,
             ),
         },
         TagAttribute {
-                name: "manipulate",
-                detail: None,
-                documentation: Some(
+            name: "manipulate",
+            detail: None,
+            documentation: Some(
                 r#"
 __Deprecated__. *Dieses Attribut wird nicht mehr unterstützt.*
 Erzeugt verschiedene Effekte wie weichzeichnen oder schärfen über `sharp1`, `sharp2`, `sharp3`, `sharp4`, `laplace1`, `laplace2`, `box`, `lowpass`, `neon`, `emboss` und `bw`"#,
             ),
         },
         TagAttribute {
-                name: "offset",
-                detail: None,
-                documentation: Some(
+            name: "offset",
+            detail: None,
+            documentation: Some(
                 r#"
 Der Anfangspunkt des auszugebenden Textes, die über die Option `gravity` angegeben ist, von der Seite aus gesehen. Ohne Angabe von `gravity` ist dies normalerweise die linke Seite in der Mitte (z.B.: `3,10`)"#,
             ),
         },
         TagAttribute {
-                name: "padding",
-                detail: None,
-                documentation: Some(
+            name: "padding",
+            detail: None,
+            documentation: Some(
                 r#"
 Der Wert `"on"` erzeugt Rahmen zur Auffüllung der Flächen um das Bild. Damit ist das resultierende Bild immer so groß wie durch die Auflösung gefordert. `padding=on` ist als Standardwert gesetzt, solange es nicht durch andere Optionen ausgeschlossen ist.
 Der Wert `"off"` erzeugt keinen Rahmen zur Auffüllung der Flächen um das Bild. Damit ist das resultierende Bild unter Umständen kleiner als die geforderte Auflösung.
@@ -4548,26 +4548,26 @@ Um eine Abwärtskompatibilität zu gewährleisten, wird auch der Wert `"yes"` (e
             ),
         },
         TagAttribute {
-                name: "paddingcolor",
-                detail: None,
-                documentation: Some(
+            name: "paddingcolor",
+            detail: None,
+            documentation: Some(
                 r#"
 __Deprecated__. *Dieses Attribut ist veraltet. Es sollte das Attribut `background` verwendet werden.*
 Mit `paddingcolor` kann durch Hexadezimalwerte oder `X`-Window-Namen die Farbe des Rahmen bzw. des Hintergrundes, die bei `padding=yes` verwendet wird, angegeben werden. `transparent` ist das Default."#,
             ),
         },
         TagAttribute {
-                name: "scalesteps",
-                detail: None,
-                documentation: Some(
+            name: "scalesteps",
+            detail: None,
+            documentation: Some(
                 r#"
 Schalter um das Optimierungsverhalten im `In`-Modus auszuschalten."#,
             ),
         },
         TagAttribute {
-                name: "text",
-                detail: None,
-                documentation: Some(
+            name: "text",
+            detail: None,
+            documentation: Some(
                 r#"
 Der auszugebende Text in URL-encodeter Form."#,
             ),
@@ -4724,8 +4724,8 @@ Erzeugt Links auf Informationen und bindet Bildmedien ein."#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "filter",
-                detail: None,
-                documentation: Some(
+            detail: None,
+            documentation: Some(
                 r#"
 Die Filterdefinition für die Filtertypen Wildcard und regulärer Ausdruck. Der mit dem Attribut `mode` angegebene Modus wird verwendet. Ohne Angabe eines Modus wird `simple` verwendet."#,
             ),
@@ -4823,8 +4823,8 @@ Name der Variable, unter der der Systemlink in die Datenbank geschrieben wird."#
         },
         TagAttribute {
             name: "pools",
-                detail: None,
-                documentation: Some(
+            detail: None,
+            documentation: Some(
                 r#"
 Kommaseparierte Liste mit `Anchor`s von Artikelpools oder mit `ID`s von Artikelpools; die Elemente der Pools werden dem Redakteur zur Auswahl angeboten."#,
             ),
@@ -4873,7 +4873,7 @@ Typ der Verlinkung
             documentation: Some(
                 r#"
 Vorgabefeld für das erzeugte Eingabefeld."#,
-        ),
+            ),
         },
         TagAttribute {
             name: "width",
@@ -4999,7 +4999,7 @@ Artikel dessen Personalisierungs-Daten für das Apache-Personalisierungsmodul au
 Dieses Attribut kann benutzt werden um eine alternative Ausgabe zu erzeugen.
 Mit `mode="php"` werden die Personlisierungsinformationen auf PHP-Ebene ausgewertet und anstelle von `<sitepark_authpart>`-Tags wird entsprechender PHP-Code rausgeschrieben.
 Unterstützte Werte derzeit: `php`"#,
-        ),
+            ),
         },
         TagAttribute {
             name: "name",
@@ -5007,7 +5007,7 @@ Unterstützte Werte derzeit: `php`"#,
             documentation: Some(
                 r#"
 Variablenname, unter dem die Rechte gespeichert werden."#,
-        ),
+            ),
         },
         TagAttribute {
             name: "publisher",
@@ -5061,9 +5061,9 @@ Integriert den WYSIWYG-SmartEditor ins CMS"#,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
-                name: "cols",
-                detail: None,
-                documentation: Some(
+            name: "cols",
+            detail: None,
+            documentation: Some(
                 r#"
 Breite des Eingabefeldes in Spalten."#,
             ),
@@ -5074,7 +5074,7 @@ Breite des Eingabefeldes in Spalten."#,
             documentation: Some(
                 r#"
 Ist `hide="false"` gesetzt, so wird eine Textarea generiert, die den vom SmartEditor erzeugten Quellcode aufnimmt. Ist `hide="true"` gesetzt, so erscheint lediglich die Schaltfläche, über die sich der SmartEditor starten lässt. Standardwert ist `true`."#,
-        ),
+            ),
         },
         TagAttribute {
             name: "name",
@@ -5082,7 +5082,7 @@ Ist `hide="false"` gesetzt, so wird eine Textarea generiert, die den vom SmartEd
             documentation: Some(
                 r#"
 Bestimmt den Namen des Eingabefeldes."#,
-        ),
+            ),
         },
         TagAttribute {
             name: "options",
@@ -5098,7 +5098,7 @@ Optionen, die beim Aufruf des Smarteditors an diesen übergeben werden."#,
             documentation: Some(
                 r#"
 Höhe des Eingabefeldes in Zeilen."#,
-        ),
+            ),
         },
         TagAttribute {
             name: "textlabel",
@@ -5106,7 +5106,7 @@ Höhe des Eingabefeldes in Zeilen."#,
             documentation: Some(
                 r#"
 Beschriftung des Smarteditorfeldes, oberhalb."#,
-        ),
+            ),
         },
         TagAttribute {
             name: "value",
@@ -5128,19 +5128,17 @@ const SPT_SPML: TagProperties = TagProperties {
 schreibt den Header für SPML-Live Seiten"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::These(&[
-        TagAttribute {
-                name: "api",
-                detail: None,
-                documentation: Some(
-                r#"
+    attributes: TagAttributes::These(&[TagAttribute {
+        name: "api",
+        detail: None,
+        documentation: Some(
+            r#"
 Kommaseparierte Liste von APIs, dessen Packages mit Import-Anweisungen eingebunden werden sollen. Mögliche APIs sind:
 - `log4j` Siehe [hier](http://logging.apache.org/log4j/1.2/apidocs/index.html)
 - `jdom` Siehe [hier](http://www.jdom.org/docs/apidocs/index.html)
 - `mail` Siehe [hier](http://java.sun.com/products/javamail/javadocs/index.html)"#,
-            ),
-        },
-    ]),
+        ),
+    }]),
     attribute_rules: &[],
 };
 
@@ -5179,8 +5177,8 @@ Mit dem Setzen von `false`, kann die Editierbarkeit von Placeholdern deaktiviert
         },
         TagAttribute {
             name: "format",
-                detail: None,
-                documentation: Some(
+            detail: None,
+            documentation: Some(
                 r#"
 Wenn bei type beispielsweise `date` oder `number` angegeben wurde, kann format entsprechend des Types die Formatierung bestimmen (`dd.MM.yyyy` oder `#0.00`)."#,
             ),
@@ -5291,8 +5289,8 @@ Mit dem Setzen von `false`, kann die Editierbarkeit von Placeholdern deaktiviert
         },
         TagAttribute {
             name: "format",
-                detail: None,
-                documentation: Some(
+            detail: None,
+            documentation: Some(
                 r#"
 Wenn bei type beispielsweise `date` oder `number` angegeben wurde, kann format entsprechend des Types die Formatierung bestimmen (`dd.MM.yyyy` oder `#0.00`)."#,
             ),
@@ -5376,16 +5374,14 @@ const SPT_TIMESTAMP: TagProperties = TagProperties {
 Zeitstempel in ein Eingabefeld schreiben"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::These(&[
-        TagAttribute {
-            name: "connect",
-            detail: None,
-            documentation: Some(
-                r#"
+    attributes: TagAttributes::These(&[TagAttribute {
+        name: "connect",
+        detail: None,
+        documentation: Some(
+            r#"
 Mit diesem Attribut wird das Eingabefeld referenziert, in das der Zeitstempel geschrieben werden soll. Das Eingabefeld muss explizit initialisert werden, da der `spt:timestamp`-Tag den Zeitstempel nicht direkt in die Datenbank schreibt."#,
-            ),
-        },
-    ]),
+        ),
+    }]),
     attribute_rules: &[AttributeRule::Required("connect")],
 };
 
@@ -5548,7 +5544,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
             documentation: Some(
                 r#"
 Bestimmt den Namen des Feldes."#,
-        ),
+            ),
         },
         TagAttribute {
             name: "to",
@@ -5556,7 +5552,7 @@ Bestimmt den Namen des Feldes."#,
             documentation: Some(
                 r#"
 Endwert des Bereichs (Maximalwert, es folgt `'unendlich'`)."#,
-        ),
+            ),
         },
         TagAttribute {
             name: "value",

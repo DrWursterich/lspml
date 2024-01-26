@@ -47,10 +47,7 @@ fn validate_document(
             | "comment" => continue,
             "ERROR" => diagnositcs.push(Diagnostic {
                 source: Some("lspml".to_string()),
-                message: format!(
-                    "unexpected \"{}\"",
-                    node.utf8_text(text.as_bytes()).unwrap()
-                ),
+                message: format!("unexpected \"{}\"", node.utf8_text(text.as_bytes())?),
                 range: node_range(node),
                 severity: Some(DiagnosticSeverity::ERROR),
                 ..Default::default()
@@ -78,10 +75,7 @@ fn validate_tag(
     for child in node.children(&mut node.walk()) {
         match child.kind() {
             "ERROR" => diagnositcs.push(Diagnostic {
-                message: format!(
-                    "unexpected \"{}\"",
-                    child.utf8_text(text.as_bytes()).unwrap()
-                ),
+                message: format!("unexpected \"{}\"", child.utf8_text(text.as_bytes())?),
                 severity: Some(DiagnosticSeverity::ERROR),
                 range: node_range(child),
                 source: Some("lspml".to_string()),
@@ -95,9 +89,21 @@ fn validate_tag(
             kind if kind.ends_with("_attribute") => {
                 let attribute = child
                     .child(0)
-                    .unwrap()
+                    .expect(
+                        format!(
+                            "attribute {:?} of {:?} did not have a attribute-name child",
+                            child, node
+                        )
+                        .as_str(),
+                    )
                     .utf8_text(text.as_bytes())
-                    .unwrap()
+                    .expect(
+                        format!(
+                            "attribute-name in {:?} of {:?} did not have a contain text",
+                            child, node
+                        )
+                        .as_str(),
+                    )
                     .to_string();
                 if attributes.contains_key(&attribute) {
                     diagnositcs.push(Diagnostic {
@@ -110,9 +116,21 @@ fn validate_tag(
                 } else {
                     let quoted_value = child
                         .child(2)
-                        .unwrap()
+                        .expect(
+                            format!(
+                                "attribute {:?} of {:?} did not have a attribute-value child",
+                                child, node
+                            )
+                            .as_str(),
+                        )
                         .utf8_text(text.as_bytes())
-                        .unwrap()
+                        .expect(
+                            format!(
+                                "attribute-value in {:?} of {:?} did not contain text",
+                                child, node
+                            )
+                            .as_str(),
+                        )
                         .to_string();
                     attributes.insert(
                         attribute,
@@ -120,20 +138,27 @@ fn validate_tag(
                     );
                 }
             }
-            kind if kind.ends_with("_tag") => {
-                let child_tag = &grammar::Tag::from_str(kind).unwrap();
-                if can_have_child(&tag, child_tag) {
-                    validate_tag(child_tag.properties(), child, text, diagnositcs, file)?;
-                } else {
-                    diagnositcs.push(Diagnostic {
-                        message: format!("unexpected {} tag", &kind[..kind.find("_tag").unwrap()]),
-                        severity: Some(DiagnosticSeverity::WARNING),
-                        range: node_range(child),
-                        source: Some("lspml".to_string()),
-                        ..Default::default()
-                    });
+            kind if kind.ends_with("_tag") => match &grammar::Tag::from_str(kind) {
+                Ok(child_tag) => {
+                    if can_have_child(&tag, child_tag) {
+                        validate_tag(child_tag.properties(), child, text, diagnositcs, file)?;
+                    } else {
+                        diagnositcs.push(Diagnostic {
+                            message: format!(
+                                "unexpected {} tag",
+                                &kind[..kind.find("_tag").unwrap()]
+                            ),
+                            severity: Some(DiagnosticSeverity::WARNING),
+                            range: node_range(child),
+                            source: Some("lspml".to_string()),
+                            ..Default::default()
+                        });
+                    }
                 }
-            }
+                Err(err) => {
+                    log::info!("expected sp or spt tag: {}", err);
+                }
+            },
             _ => validate_children(child, text, diagnositcs, file)?,
         }
     }
@@ -320,7 +345,7 @@ fn validate_children(
             "ERROR" => diagnositcs.push(Diagnostic {
                 message: format!(
                     "unexpected \"{}\"",
-                    child.utf8_text(text.as_bytes()).unwrap()
+                    child.utf8_text(text.as_bytes())?
                 ),
                 severity: Some(DiagnosticSeverity::ERROR),
                 range: node_range(child),
@@ -335,8 +360,12 @@ fn validate_children(
                 validate_children(child, text, diagnositcs, file)?;
             }
             kind if kind.ends_with("_tag") => {
-                let child_tag = &grammar::Tag::from_str(kind).unwrap();
-                validate_tag(child_tag.properties(), child, text, diagnositcs, file)?;
+                match &grammar::Tag::from_str(kind) {
+                    Ok(child_tag) => validate_tag(child_tag.properties(), child, text, diagnositcs, file)?,
+                    Err(err) => {
+                        log::info!("expected sp or spt tag: {}", err);
+                    }
+                }
             }
             _ => validate_children(child, text, diagnositcs, file)?,
         }
