@@ -60,8 +60,14 @@ fn search_completions_in_document(
     completions: &mut Vec<CompletionItem>,
 ) -> Result<()> {
     for node in root.children(&mut root.walk()) {
-        if node.end_position() < *cursor {
-            // also skips over "implicitly" closed tags
+        // tree sitter puts an 'missing' node at the end of unclosed tags, so we cannot blindly
+        // skip all nodes that end before the cursor
+        if node.end_position() < *cursor
+            && (node.child_count() == 0
+                || !node
+                    .child(node.child_count() - 1)
+                    .is_some_and(|close_bracket| close_bracket.is_missing()))
+        {
             log::trace!("skip over {}", node.kind());
             continue;
         }
@@ -125,8 +131,14 @@ fn search_completions_in_tag(
     let mut position = TagParsePosition::Attributes;
     for child in node.children(&mut node.walk()) {
         if position == TagParsePosition::Children {
-            if *cursor >= child.end_position() {
-                log::trace!("skip over {} child {}", tag.name, node.kind());
+            // tree sitter puts an 'missing' node at the end of unclosed tags, so we cannot blindly
+            // skip all nodes that end before the cursor
+            if child.end_position() < *cursor
+                && (child.child_count() == 0
+                    || !child
+                        .child(child.child_count() - 1)
+                        .is_some_and(|close_bracket| close_bracket.is_missing()))
+            {
                 continue;
             }
             if *cursor < child.start_position() {
@@ -135,27 +147,21 @@ fn search_completions_in_tag(
             completion_type = CompletionType::Tags;
         }
         match child.kind() {
+            _ if child.is_error() => {}
             ">" => {
+                if child.is_missing() {
+                    log::trace!("\">\" is missing in {}", node.kind());
+                    continue;
+                }
                 if *cursor > child.start_position() {
-                    log::trace!(
-                        "since cursor at {} is greater than '>' ({}) we should complete tags",
-                        cursor,
-                        child.start_position()
-                    );
                     completion_type = CompletionType::Tags;
-                } else {
-                    log::trace!(
-                        "since cursor at {} is less than '>' ({}) we should complete attributes",
-                        cursor,
-                        child.start_position()
-                    );
                 }
                 position = TagParsePosition::Children;
             }
             "self_closing_tag_end" => {
                 if child.is_missing() {
-                    log::trace!("found missing '/>' in {}", tag.name);
-                    break;
+                    log::trace!("\"/>\" is missing in {}", node.kind());
+                    continue;
                 }
                 log::trace!("reached end of {}", tag.name);
                 break;
@@ -164,7 +170,6 @@ fn search_completions_in_tag(
                 log::trace!("reached end of {}", tag.name);
                 break;
             }
-            "ERROR" => {}
             "text" => {
                 // TODO: what tags can/cannot have text?
             }
