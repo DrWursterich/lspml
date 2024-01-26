@@ -71,6 +71,15 @@ fn validate_tag(
     diagnositcs: &mut Vec<Diagnostic>,
     file: &Url,
 ) -> Result<()> {
+    if tag.deprecated {
+        diagnositcs.push(Diagnostic {
+            message: format!("{} tag is deprecated", tag.name),
+            severity: Some(DiagnosticSeverity::INFORMATION),
+            range: node_range(node),
+            source: Some("lspml".to_string()),
+            ..Default::default()
+        });
+    }
     let mut attributes: HashMap<String, String> = HashMap::new();
     for child in node.children(&mut node.walk()) {
         match child.kind() {

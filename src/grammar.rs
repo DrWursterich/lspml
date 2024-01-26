@@ -6,7 +6,7 @@ pub(crate) struct TagProperties {
     pub(crate) name: &'static str,
     pub(crate) detail: Option<&'static str>,
     pub(crate) documentation: Option<&'static str>,
-    // pub(crate) deprecated: bool,
+    pub(crate) deprecated: bool,
     pub(crate) children: TagChildren,
     pub(crate) attributes: TagAttributes,
     pub(crate) attribute_rules: &'static [AttributeRule],
@@ -141,6 +141,7 @@ const SP_ARGUMENT: TagProperties = TagProperties {
         r#"
 Setzt ein Argument für ein sp:include"#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -211,6 +212,7 @@ const SP_ATTRIBUTE: TagProperties = TagProperties {
     name: "sp:attribute",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -256,6 +258,7 @@ const SP_BARCODE: TagProperties = TagProperties {
     name: "sp:barcode",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -321,6 +324,7 @@ const SP_BREAK: TagProperties = TagProperties {
         r#"
 Beendet FOR- und ITERATE-Schleifen."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::None,
     attribute_rules: &[],
@@ -333,6 +337,7 @@ const SP_CALENDARSHEET: TagProperties = TagProperties {
         r#"
 CalendarSheet manage dates and objects"#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -424,6 +429,7 @@ const SP_CHECKBOX: TagProperties = TagProperties {
         r#"
 Check-Box-Tag, erzeugt eine checkBox."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -493,6 +499,7 @@ const SP_CODE: TagProperties = TagProperties {
         r#"
 Schreibt den bodyContent ohne dass dieser ausgeführt wird in die Ergebnis-Datei."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::None,
     attribute_rules: &[],
@@ -505,6 +512,7 @@ const SP_COLLECTION: TagProperties = TagProperties {
         r#"
 Collection tag offers certain operation that deal with a common collection. For further description see the javadoc of the class com.sitepark.ies.taglib.core.CollectionTag."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -634,6 +642,7 @@ const SP_CONDITION: TagProperties = TagProperties {
         r#"
 Umklammert einen if-else Konstrukt."#,
     ),
+    deprecated: false,
     children: TagChildren::Vector(&[Tag::SpIf, Tag::SpElse, Tag::SpElseif]),
     attributes: TagAttributes::None,
     attribute_rules: &[],
@@ -646,6 +655,7 @@ const SP_DIFF: TagProperties = TagProperties {
         r#"
 Vergleicht ein Attribute von zwei Versionen einer Information"#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -704,6 +714,7 @@ const SP_ELSE: TagProperties = TagProperties {
         r#"
 passendes else zu einem If innerhalb eines contitionTag."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::None,
     attribute_rules: &[],
@@ -716,6 +727,7 @@ const SP_ELSEIF: TagProperties = TagProperties {
         r#"
 ElseIf-Tag, schreibt Body wenn Bedingung ok ist und vorheriges if fehl schlug."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -840,6 +852,7 @@ const SP_ERROR: TagProperties = TagProperties {
         r#"
 Prüft ein Fehler aufgetreten ist, markiert ihn gegebenenfals als gefangen und führt den innhalt des Tags aus."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[TagAttribute {
         name: "code",
@@ -856,6 +869,7 @@ const SP_EXPIRE: TagProperties = TagProperties {
     name: "sp:expire",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[TagAttribute {
         name: "date",
@@ -875,6 +889,7 @@ const SP_FILTER: TagProperties = TagProperties {
         r#"
 Filtert eine Liste"#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -1012,6 +1027,7 @@ const SP_FOR: TagProperties = TagProperties {
         r#"
 For-Tag, wiederholt solange wie angegeben."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -1077,6 +1093,7 @@ const SP_FORM: TagProperties = TagProperties {
         r#"
 Erzeugt ein HTML-Form-Tag mit einem angepassten Kommando"#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -1195,6 +1212,7 @@ const SP_HIDDEN: TagProperties = TagProperties {
         r#"
 Hidden-Tag, erzeugt ein Hiddenfeld."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -1251,6 +1269,7 @@ const SP_IF: TagProperties = TagProperties {
         r#"
 If-Tag, schreibt Body wenn Bedingung ok ist."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -1375,6 +1394,7 @@ const SP_INCLUDE: TagProperties = TagProperties {
         r#"
 includiert ein anderes bereits im System gespeichertes Template."#,
     ),
+    deprecated: false,
     children: TagChildren::Scalar(Tag::SpArgument),
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -1460,6 +1480,7 @@ const SP_IO: TagProperties = TagProperties {
         r#"
 IO-Tag"#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -1489,6 +1510,7 @@ const SP_ITERATOR: TagProperties = TagProperties {
         r#"
 Wird für den Aufbau von Wiederholfeldern verwendet."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -1531,6 +1553,7 @@ const SP_JSON: TagProperties = TagProperties {
     name: "sp:json",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -1592,6 +1615,7 @@ const SP_LINKEDINFORMATION: TagProperties = TagProperties {
         r#"
 Diese Tag definiert einen Link eines Artikels auf einen Anderen Artikel. Das Besondere ist, dass der Artikel auf dem Verlinkt wird erst innerhalb dieses tags definiert wird. Dazu müssen alle Paramter wie parent, filename, usw. vorhanden sein. Mit dem Reques können dann schliesslich beide Artikel ubgedatet werden(oder auch erstellt)."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::None,
     attribute_rules: &[], // not documented
@@ -1601,6 +1625,7 @@ const SP_LINKTREE: TagProperties = TagProperties {
     name: "sp:linktree",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -1690,6 +1715,7 @@ const SP_LIVETREE: TagProperties = TagProperties {
     name: "sp:livetree",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -1801,6 +1827,7 @@ const SP_LOG: TagProperties = TagProperties {
     name: "sp:log",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[TagAttribute {
         name: "level",
@@ -1817,6 +1844,7 @@ const SP_LOGIN: TagProperties = TagProperties {
     name: "sp:login",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -1892,6 +1920,7 @@ const SP_LOOP: TagProperties = TagProperties {
         r#"
 Dient zur Ausgabe eines oder mehrerer Elemente."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -1945,6 +1974,7 @@ const SP_MAP: TagProperties = TagProperties {
     name: "sp:map",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -2060,6 +2090,7 @@ const SP_OPTION: TagProperties = TagProperties {
         r#"
 Option-Tag, für das Select Tag."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -2105,6 +2136,7 @@ const SP_PASSWORD: TagProperties = TagProperties {
         r#"
 Password-Tag, erzeugt ein Passwordfeld."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::None,
     attribute_rules: &[], // not documented
@@ -2117,6 +2149,7 @@ const SP_PRINT: TagProperties = TagProperties {
         r#"
 Dient zur Ausgabe eines Attributes"#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -2355,6 +2388,7 @@ const SP_QUERYTREE: TagProperties = TagProperties {
     name: "sp:querytree",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::None,
     attribute_rules: &[], // not documented
@@ -2367,6 +2401,7 @@ const SP_RADIO: TagProperties = TagProperties {
         r#"
 Radio Button-Tag, erzeugt einen RadioButton."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -2433,6 +2468,7 @@ const SP_RANGE: TagProperties = TagProperties {
     name: "sp:range",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -2482,6 +2518,7 @@ const SP_RETURN: TagProperties = TagProperties {
         r#"
 Verlässt die SPML-Seite und setzt ggf. einen Rückgabewert für sp:include"#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -2543,6 +2580,7 @@ const SP_SASS: TagProperties = TagProperties {
     name: "sp:sass",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -2584,6 +2622,7 @@ const SP_SCALEIMAGE: TagProperties = TagProperties {
     name: "sp:scaleimage",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -2708,6 +2747,7 @@ const SP_SCOPE: TagProperties = TagProperties {
         r#"
 Setzt bereichsweise oder global den Scope für die folgenden Tags"#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[TagAttribute {
         name: "scope",
@@ -2727,6 +2767,7 @@ const SP_SEARCH: TagProperties = TagProperties {
         r#"
 Findet die gewünschte Suche"#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::None,
     attribute_rules: &[], // not documented
@@ -2739,6 +2780,7 @@ const SP_SELECT: TagProperties = TagProperties {
         r#"
 Select-Tag, erzeugt den Rahmen einen Auswahlliste."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -2792,6 +2834,7 @@ const SP_SET: TagProperties = TagProperties {
         r#"
 Setzt ein Attribute"#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -2901,6 +2944,7 @@ const SP_SORT: TagProperties = TagProperties {
         r#"
 Sortiert eine Liste"#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -2970,6 +3014,7 @@ const SP_SUBINFORMATION: TagProperties = TagProperties {
     name: "sp:subinformation",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -2996,6 +3041,7 @@ const SP_TAGBODY: TagProperties = TagProperties {
     name: "sp:tagbody",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::None,
     attribute_rules: &[],
@@ -3008,6 +3054,7 @@ const SP_TEXT: TagProperties = TagProperties {
         r#"
 Text-Tag, erzeugt ein Eingabefeld."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -3096,6 +3143,7 @@ const SP_TEXTAREA: TagProperties = TagProperties {
         r#"
 Textarea-Tag, erzeugt einen Einabebereich."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -3165,6 +3213,7 @@ const SP_TEXTIMAGE: TagProperties = TagProperties {
     name: "sp:textimage",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -3292,6 +3341,7 @@ const SP_THROW: TagProperties = TagProperties {
     name: "sp:throw",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::None,
     attribute_rules: &[], // not documented
@@ -3304,6 +3354,7 @@ const SP_TOGGLE: TagProperties = TagProperties {
         r#"
 Toggle-Tag erzeugt einen toggle der einen einzigen boolischen Wert speichert"#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -3392,6 +3443,7 @@ const SP_UPLOAD: TagProperties = TagProperties {
         r#"
 Das Tag, erzeugt ein Eingabefeld zum Herunderladen von Dateien."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -3421,6 +3473,7 @@ const SP_URL: TagProperties = TagProperties {
         r#"
 Fügt den ContextPath vor die angegebene URL und hängt, falls nötig die Session ID an die URL."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -3545,6 +3598,7 @@ const SP_WARNING: TagProperties = TagProperties {
         r#"
 Prüft, ob eine Warnung aufgetreten ist, markiert sie gegebenenfalls als gefangen und führt den innhalt des Tags aus."#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[TagAttribute {
         name: "code",
@@ -3564,6 +3618,7 @@ const SP_WORKLIST: TagProperties = TagProperties {
         r#"
 Findet die gewünschte Workliste"#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -3606,6 +3661,7 @@ const SP_ZIP: TagProperties = TagProperties {
     name: "sp:zip",
     detail: None,
     documentation: None,
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::None,
     attribute_rules: &[], // not documented
@@ -3620,7 +3676,7 @@ const SPT_COUNTER: TagProperties = TagProperties {
         r#"
 Zählt Zugriffe auf publizierte Informationen"#,
     ),
-    // deprecated: true,
+    deprecated: true,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -3683,6 +3739,7 @@ const SPT_DATE: TagProperties = TagProperties {
         r#"
 Datums- und Uhrzeiteingabe mit Prüfung auf Gültigkeit"#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -3781,6 +3838,7 @@ const SPT_DIFF: TagProperties = TagProperties {
         r#"
 Vergleicht zwei Zeichenketten und zeigt die Unterschiede an"#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -3822,7 +3880,7 @@ const SPT_EMAIL2IMG: TagProperties = TagProperties {
         r#"
 Ersetzt E-Mail-Adressen durch Bilder"#,
     ),
-    // deprecated: true,
+    deprecated: true,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -4003,6 +4061,7 @@ const SPT_ENCRYPTEMAIL: TagProperties = TagProperties {
         r#"
 Verschlüsselt Email-Adressen so, dass sie auch für Responsive-Design-Anforderungen verwendet werden können"#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -4067,7 +4126,7 @@ const SPT_ESCAPEEMAIL: TagProperties = TagProperties {
         r#"
 Ersetzt Email-Adressen durch Bilder"#,
     ),
-    // deprecated: true,
+    deprecated: true,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -4187,6 +4246,7 @@ const SPT_FORMSOLUTIONS: TagProperties = TagProperties {
         r#"
 Erzeugt eine eindeutige Url auf PDF-Dokumente des Form-Solutions Formular Servers."#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -4216,6 +4276,7 @@ const SPT_ID2URL: TagProperties = TagProperties {
         r#"
 Durchsucht einen Text nach ID-Signaturen von Artikeln und ersetzt die IDs durch die URL des aktuellen Publikationsbereichs."#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -4282,6 +4343,7 @@ const SPT_ILINK: TagProperties = TagProperties {
         r#"
 Erzeugt einen Link auf das CMS"#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -4327,6 +4389,7 @@ const SPT_IMAGEEDITOR: TagProperties = TagProperties {
         r#"
 Erzeugt eine Bearbeitungsoberfläche für Bilder"#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -4388,6 +4451,7 @@ const SPT_IMP: TagProperties = TagProperties {
         r#"
 Erzeugt einen <img src="...">-Tag für kleingerechnete, sowie aus Texten generierte Bilder"#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -4635,6 +4699,7 @@ const SPT_ITERATOR: TagProperties = TagProperties {
         r#"
 Erzeugt Wiederholfelder"#,
     ),
+    deprecated: false,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -4720,6 +4785,7 @@ const SPT_LINK: TagProperties = TagProperties {
         r#"
 Erzeugt Links auf Informationen und bindet Bildmedien ein."#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -4901,6 +4967,7 @@ const SPT_NUMBER: TagProperties = TagProperties {
         r#"
 Zahleneingabe mit Prüfung auf Gültigkeit"#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -4981,6 +5048,7 @@ const SPT_PERSONALIZATION: TagProperties = TagProperties {
         r#"
 Definiert personalisierte Bereiche"#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -5025,6 +5093,7 @@ const SPT_PREHTML: TagProperties = TagProperties {
         r#"
 HTML-Code nachbearbeiten."#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -5057,7 +5126,7 @@ const SPT_SMARTEDITOR: TagProperties = TagProperties {
         r#"
 Integriert den WYSIWYG-SmartEditor ins CMS"#,
     ),
-    // deprecated: true,
+    deprecated: true,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -5127,6 +5196,7 @@ const SPT_SPML: TagProperties = TagProperties {
         r#"
 schreibt den Header für SPML-Live Seiten"#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[TagAttribute {
         name: "api",
@@ -5149,6 +5219,7 @@ const SPT_TEXT: TagProperties = TagProperties {
         r#"
 Einzeiliges Textfeld, das Versionierung unterstützt"#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -5261,6 +5332,7 @@ const SPT_TEXTAREA: TagProperties = TagProperties {
         r#"
 Erzeugt ein mehrzeiliges Textfeld, das Versionierung unterstützt"#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -5373,6 +5445,7 @@ const SPT_TIMESTAMP: TagProperties = TagProperties {
         r#"
 Zeitstempel in ein Eingabefeld schreiben"#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[TagAttribute {
         name: "connect",
@@ -5392,6 +5465,7 @@ const SPT_TINYMCE: TagProperties = TagProperties {
         r#"
 Integriert einen Editor"#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -5520,6 +5594,7 @@ const SPT_UPDOWN: TagProperties = TagProperties {
         r#"
 Zahlenfeld, das per Klick auf- und abwärts gezählt werden kann"#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -5573,6 +5648,7 @@ const SPT_UPLOAD: TagProperties = TagProperties {
         r#"
 Upload von Dateien"#,
     ),
+    deprecated: false,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -5610,7 +5686,7 @@ const SPT_WORKLIST: TagProperties = TagProperties {
         r#"
 Workflow Management einbinden"#,
     ),
-    // deprecated: true,
+    deprecated: true,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[
         TagAttribute {
