@@ -7,7 +7,7 @@ use lsp_types::{
     DidSaveTextDocumentParams, HoverOptions, HoverProviderCapability, InitializeParams, OneOf,
     ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions,
 };
-use std::{error::Error, fs::File};
+use std::{error::Error, fs::File, str::FromStr};
 use structured_logger::Builder;
 mod command;
 mod document_store;
@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let (connection, io_threads) = Connection::stdio();
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
         definition_provider: Some(OneOf::Left(true)),
-        text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::NONE)),
+        text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
         diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
             inter_file_dependencies: true,
             ..DiagnosticOptions::default()
@@ -135,21 +135,29 @@ fn main_loop(
     return Ok(());
 }
 
-// is probably called on every key hit when TextDocumentSyncKind is INCREMENTAL.
 fn changed(params: DidChangeTextDocumentParams) -> Result<()> {
-    return document_store::Document::new(&params.text_document.uri).map(|document| {
-        document_store::put(&params.text_document.uri, document);
-        log::debug!("updated {}", params.text_document.uri);
-        return ();
-    });
+    if let Some(change) = &params.content_changes.last() {
+        return document_store::Document::from_str(&change.text).map(|document| {
+            log::debug!(
+                "updated {}",
+                params.text_document.uri
+            );
+            document_store::put(&params.text_document.uri, document);
+            return ();
+        });
+    }
+    return Ok(());
 }
 
 fn opened(params: DidOpenTextDocumentParams) -> Result<()> {
     return match document_store::get(&params.text_document.uri) {
         Some(_) => Result::Ok(()),
-        None => document_store::Document::new(&params.text_document.uri).map(|document| {
+        None => document_store::Document::from_str(&params.text_document.text).map(|document| {
             document_store::put(&params.text_document.uri, document);
-            log::debug!("opened {}", params.text_document.uri);
+            log::debug!(
+                "opened {}",
+                params.text_document.uri
+            );
             return ();
         }),
     };
@@ -158,7 +166,10 @@ fn opened(params: DidOpenTextDocumentParams) -> Result<()> {
 fn saved(params: DidSaveTextDocumentParams) -> Result<()> {
     return document_store::Document::new(&params.text_document.uri).map(|document| {
         document_store::put(&params.text_document.uri, document);
-        log::debug!("updated {}", params.text_document.uri);
+        log::debug!(
+            "saved {}",
+            params.text_document.uri
+        );
         return ();
     });
 }

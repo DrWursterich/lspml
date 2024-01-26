@@ -3,6 +3,7 @@ use lsp_types::Url;
 use std::{
     collections::HashMap,
     fs,
+    str::FromStr,
     sync::{Arc, Mutex, OnceLock},
 };
 use tree_sitter::{Parser, Tree};
@@ -19,14 +20,23 @@ impl Document {
             Ok(path) => fs::read_to_string(path.to_owned()).map_err(Error::from),
             Err(_) => Result::Err(anyhow::anyhow!("failed to read file path from uri {}", uri)),
         }
-        .and_then(|text| {
-            let mut parser = Parser::new();
-            parser.set_language(tree_sitter_spml::language())?;
-            parser
-                .parse(&text, None)
-                .map(|tree| Document { text, tree })
-                .ok_or_else(|| anyhow::anyhow!("failed to parse file {}", uri))
-        });
+        .and_then(|text| Document::from_str(&text));
+    }
+}
+
+impl FromStr for Document {
+    type Err = Error;
+
+    fn from_str(text: &str) -> Result<Document> {
+        let mut parser = Parser::new();
+        parser.set_language(tree_sitter_spml::language())?;
+        return parser
+            .parse(&text, None)
+            .map(|tree| Document {
+                text: text.to_string(),
+                tree,
+            })
+            .ok_or_else(|| anyhow::anyhow!("failed to parse text: {}", text));
     }
 }
 

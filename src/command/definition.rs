@@ -1,7 +1,7 @@
 use super::{LsError, ResponseErrorCode};
 use crate::document_store;
-use crate::parser;
 use crate::modules;
+use crate::parser;
 use lsp_types::{GotoDefinitionParams, Location, Position, Range, Url};
 use std::path::Path;
 use tree_sitter::{Query, QueryCursor};
@@ -273,13 +273,15 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                         .and_then(|attribute| attribute.child(2))
                         .map(|node| node.utf8_text(document.text.as_bytes()))
                     {
-                        Some(Ok("\"${module.id}\"")) | None => {
-                            text_params.text_document.uri
+                        Some(Ok("\"${module.id}\"")) | None => text_params
+                            .text_document
+                            .uri
                             .to_file_path()
                             .ok()
-                            .and_then(|file| modules::find_module_for_file(file.as_path()))
+                            .and_then(|file| modules::find_module_for_file(file.as_path())),
+                        Some(Ok(module)) => {
+                            modules::find_module_by_name(&module[1..module.len() - 1])
                         }
-                        Some(Ok(module)) => modules::find_module_by_name(&module[1..module.len() - 1]),
                         Some(Err(err)) => {
                             log::error!(
                                 "error while reading include_tag module_attribute text {}",

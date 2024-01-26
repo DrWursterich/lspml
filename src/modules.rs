@@ -69,16 +69,16 @@ pub(crate) fn find_module_by_name(module: &str) -> Option<Module> {
 
 pub(crate) fn find_module_for_file(file: &Path) -> Option<Module> {
     return MODULE_MAPPINGS
-            .get()
-            .expect("module mappings not initialized")
-            .lock()
-            .expect("module mappings mutex poisoned")
-            .iter()
-            .find_map(|(_, module)| {
-                if file.strip_prefix(&module.path).is_ok() {
-                    return Some(module.clone());
-                } else {
-                    return None;
-                }
-            });
+        .get()
+        .expect("module mappings not initialized")
+        .lock()
+        .expect("module mappings mutex poisoned")
+        .iter()
+        .find_map(|(_, module)| {
+            if file.strip_prefix(&module.path).is_ok() {
+                return Some(module.clone());
+            } else {
+                return None;
+            }
+        });
 }
