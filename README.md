@@ -25,10 +25,10 @@ The `modules-file` is a `json` file, in which module names can be mapped to loca
 ```json
 {
 	"test-module": {
-		"path": "/path/to/this/repo/lspml/test-spml/test-module/src/main/webapp/"
+		"path": "/path/to/this/repo/lspml/test-spml/test-module/src/main/webapp"
 	},
 	"sitekit-module": {
-		"path": "/path/to/this/repo/lspml/test-spml/sitekit-module/src/main/webapp/"
+		"path": "/path/to/this/repo/lspml/test-spml/sitekit-module/src/main/webapp"
 	}
 }
 ```
