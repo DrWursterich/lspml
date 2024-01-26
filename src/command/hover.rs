@@ -152,8 +152,7 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
                 .properties()
                 .attributes
             {
-                grammar::TagAttributes::These(attributes)
-                | grammar::TagAttributes::TheseAndDynamic(attributes) => {
+                grammar::TagAttributes::These(attributes) => {
                     let kind = &node.parent().unwrap().kind();
                     let attribute_name = &kind[..kind.len() - "_attribute".len()];
                     log::trace!(
@@ -166,7 +165,7 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
                         .find(|attribute| attribute.name == attribute_name)
                         .and_then(|attribute| attribute.documentation)
                 }
-                grammar::TagAttributes::OnlyDynamic | grammar::TagAttributes::None => {
+                grammar::TagAttributes::None => {
                     log::info!("no hover information about attribute \"{}\"", kind);
                     return Ok(None);
                 }

@@ -15,11 +15,7 @@ pub(crate) struct TagProperties {
 #[derive(Debug)]
 pub(crate) enum TagAttributes {
     None,
-    #[allow(dead_code)]
-    OnlyDynamic,
     These(&'static [TagAttribute]),
-    #[allow(dead_code)]
-    TheseAndDynamic(&'static [TagAttribute]),
 }
 
 #[derive(Debug)]

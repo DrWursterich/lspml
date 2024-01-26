@@ -212,8 +212,7 @@ fn search_completions_in_tag(
             // present.
             log::info!("complete attributes for {}", tag.name);
             match tag.attributes {
-                grammar::TagAttributes::These(possible)
-                | grammar::TagAttributes::TheseAndDynamic(possible) => possible
+                grammar::TagAttributes::These(possible) => possible
                     .iter()
                     .filter(|attribute| !attributes.contains_key(attribute.name))
                     .map(|attribute| CompletionItem {
@@ -230,7 +229,7 @@ fn search_completions_in_tag(
                         ..Default::default()
                     })
                     .for_each(|completion| completions.push(completion)),
-                grammar::TagAttributes::None | grammar::TagAttributes::OnlyDynamic => {}
+                grammar::TagAttributes::None => {}
             };
         }
         CompletionType::Tags => {
