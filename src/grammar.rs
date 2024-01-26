@@ -950,7 +950,7 @@ Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen
             detail: None,
             documentation: Some(
                 r#"
-Auswahl des Filter-Mechanismus.  
+Auswahl des Filter-Mechanismus.
 __simple (Wildcard-Filter)__
 Der Filter kann die Wildcards `*` für beliebige Zeichen und `?` für ein beliebiges Zeichen enthalten. So würde eine wie folgt gefilterte Liste nur Elemente enthalten, die mit a beginnen.
 ```regex
@@ -1088,7 +1088,7 @@ Erzeugt ein HTML-Form-Tag mit einem angepassten Kommando"#,
             detail: None,
             documentation: Some(
                 r#"
-__Deprecated__. *Dieses Attribut ist veraltet und wird in zukünftigen Versionen nicht mehr unterstüzt werden. Kommandos wurden in der Version 2.0 zugunsten einer flexibleren Lösung abgeschafft. Ein Kommando bestand aus einem Template mit einem optionalen Handler. Für jede Template-Handler-Kombination musste ein eigenes Kommando angelegt werden. Diese Verbindung wurde aufgebrochen und durch zwei neue Attribute `template` und `handler` ersetzt. Um einen Handler aufzurufen und anschließend ein Template auszuführen, ist nun die Definition eines Kommandos nicht mehr nötig. Um einen Handler aufzurufen und anschließend ein Template auszuführen, verwenden Sie die beiden Attribute `handler` und `template`. Um einen Handler aufzurufen und anschließend eine SPML-Seite auszuführen, verwenden Sie die Attribute `handler` und `uri`.*  
+__Deprecated__. *Dieses Attribut ist veraltet und wird in zukünftigen Versionen nicht mehr unterstüzt werden. Kommandos wurden in der Version 2.0 zugunsten einer flexibleren Lösung abgeschafft. Ein Kommando bestand aus einem Template mit einem optionalen Handler. Für jede Template-Handler-Kombination musste ein eigenes Kommando angelegt werden. Diese Verbindung wurde aufgebrochen und durch zwei neue Attribute `template` und `handler` ersetzt. Um einen Handler aufzurufen und anschließend ein Template auszuführen, ist nun die Definition eines Kommandos nicht mehr nötig. Um einen Handler aufzurufen und anschließend ein Template auszuführen, verwenden Sie die beiden Attribute `handler` und `template`. Um einen Handler aufzurufen und anschließend eine SPML-Seite auszuführen, verwenden Sie die Attribute `handler` und `uri`.*
 Existierendes Command. Muss im GUI definiert worden sein."#,
             ),
         },
@@ -1612,7 +1612,7 @@ const SP_LINKTREE: TagProperties = TagProperties {
             detail: None,
             documentation: Some(
                 r#"
-__Deprecated__. *Dieses Attribut wird nicht mehr benötigt. Die Abhängigkeiten werden automatisch erkannt (siehe `Dependencies-Service`, `LinkTree-Service`)*  
+__Deprecated__. *Dieses Attribut wird nicht mehr benötigt. Die Abhängigkeiten werden automatisch erkannt (siehe `Dependencies-Service`, `LinkTree-Service`)*
 Eine Kommaseparierte Liste von Attributen, die der Artikel enthalten und auf dessen Änderungen er reagieren soll."#,
             ),
         },
@@ -2167,7 +2167,7 @@ Der bei 3DES bzw. AES zu verwendene Schlüssel. Wird keiner angegeben, wird der 
             detail: None,
             documentation: Some(
                 r#"
-Angaben zur Datumsformatierung. Um für die Formatierung die gewünschte Sprache zu erhalten, bestehen folgende Möglichkeiten:  
+Angaben zur Datumsformatierung. Um für die Formatierung die gewünschte Sprache zu erhalten, bestehen folgende Möglichkeiten:
 - Die Angabe einer Sprache über das `locale`-Attribut dieses Tags. Dies hat aber auch Einfluss auf die in `name` angegebenen Variablen.
 - Übername des Locals des aktiven Publishers. Wird das `locale`-Attribut nicht verwendet, wird das Locale des aktiven Publishers verwendet. Ist kein Publisher aktiv (`in`-Modus) oder wurde im Publisher kein Locale angegeben, wird das default-Locale des Systems verwendet (im Regelfall `de_DE`).
 - Angabe eines Locale in der Formatdefinition. In der Formatdefinition kann unabhängig von allen sonst definierten Formaten nur für dieses Format ein Locale angegeben werden. Dazu muss nach der Formatdefinition, mit einem Pipe-Zeichen (`|`) getrennt, das Locale angegeben werden:
@@ -2181,7 +2181,7 @@ dd.MM.yyyy HH:mm|en
             detail: None,
             documentation: Some(
                 r#"
-Angaben zur Dezimalformatierung. Um für die Formatierung die gewünschte Sprache zu erhalten, bestehen folgende Möglichkeiten:  
+Angaben zur Dezimalformatierung. Um für die Formatierung die gewünschte Sprache zu erhalten, bestehen folgende Möglichkeiten:
 - Die Angabe einer Sprache über das `locale`-Attribut dieses Tags. Dies hat aber auch Einfluss auf die in `name` angegebenen Variablen.
 - Übername des Locals des aktiven Publishers. Wird das `locale`-Attribut nicht verwendet, wird das Locale des aktiven Publishers verwendet. Ist kein Publisher aktiv (`in`-Modus) oder wurde im Publisher kein Locale angegeben, wird das default-Locale des Systems verwendet (im Regelfall `de_DE`).
 - Angabe eines Locale in der Formatdefinition. In der Formatdefinition kann unabhängig von allen sonst definierten Formaten nur für dieses Format ein Locale angegeben werden. Dazu muss nach der Formatdefinition mit einem Pipe-Zeichen (`|`) getrennt, das Locale angegeben werden:
@@ -2651,9 +2651,9 @@ Mit diesem Attribut können Bild-Optionen für die Berechnung des Bildes überge
             detail: None,
             documentation: Some(
                 r#"
-Der Wert `"on"` erzeugt Rahmen zur Auffüllung der Flächen um das Bild. Damit ist das resultierende Bild immer so groß. wie durch die Auflösung gefordert.  
-Der Wert `"off"` erzeugt keinen Rahmen zur Auffüllung der Flächen um das Bild. Damit ist das resultierende Bild unter Umständen kleiner als die geforderte Auflösung.  
-Mit `"fit"` wird der größtmögliche Ausschnitt aus dem Originalbild bzw. aus dem durch excerpt gewählten Ausschnitt gesucht, bei dem das Seitenverhältnis der geforderten Auflösung entspricht. Es wird kein Rahmen erzeugt, sondern das Bild in einer Dimension gegebenenfalls gekürzt. Ist das gewünschte Bild größer als das Original wird das Bild wie bei `padding="on"` aufgefüllt.  
+Der Wert `"on"` erzeugt Rahmen zur Auffüllung der Flächen um das Bild. Damit ist das resultierende Bild immer so groß. wie durch die Auflösung gefordert.
+Der Wert `"off"` erzeugt keinen Rahmen zur Auffüllung der Flächen um das Bild. Damit ist das resultierende Bild unter Umständen kleiner als die geforderte Auflösung.
+Mit `"fit"` wird der größtmögliche Ausschnitt aus dem Originalbild bzw. aus dem durch excerpt gewählten Ausschnitt gesucht, bei dem das Seitenverhältnis der geforderten Auflösung entspricht. Es wird kein Rahmen erzeugt, sondern das Bild in einer Dimension gegebenenfalls gekürzt. Ist das gewünschte Bild größer als das Original wird das Bild wie bei `padding="on"` aufgefüllt.
 Mit `"fit/no"` wird der größtmögliche Ausschnitt aus dem Originalbild bzw. aus dem durch excerpt gewählten Ausschnitt gesucht, bei dem das Seitenverhältnis der geforderten Auflösung entspricht. Es wird kein Rahmen erzeugt, sondern das Bild in einer Dimension gegebenenfalls gekürzt. Ist das gewünschte Bild größer als das Original wird das Bild nicht aufgefüllt."#,
             ),
         },
@@ -3432,7 +3432,7 @@ Fügt den ContextPath vor die angegebene URL und hängt, falls nötig die Sessio
             detail: None,
             documentation: Some(
                 r#"
-__Deprecated__. *Da dieses Attribut von dem Attribut information abhängt, ist auch dieses Attribut veraltet. (Siehe Attribut information).*  
+__Deprecated__. *Da dieses Attribut von dem Attribut information abhängt, ist auch dieses Attribut veraltet. (Siehe Attribut information).*
 Gibt an, ob die URL die durch das Attribut information ermittelt wurde mit absolutem Pfad ausgegeben werden soll."#,
             ),
         },
@@ -3441,7 +3441,7 @@ Gibt an, ob die URL die durch das Attribut information ermittelt wurde mit absol
             detail: None,
             documentation: Some(
                 r#"
-__Deprecated__. *Dieses Attribut ist veraltet und wird in zukünftigen Versionen nicht mehr unterstüzt werden. Kommandos wurden in der Version 2.0 zugunsten einer flexibleren Lösung abgeschafft. Ein Kommando bestand aus einem Template mit einem optionalen Handler. Für jede Template-Handler-Kombination musste ein eigenes Kommando angelegt werden. Diese Verbindung wurde aufgebrochen und durch die zwei neuen Attribute `template` und `handler` ersetzt. Um einen Handler aufzurufen und anschließend ein Template auszuführen, ist die Definition eines Kommandos nicht mehr nötig. Um einen Handler aufzurufen und anschließend ein Template auszuführen verwenden Sie die beiden Attribute `handler` und `template`. Um einen Handler aufzurufen und anschließend eine SPML-Seite auszuführen verwenden Sie die Attribute `handler` und `uri`.*  
+__Deprecated__. *Dieses Attribut ist veraltet und wird in zukünftigen Versionen nicht mehr unterstüzt werden. Kommandos wurden in der Version 2.0 zugunsten einer flexibleren Lösung abgeschafft. Ein Kommando bestand aus einem Template mit einem optionalen Handler. Für jede Template-Handler-Kombination musste ein eigenes Kommando angelegt werden. Diese Verbindung wurde aufgebrochen und durch die zwei neuen Attribute `template` und `handler` ersetzt. Um einen Handler aufzurufen und anschließend ein Template auszuführen, ist die Definition eines Kommandos nicht mehr nötig. Um einen Handler aufzurufen und anschließend ein Template auszuführen verwenden Sie die beiden Attribute `handler` und `template`. Um einen Handler aufzurufen und anschließend eine SPML-Seite auszuführen verwenden Sie die Attribute `handler` und `uri`.*
 Existierendes Command. Muss im GUI definiert worden sein."#,
             ),
         },
@@ -3458,7 +3458,7 @@ SPML-Seiten sind immer Teil einer Webapplikation. Jede Webapplikation besitzt ei
             detail: None,
             documentation: Some(
                 r#"
-__Deprecated__. *Da dieses Attribut von dem Attribut `command` abhängt ist auch dieses Attribut veraltet. (Siehe Attribut `command`). Ein GUI war eine `List` von Kommandos um Live-Seiten zu realisieren. GUIs wurde durch Webapplikationen ersetzt.*  
+__Deprecated__. *Da dieses Attribut von dem Attribut `command` abhängt ist auch dieses Attribut veraltet. (Siehe Attribut `command`). Ein GUI war eine `List` von Kommandos um Live-Seiten zu realisieren. GUIs wurde durch Webapplikationen ersetzt.*
 Steuert, ob das aktuelle GUI an die URL angefügt werden soll (nur in Verbindung mit `command` notwendig). Wird ab IES Version 2 nicht mehr ausgewertet, da keine GUIs mehr existieren. Sie werden durch Live-Seiten und Webapplikationen abgelöst."#,
             ),
         },
@@ -3475,7 +3475,7 @@ Handler der vor dem Aufruf, der mit `uri` oder `template` angegebenen Seite, aus
             detail: None,
             documentation: Some(
                 r#"
-__Deprecated__. *Dieses Attribute ist veraltet und wird in zukünftigen Versionen nicht mehr unterstützt. `sp:url` wurde in in früheren Versionen auch dazu verwendet die URL eines generierten Artikels zu ermitteln. Welche URL herausgeschieben werden sollte, wurde auch noch über die Attribute publisher und absolute gesteuert. Für diesen Zweck sollte `sp:url` nicht mehr verwendet werden. Statt dessen sollten die Attribute `url`, `relativeUrl`, `absoluteUrl` und die Methoden `url()`, `relativeUrl()` oder `absoluteUrl()` der Objecte `Article`, `Media` und `Resource` verwendet werden.*  
+__Deprecated__. *Dieses Attribute ist veraltet und wird in zukünftigen Versionen nicht mehr unterstützt. `sp:url` wurde in in früheren Versionen auch dazu verwendet die URL eines generierten Artikels zu ermitteln. Welche URL herausgeschieben werden sollte, wurde auch noch über die Attribute publisher und absolute gesteuert. Für diesen Zweck sollte `sp:url` nicht mehr verwendet werden. Statt dessen sollten die Attribute `url`, `relativeUrl`, `absoluteUrl` und die Methoden `url()`, `relativeUrl()` oder `absoluteUrl()` der Objecte `Article`, `Media` und `Resource` verwendet werden.*
 Artikel dessen URL geschrieben werden soll."#,
             ),
         },
@@ -3500,7 +3500,7 @@ SPML-Seiten sind immer Teil einer Webapplikation. Jede Webapplikation besitzt ei
             detail: None,
             documentation: Some(
                 r#"
-__Deprecated__. *Da dieses Attribut von dem Attribut `information` abhängt, ist auch dieses Attribut veraltet. (Siehe Attribut `information`).*  
+__Deprecated__. *Da dieses Attribut von dem Attribut `information` abhängt, ist auch dieses Attribut veraltet. (Siehe Attribut `information`).*
 Wird in Verbindung mit information verwendet, um zu bestimmen, aus welchem Publikationsbereich die URL erzeugt werden soll."#,
             ),
         },
@@ -3626,8 +3626,58 @@ Zählt Zugriffe auf publizierte Informationen"#,
     ),
     // deprecated: true,
     children: TagChildren::None,
-    attributes: TagAttributes::None,
-    attribute_rules: &[AttributeRule::Required("name")],
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "language",
+            detail: None,
+            documentation: Some(
+                r#"
+Gibt an in welcher Programmiersprache der Code generiert werden soll. Mögliche Werte sind:
+- `javascript` Es wird JavaScript-Code generiert.
+- `php` Es wird PHP-Code generiert."#,
+            ),
+        },
+        TagAttribute {
+            name: "mode",
+            detail: None,
+            documentation: Some(
+                r#"
+Der Zähler kann in verschiedenen Modi betrieben werden. Gültige Modi sind:
+- `read` Counter wird nicht hochgezählt, sondern es wird nur der aktuelle Zählerstand als Variable ausgegeben.
+- `write` Counter wird hochgezählt, aber es wird keine Variable gesetzt.
+- *keine Angabe* Counter wird hochgezählt und der aktuelle Zählerstand wird als Variable ausgegeben."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Name der Variable in der der Zugriffswert gespeichert wird."#,
+            ),
+        },
+        TagAttribute {
+                name: "varName",
+            detail: None,
+            documentation: Some(
+                r#"
+__Deprecated__ *(ab Version 2.0.3) Das Attribut ist veraltet, und sollte nicht mehr verwendet werden. Stattdessen sollte varname verwendet werden.*
+der Name der Variable, in die der aktuelle Counterwert ausgegeben wird [default=`sp_counter`]."#,
+            ),
+        },
+        TagAttribute {
+            name: "varname",
+            detail: None,
+            documentation: Some(
+                r#"
+der Name der Variable, in die der aktuelle Counterwert ausgegeben wird [default=`sp_counter`]."#,
+            ),
+        },
+    ]),
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::Deprecated("varName"),
+    ],
 };
 
 const SPT_DATE: TagProperties = TagProperties {
@@ -3638,7 +3688,90 @@ const SPT_DATE: TagProperties = TagProperties {
 Datums- und Uhrzeiteingabe mit Prüfung auf Gültigkeit"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+                name: "disabled",
+                detail: None,
+                documentation: Some(
+                r#"
+HTML-Attribut (`true`, `false`)."#,
+            ),
+        },
+        TagAttribute {
+                name: "fixvalue",
+                detail: None,
+                documentation: Some(
+                r#"
+Überschreibt jeden vorhandenen Inhalt der mit `name` bestimmten Variablen mit dem durch `fixvalue` angegebenen Wert."#,
+            ),
+        },
+        TagAttribute {
+                name: "locale",
+                detail: None,
+                documentation: Some(
+                r#"
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
+            ),
+        },
+        TagAttribute {
+                name: "name",
+                detail: None,
+                documentation: Some(
+                r#"
+Bestimmt den Namen des Feldes."#,
+            ),
+        },
+        TagAttribute {
+                name: "nowButton",
+                detail: None,
+                documentation: Some(
+                r#"
+Zeigt bei true eine Schaltfläche zum setzen des aktuellen Zeitpunkts an"#,
+            ),
+        },
+        TagAttribute {
+                name: "placeholder",
+                detail: None,
+                documentation: Some(
+                r#"
+Muss ein Datum sind und wird als Placeholder eingesetzt"#,
+            ),
+        },
+        TagAttribute {
+                name: "readonly",
+                detail: None,
+                documentation: Some(
+                r#"
+HTML-Attribut (`true`, `false`)."#,
+            ),
+        },
+        TagAttribute {
+                name: "size",
+                detail: None,
+                documentation: Some(
+                r#"
+`'size'`-Wert des generierten input-Tags."#,
+            ),
+        },
+        TagAttribute {
+            name: "type",
+                detail: None,
+                documentation: Some(
+                r#"
+Der Typ des Eingabefeldes.
+- `date` Einfaches Eingabefeld im Format `TT.MM.JJJJ`
+- `datetime` Zweifaches Eingabefeld für separate Eingabe von Datum und Uhrzeit im Format `TT.MM.JJJJ` und `HH:MM`"#,
+            ),
+        },
+        TagAttribute {
+                name: "value",
+                detail: None,
+                documentation: Some(
+                r#"
+Vorgabetext für das erzeugte Eingabefeld. Ohne bzw. mit einem leeren `value`-Attribut wird in der Eingabe das aktuelle Datum angezeigt. Soll das Eingabefeld leer bleiben, muss als `value` ein Leerzeichen (`" "`) angegeben werden."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
@@ -3653,7 +3786,32 @@ const SPT_DIFF: TagProperties = TagProperties {
 Vergleicht zwei Zeichenketten und zeigt die Unterschiede an"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "from",
+            detail: None,
+            documentation: Some(
+                r#"
+Text der verglichen werden soll. Wörter die hier enthalten und in `to` nicht mehr enthalten sind, werden als 'gelöscht' markiert."#,
+        ),
+        },
+        TagAttribute {
+            name: "style",
+            detail: None,
+            documentation: Some(
+                r#"
+CSS Styleangaben, die noch in den umschließenden div-Tag eingetragen werden."#,
+        ),
+        },
+        TagAttribute {
+            name: "to",
+            detail: None,
+            documentation: Some(
+                r#"
+Text der verglichen werden soll. Wörter die hier enthalten und in `from` nicht enthalten sind, werden als 'neu' markiert."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("from"),
         AttributeRule::Required("to"),
@@ -3670,7 +3828,172 @@ Ersetzt E-Mail-Adressen durch Bilder"#,
     ),
     // deprecated: true,
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+                name: "alt",
+                detail: None,
+                documentation: Some(
+                r#"
+Alternativtext der in die `alt`-Attribute der `<img>`-Tags eingetragen wird."#,
+            ),
+        },
+        TagAttribute {
+                name: "bgcolor",
+                detail: None,
+                documentation: Some(
+                r#"
+Hintergrundfarbe, die für den E-Mail-Text in dem generierten Bild verwendet werden soll."#,
+            ),
+        },
+        TagAttribute {
+                name: "bgcolor2",
+                detail: None,
+                documentation: Some(
+                r#"
+Hintergrundfarbe, die für den E-Mail-Text in dem generierten Bild für das Mailformular verwendet werden soll."#,
+            ),
+        },
+        TagAttribute {
+                name: "color",
+                detail: None,
+                documentation: Some(
+                r#"
+Schriftfarbe, die für den E-Mail-Text in dem generierten Bild verwendet werden soll."#,
+            ),
+        },
+        TagAttribute {
+                name: "color2",
+                detail: None,
+                documentation: Some(
+                r#"
+Schriftfarbe, die für den E-Mail-Text in dem generierten Bild für das Mailformular verwendet werden soll."#,
+            ),
+        },
+        TagAttribute {
+                name: "font",
+                detail: None,
+                documentation: Some(
+                r#"
+Schriftart, die für den E-Mail-Text in dem generierten Bild verwendet werden soll.
+In der Standardinstallalation enthaltene Fonts sind: `Arial` `Lucida` `Verdana` `Futura`"#,
+            ),
+        },
+        TagAttribute {
+                name: "font2",
+                detail: None,
+                documentation: Some(
+                r#"
+Schriftart, die für den E-Mail-Text in dem generierten Bild für das Mailformular verwendet werden soll.
+In der Standardinstallalation enthaltene Fonts sind: `Arial` `Lucida` `Verdana` `Futura`"#,
+            ),
+        },
+        TagAttribute {
+                name: "fontsize",
+                detail: None,
+                documentation: Some(
+                r#"
+Schriftgröße, die für den E-Mail-Text in dem generierten Bild verwendet werden soll."#,
+            ),
+        },
+        TagAttribute {
+                name: "fontsize2",
+                detail: None,
+                documentation: Some(
+                r#"
+Schriftgröße, die für den E-Mail-Text in dem generierten Bild für das Mailformular verwendet werden soll."#,
+            ),
+        },
+        TagAttribute {
+                name: "fontweight",
+                detail: None,
+                documentation: Some(
+                r#"
+Schriftstyle, die für den E-Mail-Text in dem generierten Bild verwendet werden soll.
+Mögliche Werte sind: `plain` `bold` `italic`"#,
+            ),
+        },
+        TagAttribute {
+                name: "fontweight2",
+                detail: None,
+                documentation: Some(
+                r#"
+Schriftstyle, die für den E-Mail-Text in dem generierten Bild für das Mailformular verwendet werden soll.
+Mögliche Werte sind: `plain` `bold` `italic`"#,
+            ),
+        },
+        TagAttribute {
+                name: "form",
+                detail: None,
+                documentation: Some(
+                r#"
+Artikel, der das Kontaktformular bereitstellt."#,
+            ),
+        },
+        TagAttribute {
+                name: "linkcolor",
+                detail: None,
+                documentation: Some(
+                r#"
+Schriftfarbe, die für den E-Mail-Text in dem generierten und verlinkten Bild verwendet werden soll."#,
+            ),
+        },
+        TagAttribute {
+                name: "name",
+                detail: None,
+                documentation: Some(
+                r#"
+Variable, in der der ersetzte Text abgelegt wird."#,
+            ),
+        },
+        TagAttribute {
+                name: "object",
+                detail: None,
+                documentation: Some(
+                r#"
+Objekt das den zu ersetzenden Text enhält."#,
+            ),
+        },
+        TagAttribute {
+                name: "onclick",
+                detail: None,
+                documentation: Some(
+                r#"
+JavaScript-Funktion die nach dem Klick auf eine E-Mail-Adresse ausgeführt werden soll."#,
+            ),
+        },
+        TagAttribute {
+                name: "popupheight",
+                detail: None,
+                documentation: Some(
+                r#"
+Höhe des Popup-Fensters für das Kontaktformular."#,
+            ),
+        },
+        TagAttribute {
+                name: "popupwidth",
+                detail: None,
+                documentation: Some(
+                r#"
+Breite des Popup-Fensters für das Kontaktformular."#,
+            ),
+        },
+        TagAttribute {
+            name: "title",
+            detail: None,
+            documentation: Some(
+                r#"
+Alternativtext der in die `title`-Attribute der `<img>`-Tags eingetragen wird."#,
+            ),
+        },
+        TagAttribute {
+            name: "urlparam",
+            detail: None,
+            documentation: Some(
+                r#"
+Übergabe weiterer Parameter an das Kontaktformular. Mehrere Parameter werden über `&amp;` getrennt (Beispiel: `"peter=pan&amp;donald=duck"`)"#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("object"),
@@ -3685,7 +4008,56 @@ const SPT_ENCRYPTEMAIL: TagProperties = TagProperties {
 Verschlüsselt Email-Adressen so, dass sie auch für Responsive-Design-Anforderungen verwendet werden können"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "form",
+            detail: None,
+            documentation: Some(
+                r#"
+Artikel, der das Kontaktformular bereitstellt."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Variable, in der der ersetzte Text abgelegt wird."#,
+            ),
+        },
+        TagAttribute {
+            name: "object",
+            detail: None,
+            documentation: Some(
+                r#"
+Objekt das den zu ersetzenden Text enhält."#,
+            ),
+        },
+        TagAttribute {
+            name: "popupheight",
+            detail: None,
+            documentation: Some(
+                r#"
+Höhe des Popup-Fensters für das Kontaktformular."#,
+        ),
+        },
+        TagAttribute {
+            name: "popupwidth",
+            detail: None,
+            documentation: Some(
+                r#"
+Breite des Popup-Fensters für das Kontaktformular."#,
+        ),
+        },
+        TagAttribute {
+            name: "urlparam",
+            detail: None,
+            documentation: Some(
+                r#"
+Übergabe weiterer Parameter an das Kontaktformular. Mehrere Parameter werden über `&amp;` getrennt (Beispiel: `"peter=pan&amp;donald=duck"`)"#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("object"),
@@ -3701,7 +4073,114 @@ Ersetzt Email-Adressen durch Bilder"#,
     ),
     // deprecated: true,
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+                name: "alt",
+                detail: None,
+                documentation: Some(
+                r#"
+Alternativtext der in die `alt`-Attribute der `<img>`-Tags eingetragen wird."#,
+            ),
+        },
+        TagAttribute {
+                name: "bgcolor",
+                detail: None,
+                documentation: Some(
+                r#"
+Hintergrundfarbe, die für den E-Mail-Text in dem generierten Bild verwendet werden soll."#,
+            ),
+        },
+        TagAttribute {
+                name: "color",
+                detail: None,
+                documentation: Some(
+                r#"
+Schriftfarbe, die für den E-Mail-Text in dem generierten Bild verwendet werden soll."#,
+            ),
+        },
+        TagAttribute {
+                name: "font",
+                detail: None,
+                documentation: Some(
+                r#"
+Schriftart, die für den E-Mail-Text in dem generierten Bild verwendet werden soll.
+In der Standardinstallalation enthaltene Fonts sind: `Arial` `Lucida` `Verdana` `Futura`"#,
+            ),
+        },
+        TagAttribute {
+                name: "fontsize",
+                detail: None,
+                documentation: Some(
+                r#"
+Schriftgröße, die für den E-Mail-Text in dem generierten Bild verwendet werden soll."#,
+            ),
+        },
+        TagAttribute {
+                name: "fontweight",
+                detail: None,
+                documentation: Some(
+                r#"
+Schriftstyle, die für den E-Mail-Text in dem generierten Bild verwendet werden soll.
+Mögliche Werte sind: `plain` `bold` `italic`"#,
+            ),
+        },
+        TagAttribute {
+                name: "form",
+                detail: None,
+                documentation: Some(
+                r#"
+Artikel, der das Kontaktformular bereitstellt."#,
+            ),
+        },
+        TagAttribute {
+                name: "name",
+                detail: None,
+                documentation: Some(
+                r#"
+Variable, in der der ersetzte Text abgelegt wird."#,
+            ),
+        },
+        TagAttribute {
+                name: "object",
+                detail: None,
+                documentation: Some(
+                r#"
+Objekt das den zu ersetzenden Text enhält."#,
+            ),
+        },
+        TagAttribute {
+                name: "onclick",
+                detail: None,
+                documentation: Some(
+                r#"
+JavaScript-Funktion die nach dem Klick auf eine E-Mail-Adresse ausgeführt werden soll."#,
+            ),
+        },
+        TagAttribute {
+                name: "popupheight",
+                detail: None,
+                documentation: Some(
+                r#"
+Höhe des Popup-Fensters für das Kontaktformular."#,
+            ),
+        },
+        TagAttribute {
+                name: "popupwidth",
+                detail: None,
+                documentation: Some(
+                r#"
+Breite des Popup-Fensters für das Kontaktformular."#,
+            ),
+        },
+        TagAttribute {
+            name: "title",
+            detail: None,
+            documentation: Some(
+                r#"
+Alternativtext der in die `title`-Attribute der `<img>`-Tags eingetragen wird."#,
+            ),
+        },
+    ]),
     attribute_rules: &[AttributeRule::Required("object")],
 };
 
@@ -3713,7 +4192,24 @@ const SPT_FORMSOLUTIONS: TagProperties = TagProperties {
 Erzeugt eine eindeutige Url auf PDF-Dokumente des Form-Solutions Formular Servers."#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Diese Attribut bestimmt die Mehrsprachigkeit der Variable."#,
+            ),
+        },
+        TagAttribute {
+                name: "name",
+                detail: None,
+                documentation: Some(
+                r#"
+Name der Variable, unter der die Verknüpfung in die Datenbank geschrieben wird."#,
+            ),
+        },
+    ]),
     attribute_rules: &[AttributeRule::Required("name")],
 };
 
@@ -3725,7 +4221,57 @@ const SPT_ID2URL: TagProperties = TagProperties {
 Durchsucht einen Text nach ID-Signaturen von Artikeln und ersetzt die IDs durch die URL des aktuellen Publikationsbereichs."#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "classname",
+            detail: None,
+            documentation: Some(
+                r#"
+Setzt oder ergänzt das class-Attribut des `<a>`-Tags für die Links, bei denen die ID durch die URL ersetzt wird."#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen Variablen."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Name der Variablen, unter der die ersetzte Zeichenkette gespeichert werden soll."#,
+            ),
+        },
+        TagAttribute {
+            name: "objekt",
+            detail: None,
+            documentation: Some(
+                r#"
+Variablenname des Objektes, das die Zeichenkette enthält."#,
+            ),
+        },
+        TagAttribute {
+            name: "querystring",
+            detail: None,
+            documentation: Some(
+                r#"
+Mit diesem Attribut kann für die eingesetzten URL noch ein Querystring (Parameter nach einem `?`) angehängt werden."#,
+            ),
+        },
+        TagAttribute {
+            name: "url",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut kann benutzt werden um relative oder absolute URL zu generieren.
+Erlaubte Werte: `relative` | `absolute`"#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("object"),
@@ -3741,7 +4287,40 @@ const SPT_ILINK: TagProperties = TagProperties {
 Erzeugt einen Link auf das CMS"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "action",
+            detail: None,
+            documentation: Some(
+                r#"
+Gibt an ob das Objekt in der Bearbeitungsansicht (`edit`) oder in der Listen-Ansicht (`list`) geöffnet werden soll"#,
+            ),
+        },
+        TagAttribute {
+            name: "information",
+            detail: None,
+            documentation: Some(
+                r#"
+Optionale Angabe eines Artikels, auf den der Link zeigen soll (z.B. für Listen)."#,
+            ),
+        },
+        TagAttribute {
+            name: "step",
+            detail: None,
+            documentation: Some(
+                r#"
+Bei Templates, die mit mehreren Steps aufgebaut sind ist hiermit der Sprung an eine definierte Stelle möglich. Die Angabe erfolgt relativ zum Step "Verwaltung"."#,
+            ),
+        },
+        TagAttribute {
+            name: "value",
+            detail: None,
+            documentation: Some(
+                r#"
+Code für den generierten i-Link."#,
+            ),
+        },
+    ]),
     attribute_rules: &[],
 };
 
@@ -3753,7 +4332,56 @@ const SPT_IMAGEEDITOR: TagProperties = TagProperties {
 Erzeugt eine Bearbeitungsoberfläche für Bilder"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "delete",
+            detail: None,
+            documentation: Some(
+                r#"
+Aktiviert die Möglichkeit das Bild im Editor löschen zu können"#,
+            ),
+        },
+        TagAttribute {
+            name: "focalpoint",
+            detail: None,
+            documentation: Some(
+                r#"
+Aktiviert die Bearbeitung des Fokus-Punktes"#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Bestimmt den Namen des Feldes."#,
+        ),
+        },
+        TagAttribute {
+            name: "object",
+            detail: None,
+            documentation: Some(
+                r#"
+Referenz zu einem Bild. Wenn eine Referenz zu einem Bild übergeben wird, ist der ImageEditor im Read-Only Modus."#,
+        ),
+        },
+        TagAttribute {
+            name: "width",
+            detail: None,
+            documentation: Some(
+                r#"
+Setzt die Breite des ImageEditors. Die Höhe wird dynamisch im Seitenverhältnis von 3/2 ermittelt."#,
+            ),
+        },
+    ]),
     attribute_rules: &[],
 };
 
@@ -3765,7 +4393,229 @@ const SPT_IMP: TagProperties = TagProperties {
 Erzeugt einen <img src="...">-Tag für kleingerechnete, sowie aus Texten generierte Bilder"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+                name: "alt",
+                detail: None,
+                documentation: Some(
+                r#"
+Der Alternativtext für Bilder. Die Ausgabe erfolgt automatisch mit `encoding=ascii,html`, so dass Anführungszeichen im Alternativtext nicht zu Fehlern führen."#,
+            ),
+        },
+        TagAttribute {
+                name: "background",
+                detail: None,
+                documentation: Some(
+                r#"
+Die Farbe des Hintergrunds kann durch Hexadezimalwerte gesetzt werden (z.B. `e3a383`). Für Thumbnails wird hiermit die Farbe des `padding`-Rahmens bestimmt. Für Textbilder wird hiermit die Hindergrundfarbe des Bildes gesetzt."#,
+            ),
+        },
+        TagAttribute {
+                name: "color",
+                detail: None,
+                documentation: Some(
+                r#"
+__Deprecated__. *Dieses Attribut ist veraltet und es sollte das Attribut fontcolor verwendet werden.*
+Die Farbe der Schrift. Beispielsweise `AA00DD` oder `ff77ff`"#,
+            ),
+        },
+        TagAttribute {
+                name: "excerpt",
+                detail: None,
+                documentation: Some(
+                r#"
+__Deprecated__. *Dieses Attribut wird nicht mehr unterstützt.*
+Diese Option schneidet einen Ausschnitt eines größeren Bildes aus. Die ersten beiden Zahlen geben die linke obere Ecke des Ausschnittes an, die letzteren beiden die untere rechte Ecke. Mögliche Werte sind x0,y0,x1,y1 z.B. 100,100,300,200. Dieser Ausschnitt wird entsprechend der Optionen `height` und `width` noch verkleinert oder vergrößert. Hierbei wird gegebenenfalls ein Rand erzeugt, sprich die Option `padding=yes` ist automatisch gesetzt, falls nicht `padding=fit` gesetzt ist.
+Alle 4 Zahlen können auch negativ sein. In diesem Fall wird der Wert als Differenz zum hinteren oder unteren Rand des Bildes berechnet. Also bedeutet -10% dasselbe wie 90% und -100 bei einem 300 Pixel breiten (oder hohen) Bild dasselbe wie 200. Ist `x0 > x1`, wird das Bild an der `x`-Achse gespiegelt.
+Ist `y0 > y1`, wird das Bild an der `y`-Achse gespiegelt. Mit Angabe der Werte `x0,y0` z.B. 100,50 wird der Ausschnitt in der exakten Größe der mittels `height` und `width` geforderten Auflösung gewählt. Es ist dann keine Verkleinerung oder Vergrößerung mehr notwendig und man erhält einen 1:1 Ausschnitt des Orignals. Hierbei ist immer `padding=no` gesetzt.
+Mit den Variablen `north`, `west`, `east` oder `south` wird ein in der jeweiligen Himmelsrichtung gelegener Ausschnitt in der mittels `height` und `width` geforderten Auflösung gewählt. Also wird mit `excerpt=south` ein Ausschnitt auf der Mitte der Bildbreite ganz unten gewählt, mit `excerpt=east` dagegen ein Ausschnitt aus der Mitte der Bildhöhe ganz rechts. Es ist dann keine Verkleinerung oder Vergrößerung mehr notwendig und man erhält einen 1:1 Ausschnitt des Orignals. Hierbei ist immer `padding=no` gesetzt.
+Mit northwest, northeast, southwest oder southeast wird ein in der jeweiligen Himmelsrichtung gelegener Ausschnitt in der mittels `height` und `width` geforderten Auflösung gewählt. Also wird mit `excerpt=southeast` die äußerste untere, rechte Ecke des Originalbildes gewählt, mit `excerpt=northwest` dagegen die obere, linke Ecke. Es ist dann keine Verkleinerung oder Vergrößerung mehr notwendig und man erhält einen 1:1 Ausschnitt des Orignals. Hierbei is immer `padding=no` gesetzt."#,
+            ),
+        },
+        TagAttribute {
+                name: "font",
+                detail: None,
+                documentation: Some(
+                r#"
+__Deprecated__. *Dieses Attribut ist veraltet und es sollte das Attribut fontname verwendet werden.*
+Der Font (z.B. `Arial`)"#,
+            ),
+        },
+        TagAttribute {
+                name: "font-size",
+            detail: None,
+            documentation: Some(
+                r#"
+__Deprecated__. *Dieses Attribut ist veraltet und es sollte das Attribut fontsize verwendet werden.*
+Punkt-Größe des zu verwendenden Fonts (z.b.: `12`) "#,
+            ),
+        },
+        TagAttribute {
+                name: "font-weight",
+            detail: None,
+            documentation: Some(
+                r#"
+__Deprecated__. *Dieses Attribut ist veraltet unde es sollte das Attribut fontweight verwendet werden.*
+Die Dicke (Wichtung) des angegebenen Fonts (z.b.: `bold`, `200` oder `900`)."#,
+            ),
+        },
+        TagAttribute {
+                name: "fontcolor",
+                detail: None,
+                documentation: Some(
+                r#"
+Die Farbe der Schrift. Beispielsweise `AA00DD` oder `ff77ff`"#,
+            ),
+        },
+        TagAttribute {
+                name: "fontname",
+                detail: None,
+                documentation: Some(
+                r#"
+Der Font (z.B. `Arial`)"#,
+            ),
+        },
+        TagAttribute {
+                name: "fontsize",
+                detail: None,
+                documentation: Some(
+                r#"
+Punkt-Größe des zu verwendenden Fonts (z.b.: `12`) "#,
+            ),
+        },
+        TagAttribute {
+                name: "fontweight",
+                detail: None,
+                documentation: Some(
+                r#"
+Die Dicke (Wichtung) des angegebenen Fonts (z.b.: `bold`, `200` oder `900`)."#,
+            ),
+        },
+        TagAttribute {
+                name: "format",
+                detail: None,
+                documentation: Some(
+                r#"
+Die Formate `png` und `jpeg` können für Thumbnails verwendet werden"#,
+            ),
+        },
+        TagAttribute {
+                name: "gravity",
+                detail: None,
+                documentation: Some(
+                r#"
+Mit den Werten `n`, `w`, `e`, `s`, `nw`, `ne`, `sw`, `se` oder `Center`, `North`, `South`, `NorthEast` etc. kann die gewünschte Position des Textes im umgebenen Rahmen ausgerichtet werden. `West` ist der Standardwert. Das heißt alle Texte beginnen links auf mittlerer Höhe."#,
+            ),
+        },
+        TagAttribute {
+                name: "height",
+                detail: None,
+                documentation: Some(
+                r#"
+Die gewünschte Bildhöhe z.B. `100`. Die Breite wird unter Beibehaltung des Seiten-Verhältnisses des Originalbildes oder des gewählten Ausschnittes berechnet. Bei gesetzter Höhe ist daher die Option `padding` zwingend auf `no` gesetzt."#,
+            ),
+        },
+        TagAttribute {
+                name: "image",
+                detail: None,
+                documentation: Some(
+                r#"
+Bild-Object, das mit dem `spt:imp`-Tag verarbeitet werden soll."#,
+            ),
+        },
+        TagAttribute {
+                name: "manipulate",
+                detail: None,
+                documentation: Some(
+                r#"
+__Deprecated__. *Dieses Attribut wird nicht mehr unterstützt.*
+Erzeugt verschiedene Effekte wie weichzeichnen oder schärfen über `sharp1`, `sharp2`, `sharp3`, `sharp4`, `laplace1`, `laplace2`, `box`, `lowpass`, `neon`, `emboss` und `bw`"#,
+            ),
+        },
+        TagAttribute {
+                name: "offset",
+                detail: None,
+                documentation: Some(
+                r#"
+Der Anfangspunkt des auszugebenden Textes, die über die Option `gravity` angegeben ist, von der Seite aus gesehen. Ohne Angabe von `gravity` ist dies normalerweise die linke Seite in der Mitte (z.B.: `3,10`)"#,
+            ),
+        },
+        TagAttribute {
+                name: "padding",
+                detail: None,
+                documentation: Some(
+                r#"
+Der Wert `"on"` erzeugt Rahmen zur Auffüllung der Flächen um das Bild. Damit ist das resultierende Bild immer so groß wie durch die Auflösung gefordert. `padding=on` ist als Standardwert gesetzt, solange es nicht durch andere Optionen ausgeschlossen ist.
+Der Wert `"off"` erzeugt keinen Rahmen zur Auffüllung der Flächen um das Bild. Damit ist das resultierende Bild unter Umständen kleiner als die geforderte Auflösung.
+Mit `"fit"` wird der größte mögliche Ausschnitt aus dem Originalbild, bzw. aus dem durch `excerpt` gewählten Ausschnitt gesucht, bei dem das Seitenverhältnis der geforderten Auflösung entspricht. Es wird kein Rahmen erzeugt, sondern das Bild in einer Dimension gegebenenfalls gekürzt.
+Um eine Abwärtskompatibilität zu gewährleisten, wird auch der Wert `"yes"` (entspricht `"on"`) und `"no"` (entspricht `"off"`) unterstützt."#,
+            ),
+        },
+        TagAttribute {
+                name: "paddingcolor",
+                detail: None,
+                documentation: Some(
+                r#"
+__Deprecated__. *Dieses Attribut ist veraltet. Es sollte das Attribut `background` verwendet werden.*
+Mit `paddingcolor` kann durch Hexadezimalwerte oder `X`-Window-Namen die Farbe des Rahmen bzw. des Hintergrundes, die bei `padding=yes` verwendet wird, angegeben werden. `transparent` ist das Default."#,
+            ),
+        },
+        TagAttribute {
+                name: "scalesteps",
+                detail: None,
+                documentation: Some(
+                r#"
+Schalter um das Optimierungsverhalten im `In`-Modus auszuschalten."#,
+            ),
+        },
+        TagAttribute {
+                name: "text",
+                detail: None,
+                documentation: Some(
+                r#"
+Der auszugebende Text in URL-encodeter Form."#,
+            ),
+        },
+        TagAttribute {
+            name: "text-transform",
+            detail: None,
+            documentation: Some(
+                r#"
+__Deprecated__. *Dieses Attribut ist veraltet. Die Umwandlung von Texten sollten über die Attribute und Methoden des `String`-Objektes durchgeführt werden*
+Manipulation des Textes, bevor das Bild berechnet wird. Mögliche Werte sind
+- `uppercase` Alle Zeichen in Großbuchstaben umwandeln
+- `lowercase` Alle Zeichen in Kleinbuchstaben umwandeln"#,
+            ),
+        },
+        TagAttribute {
+            name: "transform",
+            detail: None,
+            documentation: Some(
+                r#"
+__Deprecated__. *Dieses Attribut ist veraltet. Die Umwandlung von Texten sollten über die Attribute und Methoden des `String`-Objektes durchgeführt werden*
+Manipulation des Textes, bevor das Bild berechnet wird. Mögliche Werte sind
+- `uppercase` Alle Zeichen in Großbuchstaben umwandeln
+- `lowercase` Alle Zeichen in Kleinbuchstaben umwandeln"#,
+            ),
+        },
+        TagAttribute {
+            name: "urlonly",
+            detail: None,
+            documentation: Some(
+                r#"
+__Deprecated__. *Das Attribut ist veraltet, und sollte nicht mehr verwendet werden. Wird nur die URL benötigt oder weiterer Metadaten des berechneten Bildes sollte der Tag `sp:scaleimage` für Thumbnails oder sp:textimage für Texte verwendet werden.*
+schreibt nur die URL ohne `<img>`-Tag heraus"#,
+            ),
+        },
+        TagAttribute {
+            name: "width",
+            detail: None,
+            documentation: Some(
+                r#"
+Die gewünschte Bildbreite z.B. `100`. Die Höhe wird unter Beibehaltung des Seiten-Verhältnisses des Originalbildes oder des gewählten Ausschnittes berechnet. Bei gesetzter Breite ist daher die Option `padding` zwingend auf `no` gesetzt"#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("image"),
         AttributeRule::AtleastOneOf(&["height", "width"]),
@@ -3790,7 +4640,80 @@ const SPT_ITERATOR: TagProperties = TagProperties {
 Erzeugt Wiederholfelder"#,
     ),
     children: TagChildren::Any,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "disabled",
+            detail: None,
+            documentation: Some(
+                r#"
+Liste von Elementen (beginnend mit `1` für das erste Listenelement: `1,2,4,5,8,...`), welche nicht bearbeitet werden dürfen. Sowohl das Listenelement selbst kann nicht gelöscht werden, also auch alle in dem Listenelement enthalten Felder können nicht bearbeitet werden."#,
+            ),
+        },
+        TagAttribute {
+            name: "invert",
+            detail: None,
+            documentation: Some(
+                r#"
+Mit diesem Attribut (`true`, `false`) kann die Darstellung der Liste beeinflusst werden. Wenn auf `true` gesetzt, werden die Listenelemente mit einem dunklen Rahmen umschlossen, andernfalls mit einem hellen Rahmen. Eine eventuell vorhandene Blocküberschrift (siehe Attribut itemtext passt sich der Darstellung an und erscheint bei invertierter Darstellung in heller Schrift auf dunklem Grund."#,
+            ),
+        },
+        TagAttribute {
+            name: "item",
+            detail: None,
+            documentation: Some(
+                r#"
+Die in `name` angegebene Liste wird Element für Element durchlaufen. Mit dem, in diesem Attribut angegebenen Namen kann auf das aktuelle Element der Liste zugegriffen werden. Für das aktuelle Element können noch zusätzliche Informationen die den Schleifendurchlauf betreffen abgefragt werden (siehe `IteratorItem`)."#,
+            ),
+        },
+        TagAttribute {
+            name: "itemtext",
+            detail: None,
+            documentation: Some(
+                r#"
+Mit diesem Attribut kann ein Text definiert werden, der an Stelle der Listennummerierung als Blocküberschrift erscheint, wenn das Attribut `layout` nicht auf `plain` gesetzt wurde. Dem Text folgt bei mehr als 1 Listenelement automatisch die Listennummerierung in der Form `"x von n"`, wobei `x` die Nummer des Listenelementes ist und `n` die Anzahl der Listenelemente."#,
+            ),
+        },
+        TagAttribute {
+            name: "layout",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut bestimmt die Darstellung der Liste. Wenn `plain`, werden die Listenelemente ohne Rahmen und Schaltflächen ausgegeben. Mögliche Schaltflächen zum Hinzufügen oder Löschen eines Listenelementes müssen manuell im Template gecodet werden."#,
+            ),
+        },
+        TagAttribute {
+            name: "max",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Anzahl der maximal zu iterierenden Elemente. Enthält die zu iterierende Liste mehr Elemente als in `max` angegeben, so wird die Anzahl der Elemente auf die Anzahl `max` gekürzt."#,
+            ),
+        },
+        TagAttribute {
+            name: "min",
+            detail: None,
+            documentation: Some(
+                r#"
+Die Anzahl der mindestens zu iterierenden Elemente. Enthält die zu iterierende Liste weniger Elemente als in `min` angegeben werden so viele leere Elemente hinzugefügt, bis mindestens die in `min` angegebene Anzahl von Elementen vorhanden ist."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Name der Variablen, unter der die Liste auch für die Ausgabe erreichbar ist. Dieses Attribut entspricht dem `collection`-Attribut des `sp:iterator`-Tags."#,
+            ),
+        },
+        TagAttribute {
+            name: "readonly",
+            detail: None,
+            documentation: Some(
+                r#"
+Attribut (`true`, `false`) was bestimmt, ob die Schaltflächen zum Hinzufügen, Löschen und Verschieben von Listenelementen angezeigt werden, wenn das Attribut `layout nicht auf `plain gesetzt wurde."#,
+            ),
+        },
+    ]),
     attribute_rules: &[AttributeRule::Required("name")],
 };
 
@@ -3802,7 +4725,169 @@ const SPT_LINK: TagProperties = TagProperties {
 Erzeugt Links auf Informationen und bindet Bildmedien ein."#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "filter",
+                detail: None,
+                documentation: Some(
+                r#"
+Die Filterdefinition für die Filtertypen Wildcard und regulärer Ausdruck. Der mit dem Attribut `mode` angegebene Modus wird verwendet. Ohne Angabe eines Modus wird `simple` verwendet."#,
+            ),
+        },
+        TagAttribute {
+            name: "filterattribute",
+            detail: None,
+            documentation: Some(
+                r#"
+Attribut, auf das der Filter angewendet werden soll."#,
+            ),
+        },
+        TagAttribute {
+            name: "filteric",
+            detail: None,
+            documentation: Some(
+                r#"
+Ist Ignore-Case auf `true` gesetzt, wird eine Groß- und Kleinschreibung nicht berücksichtigt. Dieses Attribut gilt nur für die Filtertypen Wildcard und regulärer Ausdruck."#,
+            ),
+        },
+        TagAttribute {
+            name: "filterinvert",
+            detail: None,
+            documentation: Some(
+                r#"
+Invertiert die Logik des Filters. Alle Elemente die normalerweise herausgefiltert würden, bilden die Filterergebnisse."#,
+            ),
+        },
+        TagAttribute {
+            name: "filtermode",
+            detail: None,
+            documentation: Some(
+                r#"
+Auswahl des Filter-Mechanismus.
+__simple (Wildcard-Filter)__
+Der Filter kann die Wildcards `*` für beliebige Zeichen und `?` für ein beliebiges Zeichen enthalten. So würde eine wie folgt gefilterte Liste nur Elemente enthalten, die mit a beginnen.
+```regex
+a*
+```
+__regex (Reguläre Ausdrücke)__
+Für komplexe Filter stehen Reguläre Ausdrücke (POSIX) zur Verfügung. So würde im regex-Filtermode eine mit
+```regex
+[a-dA-D].*
+```
+gefilterte Liste nur Elemente enthalten, die mit dem Buchstaben A, a, B, b, C, c, d oder D beginnen."#,
+            ),
+        },
+        TagAttribute {
+            name: "filterquery",
+            detail: None,
+            documentation: Some(
+                r#"
+mit diesem Parameter kann eine Suchabfrage definiert werden, welche die anzuzeigenden Elemente für jeden Pool filtert. Als Ergänzung zu den folgenden 5 Parametern, die mit sp:filter arbeiten, ist es so auch möglich, Artikel herauszufiltern, deren Informationen sich in Iteratoren befinden."#,
+            ),
+        },
+        TagAttribute {
+            name: "fixvalue",
+            detail: None,
+            documentation: Some(
+                r#"
+Überschreibt jeden vorhandenen Inhalt der mit name bestimmten Variablen mit dem durch `fixvalue` angegebenen Wert."#,
+            ),
+        },
+        TagAttribute {
+            name: "height",
+            detail: None,
+            documentation: Some(
+                r#"
+Bei `type="image"` kann durch dieses Attribut der `'height'`-Wert des generierten `<img ...>`-Tags gesetzt werden."#,
+            ),
+        },
+        TagAttribute {
+            name: "hidden",
+            detail: None,
+            documentation: Some(
+                r#"
+Macht das Feld unsichtbar."#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Diese Attribut bestimmt die Mehrsprachigkeit der Variable."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Name der Variable, unter der der Systemlink in die Datenbank geschrieben wird."#,
+            ),
+        },
+        TagAttribute {
+            name: "pools",
+                detail: None,
+                documentation: Some(
+                r#"
+Kommaseparierte Liste mit `Anchor`s von Artikelpools oder mit `ID`s von Artikelpools; die Elemente der Pools werden dem Redakteur zur Auswahl angeboten."#,
+            ),
+        },
+        TagAttribute {
+            name: "previewimage",
+            detail: None,
+            documentation: Some(
+                r#"
+`previewimage=false` verhindert die automatische Anzeige von verküpften Bildern."#,
+            ),
+        },
+        TagAttribute {
+            name: "showtree",
+            detail: None,
+            documentation: Some(
+                r#"
+wenn `false`, werden nur die im Attribut pools übergebenen Einsprungpunkte in der Baumansicht angezeigt (ohne Aufklappmöglichkeit und ohne Kinder)"#,
+            ),
+        },
+        TagAttribute {
+            name: "size",
+            detail: None,
+            documentation: Some(
+                r#"
+HTML-size Wert des von `spt:link` erzeugten Eingabefeldes."#,
+            ),
+        },
+        TagAttribute {
+            name: "type",
+            detail: None,
+            documentation: Some(
+                r#"
+Typ der Verlinkung
+- `systemlink` bei Änderung des verlinkten Artikels wird der verlinkende Artikel neu publiziert.
+- `navlink` bei Änderung des verlinkenden Artikels wird der verlinkte neu publiziert.
+- `resultlink` wird auf eine Suchabfrage verlinkt wird bei Änderung der Suchabfrage der verlinkende Artikel neu publiziert.
+- `link` es erfolgt keine Aktualisierung in irgendeine Richtung.
+- `image` `'image'` erzeugt einen Linktype `'systemlink'`
+    Es wird bei Verwendung im Ausgabebereich eines Templates ein `<a href=...>`-Tag generiert. Die Auswahl, die dem Redakteur zur Verfügung gestellt wird, ist von dieser Einstellung abhängig. Ist `'type=image'` gesetzt, kann der Redakteur ein Bildmedium auswählen, mit dem ein `<img ...>`-Tag generiert wird."#,
+            ),
+        },
+        TagAttribute {
+            name: "value",
+            detail: None,
+            documentation: Some(
+                r#"
+Vorgabefeld für das erzeugte Eingabefeld."#,
+        ),
+        },
+        TagAttribute {
+            name: "width",
+            detail: None,
+            documentation: Some(
+                r#"
+Bei `type="image"` kann durch dieses Attribut der `'width'`-Wert des generierten `<img ...>`-Tags gesetzt werden."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
@@ -3821,7 +4906,72 @@ const SPT_NUMBER: TagProperties = TagProperties {
 Zahleneingabe mit Prüfung auf Gültigkeit"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "align",
+            detail: None,
+            documentation: Some(
+                r#"
+Ausrichtung des Inhalts für das erzeugte Eingabefeld."#,
+            ),
+        },
+        TagAttribute {
+            name: "disabled",
+            detail: None,
+            documentation: Some(
+                r#"
+HTML-Attribut (`true`, `false`)."#,
+            ),
+        },
+        TagAttribute {
+            name: "fixvalue",
+            detail: None,
+            documentation: Some(
+                r#"
+Überschreibt jeden vorhandenen Inhalt der mit `name` bestimmten Variablen mit dem durch `fixvalue` angegebenen Wert."#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Bestimmt den Namen des Feldes."#,
+            ),
+        },
+        TagAttribute {
+            name: "readonly",
+            detail: None,
+            documentation: Some(
+                r#"
+HTML-Attribut (`true`, `false`)."#,
+            ),
+        },
+        TagAttribute {
+            name: "size",
+            detail: None,
+            documentation: Some(
+                r#"
+`'size'`-Wert des generierten input-Tags."#,
+            ),
+        },
+        TagAttribute {
+            name: "value",
+            detail: None,
+            documentation: Some(
+                r#"
+Setzt einen Default-Wert für die mit `name` angegebenen Variable, wenn sie leer ist."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
@@ -3836,7 +4986,39 @@ const SPT_PERSONALIZATION: TagProperties = TagProperties {
 Definiert personalisierte Bereiche"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "information",
+            detail: None,
+            documentation: Some(
+                r#"
+Artikel dessen Personalisierungs-Daten für das Apache-Personalisierungsmodul ausgegeben werden sollen."#,
+            ),
+        },
+        TagAttribute {
+            name: "mode",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut kann benutzt werden um eine alternative Ausgabe zu erzeugen.
+Mit `mode="php"` werden die Personlisierungsinformationen auf PHP-Ebene ausgewertet und anstelle von `<sitepark_authpart>`-Tags wird entsprechender PHP-Code rausgeschrieben.
+Unterstützte Werte derzeit: `php`"#,
+        ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Variablenname, unter dem die Rechte gespeichert werden."#,
+        ),
+        },
+        TagAttribute {
+            name: "publisher",
+            detail: None,
+            documentation: None,
+        },
+    ]),
     attribute_rules: &[],
 };
 
@@ -3848,7 +5030,24 @@ const SPT_PREHTML: TagProperties = TagProperties {
 HTML-Code nachbearbeiten."#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Name der Variablen, unter der die ersetzte Zeichenkette gespeichert werden soll."#,
+            ),
+        },
+        TagAttribute {
+            name: "object",
+            detail: None,
+            documentation: Some(
+                r#"
+Variablenname des Objektes, das die Zeichenkette enthält."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("object"),
@@ -3864,7 +5063,64 @@ Integriert den WYSIWYG-SmartEditor ins CMS"#,
     ),
     // deprecated: true,
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+                name: "cols",
+                detail: None,
+                documentation: Some(
+                r#"
+Breite des Eingabefeldes in Spalten."#,
+            ),
+        },
+        TagAttribute {
+            name: "hide",
+            detail: None,
+            documentation: Some(
+                r#"
+Ist `hide="false"` gesetzt, so wird eine Textarea generiert, die den vom SmartEditor erzeugten Quellcode aufnimmt. Ist `hide="true"` gesetzt, so erscheint lediglich die Schaltfläche, über die sich der SmartEditor starten lässt. Standardwert ist `true`."#,
+        ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Bestimmt den Namen des Eingabefeldes."#,
+        ),
+        },
+        TagAttribute {
+            name: "options",
+            detail: None,
+            documentation: Some(
+                r#"
+Optionen, die beim Aufruf des Smarteditors an diesen übergeben werden."#,
+            ),
+        },
+        TagAttribute {
+            name: "rows",
+            detail: None,
+            documentation: Some(
+                r#"
+Höhe des Eingabefeldes in Zeilen."#,
+        ),
+        },
+        TagAttribute {
+            name: "textlabel",
+            detail: None,
+            documentation: Some(
+                r#"
+Beschriftung des Smarteditorfeldes, oberhalb."#,
+        ),
+        },
+        TagAttribute {
+            name: "value",
+            detail: None,
+            documentation: Some(
+                r#"
+Vorgegebener Inhalt des Feldes."#,
+            ),
+        },
+    ]),
     attribute_rules: &[AttributeRule::Required("name")],
 };
 
@@ -3876,7 +5132,19 @@ const SPT_SPML: TagProperties = TagProperties {
 schreibt den Header für SPML-Live Seiten"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+                name: "api",
+                detail: None,
+                documentation: Some(
+                r#"
+Kommaseparierte Liste von APIs, dessen Packages mit Import-Anweisungen eingebunden werden sollen. Mögliche APIs sind:
+- `log4j` Siehe [hier](http://logging.apache.org/log4j/1.2/apidocs/index.html)
+- `jdom` Siehe [hier](http://www.jdom.org/docs/apidocs/index.html)
+- `mail` Siehe [hier](http://java.sun.com/products/javamail/javadocs/index.html)"#,
+            ),
+        },
+    ]),
     attribute_rules: &[],
 };
 
@@ -3888,7 +5156,104 @@ const SPT_TEXT: TagProperties = TagProperties {
 Einzeiliges Textfeld, das Versionierung unterstützt"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "disabled",
+            detail: None,
+            documentation: Some(
+                r#"
+HTML-Attribut (`true`, `false`)."#,
+            ),
+        },
+        TagAttribute {
+            name: "editablePlaceholder",
+            detail: None,
+            documentation: Some(
+                r#"
+Mit dem Setzen von `false`, kann die Editierbarkeit von Placeholdern deaktiviert werden."#,
+            ),
+        },
+        TagAttribute {
+            name: "fixvalue",
+            detail: None,
+            documentation: Some(
+                r#"
+Überschreibt jeden vorhandenen Inhalt der mit `name` bestimmten Variablen mit dem durch `fixvalue` angegebenen Wert."#,
+            ),
+        },
+        TagAttribute {
+            name: "format",
+                detail: None,
+                documentation: Some(
+                r#"
+Wenn bei type beispielsweise `date` oder `number` angegeben wurde, kann format entsprechend des Types die Formatierung bestimmen (`dd.MM.yyyy` oder `#0.00`)."#,
+            ),
+        },
+        TagAttribute {
+            name: "hyphenEditor",
+            detail: None,
+            documentation: Some(
+                r#"
+Deaktiviert bei `false` den Hyphen-Editor"#,
+            ),
+        },
+        TagAttribute {
+            name: "inputType",
+            detail: None,
+            documentation: Some(
+                r#"
+Setzt den [Typ](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input#Form_%3Cinput%3E_types) des Eingeabefelds"#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Bestimmt den Namen des Feldes."#,
+            ),
+        },
+        TagAttribute {
+            name: "readonly",
+            detail: None,
+            documentation: Some(
+                r#"
+HTML-Attribut (`true`, `false`)."#,
+            ),
+        },
+        TagAttribute {
+            name: "size",
+            detail: None,
+            documentation: Some(
+                r#"
+`'size'`-Wert des generierten `input`-Tags."#,
+            ),
+        },
+        TagAttribute {
+            name: "type",
+            detail: None,
+            documentation: Some(
+                r#"
+Der Typ des Eingabefeldes."#,
+            ),
+        },
+        TagAttribute {
+            name: "value",
+            detail: None,
+            documentation: Some(
+                r#"
+Setzt einen Default-Wert für die mit `name` angegebenen Variable, wenn sie leer ist."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
@@ -3903,7 +5268,104 @@ const SPT_TEXTAREA: TagProperties = TagProperties {
 Erzeugt ein mehrzeiliges Textfeld, das Versionierung unterstützt"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "disabled",
+            detail: None,
+            documentation: Some(
+                r#"
+HTML-Attribut (`true`, `false`)."#,
+            ),
+        },
+        TagAttribute {
+            name: "editablePlaceholder",
+            detail: None,
+            documentation: Some(
+                r#"
+Mit dem Setzen von `false`, kann die Editierbarkeit von Placeholdern deaktiviert werden."#,
+            ),
+        },
+        TagAttribute {
+            name: "fixvalue",
+            detail: None,
+            documentation: Some(
+                r#"
+Überschreibt jeden vorhandenen Inhalt der mit `name` bestimmten Variablen mit dem durch `fixvalue` angegebenen Wert."#,
+            ),
+        },
+        TagAttribute {
+            name: "format",
+                detail: None,
+                documentation: Some(
+                r#"
+Wenn bei type beispielsweise `date` oder `number` angegeben wurde, kann format entsprechend des Types die Formatierung bestimmen (`dd.MM.yyyy` oder `#0.00`)."#,
+            ),
+        },
+        TagAttribute {
+            name: "hyphenEditor",
+            detail: None,
+            documentation: Some(
+                r#"
+Deaktiviert bei `false` den Hyphen-Editor"#,
+            ),
+        },
+        TagAttribute {
+            name: "inputType",
+            detail: None,
+            documentation: Some(
+                r#"
+Setzt den [Typ](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input#Form_%3Cinput%3E_types) des Eingeabefelds"#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Bestimmt den Namen des Feldes."#,
+            ),
+        },
+        TagAttribute {
+            name: "readonly",
+            detail: None,
+            documentation: Some(
+                r#"
+HTML-Attribut (`true`, `false`)."#,
+            ),
+        },
+        TagAttribute {
+            name: "size",
+            detail: None,
+            documentation: Some(
+                r#"
+`'size'`-Wert des generierten `input`-Tags."#,
+            ),
+        },
+        TagAttribute {
+            name: "type",
+            detail: None,
+            documentation: Some(
+                r#"
+Der Typ des Eingabefeldes."#,
+            ),
+        },
+        TagAttribute {
+            name: "value",
+            detail: None,
+            documentation: Some(
+                r#"
+Setzt einen Default-Wert für die mit `name` angegebenen Variable, wenn sie leer ist."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
@@ -3918,7 +5380,16 @@ const SPT_TIMESTAMP: TagProperties = TagProperties {
 Zeitstempel in ein Eingabefeld schreiben"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "connect",
+            detail: None,
+            documentation: Some(
+                r#"
+Mit diesem Attribut wird das Eingabefeld referenziert, in das der Zeitstempel geschrieben werden soll. Das Eingabefeld muss explizit initialisert werden, da der `spt:timestamp`-Tag den Zeitstempel nicht direkt in die Datenbank schreibt."#,
+            ),
+        },
+    ]),
     attribute_rules: &[AttributeRule::Required("connect")],
 };
 
@@ -3930,7 +5401,120 @@ const SPT_TINYMCE: TagProperties = TagProperties {
 Integriert einen Editor"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "cols",
+            detail: None,
+            documentation: Some(
+                r#"
+Breite des Eingabefeldes in Spalten."#,
+            ),
+        },
+        TagAttribute {
+            name: "config",
+            detail: None,
+            documentation: Some(
+                r#"
+Mit diesem Attribut wird der Name einer Konfiguration angegeben. Die in dieser Konfiguration angegebenen Konfigurationsparameter überschreiben die IES-Standardkonfiguration. Die Angaben werden in JSON angegeben, wobei die umschließenden geschweiften Klammern `{}` nicht mit angegeben werden dürfen. Die möglichen Konfigurationsparameter sind unter [TinyMCE:Configuration](http://wiki.moxiecode.com/index.php/TinyMCE:Configuration) aufgelistet."#,
+            ),
+        },
+        TagAttribute {
+            name: "configextension",
+            detail: None,
+            documentation: Some(
+                r#"
+Mit diesem Attribut wird der Name einer Konfigurations-Ergänzung angegeben. Die in dieser Ergänzung angegebenen Konfigurationsparameter ergänzen und überschreiben die Parameter der IES-Standardkonfiguration. Die Angaben werden in JSON angegeben, wobei die umschließenden geschweiften Klammern `{}` nicht mit angegeben werden dürfen. Die möglichen Konfigurationsparameter sind unter [TinyMCE:Configuration](http://wiki.moxiecode.com/index.php/TinyMCE:Configuration) aufgelistet."#,
+            ),
+        },
+        TagAttribute {
+            name: "configvalues",
+            detail: None,
+            documentation: Some(
+                r#"
+Mit diesem Attribut wird der Name einer Konfigurations-Ergänzung angegeben. Die in dieser Ergänzung angegebenen Konfigurationsparameter ergänzen und überschreiben die Parameter der IES-Standardkonfiguration. Die Angaben werden in JSON angegeben, wobei die umschließenden geschweiften Klammern `{}` nicht mit angegeben werden dürfen. Die möglichen Konfigurationsparameter sind unter [TinyMCE:Configuration](http://wiki.moxiecode.com/index.php/TinyMCE:Configuration) aufgelistet."#,
+            ),
+        },
+        TagAttribute {
+            name: "disabled",
+            detail: None,
+            documentation: Some(
+                r#"
+HTML-Attribut (`true`, `false`)."#,
+            ),
+        },
+        TagAttribute {
+            name: "fixvalue",
+            detail: None,
+            documentation: Some(
+                r#"
+Überschreibt jeden vorhandenen Inhalt der mit `name` bestimmten Variablen mit dem durch `fixvalue` angegebenen Wert."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Bestimmt den Namen des Feldes."#,
+            ),
+        },
+        TagAttribute {
+            name: "pools",
+            detail: None,
+            documentation: Some(
+                r#"
+Kommaseparierte Liste von `Anchor` von Artikelpools oder von `ID`s von Artikelpools; die Elemente der Pools werden dem Redakteur in einem Linkdialog innerhalb des Editors zur Auswahl angeboten. Voraussetzung, dass der interne Linkdialog überhaupt angezeigt wird, ist die Konfiguration des Editors mit `iesLink` über `theme_advanced_buttons` in der [TinyMCE:Configuration](http://wiki.moxiecode.com/index.php/TinyMCE:Configuration). Ausgabeseitig muss man darauf achten, dass ein interner Link vor der Ausgabe mit `spt:id2url` umgewandelt wird."#,
+            ),
+        },
+        TagAttribute {
+            name: "readonly",
+            detail: None,
+            documentation: Some(
+                r#"
+HTML-Attribut (`true`, `false`)."#,
+            ),
+        },
+        TagAttribute {
+            name: "rows",
+            detail: None,
+            documentation: Some(
+                r#"
+Höhe des Eingabefeldes in Zeilen."#,
+            ),
+        },
+        TagAttribute {
+            name: "theme",
+            detail: None,
+            documentation: Some(
+                r#"
+Konfigurationstypen, die den Funktionsumfang für den Editor beschreiben. Mögliche Themes sind `simple` und `advanced`"#,
+            ),
+        },
+        TagAttribute {
+            name: "toggle",
+            detail: None,
+            documentation: Some(
+                r#"
+Mit diesem Attribut lässt sich angeben, wie der TinyMce eingeschaltet werden soll. `true` für einen Toggle Button, False für keinen Toggle-Button, auto für automatisches togglen"#,
+            ),
+        },
+        TagAttribute {
+            name: "type",
+            detail: None,
+            documentation: Some(
+                r#"
+Der Typ des Eingabefeldes."#,
+            ),
+        },
+        TagAttribute {
+            name: "value",
+            detail: None,
+            documentation: Some(
+                r#"
+Setzt einen Default-Wert für die mit name angegebenen Variable, wenn sie leer ist."#,
+            ),
+        },
+    ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
@@ -3945,7 +5529,48 @@ const SPT_UPDOWN: TagProperties = TagProperties {
 Zahlenfeld, das per Klick auf- und abwärts gezählt werden kann"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "from",
+            detail: None,
+            documentation: Some(
+                r#"
+Startwert des Bereichs (Minimalwert)."#,
+            ),
+        },
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Bestimmt den Namen des Feldes."#,
+        ),
+        },
+        TagAttribute {
+            name: "to",
+            detail: None,
+            documentation: Some(
+                r#"
+Endwert des Bereichs (Maximalwert, es folgt `'unendlich'`)."#,
+        ),
+        },
+        TagAttribute {
+            name: "value",
+            detail: None,
+            documentation: Some(
+                r#"
+Default-Wert (Vorgabewert)."#,
+            ),
+        },
+    ]),
     attribute_rules: &[AttributeRule::Required("name")],
 };
 
@@ -3957,7 +5582,32 @@ const SPT_UPLOAD: TagProperties = TagProperties {
 Upload von Dateien"#,
     ),
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "locale",
+            detail: None,
+            documentation: Some(
+                r#"
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
+            ),
+        },
+        TagAttribute {
+            name: "name",
+            detail: None,
+            documentation: Some(
+                r#"
+Bestimmt den Namen des Feldes."#,
+            ),
+        },
+        TagAttribute {
+            name: "previewimage",
+            detail: None,
+            documentation: Some(
+                r#"
+`true` um ein Vorschaubild von durch diesen Tag hochgeladenen Bildern anzuzeigen (default), `false` um diese Funktion zu deaktivieren."#,
+            ),
+        },
+    ]),
     attribute_rules: &[AttributeRule::Required("name")],
 };
 
@@ -3970,7 +5620,42 @@ Workflow Management einbinden"#,
     ),
     // deprecated: true,
     children: TagChildren::None,
-    attributes: TagAttributes::None,
+    attributes: TagAttributes::These(&[
+        TagAttribute {
+            name: "command",
+            detail: None,
+            documentation: Some(
+                r#"
+Aktion, die der Worklist-Dialog ausführen soll. Mögliche Aktionen sind:
+- `create` Erzeugt einen neuen Worklisteintrag.
+- `update` Ändert einen existierenden Worklisteintrag. Der zu ändernde Worklisteintrag wird über die `worklistID` bestimmt."#,
+            ),
+        },
+        TagAttribute {
+            name: "informationID",
+            detail: None,
+            documentation: Some(
+                r#"
+Artikel, zu dem der Worklisteintrag gehören soll."#,
+            ),
+        },
+        TagAttribute {
+            name: "poolID",
+            detail: None,
+            documentation: Some(
+                r#"
+Pool des Artikels, zu dem der Worklisteintrag gehören soll."#,
+            ),
+        },
+        TagAttribute {
+            name: "worklistID",
+            detail: None,
+            documentation: Some(
+                r#"
+Worklisteintrag der geändert werden soll."#,
+            ),
+        },
+    ]),
     attribute_rules: &[AttributeRule::Required("command")],
 };
 
