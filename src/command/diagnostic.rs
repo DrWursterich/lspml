@@ -83,7 +83,15 @@ fn validate_tag(
     let mut attributes: HashMap<String, String> = HashMap::new();
     for child in node.children(&mut node.walk()) {
         match child.kind() {
-            "ERROR" => diagnositcs.push(Diagnostic {
+            // may need to check on kind of missing child
+            _ if child.is_missing() => diagnositcs.push(Diagnostic {
+                message: format!("{} is never closed", node.kind()),
+                severity: Some(DiagnosticSeverity::ERROR),
+                range: node_range(node),
+                source: Some("lspml".to_string()),
+                ..Default::default()
+            }),
+            _ if child.is_error() => diagnositcs.push(Diagnostic {
                 message: format!("unexpected \"{}\"", child.utf8_text(text.as_bytes())?),
                 severity: Some(DiagnosticSeverity::ERROR),
                 range: node_range(child),
