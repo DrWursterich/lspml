@@ -120,23 +120,7 @@ fn search_completions_in_document(
         }
     }
     // we are at document level - propose all "top level" tags.
-    grammar::Tag::iter()
-        .map(|tag| tag.properties())
-        .map(|properties| CompletionItem {
-            kind: Some(CompletionItemKind::METHOD),
-            detail: properties.detail.map(|detail| detail.to_string()),
-            documentation: properties.documentation.map(|detail| {
-                Documentation::MarkupContent(MarkupContent {
-                    kind: MarkupKind::Markdown,
-                    value: detail.to_string(),
-                })
-            }),
-            insert_text: Some(format!("<{}", properties.name.to_string())),
-            insert_text_mode: Some(InsertTextMode::AS_IS),
-            ..Default::default()
-        })
-        .for_each(|completion| completions.push(completion));
-    return Ok(());
+    return complete_top_level_tags(completions);
 }
 
 fn search_completions_in_tag(
@@ -300,7 +284,7 @@ fn search_completions_in_tag(
             // present.
             log::info!("complete child tags for {}", tag.name);
             match tag.children {
-                grammar::TagChildren::Any => complete_all_tags(completions)?,
+                grammar::TagChildren::Any => complete_top_level_tags(completions)?,
                 grammar::TagChildren::None => {}
                 grammar::TagChildren::Scalar(tag) => completions.push(CompletionItem {
                     kind: Some(CompletionItemKind::METHOD),
@@ -338,8 +322,8 @@ fn search_completions_in_tag(
     return Ok(());
 }
 
-fn complete_all_tags(completions: &mut Vec<CompletionItem>) -> Result<()> {
-    grammar::Tag::iter()
+fn complete_top_level_tags(completions: &mut Vec<CompletionItem>) -> Result<()> {
+    grammar::TOP_LEVEL_TAGS.iter()
         .map(|tag| tag.properties())
         .map(|properties| CompletionItem {
             kind: Some(CompletionItemKind::METHOD),
