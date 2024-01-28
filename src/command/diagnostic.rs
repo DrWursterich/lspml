@@ -149,10 +149,23 @@ fn validate_tag(
                             .as_str(),
                         )
                         .to_string();
-                    attributes.insert(
-                        attribute,
-                        quoted_value.to_string(),
-                    );
+                    if quoted_value.len() > 1
+                        && quoted_value.starts_with("\"")
+                        && quoted_value.ends_with("\"")
+                    {
+                        attributes.insert(
+                            attribute,
+                            quoted_value[1..quoted_value.len() - 1].to_string(),
+                        );
+                    } else {
+                        log::info!(
+                            "unquoted attribute-value found for {:?} in {:?}: {}",
+                            child,
+                            node,
+                            quoted_value
+                        );
+                        attributes.insert(attribute, quoted_value);
+                    }
                 }
             }
             kind if kind.ends_with("_tag") => match &grammar::Tag::from_str(kind) {
@@ -360,10 +373,7 @@ fn validate_children(
     for child in node.children(&mut node.walk()) {
         match child.kind() {
             "ERROR" => diagnositcs.push(Diagnostic {
-                message: format!(
-                    "unexpected \"{}\"",
-                    child.utf8_text(text.as_bytes())?
-                ),
+                message: format!("unexpected \"{}\"", child.utf8_text(text.as_bytes())?),
                 severity: Some(DiagnosticSeverity::ERROR),
                 range: node_range(child),
                 source: Some("lspml".to_string()),
@@ -376,14 +386,14 @@ fn validate_children(
             | "style_tag" => {
                 validate_children(child, text, diagnositcs, file)?;
             }
-            kind if kind.ends_with("_tag") => {
-                match &grammar::Tag::from_str(kind) {
-                    Ok(child_tag) => validate_tag(child_tag.properties(), child, text, diagnositcs, file)?,
-                    Err(err) => {
-                        log::info!("expected sp or spt tag: {}", err);
-                    }
+            kind if kind.ends_with("_tag") => match &grammar::Tag::from_str(kind) {
+                Ok(child_tag) => {
+                    validate_tag(child_tag.properties(), child, text, diagnositcs, file)?
                 }
-            }
+                Err(err) => {
+                    log::info!("expected sp or spt tag: {}", err);
+                }
+            },
             _ => validate_children(child, text, diagnositcs, file)?,
         }
     }
