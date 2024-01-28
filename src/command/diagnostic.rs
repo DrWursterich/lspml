@@ -151,7 +151,7 @@ fn validate_tag(
                         .to_string();
                     attributes.insert(
                         attribute,
-                        quoted_value[1..quoted_value.len() - 1].to_string(),
+                        quoted_value.to_string(),
                     );
                 }
             }
