@@ -1,6 +1,7 @@
 use super::{LsError, ResponseErrorCode};
 use crate::document_store;
 use crate::grammar;
+use crate::parser;
 use anyhow::Result;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionParams, Documentation, InsertTextMode,
@@ -123,6 +124,27 @@ fn search_completions_in_document(
     return complete_top_level_tags(completions);
 }
 
+fn complete_top_level_tags(completions: &mut Vec<CompletionItem>) -> Result<()> {
+    grammar::TOP_LEVEL_TAGS
+        .iter()
+        .map(|tag| tag.properties())
+        .map(|properties| CompletionItem {
+            kind: Some(CompletionItemKind::METHOD),
+            detail: properties.detail.map(|detail| detail.to_string()),
+            documentation: properties.documentation.map(|detail| {
+                Documentation::MarkupContent(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: detail.to_string(),
+                })
+            }),
+            insert_text: Some(format!("<{}", properties.name.to_string())),
+            insert_text_mode: Some(InsertTextMode::AS_IS),
+            ..Default::default()
+        })
+        .for_each(|completion| completions.push(completion));
+    return Ok(());
+}
+
 fn search_completions_in_tag(
     tag: grammar::TagProperties,
     node: Node,
@@ -193,15 +215,10 @@ fn search_completions_in_tag(
                     log::trace!("\"/>\" is missing in {}", node.kind());
                     continue;
                 }
-                log::trace!("reached end of {}", tag.name);
                 break;
             }
             kind if kind.ends_with("_tag_close") => {
-                log::trace!("reached end of {}", tag.name);
                 break;
-            }
-            "text" => {
-                // TODO: what tags can/cannot have text?
             }
             // is there a way to "include" other lsps?
             "java_tag" | "script_tag" | "style_tag" | "html_void_tag" => {
@@ -224,27 +241,9 @@ fn search_completions_in_tag(
             }
             kind if kind.ends_with("_attribute") => {
                 position = TagParsePosition::Attributes;
-                let quoted_value = child
-                    .child(0)
-                    .expect(
-                        format!(
-                            "attribute {:?} of {:?} did not have a attribute-value child",
-                            child, node
-                        )
-                        .as_str(),
-                    )
-                    .utf8_text(text.as_bytes())
-                    .expect(
-                        format!(
-                            "attribute-value in {:?} of {:?} did not contain text",
-                            child, node
-                        )
-                        .as_str(),
-                    )
-                    .to_string();
                 attributes.insert(
                     kind[..kind.find("_attribute").unwrap()].to_string(),
-                    quoted_value[1..quoted_value.len()].to_string(),
+                    parser::attribute_value_of(child, text).to_string(),
                 );
             }
             kind if kind.ends_with("_tag") => {
@@ -258,97 +257,87 @@ fn search_completions_in_tag(
             }
             kind => {
                 log::info!("ignore node {}", kind);
-                // validate_children(child, text, cursor, completions)?;
             }
         }
     }
     match completion_type {
         CompletionType::Attributes => {
-            // complete all attributes that the tag permitts, that are not already present and are
-            // not in conflict with any present ones. also propose "/>" and/or ">" if not already
-            // present.
             log::info!("complete attributes for {}", tag.name);
-            match tag.attributes {
-                grammar::TagAttributes::These(possible) => possible
-                    .iter()
-                    .filter(|attribute| !attributes.contains_key(attribute.name))
-                    .map(|attribute| CompletionItem {
-                        kind: Some(CompletionItemKind::PROPERTY),
-                        detail: attribute.detail.map(|detail| detail.to_string()),
-                        documentation: attribute.documentation.map(|detail| {
-                            Documentation::MarkupContent(MarkupContent {
-                                kind: MarkupKind::Markdown,
-                                value: detail.to_string(),
-                            })
-                        }),
-                        insert_text: Some(format!("{}=\"", attribute.name.to_string())),
-                        insert_text_mode: Some(InsertTextMode::AS_IS),
-                        ..Default::default()
-                    })
-                    .for_each(|completion| completions.push(completion)),
-                grammar::TagAttributes::None => {}
-            };
+            return complete_attributes_of(tag, attributes, completions);
         }
         CompletionType::Tags => {
-            // complete all possible child tags of tag. also propose cosing tag if not already
-            // present.
             log::info!("complete child tags for {}", tag.name);
-            match tag.children {
-                grammar::TagChildren::Any => complete_top_level_tags(completions)?,
-                grammar::TagChildren::None => {}
-                grammar::TagChildren::Scalar(tag) => completions.push(CompletionItem {
-                    kind: Some(CompletionItemKind::METHOD),
-                    detail: tag.properties().detail.map(|detail| detail.to_string()),
-                    documentation: tag.properties().documentation.map(|detail| {
-                        Documentation::MarkupContent(MarkupContent {
-                            kind: MarkupKind::Markdown,
-                            value: detail.to_string(),
-                        })
-                    }),
-                    insert_text: Some(format!("<{}", tag.properties().name.to_string())),
-                    insert_text_mode: Some(InsertTextMode::AS_IS),
-                    ..Default::default()
-                }),
-                grammar::TagChildren::Vector(tags) => tags
-                    .iter()
-                    .map(|tag| tag.properties())
-                    .map(|properties| CompletionItem {
-                        kind: Some(CompletionItemKind::METHOD),
-                        detail: properties.detail.map(|detail| detail.to_string()),
-                        documentation: properties.documentation.map(|detail| {
-                            Documentation::MarkupContent(MarkupContent {
-                                kind: MarkupKind::Markdown,
-                                value: detail.to_string(),
-                            })
-                        }),
-                        insert_text: Some(format!("<{}", properties.name.to_string())),
-                        insert_text_mode: Some(InsertTextMode::AS_IS),
-                        ..Default::default()
-                    })
-                    .for_each(|completion| completions.push(completion)),
-            }
+            // TODO: maybe also propose cosing tag if not already present.
+            return complete_children_of(tag, completions);
         }
+    };
+}
+
+fn complete_attributes_of(
+    tag: grammar::TagProperties,
+    attributes: HashMap<String, String>,
+    completions: &mut Vec<CompletionItem>,
+) -> Result<()> {
+    match tag.attributes {
+        grammar::TagAttributes::These(possible) => possible
+            .iter()
+            .filter(|attribute| !attributes.contains_key(attribute.name))
+            .map(|attribute| CompletionItem {
+                kind: Some(CompletionItemKind::PROPERTY),
+                detail: attribute.detail.map(|detail| detail.to_string()),
+                documentation: attribute.documentation.map(|detail| {
+                    Documentation::MarkupContent(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value: detail.to_string(),
+                    })
+                }),
+                insert_text: Some(format!("{}=\"", attribute.name.to_string())),
+                insert_text_mode: Some(InsertTextMode::AS_IS),
+                ..Default::default()
+            })
+            .for_each(|completion| completions.push(completion)),
+        grammar::TagAttributes::None => {}
     };
     return Ok(());
 }
 
-fn complete_top_level_tags(completions: &mut Vec<CompletionItem>) -> Result<()> {
-    grammar::TOP_LEVEL_TAGS
-        .iter()
-        .map(|tag| tag.properties())
-        .map(|properties| CompletionItem {
+fn complete_children_of(
+    tag: grammar::TagProperties,
+    completions: &mut Vec<CompletionItem>,
+) -> Result<()> {
+    match tag.children {
+        grammar::TagChildren::Any => complete_top_level_tags(completions)?,
+        grammar::TagChildren::None => {}
+        grammar::TagChildren::Scalar(tag) => completions.push(CompletionItem {
             kind: Some(CompletionItemKind::METHOD),
-            detail: properties.detail.map(|detail| detail.to_string()),
-            documentation: properties.documentation.map(|detail| {
+            detail: tag.properties().detail.map(|detail| detail.to_string()),
+            documentation: tag.properties().documentation.map(|detail| {
                 Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
                     value: detail.to_string(),
                 })
             }),
-            insert_text: Some(format!("<{}", properties.name.to_string())),
+            insert_text: Some(format!("<{}", tag.properties().name.to_string())),
             insert_text_mode: Some(InsertTextMode::AS_IS),
             ..Default::default()
-        })
-        .for_each(|completion| completions.push(completion));
+        }),
+        grammar::TagChildren::Vector(tags) => tags
+            .iter()
+            .map(|tag| tag.properties())
+            .map(|properties| CompletionItem {
+                kind: Some(CompletionItemKind::METHOD),
+                detail: properties.detail.map(|detail| detail.to_string()),
+                documentation: properties.documentation.map(|detail| {
+                    Documentation::MarkupContent(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value: detail.to_string(),
+                    })
+                }),
+                insert_text: Some(format!("<{}", properties.name.to_string())),
+                insert_text_mode: Some(InsertTextMode::AS_IS),
+                ..Default::default()
+            })
+            .for_each(|completion| completions.push(completion)),
+    };
     return Ok(());
 }

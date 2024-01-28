@@ -2,6 +2,7 @@ use super::{LsError, ResponseErrorCode};
 use crate::document_store;
 use crate::grammar;
 use crate::modules;
+use crate::parser;
 use anyhow::Result;
 use lsp_types::{Diagnostic, DiagnosticSeverity, DocumentDiagnosticParams, Position, Range, Url};
 use std::{collections::HashMap, path::Path, str::FromStr};
@@ -98,30 +99,10 @@ fn validate_tag(
                 source: Some("lspml".to_string()),
                 ..Default::default()
             }),
-            "text" => {
-                // TODO: what tags can/cannot have text?
-            }
-            "html_tag" | "html_option_tag" | "html_void_tag" | "java_tag" | "script_tag"
-            | "style_tag" => validate_children(child, text, diagnositcs, file)?,
+            "html_void_tag" | "java_tag" | "script_tag" | "style_tag" => {}
+            "html_tag" | "html_option_tag" => validate_children(child, text, diagnositcs, file)?,
             kind if kind.ends_with("_attribute") => {
-                let attribute = child
-                    .child(0)
-                    .expect(
-                        format!(
-                            "attribute {:?} of {:?} did not have a attribute-name child",
-                            child, node
-                        )
-                        .as_str(),
-                    )
-                    .utf8_text(text.as_bytes())
-                    .expect(
-                        format!(
-                            "attribute-name in {:?} of {:?} did not have a contain text",
-                            child, node
-                        )
-                        .as_str(),
-                    )
-                    .to_string();
+                let attribute = parser::attribute_name_of(child, text).to_string();
                 if attributes.contains_key(&attribute) {
                     diagnositcs.push(Diagnostic {
                         message: format!("duplicate {} attribute", attribute),
@@ -131,41 +112,10 @@ fn validate_tag(
                         ..Default::default()
                     });
                 } else {
-                    let quoted_value = child
-                        .child(2)
-                        .expect(
-                            format!(
-                                "attribute {:?} of {:?} did not have a attribute-value child",
-                                child, node
-                            )
-                            .as_str(),
-                        )
-                        .utf8_text(text.as_bytes())
-                        .expect(
-                            format!(
-                                "attribute-value in {:?} of {:?} did not contain text",
-                                child, node
-                            )
-                            .as_str(),
-                        )
-                        .to_string();
-                    if quoted_value.len() > 1
-                        && quoted_value.starts_with("\"")
-                        && quoted_value.ends_with("\"")
-                    {
-                        attributes.insert(
-                            attribute,
-                            quoted_value[1..quoted_value.len() - 1].to_string(),
-                        );
-                    } else {
-                        log::info!(
-                            "unquoted attribute-value found for {:?} in {:?}: {}",
-                            child,
-                            node,
-                            quoted_value
-                        );
-                        attributes.insert(attribute, quoted_value);
-                    }
+                    attributes.insert(
+                        attribute,
+                        parser::attribute_value_of(child, text).to_string(),
+                    );
                 }
             }
             kind if kind.ends_with("_tag") => match &grammar::Tag::from_str(kind) {
