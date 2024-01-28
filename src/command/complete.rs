@@ -79,8 +79,9 @@ fn search_completions_in_document(
         match node.kind() {
             // ignore for now
             "page_header" | "import_header" | "taglib_header" | "text" | "comment" => return Ok(()),
-            "html_tag" | "html_option_tag" | "html_void_tag" | "java_tag" | "script_tag"
-            | "style_tag" => return Ok(()), // validate_children(node, &text, cursor, completions)?,
+            // is there a way to "include" other lsps?
+            "java_tag" | "script_tag" | "style_tag" => return Ok(()),
+            "html_tag" | "html_option_tag" | "html_void_tag" => {}
             _ if node.is_error() => match node.child(0) {
                 Some(child) if child.kind().ends_with("_tag_open") => {
                     let kind = child.kind();
@@ -119,7 +120,6 @@ fn search_completions_in_document(
             }
         }
     }
-    // we are at document level - propose all "top level" tags.
     return complete_top_level_tags(completions);
 }
 
@@ -172,12 +172,12 @@ fn search_completions_in_tag(
                             completions,
                         )
                     });
-                },
+                }
                 _ => {
                     log::trace!("cursor {} is in ERROR without children", cursor);
                     break;
-                },
-            }
+                }
+            },
             ">" => {
                 if child.is_missing() {
                     log::trace!("\">\" is missing in {}", node.kind());
@@ -203,14 +203,24 @@ fn search_completions_in_tag(
             "text" => {
                 // TODO: what tags can/cannot have text?
             }
-            "html_tag" | "html_option_tag" | "html_void_tag" | "java_tag" | "script_tag"
-            | "style_tag" => {
+            // is there a way to "include" other lsps?
+            "java_tag" | "script_tag" | "style_tag" | "html_void_tag" => {
                 log::info!(
-                    "cursor seems to be inside a special tag ({}), which is not yet implemented",
+                    "cursor seems to be inside {}, for which completion is not supported",
                     node.kind()
                 );
-                // should carry over the possible children of the current tag
-                // validate_children(child, text, cursor, completions)?;
+            }
+            "html_tag" | "html_option_tag" => {
+                if child.child_count() == 0 {
+                    log::info!(
+                        "cursor seems to be inside {}, for which completion is not supported",
+                        node.kind()
+                    );
+                    continue;
+                }
+                // search in the child tag and complete the children possible in the current tag
+                log::info!("search {} children in {}", tag.name, node.kind());
+                return search_completions_in_tag(tag, child, text, cursor, completions);
             }
             kind if kind.ends_with("_attribute") => {
                 position = TagParsePosition::Attributes;
@@ -323,7 +333,8 @@ fn search_completions_in_tag(
 }
 
 fn complete_top_level_tags(completions: &mut Vec<CompletionItem>) -> Result<()> {
-    grammar::TOP_LEVEL_TAGS.iter()
+    grammar::TOP_LEVEL_TAGS
+        .iter()
         .map(|tag| tag.properties())
         .map(|properties| CompletionItem {
             kind: Some(CompletionItemKind::METHOD),
