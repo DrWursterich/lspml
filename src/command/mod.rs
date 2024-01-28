@@ -57,7 +57,7 @@ impl fmt::Display for ResponseErrorCode {
 }
 
 pub(crate) fn complete(request: Request) -> Result<Message> {
-    log::debug!("got completion request: {request:?}");
+    log::trace!("got completion request: {request:?}");
     return serde_json::from_value(request.params)
         .map(|params| {
             Message::Response(match complete::complete(params) {
@@ -73,7 +73,7 @@ pub(crate) fn complete(request: Request) -> Result<Message> {
 }
 
 pub(crate) fn definition(request: Request) -> Result<Message> {
-    log::debug!("got go to definition request: {request:?}");
+    log::trace!("got go to definition request: {request:?}");
     return serde_json::from_value(request.params)
         .map(|params| {
             Message::Response(match definition::definition(params) {
@@ -90,7 +90,7 @@ pub(crate) fn definition(request: Request) -> Result<Message> {
 }
 
 pub(crate) fn diagnostic(request: Request) -> Result<Message> {
-    log::debug!("got diagnose request: {request:?}");
+    log::trace!("got diagnose request: {request:?}");
     return serde_json::from_value(request.params)
         .map(|params| {
             Message::Response(match diagnostic::diagnostic(params) {
@@ -110,7 +110,7 @@ pub(crate) fn diagnostic(request: Request) -> Result<Message> {
 }
 
 pub(crate) fn hover(request: Request) -> Result<Message> {
-    log::debug!("got hover request: {request:?}");
+    log::trace!("got hover request: {request:?}");
     return serde_json::from_value(request.params)
         .map(|params| {
             Message::Response(match hover::hover(params) {
