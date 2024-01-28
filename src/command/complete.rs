@@ -79,12 +79,32 @@ fn search_completions_in_document(
         match node.kind() {
             // ignore for now
             "page_header" | "import_header" | "taglib_header" | "text" | "comment" => return Ok(()),
-            "ERROR" => {
-                log::trace!("cursor {} is in ERROR", cursor);
-                return Ok(());
-            }
             "html_tag" | "html_option_tag" | "html_void_tag" | "java_tag" | "script_tag"
             | "style_tag" => return Ok(()), // validate_children(node, &text, cursor, completions)?,
+            _ if node.is_error() => match node.child(0) {
+                Some(child) if child.kind().ends_with("_tag_open") => {
+                    let kind = child.kind();
+                    if kind == "html_tag_open" {
+                        break;
+                    }
+                    let tag = &kind[..kind.len() - "_open".len()];
+                    log::trace!(
+                        "cursor {} is in ERROR which appears to be a {}",
+                        cursor,
+                        tag
+                    );
+                    return grammar::Tag::from_str(&tag).and_then(|tag| {
+                        search_completions_in_tag(
+                            tag.properties(),
+                            node,
+                            &text,
+                            cursor,
+                            completions,
+                        )
+                    });
+                }
+                _ => log::trace!("cursor {} is in ERROR without children", cursor),
+            },
             kind => {
                 log::trace!(
                     "cursor {} is in tag {} ({} - {})",
@@ -147,7 +167,33 @@ fn search_completions_in_tag(
             completion_type = CompletionType::Tags;
         }
         match child.kind() {
-            _ if child.is_error() => {}
+            _ if child.is_error() => match child.child(0) {
+                Some(child) if child.kind().ends_with("_tag_open") => {
+                    let kind = child.kind();
+                    if kind == "html_tag_open" {
+                        break;
+                    }
+                    let tag = &kind[..kind.len() - "_open".len()];
+                    log::trace!(
+                        "cursor {} is in ERROR which appears to be a {}",
+                        cursor,
+                        tag
+                    );
+                    return grammar::Tag::from_str(&tag).and_then(|tag| {
+                        search_completions_in_tag(
+                            tag.properties(),
+                            child,
+                            &text,
+                            cursor,
+                            completions,
+                        )
+                    });
+                },
+                _ => {
+                    log::trace!("cursor {} is in ERROR without children", cursor);
+                    break;
+                },
+            }
             ">" => {
                 if child.is_missing() {
                     log::trace!("\">\" is missing in {}", node.kind());
