@@ -4,7 +4,7 @@ A proof-of-concept language server for the sitepark markup language (spml).
 
 ## features
 
-- go to definition for variables and `<sp:include>` tags
+- go to definition for variables and `<sp:include>` tag `uri` attributes
 - hover for documentation of most tags and attributes
 - diagnostics on:
     - syntax errors
