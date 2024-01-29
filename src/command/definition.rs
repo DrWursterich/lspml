@@ -49,7 +49,7 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                     .utf8_text(document.text.as_bytes())
                     .map_err(|err| LsError {
                         message: format!(
-                            "error while reading include_tag module_attribute text: {}",
+                            "error while reading file: {}",
                             err
                         ),
                         code: ResponseErrorCode::RequestFailed,

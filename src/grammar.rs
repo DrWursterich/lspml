@@ -39,6 +39,16 @@ pub(crate) enum AttributeRule {
     // OnlyIfAttributeHasValue
     // Renamed
     // Body?!?
+    ValueOneOf(&'static str, &'static [&'static str]),
+    OnlyWithValue(&'static str, &'static str, &'static str),
+    OnlyWithEitherValue(&'static str, &'static str, &'static [&'static str]),
+    RequiredWithValue(&'static str, &'static str, &'static str),
+    RequiredWithEitherValue(&'static str, &'static str, &'static [&'static str]),
+    ExactlyOneOfWithEitherValue(
+        &'static [&'static str],
+        &'static str,
+        &'static [&'static str],
+    ),
 }
 
 #[derive(Debug)]
@@ -314,6 +324,8 @@ Zu erzeugender Barcode-Typ. Unterstütz wird z.Z. nur `qrcode`"#,
         AttributeRule::Required("name"),
         AttributeRule::Required("text"),
         AttributeRule::Required("type"),
+        AttributeRule::ValueOneOf("type", &["qrcode"]),
+        AttributeRule::ValueOneOf("scope", &["page", "request"]),
     ],
 };
 
@@ -416,8 +428,16 @@ Zu setzendes `CalendarInformation`-Objekt. Dieser wird immer als Zeichenkette au
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("action"),
-        AttributeRule::Required("from"),
-        AttributeRule::Required("to"),
+        AttributeRule::ValueOneOf("action", &["add", "clear", "new"]),
+        AttributeRule::ValueOneOf("mode", &["allDays", "startDays", "firstDays"]),
+        AttributeRule::ValueOneOf("scope", &["page", "request"]),
+        AttributeRule::OnlyWithValue("from", "action", "new"),
+        AttributeRule::OnlyWithValue("to", "action", "new"),
+        AttributeRule::RequiredWithValue("from", "action", "new"),
+        AttributeRule::RequiredWithValue("to", "action", "new"),
+        AttributeRule::OnlyWithValue("value", "action", "add"),
+        AttributeRule::OnlyWithValue("object", "action", "add"),
+        AttributeRule::OnlyWithValue("date", "action", "add"),
         AttributeRule::ExactlyOneOf(&["value", "object", "date"]),
     ],
 };
@@ -629,9 +649,49 @@ Ein Text, der mit der Liste verarbeitet werden soll."#,
     ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
-        AttributeRule::ExactlyOneOf(&["action", "query"]),
-        AttributeRule::ExactlyOneOf(&["value", "object", "expression", "condition"]), // or body
-                                                                                      // index is required if "value" is "remove" or "replace"
+        AttributeRule::AtleastOneOf(&["action", "query"]),
+        AttributeRule::ValueOneOf(
+            "action",
+            &[
+                "add",
+                "addAll",
+                "remove",
+                "clear",
+                "new",
+                "replace",
+                "removeFirst",
+                "removeLast",
+                "unique",
+            ],
+        ),
+        AttributeRule::ValueOneOf("publisher", &["current", "ignore", "all", "auto"]),
+        AttributeRule::ValueOneOf("scope", &["page", "request"]),
+        AttributeRule::ExactlyOneOfWithEitherValue(
+            &["value", "object", "expression", "condition"], // or body
+            "action",
+            &["add", "addNotEmpty"],
+        ),
+        AttributeRule::ExactlyOneOfWithEitherValue(
+            &["index", "value", "object"],
+            "action",
+            &["remove", "replace"],
+        ),
+        AttributeRule::RequiredWithValue("object", "action", "addAll"),
+        AttributeRule::OnlyWithEitherValue(
+            "value",
+            "action",
+            &["add", "addNotEmpty", "remove", "replace"],
+        ),
+        AttributeRule::OnlyWithEitherValue("expression", "action", &["add", "addNotEmpty"]),
+        AttributeRule::OnlyWithEitherValue("condition", "action", &["add", "addNotEmpty"]),
+        AttributeRule::OnlyWithEitherValue(
+            "object",
+            "action",
+            &["add", "addNotEmpty", "addAll", "remove", "replace"],
+        ),
+        AttributeRule::OnlyWithEitherValue("index", "action", &["remove", "replace"]),
+        AttributeRule::OnlyWithEither("default", &["value", "expression"]),
+        AttributeRule::OnlyWithEither("publisher", &["query", "object"]),
     ],
 };
 
@@ -1016,7 +1076,10 @@ Der Typ für die from und to Attribute: `number`, `text`, `date`.
         AttributeRule::Required("collection"),
         AttributeRule::OnlyWith("ic", "filter"),
         AttributeRule::OnlyWithEither("type", &["from", "to"]),
-        AttributeRule::OnlyWithEither("format", &["from", "to"]),
+        AttributeRule::ValueOneOf("mode", &["simple", "regex"]),
+        AttributeRule::ValueOneOf("type", &["number", "text", "date"]),
+        AttributeRule::ValueOneOf("scope", &["page", "request", "session"]),
+        AttributeRule::OnlyWithValue("format", "type", "date"),
     ],
 };
 
@@ -1202,6 +1265,10 @@ Dies kann ein beliebiger Pfad zu einer Seite sein. sp:form sorgt dafür, dass al
         AttributeRule::Deprecated("command"),
         AttributeRule::OnlyOneOf(&["uri", "template"]),
         AttributeRule::OnlyWith("module", "uri"),
+        AttributeRule::ValueOneOf("nameencoding", &["escff", "hex"]),
+        AttributeRule::ValueOneOf("enctype", &["text/plain", "multipart/form-data"]),
+        AttributeRule::ValueOneOf("method", &["get", "post"]),
+        AttributeRule::UriExists("uri", "module"),
     ],
 };
 
@@ -1469,6 +1536,7 @@ URI einer Seite die includiert werden soll. Dieser muss in der gleichen Webappli
         AttributeRule::OnlyOneOf(&["context", "module"]),
         AttributeRule::OnlyWith("context", "uri"),
         AttributeRule::OnlyWith("module", "uri"),
+        AttributeRule::ValueOneOf("mode", &["in", "out"]),
         AttributeRule::UriExists("uri", "module"),
     ],
 };
@@ -1500,7 +1568,10 @@ Bestimmt ob der Bereich für die Ein- oder Ausgabe ist. Gültig sind `in` und `o
             ),
         },
     ]),
-    attribute_rules: &[AttributeRule::Required("type")],
+    attribute_rules: &[
+        AttributeRule::Required("type"),
+        AttributeRule::ValueOneOf("type", &["in", "out"]),
+    ],
 };
 
 const SP_ITERATOR: TagProperties = TagProperties {
@@ -1605,7 +1676,7 @@ Gültigkeitsbereich, in dem die Variable definiert ist. Möglich sind `page` und
             ),
         },
     ]),
-    attribute_rules: &[],
+    attribute_rules: &[AttributeRule::ValueOneOf("scope", &["page", "request"])],
 };
 
 const SP_LINKEDINFORMATION: TagProperties = TagProperties {
@@ -1818,8 +1889,9 @@ Für jedes Sortierkriterium kann ein Sortiertyp festgelegt werden, der bestimmt,
         AttributeRule::Required("publisher"),
         AttributeRule::Required("parentlink"),
         AttributeRule::OnlyWith("sortsequences", "sortkeys"),
-        AttributeRule::OnlyWith("sortkeys", "sortsequences"), // OnlyBoth?
+        AttributeRule::OnlyWith("sortkeys", "sortsequences"),
         AttributeRule::OnlyWith("sorttypes", "sortkeys"),
+        AttributeRule::ValueOneOf("action", &["flip", "open", "close", "expand", "none"]),
     ],
 };
 
@@ -1837,7 +1909,13 @@ const SP_LOG: TagProperties = TagProperties {
 Der Log-Level (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL`)"#,
         ),
     }]),
-    attribute_rules: &[AttributeRule::Required("level")],
+    attribute_rules: &[
+        AttributeRule::Required("level"),
+        AttributeRule::ValueOneOf(
+            "level",
+            &["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"],
+        ),
+    ],
 };
 
 const SP_LOGIN: TagProperties = TagProperties {
@@ -1908,9 +1986,10 @@ Verwendet eine aktive Session für die Authentifizierung."#,
             ),
         },
     ]),
-    attribute_rules: &[AttributeRule::ExactlyOneOf(&[
-        "session", "login", "password", "client",
-    ])],
+    attribute_rules: &[
+        AttributeRule::ExactlyOneOf(&["session", "login", "password", "client"]),
+        AttributeRule::ValueOneOf("scope", &["windowSession", "browserSession", "application"]),
+    ],
 };
 
 const SP_LOOP: TagProperties = TagProperties {
@@ -2077,9 +2156,42 @@ Kennzeichnet den Wert, der eingefügt, ersetzt oder gelöscht werden soll."#,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("action"),
-        // depending on the action, key or the value/expression/.. may or may not be required
-        AttributeRule::OnlyOneOf(&["value", "expression", "condition", "object"]), // or body
+        AttributeRule::ValueOneOf(
+            "action",
+            &[
+                "put",
+                "putNotEmpty",
+                "putAll",
+                "merge",
+                "remove",
+                "new",
+                "clear",
+            ],
+        ),
+        AttributeRule::ValueOneOf("scope", &["page", "request"]),
+        AttributeRule::ExactlyOneOfWithEitherValue(
+            &["value", "expression", "condition", "object"], // or body
+            "action",
+            &["put", "putNotEmpty"],
+        ),
+        AttributeRule::RequiredWithEitherValue("object", "action", &["putAll", "merge"]),
+        AttributeRule::RequiredWithEitherValue("key", "action", &["put", "putNotEmpty", "remove"]),
+        AttributeRule::OnlyWithEitherValue("value", "action", &["put", "putNotEmpty"]),
+        AttributeRule::OnlyWithEitherValue("expression", "action", &["put", "putNotEmpty"]),
+        AttributeRule::OnlyWithEitherValue("condition", "action", &["put", "putNotEmpty"]),
+        AttributeRule::OnlyWithEitherValue(
+            "object",
+            "action",
+            &["put", "putNotEmpty", "putAll", "merge"],
+        ),
+        AttributeRule::OnlyWithEitherValue("key", "action", &["put", "putNotEmpty", "remove"]),
+        AttributeRule::OnlyOneOf(&["value", "expression", "condition", "object"]),
         AttributeRule::OnlyWithEither("default", &["object", "expression"]),
+        AttributeRule::OnlyWithEitherValue(
+            "overwrite",
+            "action",
+            &["put", "putNotEmpty", "putAll", "merge"],
+        ),
     ],
 };
 
@@ -2126,7 +2238,37 @@ Gibt den Wert der Option an."#,
             ),
         },
     ]),
-    attribute_rules: &[],
+    attribute_rules: &[
+        // multiple separated by commas possible for all of these:
+        AttributeRule::ValueOneOf("convert", &["html2text", "wiki2html", "html2wiki"]),
+        AttributeRule::ValueOneOf(
+            "encoding",
+            &[
+                "none",
+                "html",
+                "xml",
+                "script",
+                "php",
+                // "php<;ignore=[backslash|singleQuote|doubleQuote|carriageReturn|newLine|backspace|tab|dollar] ...>
+                "url",
+                "url; charset=latin1",
+                "entity",
+                "plain",
+                "ascii",
+                "path",
+                "filename",
+                "wikitext",
+                "base64",
+                "base64NotChunked",
+                "hex",
+                "escff",
+            ],
+        ),
+        AttributeRule::ValueOneOf("decoding", &["none", "xml", "url", "base64", "escff"]),
+        AttributeRule::ValueOneOf("encrypt", &["3des", "aes", "unixcrypt", "md5", "sha"]),
+        AttributeRule::ValueOneOf("decrypt", &["3des", "aes"]),
+        AttributeRule::OnlyWithEither("cryptkey", &["encrypt", "decrypt"]),
+    ],
 };
 
 const SP_PASSWORD: TagProperties = TagProperties {
@@ -2508,6 +2650,7 @@ Namensraum, in dem die Variable definiert ist. Für diesen Tag ist der Page- und
         AttributeRule::Required("name"),
         AttributeRule::Required("collection"),
         AttributeRule::Required("range"),
+        AttributeRule::ValueOneOf("scope", &["page", "request"]),
     ],
 };
 
@@ -2737,6 +2880,8 @@ Breite des zu berechnenden Bildes."#,
         AttributeRule::Required("name"),
         AttributeRule::AtleastOneOf(&["height", "width"]),
         AttributeRule::Deprecated("scalesteps"),
+        AttributeRule::ValueOneOf("padding", &["on", "off", "fit", "fit/no"]),
+        AttributeRule::ValueOneOf("scope", &["page", "request"]),
     ],
 };
 
@@ -2757,7 +2902,10 @@ Setzt bereichsweise oder global den Scope für die folgenden Tags"#,
 Gültigkeitsbereich der als Standard-Scope im Tagbody definiert werden soll. Möglich sind `page` und `request`."#,
         ),
     }]),
-    attribute_rules: &[AttributeRule::Required("scope")],
+    attribute_rules: &[
+        AttributeRule::Required("scope"),
+        AttributeRule::ValueOneOf("scope", &["page", "request"]),
+    ],
 };
 
 const SP_SEARCH: TagProperties = TagProperties {
@@ -2934,6 +3082,9 @@ Zu setzender Wert. Dieser wird immer als Zeichenkette ausgewertet."#,
         AttributeRule::ExactlyOneOf(&["value", "expression", "condition", "object"]), // or body
         AttributeRule::OnlyWithEither("default", &["object", "expression"]),
         AttributeRule::OnlyOneOf(&["overwrite", "insert"]),
+        AttributeRule::ValueOneOf("scope", &["page", "request"]),
+        AttributeRule::ValueOneOf("insert", &["replace", "append", "prepend"]),
+        AttributeRule::ValueOneOf("contentType", &["json"]),
     ],
 };
 
@@ -3007,6 +3158,7 @@ Für jedes Sortierkriterium muss ein Sortiertyp festgelegt werden, der bestimmt,
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("collection"),
+        AttributeRule::ValueOneOf("scope", &["page", "request", "session"]),
     ],
 };
 
@@ -3034,7 +3186,10 @@ Optionale Angabe eines Typs. Dieser Tag erzeugt standardmäßig `Subinformation`
             ),
         },
     ]),
-    attribute_rules: &[AttributeRule::Required("name")],
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::ValueOneOf("type", &["calendar"]),
+    ],
 };
 
 const SP_TAGBODY: TagProperties = TagProperties {
@@ -3133,6 +3288,8 @@ Setzt einen Default-Wert für die mit `name` angegebenen Variable, wenn sie leer
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
+        AttributeRule::ValueOneOf("type", &["date", "number", "text"]),
+        AttributeRule::OnlyWithEitherValue("format", "type", &["date", "number"]),
     ],
 };
 
@@ -3334,6 +3491,31 @@ Breite des Bildes."#,
         AttributeRule::Required("name"),
         AttributeRule::Required("text"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
+        AttributeRule::ValueOneOf("fontstyle", &["plain", "bold", "italic"]),
+        AttributeRule::ValueOneOf(
+            "gravity",
+            &[
+                "c",
+                "center",
+                "n",
+                "north",
+                "ne",
+                "northeast",
+                "e",
+                "east",
+                "se",
+                "southeast",
+                "s",
+                "south",
+                "sw",
+                "southwest",
+                "w",
+                "west",
+                "nw",
+                "northwest",
+            ],
+        ),
+        AttributeRule::ValueOneOf("scope", &["page", "request"]),
     ],
 };
 
@@ -3588,6 +3770,7 @@ Innerhalb einer (`Session`) können für jedes Browserfenster weitere `Windowses
         AttributeRule::OnlyOneOf(&["context", "module"]),
         AttributeRule::OnlyWith("context", "uri"),
         AttributeRule::OnlyWith("module", "uri"),
+        AttributeRule::UriExists("uri", "module"),
     ],
 };
 
@@ -3618,7 +3801,7 @@ const SP_WORKLIST: TagProperties = TagProperties {
         r#"
 Findet die gewünschte Workliste"#,
     ),
-    deprecated: false,
+    deprecated: true,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[
         TagAttribute {
@@ -3729,6 +3912,8 @@ der Name der Variable, in die der aktuelle Counterwert ausgegeben wird [default=
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Deprecated("varName"),
+        AttributeRule::ValueOneOf("mode", &["read", "write"]),
+        AttributeRule::ValueOneOf("language", &["javascript", "php"]),
     ],
 };
 
@@ -3828,6 +4013,7 @@ Vorgabetext für das erzeugte Eingabefeld. Ohne bzw. mit einem leeren `value`-At
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
+        AttributeRule::ValueOneOf("type", &["date", "datetime"]),
     ],
 };
 
@@ -4051,6 +4237,10 @@ Alternativtext der in die `title`-Attribute der `<img>`-Tags eingetragen wird."#
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::Required("object"),
+        AttributeRule::ValueOneOf("font", &["Arial", "Lucida", "Verdana", "Futura"]),
+        AttributeRule::ValueOneOf("fontweight", &["plain", "bold", "italic"]),
+        AttributeRule::ValueOneOf("font2", &["Arial", "Lucida", "Verdana", "Futura"]),
+        AttributeRule::ValueOneOf("fontweight2", &["plain", "bold", "italic"]),
     ],
 };
 
@@ -4236,7 +4426,11 @@ Alternativtext der in die `title`-Attribute der `<img>`-Tags eingetragen wird."#
             ),
         },
     ]),
-    attribute_rules: &[AttributeRule::Required("object")],
+    attribute_rules: &[
+        AttributeRule::Required("object"),
+        AttributeRule::ValueOneOf("font", &["Arial", "Lucida", "Verdana", "Futura"]),
+        AttributeRule::ValueOneOf("fontweight", &["plain", "bold", "italic"]),
+    ],
 };
 
 const SPT_FORMSOLUTIONS: TagProperties = TagProperties {
@@ -4333,6 +4527,7 @@ Erlaubte Werte: `relative` | `absolute`"#,
         AttributeRule::Required("name"),
         AttributeRule::Required("object"),
         AttributeRule::Required("querystring"),
+        AttributeRule::ValueOneOf("url", &["relative", "absolute"]),
     ],
 };
 
@@ -4379,7 +4574,7 @@ Code für den generierten i-Link."#,
             ),
         },
     ]),
-    attribute_rules: &[],
+    attribute_rules: &[AttributeRule::ValueOneOf("action", &["edit", "list"])],
 };
 
 const SPT_IMAGEEDITOR: TagProperties = TagProperties {
@@ -4689,6 +4884,40 @@ Die gewünschte Bildbreite z.B. `100`. Die Höhe wird unter Beibehaltung des Sei
         AttributeRule::Deprecated("text_transform"),
         AttributeRule::Deprecated("transform"),
         AttributeRule::Deprecated("urlonly"),
+        AttributeRule::ValueOneOf("format", &["png", "jpeg"]),
+        AttributeRule::ValueOneOf("padding", &["on", "off", "fit", "yes", "no"]),
+        AttributeRule::ValueOneOf(
+            "manipulate",
+            &[
+                "sharp1", "sharp2", "sharp3", "sharp4", "laplace1", "laplace2", "box", "lowpass",
+                "neon", "emboss", "bw",
+            ],
+        ),
+        AttributeRule::ValueOneOf(
+            "gravity",
+            &[
+                "c",
+                "Center",
+                "n",
+                "North",
+                "ne",
+                "NorthEast",
+                "e",
+                "East",
+                "se",
+                "SouthEast",
+                "s",
+                "South",
+                "sw",
+                "SouthWest",
+                "w",
+                "West",
+                "nw",
+                "NorthWest",
+            ],
+        ),
+        AttributeRule::ValueOneOf("transform", &["uppercase", "lowercase"]),
+        AttributeRule::ValueOneOf("text_transform", &["uppercase", "lowercase"]),
     ],
 };
 
@@ -4775,7 +5004,10 @@ Attribut (`true`, `false`) was bestimmt, ob die Schaltflächen zum Hinzufügen, 
             ),
         },
     ]),
-    attribute_rules: &[AttributeRule::Required("name")],
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::ValueOneOf("layout", &["standard", "plain"]),
+    ],
 };
 
 const SPT_LINK: TagProperties = TagProperties {
@@ -4957,6 +5189,13 @@ Bei `type="image"` kann durch dieses Attribut der `'width'`-Wert des generierten
         AttributeRule::OnlyWith("filteric", "filter"),
         AttributeRule::OnlyWith("filterinvert", "filter"),
         AttributeRule::OnlyWith("filtermode", "filter"),
+        AttributeRule::ValueOneOf(
+            "type",
+            &["systemlink", "navlink", "resultlink", "link", "image"],
+        ),
+        AttributeRule::ValueOneOf("filtermode", &["simple", "regex"]),
+        AttributeRule::OnlyWithValue("height", "type", "image"),
+        AttributeRule::OnlyWithValue("width", "type", "image"),
     ],
 };
 
@@ -5083,7 +5322,7 @@ Variablenname, unter dem die Rechte gespeichert werden."#,
             documentation: None,
         },
     ]),
-    attribute_rules: &[],
+    attribute_rules: &[AttributeRule::ValueOneOf("mode", &["php"])],
 };
 
 const SPT_PREHTML: TagProperties = TagProperties {
@@ -5209,7 +5448,7 @@ Kommaseparierte Liste von APIs, dessen Packages mit Import-Anweisungen eingebund
 - `mail` Siehe [hier](http://java.sun.com/products/javamail/javadocs/index.html)"#,
         ),
     }]),
-    attribute_rules: &[],
+    attribute_rules: &[AttributeRule::ValueOneOf("api", &["log4j", "jdom", "mail"])],
 };
 
 const SPT_TEXT: TagProperties = TagProperties {
@@ -5322,6 +5561,8 @@ Setzt einen Default-Wert für die mit `name` angegebenen Variable, wenn sie leer
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
+        AttributeRule::ValueOneOf("type", &["date", "number", "text"]),
+        AttributeRule::OnlyWithEitherValue("format", "type", &["date", "number"]),
     ],
 };
 
@@ -5584,6 +5825,8 @@ Setzt einen Default-Wert für die mit name angegebenen Variable, wenn sie leer i
     attribute_rules: &[
         AttributeRule::Required("name"),
         AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
+        AttributeRule::ValueOneOf("theme", &["simple", "advanced"]),
+        AttributeRule::ValueOneOf("toggle", &["true", "false", "auto"]),
     ],
 };
 
@@ -5724,7 +5967,10 @@ Worklisteintrag der geändert werden soll."#,
             ),
         },
     ]),
-    attribute_rules: &[AttributeRule::Required("command")],
+    attribute_rules: &[
+        AttributeRule::Required("command"),
+        AttributeRule::ValueOneOf("command", &["create", "update"]),
+    ],
 };
 
 pub(crate) const TOP_LEVEL_TAGS: [Tag; 79] = [

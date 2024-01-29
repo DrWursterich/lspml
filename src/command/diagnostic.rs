@@ -299,6 +299,125 @@ fn validate_tag(
                     // else check if arguments are ok?
                 }
             }
+            grammar::AttributeRule::ValueOneOf(name, values)
+                if attributes
+                    .get(*name)
+                    .is_some_and(|v| !values.contains(&v.as_str())) =>
+            {
+                diagnositcs.push(Diagnostic {
+                    message: format!(
+                        "attribute {} should be one of these values: [{}]",
+                        name, values.join(", ")
+                    ),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    range: node_range(node),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
+            grammar::AttributeRule::OnlyWithValue(name, attribute, value)
+                if attributes.contains_key(*name)
+                    && !attributes.get(*attribute).is_some_and(|v| v == value) =>
+            {
+                diagnositcs.push(Diagnostic {
+                    message: format!(
+                        "attribute {} is useless without attribute {} containing the value {}",
+                        name, attribute, value
+                    ),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    range: node_range(node),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
+            grammar::AttributeRule::OnlyWithEitherValue(name, attribute, values)
+                if attributes.contains_key(*name)
+                    && !attributes
+                        .get(*attribute)
+                        .is_some_and(|v| values.contains(&v.as_str())) =>
+            {
+                diagnositcs.push(Diagnostic {
+                    message: format!(
+                        "attribute {} is useless without attribute {} containing one of these values: [{}]",
+                        name, attribute, values.join(", ")
+                    ),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    range: node_range(node),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
+            grammar::AttributeRule::RequiredWithValue(name, attribute, value)
+                if attributes.get(*attribute).is_some_and(|v| v == value)
+                    && !attributes.contains_key(*name) =>
+            {
+                diagnositcs.push(Diagnostic {
+                    message: format!(
+                        "{} attribute {} is required when attribute {} is {}",
+                        attributes.get(*attribute).is_some_and(|v| v == value),
+                        name, attribute, value
+                    ),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    range: node_range(node),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
+            grammar::AttributeRule::RequiredWithEitherValue(name, attribute, values)
+                if attributes
+                    .get(*attribute)
+                    .is_some_and(|v| values.contains(&v.as_str()))
+                    && !attributes.contains_key(*name) =>
+            {
+                diagnositcs.push(Diagnostic {
+                    message: format!(
+                        "attribute {} is required when attribute {} is either of [{}]",
+                        name, attribute, values.join(", ")
+                    ),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    range: node_range(node),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
+            grammar::AttributeRule::ExactlyOneOfWithEitherValue(names, attribute, values)
+                if attributes
+                    .get(*attribute)
+                    .is_some_and(|v| values.contains(&v.as_str())) =>
+            {
+                let present: Vec<&str> = names
+                    .iter()
+                    .map(|name| *name)
+                    .filter(|name| attributes.contains_key(*name))
+                    .collect();
+                match present.len() {
+                    0 => {
+                        diagnositcs.push(Diagnostic {
+                            message: format!(
+                                "when attribute {} is either of [{}] exactly one of these attributes is required: [{}]",
+                                attribute, values.join(", "), names.join(", ")
+                            ),
+                            severity: Some(DiagnosticSeverity::ERROR),
+                            range: node_range(node),
+                            source: Some("lspml".to_string()),
+                            ..Default::default()
+                        });
+                    }
+                    1 => {}
+                    _ => {
+                        diagnositcs.push(Diagnostic {
+                            message: format!(
+                                "when attribute {} is either of [{}] only one of these attributes is required: [{}]",
+                                attribute, values.join(", "), names.join(", ")
+                            ),
+                            severity: Some(DiagnosticSeverity::ERROR),
+                            range: node_range(node),
+                            source: Some("lspml".to_string()),
+                            ..Default::default()
+                        });
+                    }
+                }
+            }
             _ => {}
         }
     }
