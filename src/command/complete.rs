@@ -1,11 +1,12 @@
 use super::{LsError, ResponseErrorCode};
 use crate::document_store;
 use crate::grammar;
+use crate::modules;
 use crate::parser;
 use anyhow::Result;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionParams, Documentation, InsertTextMode,
-    MarkupContent, MarkupKind,
+    MarkupContent, MarkupKind, Url,
 };
 use std::{collections::HashMap, str::FromStr};
 use tree_sitter::{Node, Point};
@@ -19,19 +20,21 @@ enum TagParsePosition {
 #[derive(PartialEq)]
 enum CompletionType {
     Attributes,
+    Attribute(String),
     Tags,
 }
 
 pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, LsError> {
     let text_params = params.text_document_position;
-    let document = match document_store::get(&text_params.text_document.uri) {
+    let uri = &text_params.text_document.uri;
+    let document = match document_store::get(uri) {
         Some(document) => Ok(document),
-        None => document_store::Document::new(&text_params.text_document.uri)
-            .map(|document| document_store::put(&text_params.text_document.uri, document))
+        None => document_store::Document::new(uri)
+            .map(|document| document_store::put(uri, document))
             .map_err(|err| {
-                log::error!("failed to read {}: {}", text_params.text_document.uri, err);
+                log::error!("failed to read {}: {}", uri, err);
                 return LsError {
-                    message: format!("cannot read file {}", text_params.text_document.uri),
+                    message: format!("cannot read file {}", uri),
                     code: ResponseErrorCode::RequestFailed,
                 };
             }),
@@ -45,6 +48,7 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
             text_params.position.line as usize,
             text_params.position.character as usize,
         ),
+        uri,
         &mut completions,
     )
     .map_err(|err| LsError {
@@ -58,6 +62,7 @@ fn search_completions_in_document(
     root: Node,
     text: &String,
     cursor: &Point,
+    file: &Url,
     completions: &mut Vec<CompletionItem>,
 ) -> Result<()> {
     for node in root.children(&mut root.walk()) {
@@ -101,6 +106,7 @@ fn search_completions_in_document(
                             node,
                             &text,
                             cursor,
+                            file,
                             completions,
                         )
                     });
@@ -116,7 +122,14 @@ fn search_completions_in_document(
                     node.end_position()
                 );
                 return grammar::Tag::from_str(kind).and_then(|tag| {
-                    search_completions_in_tag(tag.properties(), node, &text, cursor, completions)
+                    search_completions_in_tag(
+                        tag.properties(),
+                        node,
+                        &text,
+                        cursor,
+                        file,
+                        completions,
+                    )
                 });
             }
         }
@@ -150,6 +163,7 @@ fn search_completions_in_tag(
     node: Node,
     text: &String,
     cursor: &Point,
+    file: &Url,
     completions: &mut Vec<CompletionItem>,
 ) -> Result<()> {
     let mut attributes: HashMap<String, String> = HashMap::new();
@@ -191,6 +205,7 @@ fn search_completions_in_tag(
                             child,
                             &text,
                             cursor,
+                            file,
                             completions,
                         )
                     });
@@ -241,14 +256,15 @@ fn search_completions_in_tag(
                 }
                 // search in the child tag and complete the children possible in the current tag
                 log::info!("search {} children in {}", tag.name, node.kind());
-                return search_completions_in_tag(tag, child, text, cursor, completions);
+                return search_completions_in_tag(tag, child, text, cursor, file, completions);
             }
             kind if kind.ends_with("_attribute") => {
+                let attribute = kind[..kind.len() - "_attribute".len()].to_string();
                 if &child.start_position() < cursor && &child.end_position() > cursor {
-                    return search_completions_in_attribute(tag, child, completions);
+                    completion_type = CompletionType::Attribute(attribute.clone());
                 }
                 attributes.insert(
-                    kind[..kind.find("_attribute").unwrap()].to_string(),
+                    attribute,
                     parser::attribute_value_of(child, text).to_string(),
                 );
             }
@@ -258,6 +274,7 @@ fn search_completions_in_tag(
                     child,
                     text,
                     cursor,
+                    file,
                     completions,
                 );
             }
@@ -271,6 +288,10 @@ fn search_completions_in_tag(
             log::info!("complete attributes for {}", tag.name);
             return complete_attributes_of(tag, attributes, completions);
         }
+        CompletionType::Attribute(name) => {
+            log::info!("complete values for attribute {} of {}", name, tag.name);
+            return complete_values_of_attribute(tag, name, attributes, file, completions);
+        }
         CompletionType::Tags => {
             log::info!("complete child tags for {}", tag.name);
             // TODO: maybe also propose cosing tag if not already present.
@@ -279,18 +300,60 @@ fn search_completions_in_tag(
     };
 }
 
-fn search_completions_in_attribute(
+fn complete_values_of_attribute(
     tag: grammar::TagProperties,
-    node: Node,
+    attribute: String,
+    attributes: HashMap<String, String>,
+    file: &Url,
     completions: &mut Vec<CompletionItem>,
 ) -> Result<()> {
-    let attribute_name = &node.kind()[..node.kind().len() - "_attribute".len()];
     for rule in tag.attribute_rules {
         match rule {
-            grammar::AttributeRule::ValueOneOf(attribute, values)
-                if *attribute == attribute_name =>
-            {
-                log::trace!("found enum values for {}: {}", attribute, values.join(", "));
+            grammar::AttributeRule::UriExists(uri, module) if *uri == attribute => {
+                let module = match attributes.get(*module).map(|str| str.as_str()) {
+                    Some("${module.id}") | None => file
+                        .to_file_path()
+                        .ok()
+                        .and_then(|file| modules::find_module_for_file(file.as_path())),
+                    Some(module) => modules::find_module_by_name(module),
+                };
+                if let Some(module) = module {
+                    let path = attributes
+                        .get(&attribute)
+                        .and_then(|path| path.rfind("/").map(|index| &path[..index]))
+                        .unwrap_or("");
+                    for entry in std::fs::read_dir(module.path + path)? {
+                        let entry = entry?;
+                        let name;
+                        if path.len() == 0 {
+                            name = "/".to_string() + entry.file_name().to_str().unwrap();
+                        } else {
+                            name = entry.file_name().to_str().unwrap().to_string();
+                        }
+                        if entry.path().is_dir() {
+                            completions.push(CompletionItem {
+                                kind: Some(CompletionItemKind::FOLDER),
+                                detail: None,
+                                documentation: None,
+                                insert_text: Some(name + "/"),
+                                insert_text_mode: Some(InsertTextMode::AS_IS),
+                                ..Default::default()
+                            })
+                        } else if name.ends_with(".spml") {
+                            completions.push(CompletionItem {
+                                kind: Some(CompletionItemKind::FILE),
+                                detail: None,
+                                documentation: None,
+                                insert_text: Some(name),
+                                insert_text_mode: Some(InsertTextMode::AS_IS),
+                                ..Default::default()
+                            })
+                        }
+                    }
+                }
+                break;
+            }
+            grammar::AttributeRule::ValueOneOf(name, values) if *name == attribute => {
                 values.iter().for_each(|value| {
                     completions.push(CompletionItem {
                         kind: Some(CompletionItemKind::ENUM_MEMBER),
