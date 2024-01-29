@@ -196,7 +196,11 @@ fn search_completions_in_tag(
                     });
                 }
                 _ => {
-                    log::trace!("cursor {} is in ERROR without children", cursor);
+                    log::trace!(
+                        "cursor {} is in erronous {:?} without tag children",
+                        cursor,
+                        child
+                    );
                     break;
                 }
             },
@@ -240,7 +244,9 @@ fn search_completions_in_tag(
                 return search_completions_in_tag(tag, child, text, cursor, completions);
             }
             kind if kind.ends_with("_attribute") => {
-                position = TagParsePosition::Attributes;
+                if &child.start_position() < cursor && &child.end_position() > cursor {
+                    return search_completions_in_attribute(tag, child, completions);
+                }
                 attributes.insert(
                     kind[..kind.find("_attribute").unwrap()].to_string(),
                     parser::attribute_value_of(child, text).to_string(),
@@ -271,6 +277,36 @@ fn search_completions_in_tag(
             return complete_children_of(tag, completions);
         }
     };
+}
+
+fn search_completions_in_attribute(
+    tag: grammar::TagProperties,
+    node: Node,
+    completions: &mut Vec<CompletionItem>,
+) -> Result<()> {
+    let attribute_name = &node.kind()[..node.kind().len() - "_attribute".len()];
+    for rule in tag.attribute_rules {
+        match rule {
+            grammar::AttributeRule::ValueOneOf(attribute, values)
+                if *attribute == attribute_name =>
+            {
+                log::trace!("found enum values for {}: {}", attribute, values.join(", "));
+                values.iter().for_each(|value| {
+                    completions.push(CompletionItem {
+                        kind: Some(CompletionItemKind::ENUM_MEMBER),
+                        detail: None,
+                        documentation: None,
+                        insert_text: Some(value.to_string()),
+                        insert_text_mode: Some(InsertTextMode::AS_IS),
+                        ..Default::default()
+                    })
+                });
+                break;
+            }
+            _ => {}
+        };
+    }
+    return Ok(());
 }
 
 fn complete_attributes_of(

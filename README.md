@@ -11,7 +11,7 @@ A proof-of-concept language server for the sitepark markup language (spml).
     - misplaced, unclosed and deprecated tags
     - duplicate, required and deprecated attributes
     - nonexistent files in includes
-- completion for tags and attributes
+- completion for tags, attributes and attribute values that have a fixed set of possible values
 
 ## commandline
 
