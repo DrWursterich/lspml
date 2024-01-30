@@ -45,17 +45,13 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                     .and_then(|parent| parent.parent())
                     .is_some_and(|tag| tag.kind() == "include_tag") =>
             {
-                return node
-                    .utf8_text(document.text.as_bytes())
+                node.utf8_text(document.text.as_bytes())
                     .map_err(|err| LsError {
-                        message: format!(
-                            "error while reading file: {}",
-                            err
-                        ),
+                        message: format!("error while reading file: {}", err),
                         code: ResponseErrorCode::RequestFailed,
                     })
-                    .and_then(|path| {
-                        Ok(node
+                    .map(|path| {
+                        node
                             .parent()
                             .and_then(|p| p.parent())
                             .and_then(|p| {
@@ -65,22 +61,20 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                             .map(|attribute| parser::attribute_value_of(attribute, &document.text))
                             .filter(|module| *module != "${module.id}")
                             .and_then(modules::find_module_by_name)
-                            .and_then(|include_module| {
-                                let file = include_module.path + &path[1..path.len() - 1];
-                                if !Path::new(&file).exists() {
-                                    log::info!("included file {} does not exist", file);
-                                    return None;
-                                }
-                                let mut target = "file://".to_owned();
-                                target.push_str(&file);
-                                return Some(Location {
-                                    range: Range {
-                                        ..Default::default()
-                                    },
-                                    uri: Url::parse(&target).unwrap(),
-                                });
-                            }))
-                    });
+                            .or_else(|| {
+                                text_params.text_document.uri.to_file_path().ok().and_then(
+                                    |module| modules::find_module_for_file(module.as_path()),
+                                )
+                            })
+                            .map(|module| module.path + &path[1..path.len() - 1])
+                            .filter(|file| Path::new(&file).exists())
+                            .map(|file| Location {
+                                range: Range {
+                                    ..Default::default()
+                                },
+                                uri: Url::parse(format!("file://{}", &file).as_str()).unwrap(),
+                            })
+                    })
             }
             Some("name_attribute")
                 if node
