@@ -74,20 +74,15 @@ fn search_completions_in_document(
                     .child(node.child_count() - 1)
                     .is_some_and(|close_bracket| close_bracket.is_missing()))
         {
-            log::trace!("skip over {}", node.kind());
             continue;
         }
         if node.start_position() > *cursor {
-            log::trace!("{} is beyond cursor", node.kind());
             break;
         }
         // we are in a nested node:
         match node.kind() {
             // ignore for now
             "page_header" | "import_header" | "taglib_header" | "text" | "comment" => return Ok(()),
-            // is there a way to "include" other lsps?
-            "java_tag" | "script_tag" | "style_tag" => return Ok(()),
-            "html_tag" | "html_option_tag" | "html_void_tag" => {}
             _ if node.is_error() => match node.child(0) {
                 Some(child) if child.kind().ends_with("_tag_open") => {
                     let kind = child.kind();
@@ -111,8 +106,22 @@ fn search_completions_in_document(
                         )
                     });
                 }
-                _ => log::trace!("cursor {} is in ERROR without children", cursor),
+                _ => log::trace!(
+                    "cursor {} is in erronous {:?} without tag children",
+                    cursor,
+                    node
+                ),
             },
+            // is there a way to "include" other lsps?
+            "java_tag" | "script_tag" | "style_tag" | "html_void_tag" => {
+                log::info!(
+                    "cursor seems to be inside {}, for which completion is not supported",
+                    node.kind()
+                );
+            }
+            "html_tag" | "html_option_tag" => {
+                return search_completions_in_document(node, text, cursor, file, completions);
+            }
             kind => {
                 log::trace!(
                     "cursor {} is in tag {} ({} - {})",
@@ -181,7 +190,7 @@ fn search_completions_in_tag(
             {
                 continue;
             }
-            if *cursor < child.start_position() {
+            if child.start_position() > *cursor {
                 break;
             }
             completion_type = CompletionType::Tags;
