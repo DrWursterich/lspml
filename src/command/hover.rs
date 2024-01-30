@@ -7,28 +7,27 @@ use std::str::FromStr;
 
 pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
     let text_params = params.text_document_position_params;
-    let document = match document_store::get(&text_params.text_document.uri) {
+    let file = &text_params.text_document.uri;
+    let document = match document_store::get(file) {
         Some(document) => Ok(document),
-        None => document_store::Document::new(&text_params.text_document.uri)
-            .map(|document| document_store::put(&text_params.text_document.uri, document))
+        None => document_store::Document::new(file)
+            .map(|document| document_store::put(file, document))
             .map_err(|err| {
-                log::error!("failed to read {}: {}", text_params.text_document.uri, err);
+                log::error!("failed to read {}: {}", file, err);
                 return LsError {
-                    message: format!("cannot read file {}", text_params.text_document.uri),
+                    message: format!("cannot read file {}", file),
                     code: ResponseErrorCode::RequestFailed,
                 };
             }),
     }?;
-    let (node, _) = parser::find_current_and_previous_nodes(&document.tree, text_params.position)
-        .ok_or_else(|| LsError {
-        message: format!(
-            "could not determine node in {} at line {}, character {}",
-            text_params.text_document.uri,
-            text_params.position.line,
-            text_params.position.character
-        ),
-        code: ResponseErrorCode::RequestFailed,
-    })?;
+    let node =
+        parser::find_current_node(&document.tree, text_params.position).ok_or_else(|| LsError {
+            message: format!(
+                "could not determine node in {} at line {}, character {}",
+                file, text_params.position.line, text_params.position.character
+            ),
+            code: ResponseErrorCode::RequestFailed,
+        })?;
     return Ok((match node.kind() {
         "argument_tag_open" | "argument_tag_close" => {
             grammar::Tag::SpArgument.properties().documentation
