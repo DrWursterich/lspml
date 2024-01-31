@@ -83,6 +83,38 @@ fn search_completions_in_document(
         match node.kind() {
             // ignore for now
             "page_header" | "import_header" | "taglib_header" | "text" | "comment" => return Ok(()),
+            _ if node.is_error()
+                && node
+                    .utf8_text(&text.as_bytes())
+                    .is_ok_and(|text| text.starts_with("</")) =>
+            {
+                log::trace!("found </ error in document (node: {:?})", root);
+                let mut current = node;
+                loop {
+                    match current.prev_sibling().or_else(|| current.parent()) {
+                        Some(next) => current = next,
+                        None => return Ok(()),
+                    };
+                    let tag;
+                    match current.kind() {
+                        "html_tag_open" => tag = Some(current),
+                        "html_option_tag" => tag = current.child(0),
+                        _ => continue,
+                    }
+                    completions.push(CompletionItem {
+                        kind: Some(CompletionItemKind::SNIPPET),
+                        detail: None,
+                        documentation: None,
+                        insert_text: tag
+                            .and_then(|tag| tag.utf8_text(text.as_bytes()).ok())
+                            .map(|tag| tag[1..].to_string() + ">"),
+                        insert_text_mode: Some(InsertTextMode::AS_IS),
+                        ..Default::default()
+                    });
+                    break;
+                }
+                return Ok(());
+            }
             _ if node.is_error() => match node.child(0) {
                 Some(child) if child.kind().ends_with("_tag_open") => {
                     let kind = child.kind();
@@ -196,6 +228,48 @@ fn search_completions_in_tag(
             completion_type = CompletionType::Tags;
         }
         match child.kind() {
+            _ if child.is_error()
+                && child
+                    .utf8_text(&text.as_bytes())
+                    .is_ok_and(|text| text.starts_with("</")) =>
+            {
+                log::trace!("found </ error in {} (node: {:?})", tag.name, node);
+                let mut current = child;
+                loop {
+                    match current.prev_sibling().or_else(|| current.parent()) {
+                        Some(next) => current = next,
+                        None => return Ok(()),
+                    };
+                    let tag;
+                    match current.kind() {
+                        "html_tag_open" => {
+                            tag = current.utf8_text(text.as_bytes()).ok().map(|tag| &tag[1..])
+                        }
+                        "html_option_tag" => {
+                            tag = current
+                                .child(0)
+                                .and_then(|tag| tag.utf8_text(text.as_bytes()).ok())
+                                .map(|tag| &tag[1..])
+                        }
+                        kind if kind.ends_with("_tag_open") => {
+                            tag = grammar::Tag::from_str(&kind[..kind.len() - "_open".len()])
+                                .ok()
+                                .map(|tag| tag.properties().name)
+                        }
+                        _ => continue,
+                    }
+                    completions.push(CompletionItem {
+                        kind: Some(CompletionItemKind::SNIPPET),
+                        detail: None,
+                        documentation: None,
+                        insert_text: tag.map(|tag| tag.to_string() + ">"),
+                        insert_text_mode: Some(InsertTextMode::AS_IS),
+                        ..Default::default()
+                    });
+                    break;
+                }
+                return Ok(());
+            }
             _ if child.is_error() => match child.child(0) {
                 Some(child) if child.kind().ends_with("_tag_open") => {
                     let kind = child.kind();
@@ -221,9 +295,10 @@ fn search_completions_in_tag(
                 }
                 _ => {
                     log::trace!(
-                        "cursor {} is in erronous {:?} without tag children",
+                        "cursor {} is in erronous {:?} tag without children. content: {}",
                         cursor,
-                        child
+                        child,
+                        child.utf8_text(&text.as_bytes()).unwrap(),
                     );
                     break;
                 }

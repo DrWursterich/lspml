@@ -13,6 +13,7 @@ A proof-of-concept language server for the sitepark markup language (spml).
     - nonexistent files in includes
 - completion for:
     - tags
+    - `</`, closing the last unclosed tag
     - attributes
     - attribute values that either:
         - have a fixed set of possible values
