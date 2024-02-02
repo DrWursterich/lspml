@@ -438,7 +438,7 @@ Zu setzendes `CalendarInformation`-Objekt. Dieser wird immer als Zeichenkette au
         AttributeRule::OnlyWithValue("value", "action", "add"),
         AttributeRule::OnlyWithValue("object", "action", "add"),
         AttributeRule::OnlyWithValue("date", "action", "add"),
-        AttributeRule::ExactlyOneOf(&["value", "object", "date"]),
+        AttributeRule::OnlyOneOf(&["value", "object", "date"]),
     ],
 };
 
