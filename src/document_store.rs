@@ -17,7 +17,8 @@ pub(crate) struct Document {
 impl Document {
     pub(crate) fn new(uri: &Url) -> Result<Document> {
         return match uri.to_file_path() {
-            Ok(path) => fs::read_to_string(path.to_owned()).map_err(Error::from),
+            Ok(path) if path.exists() => fs::read_to_string(path.to_owned()).map_err(Error::from),
+            Ok(path) => Result::Err(anyhow::anyhow!("file {:?} does not exist", path)),
             Err(_) => Result::Err(anyhow::anyhow!("failed to read file path from uri {}", uri)),
         }
         .and_then(|text| Document::from_str(&text));
