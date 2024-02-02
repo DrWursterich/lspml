@@ -691,7 +691,7 @@ Ein Text, der mit der Liste verarbeitet werden soll."#,
             &["add", "addNotEmpty", "addAll", "remove", "replace"],
         ),
         AttributeRule::OnlyWithEitherValue("index", "action", &["remove", "replace"]),
-        AttributeRule::OnlyWithEither("default", &["value", "expression"]),
+        AttributeRule::OnlyWithEither("default", &["object", "expression"]),
         AttributeRule::OnlyWithEither("publisher", &["query", "object"]),
     ],
 };
