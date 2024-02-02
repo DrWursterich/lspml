@@ -101,16 +101,20 @@ fn search_completions_in_document(
                         "html_option_tag" => tag = current.child(0),
                         _ => continue,
                     }
-                    completions.push(CompletionItem {
-                        kind: Some(CompletionItemKind::SNIPPET),
-                        detail: None,
-                        documentation: None,
-                        insert_text: tag
-                            .and_then(|tag| tag.utf8_text(text.as_bytes()).ok())
-                            .map(|tag| tag[1..].to_string() + ">"),
-                        insert_text_mode: Some(InsertTextMode::AS_IS),
-                        ..Default::default()
-                    });
+                    match tag
+                        .and_then(|tag| tag.utf8_text(text.as_bytes()).ok())
+                        .map(|tag| tag[1..].to_string() + ">") {
+                            Some(tag) => completions.push(CompletionItem {
+                                label: "</".to_string() + &tag,
+                                kind: Some(CompletionItemKind::SNIPPET),
+                                detail: None,
+                                documentation: None,
+                                insert_text: Some(tag),
+                                insert_text_mode: Some(InsertTextMode::AS_IS),
+                                ..Default::default()
+                            }),
+                            None => {},
+                        };
                     break;
                 }
                 return Ok(());
@@ -183,6 +187,7 @@ fn complete_top_level_tags(completions: &mut Vec<CompletionItem>) -> Result<()> 
         .iter()
         .map(|tag| tag.properties())
         .map(|properties| CompletionItem {
+            label: "<".to_string() + properties.name,
             kind: Some(CompletionItemKind::METHOD),
             detail: properties.detail.map(|detail| detail.to_string()),
             documentation: properties.documentation.map(|detail| {
@@ -191,7 +196,7 @@ fn complete_top_level_tags(completions: &mut Vec<CompletionItem>) -> Result<()> 
                     value: detail.to_string(),
                 })
             }),
-            insert_text: Some(format!("<{}", properties.name.to_string())),
+            insert_text: Some("<".to_string() + properties.name),
             insert_text_mode: Some(InsertTextMode::AS_IS),
             ..Default::default()
         })
@@ -258,14 +263,18 @@ fn search_completions_in_tag(
                         }
                         _ => continue,
                     }
-                    completions.push(CompletionItem {
-                        kind: Some(CompletionItemKind::SNIPPET),
-                        detail: None,
-                        documentation: None,
-                        insert_text: tag.map(|tag| tag.to_string() + ">"),
-                        insert_text_mode: Some(InsertTextMode::AS_IS),
-                        ..Default::default()
-                    });
+                    match tag.map(|tag| tag.to_string() + ">") {
+                        Some(tag) => completions.push(CompletionItem {
+                            label: "</".to_string() + &tag,
+                            kind: Some(CompletionItemKind::SNIPPET),
+                            detail: None,
+                            documentation: None,
+                            insert_text: Some(tag),
+                            insert_text_mode: Some(InsertTextMode::AS_IS),
+                            ..Default::default()
+                        }),
+                        None => {}
+                    };
                     break;
                 }
                 return Ok(());
@@ -416,6 +425,7 @@ fn complete_values_of_attribute(
                         }
                         if entry.path().is_dir() {
                             completions.push(CompletionItem {
+                                label: name.clone() + "/",
                                 kind: Some(CompletionItemKind::FOLDER),
                                 detail: None,
                                 documentation: None,
@@ -425,6 +435,7 @@ fn complete_values_of_attribute(
                             })
                         } else if name.ends_with(".spml") {
                             completions.push(CompletionItem {
+                                label: name.clone(),
                                 kind: Some(CompletionItemKind::FILE),
                                 detail: None,
                                 documentation: None,
@@ -440,6 +451,7 @@ fn complete_values_of_attribute(
             grammar::AttributeRule::ValueOneOf(name, values) if *name == attribute => {
                 values.iter().for_each(|value| {
                     completions.push(CompletionItem {
+                        label: value.to_string(),
                         kind: Some(CompletionItemKind::ENUM_MEMBER),
                         detail: None,
                         documentation: None,
@@ -466,6 +478,7 @@ fn complete_attributes_of(
             .iter()
             .filter(|attribute| !attributes.contains_key(attribute.name))
             .map(|attribute| CompletionItem {
+                label: attribute.name.to_string(),
                 kind: Some(CompletionItemKind::PROPERTY),
                 detail: attribute.detail.map(|detail| detail.to_string()),
                 documentation: attribute.documentation.map(|detail| {
@@ -474,7 +487,7 @@ fn complete_attributes_of(
                         value: detail.to_string(),
                     })
                 }),
-                insert_text: Some(format!("{}=\"", attribute.name.to_string())),
+                insert_text: Some(attribute.name.to_string() + "=\""),
                 insert_text_mode: Some(InsertTextMode::AS_IS),
                 ..Default::default()
             })
@@ -492,6 +505,7 @@ fn complete_children_of(
         grammar::TagChildren::Any => complete_top_level_tags(completions)?,
         grammar::TagChildren::None => {}
         grammar::TagChildren::Scalar(tag) => completions.push(CompletionItem {
+            label: "<".to_string() + tag.properties().name,
             kind: Some(CompletionItemKind::METHOD),
             detail: tag.properties().detail.map(|detail| detail.to_string()),
             documentation: tag.properties().documentation.map(|detail| {
@@ -500,7 +514,7 @@ fn complete_children_of(
                     value: detail.to_string(),
                 })
             }),
-            insert_text: Some(format!("<{}", tag.properties().name.to_string())),
+            insert_text: Some("<".to_string() + tag.properties().name),
             insert_text_mode: Some(InsertTextMode::AS_IS),
             ..Default::default()
         }),
@@ -508,6 +522,7 @@ fn complete_children_of(
             .iter()
             .map(|tag| tag.properties())
             .map(|properties| CompletionItem {
+                label: "<".to_string() + properties.name,
                 kind: Some(CompletionItemKind::METHOD),
                 detail: properties.detail.map(|detail| detail.to_string()),
                 documentation: properties.documentation.map(|detail| {
@@ -516,7 +531,7 @@ fn complete_children_of(
                         value: detail.to_string(),
                     })
                 }),
-                insert_text: Some(format!("<{}", properties.name.to_string())),
+                insert_text: Some("<".to_string() + properties.name),
                 insert_text_mode: Some(InsertTextMode::AS_IS),
                 ..Default::default()
             })
