@@ -102,7 +102,7 @@ fn validate_tag(
             "html_void_tag" | "java_tag" | "script_tag" | "style_tag" => {}
             "html_tag" | "html_option_tag" => validate_children(child, text, diagnositcs, file)?,
             kind if kind.ends_with("_attribute") => {
-                let attribute = parser::attribute_name_of(child, text).trim().to_string();
+                let attribute = parser::attribute_name_of(child, text).to_string();
                 if attributes.contains_key(&attribute) {
                     diagnositcs.push(Diagnostic {
                         message: format!("duplicate {} attribute", attribute),
