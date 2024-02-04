@@ -29,26 +29,30 @@ pub(crate) struct TagAttribute {
 pub(crate) enum AttributeRule {
     Deprecated(&'static str),
     ExactlyOneOf(&'static [&'static str]),
+    ExactlyOrBody(&'static str),
     OnlyOneOf(&'static [&'static str]),
     AtleastOneOf(&'static [&'static str]),
     OnlyWith(&'static str, &'static str),
     OnlyWithEither(&'static str, &'static [&'static str]),
+    OnlyWithEitherOrBody(&'static str, &'static [&'static str]),
     Required(&'static str),
     UriExists(&'static str, &'static str),
-    // TODO:
-    // OnlyIfAttributeHasValue
-    // Renamed
-    // Body?!?
     ValueOneOf(&'static str, &'static [&'static str]),
+    ValueOneOfCaseInsensitive(&'static str, &'static [&'static str]),
     OnlyWithValue(&'static str, &'static str, &'static str),
     OnlyWithEitherValue(&'static str, &'static str, &'static [&'static str]),
     RequiredWithValue(&'static str, &'static str, &'static str),
     RequiredWithEitherValue(&'static str, &'static str, &'static [&'static str]),
-    ExactlyOneOfWithEitherValue(
+    ExactlyOneOfOrBody(&'static [&'static str]),
+    OnlyOrBody(&'static str),
+    OnlyOneOfOrBody(&'static [&'static str]),
+    BodyOnlyWithEitherValue(&'static str, &'static [&'static str]),
+    ExactlyOneOfOrBodyWithEitherValue(
         &'static [&'static str],
         &'static str,
         &'static [&'static str],
     ),
+    // TODO: Renamed?
 }
 
 #[derive(Debug)]
@@ -213,7 +217,7 @@ Zu setzender Wert. Dieser wird immer als Zeichenkette ausgewertet."#,
     ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
-        AttributeRule::ExactlyOneOf(&["value", "expression", "condition", "object"]), // or body
+        AttributeRule::ExactlyOneOfOrBody(&["value", "expression", "condition", "object"]),
         AttributeRule::OnlyWithEither("default", &["object", "expression"]),
     ],
 };
@@ -509,7 +513,10 @@ Setzt einen zu übertragenen Wert dieser Checkbox"#,
             ),
         },
     ]),
-    attribute_rules: &[AttributeRule::Required("name")],
+    attribute_rules: &[
+        AttributeRule::Required("name"),
+        AttributeRule::OnlyOrBody("value"),
+    ],
 };
 
 const SP_CODE: TagProperties = TagProperties {
@@ -667,17 +674,21 @@ Ein Text, der mit der Liste verarbeitet werden soll."#,
         ),
         AttributeRule::ValueOneOf("publisher", &["current", "ignore", "all", "auto"]),
         AttributeRule::ValueOneOf("scope", &["page", "request"]),
-        AttributeRule::ExactlyOneOfWithEitherValue(
-            &["value", "object", "expression", "condition"], // or body
+        AttributeRule::ExactlyOneOfOrBodyWithEitherValue(
+            &["value", "object", "expression", "condition"],
             "action",
             &["add", "addNotEmpty"],
         ),
-        AttributeRule::ExactlyOneOfWithEitherValue(
+        AttributeRule::ExactlyOneOfOrBodyWithEitherValue(
             &["index", "value", "object"],
             "action",
             &["remove", "replace"],
         ),
         AttributeRule::RequiredWithValue("object", "action", "addAll"),
+        AttributeRule::BodyOnlyWithEitherValue(
+            "action",
+            &["add", "addNotEmpty", "remove", "replace"],
+        ),
         AttributeRule::OnlyWithEitherValue(
             "value",
             "action",
@@ -1677,7 +1688,12 @@ Gültigkeitsbereich, in dem die Variable definiert ist. Möglich sind `page` und
             ),
         },
     ]),
-    attribute_rules: &[AttributeRule::ValueOneOf("scope", &["page", "request"])],
+    attribute_rules: &[
+        AttributeRule::ValueOneOf("scope", &["page", "request"]),
+        AttributeRule::ExactlyOrBody("object"),
+        AttributeRule::OnlyWith("indent", "object"),
+        AttributeRule::OnlyWith("overwrite", "object"),
+    ],
 };
 
 const SP_LINKEDINFORMATION: TagProperties = TagProperties {
@@ -1912,7 +1928,7 @@ Der Log-Level (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL`)"#,
     }]),
     attribute_rules: &[
         AttributeRule::Required("level"),
-        AttributeRule::ValueOneOf(
+        AttributeRule::ValueOneOfCaseInsensitive(
             "level",
             &["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"],
         ),
@@ -2170,13 +2186,15 @@ Kennzeichnet den Wert, der eingefügt, ersetzt oder gelöscht werden soll."#,
             ],
         ),
         AttributeRule::ValueOneOf("scope", &["page", "request"]),
-        AttributeRule::ExactlyOneOfWithEitherValue(
-            &["value", "expression", "condition", "object"], // or body
+        AttributeRule::ExactlyOneOfOrBodyWithEitherValue(
+            &["value", "expression", "condition", "object"],
             "action",
             &["put", "putNotEmpty"],
         ),
         AttributeRule::RequiredWithEitherValue("object", "action", &["putAll", "merge"]),
         AttributeRule::RequiredWithEitherValue("key", "action", &["put", "putNotEmpty", "remove"]),
+        AttributeRule::OnlyOneOfOrBody(&["value", "expression", "condition", "object"]),
+        AttributeRule::BodyOnlyWithEitherValue("action", &["put", "putNotEmpty"]),
         AttributeRule::OnlyWithEitherValue("value", "action", &["put", "putNotEmpty"]),
         AttributeRule::OnlyWithEitherValue("expression", "action", &["put", "putNotEmpty"]),
         AttributeRule::OnlyWithEitherValue("condition", "action", &["put", "putNotEmpty"]),
@@ -2186,7 +2204,6 @@ Kennzeichnet den Wert, der eingefügt, ersetzt oder gelöscht werden soll."#,
             &["put", "putNotEmpty", "putAll", "merge"],
         ),
         AttributeRule::OnlyWithEitherValue("key", "action", &["put", "putNotEmpty", "remove"]),
-        AttributeRule::OnlyOneOf(&["value", "expression", "condition", "object"]),
         AttributeRule::OnlyWithEither("default", &["object", "expression"]),
         AttributeRule::OnlyWithEitherValue(
             "overwrite",
@@ -2715,8 +2732,8 @@ Zu setzender Wert. Dieser wird immer als Zeichenkette ausgewertet."#,
         },
     ]),
     attribute_rules: &[
-        AttributeRule::ExactlyOneOf(&["value", "expression", "condition", "object"]), // or body
-        AttributeRule::OnlyWithEither("default", &["object", "expression"]),
+        AttributeRule::ExactlyOneOfOrBody(&["value", "expression", "condition", "object"]),
+        AttributeRule::OnlyWithEitherOrBody("default", &["object", "expression"]),
     ],
 };
 
@@ -3080,8 +3097,8 @@ Zu setzender Wert. Dieser wird immer als Zeichenkette ausgewertet."#,
     ]),
     attribute_rules: &[
         AttributeRule::Required("name"),
-        AttributeRule::ExactlyOneOf(&["value", "expression", "condition", "object"]), // or body
-        AttributeRule::OnlyWithEither("default", &["object", "expression"]),
+        AttributeRule::ExactlyOneOfOrBody(&["value", "expression", "condition", "object"]),
+        AttributeRule::OnlyWithEitherOrBody("default", &["object", "expression"]),
         AttributeRule::OnlyOneOf(&["overwrite", "insert"]),
         AttributeRule::ValueOneOf("scope", &["page", "request"]),
         AttributeRule::ValueOneOf("insert", &["replace", "append", "prepend"]),

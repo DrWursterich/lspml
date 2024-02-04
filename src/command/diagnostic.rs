@@ -201,6 +201,58 @@ fn validate_tag(
                     }
                 }
             }
+            grammar::AttributeRule::ExactlyOneOfOrBody(names) => {
+                let present: Vec<&str> = names
+                    .iter()
+                    .map(|name| *name)
+                    .filter(|name| attributes.contains_key(*name))
+                    .collect();
+                let has_body = node
+                    .child(node.child_count() - 1)
+                    .is_some_and(|tag| tag.kind().ends_with("_tag_close"));
+                match present.len() {
+                    0 if !has_body => {
+                        diagnositcs.push(Diagnostic {
+                            message: format!(
+                                "requires either a tag-body or one of these attributes: {}",
+                                names.join(", ")
+                            ),
+                            severity: Some(DiagnosticSeverity::ERROR),
+                            range: node_range(node),
+                            source: Some("lspml".to_string()),
+                            ..Default::default()
+                        });
+                    }
+                    0 if has_body => {}
+                    1 if !has_body => {}
+                    _ => {
+                        diagnositcs.push(Diagnostic {
+                            message: format!(
+                                "requires either a tag-body or only one of these attributes: {}",
+                                present.join(", ")
+                            ),
+                            severity: Some(DiagnosticSeverity::ERROR),
+                            range: node_range(node),
+                            source: Some("lspml".to_string()),
+                            ..Default::default()
+                        });
+                    }
+                }
+            }
+            grammar::AttributeRule::ExactlyOrBody(name)
+                if attributes.contains_key(*name)
+                    != node
+                        .child(node.child_count() - 1)
+                        .is_some_and(|tag| tag.kind().ends_with("_tag_close")) =>
+            {
+                diagnositcs.push(Diagnostic {
+                    message: format!("requires either a tag-body or the attribute {}", name,),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    range: node_range(node),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
             grammar::AttributeRule::OnlyOneOf(names) => {
                 let present: Vec<&str> = names
                     .iter()
@@ -220,6 +272,55 @@ fn validate_tag(
                     });
                 }
             }
+            grammar::AttributeRule::OnlyOneOfOrBody(names) => {
+                let present: Vec<&str> = names
+                    .iter()
+                    .map(|name| *name)
+                    .filter(|name| attributes.contains_key(*name))
+                    .collect();
+                let has_body = node
+                    .child(node.child_count() - 1)
+                    .is_some_and(|tag| tag.kind().ends_with("_tag_close"));
+                if has_body {
+                    if present.len() > 0 {
+                        diagnositcs.push(Diagnostic {
+                            message: format!(
+                                "can only have either a tag-body or one of these attributes: {}",
+                                present.join(", ")
+                            ),
+                            severity: Some(DiagnosticSeverity::WARNING),
+                            range: node_range(node),
+                            source: Some("lspml".to_string()),
+                            ..Default::default()
+                        });
+                    }
+                } else if present.len() > 1 {
+                    diagnositcs.push(Diagnostic {
+                        message: format!(
+                            "can only have one of these attributes: {}",
+                            present.join(", ")
+                        ),
+                        severity: Some(DiagnosticSeverity::WARNING),
+                        range: node_range(node),
+                        source: Some("lspml".to_string()),
+                        ..Default::default()
+                    });
+                }
+            }
+            grammar::AttributeRule::OnlyOrBody(name)
+                if attributes.contains_key(*name)
+                    && node
+                        .child(node.child_count() - 1)
+                        .is_some_and(|tag| tag.kind().ends_with("_tag_close")) =>
+            {
+                diagnositcs.push(Diagnostic {
+                    message: format!("can only have either a tag-body or the {} attribute", name),
+                    severity: Some(DiagnosticSeverity::WARNING),
+                    range: node_range(node),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
             grammar::AttributeRule::OnlyWith(name1, name2)
                 if attributes.contains_key(*name1) && !attributes.contains_key(*name2) =>
             {
@@ -238,6 +339,25 @@ fn validate_tag(
                 diagnositcs.push(Diagnostic {
                     message: format!(
                         "attribute {} is useless without one of these attributes: {}",
+                        name,
+                        names.join(", ")
+                    ),
+                    severity: Some(DiagnosticSeverity::WARNING),
+                    range: node_range(node),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
+            grammar::AttributeRule::OnlyWithEitherOrBody(name, names)
+                if attributes.contains_key(*name)
+                    && !names.iter().any(|name| attributes.contains_key(*name))
+                    && !node
+                        .child(node.child_count() - 1)
+                        .is_some_and(|tag| tag.kind().ends_with("_tag_close")) =>
+            {
+                diagnositcs.push(Diagnostic {
+                    message: format!(
+                        "attribute {} is useless without either a tag-body or one of these attributes: {}",
                         name,
                         names.join(", ")
                     ),
@@ -307,7 +427,25 @@ fn validate_tag(
                 diagnositcs.push(Diagnostic {
                     message: format!(
                         "attribute {} should be one of these values: [{}]",
-                        name, values.join(", ")
+                        name,
+                        values.join(", ")
+                    ),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    range: node_range(node),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
+            grammar::AttributeRule::ValueOneOfCaseInsensitive(name, values)
+                if attributes
+                    .get(*name)
+                    .is_some_and(|v| !values.contains(&v.to_uppercase().as_str())) =>
+            {
+                diagnositcs.push(Diagnostic {
+                    message: format!(
+                        "attribute {} should be one of these values: [{}]",
+                        name,
+                        values.join(", ")
                     ),
                     severity: Some(DiagnosticSeverity::ERROR),
                     range: node_range(node),
@@ -347,6 +485,25 @@ fn validate_tag(
                     ..Default::default()
                 });
             }
+            grammar::AttributeRule::BodyOnlyWithEitherValue(attribute, values)
+                if node
+                    .child(node.child_count() - 1)
+                    .is_some_and(|tag| tag.kind().ends_with("_tag_close"))
+                    && !attributes
+                        .get(*attribute)
+                        .is_some_and(|v| values.contains(&v.as_str())) =>
+            {
+                diagnositcs.push(Diagnostic {
+                    message: format!(
+                        "tag-body is useless without attribute {} containing one of these values: [{}]",
+                        attribute, values.join(", ")
+                    ),
+                    severity: Some(DiagnosticSeverity::WARNING),
+                    range: node_range(node),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
             grammar::AttributeRule::RequiredWithValue(name, attribute, value)
                 if attributes.get(*attribute).is_some_and(|v| v == value)
                     && !attributes.contains_key(*name) =>
@@ -371,7 +528,9 @@ fn validate_tag(
                 diagnositcs.push(Diagnostic {
                     message: format!(
                         "attribute {} is required when attribute {} is either of [{}]",
-                        name, attribute, values.join(", ")
+                        name,
+                        attribute,
+                        values.join(", ")
                     ),
                     severity: Some(DiagnosticSeverity::ERROR),
                     range: node_range(node),
@@ -379,7 +538,7 @@ fn validate_tag(
                     ..Default::default()
                 });
             }
-            grammar::AttributeRule::ExactlyOneOfWithEitherValue(names, attribute, values)
+            grammar::AttributeRule::ExactlyOneOfOrBodyWithEitherValue(names, attribute, values)
                 if attributes
                     .get(*attribute)
                     .is_some_and(|v| values.contains(&v.as_str())) =>
@@ -389,11 +548,14 @@ fn validate_tag(
                     .map(|name| *name)
                     .filter(|name| attributes.contains_key(*name))
                     .collect();
+                let has_body = node
+                    .child(node.child_count() - 1)
+                    .is_some_and(|tag| tag.kind().ends_with("_tag_close"));
                 match present.len() {
-                    0 => {
+                    0 if !has_body => {
                         diagnositcs.push(Diagnostic {
                             message: format!(
-                                "when attribute {} is either of [{}] exactly one of these attributes is required: [{}]",
+                                "when attribute {} is either of [{}] either a tag-body or exactly one of these attributes is required: [{}]",
                                 attribute, values.join(", "), names.join(", ")
                             ),
                             severity: Some(DiagnosticSeverity::ERROR),
@@ -402,11 +564,12 @@ fn validate_tag(
                             ..Default::default()
                         });
                     }
-                    1 => {}
+                    0 if has_body => {}
+                    1 if !has_body => {}
                     _ => {
                         diagnositcs.push(Diagnostic {
                             message: format!(
-                                "when attribute {} is either of [{}] only one of these attributes is required: [{}]",
+                                "when attribute {} is either of [{}] only one of a tag-body and these attributes is required: [{}]",
                                 attribute, values.join(", "), names.join(", ")
                             ),
                             severity: Some(DiagnosticSeverity::ERROR),

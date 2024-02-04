@@ -9,8 +9,8 @@ A proof-of-concept language server for the sitepark markup language (spml).
 - diagnostics on:
     - syntax errors
     - misplaced, unclosed and deprecated tags
-    - duplicate, required and deprecated attributes
-    - nonexistent files in includes
+    - duplicate, required and deprecated attributes / tag-bodies
+    - nonexistent files in `<sp:include>` and similar tags
 - completion for:
     - tags
     - `</`, closing the last unclosed tag
