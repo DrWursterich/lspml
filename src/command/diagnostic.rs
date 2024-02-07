@@ -116,41 +116,40 @@ fn validate_tag(
                             grammar::TagAttributeType::Object => {
                                 let mut parser = Parser::new();
                                 parser.set_language(tree_sitter_spel::language())?;
-                                let range = child
-                                            .child(2)
-                                            .expect(
-                                                format!(
-                                                    "attribute {:?} did not have a attribute-value child",
-                                                    attribute
-                                                )
-                                                .as_str(),
-                                            )
-                                            .child(1)
-                                            .expect(
-                                                format!(
-                                                    "attribute {:?} did not have a child in its attribute-value",
-                                                    attribute
-                                                )
-                                                .as_str(),
-                                            )
-                                            .range();
-                                parser.set_included_ranges(&[range])?;
-                                parser.print_dot_graphs(
-                                    &std::fs::File::create(
-                                        "/home/schaeper/git/lspml/tree-sitter-spel/spel-graph.html",
+                                let value_node = child
+                                    .child(2)
+                                    .expect(
+                                        format!(
+                                            "attribute {:?} did not have a attribute-value child",
+                                            attribute
+                                        )
+                                        .as_str(),
                                     )
-                                    .expect("failed to create debugging dot file"),
-                                );
+                                    .child(1)
+                                    .expect(
+                                        format!(
+                                            "attribute {:?} did not have a child in its attribute-value",
+                                            attribute
+                                        )
+                                        .as_str(),
+                                    );
+                                parser.set_included_ranges(&[value_node.range()])?;
                                 let tree = parser.parse(&text, None).expect(
                                     format!("failed to parse spel object in {:?}", child).as_str(),
                                 );
-                                log::debug!(
-                                    "parsed spel object in {:?} ({}) to {:?} ({})",
-                                    child,
-                                    value,
-                                    tree,
-                                    tree.root_node().utf8_text(&text.as_bytes())?
-                                );
+                                let root = tree.root_node();
+                                if root.has_error() {
+                                    diagnositcs.push(Diagnostic {
+                                        message: format!(
+                                            "{} expects an object, this is not a valid one",
+                                            attribute
+                                        ),
+                                        severity: Some(DiagnosticSeverity::ERROR),
+                                        range: node_range(root),
+                                        source: Some("lspml".to_string()),
+                                        ..Default::default()
+                                    });
+                                }
                             }
                             grammar::TagAttributeType::Regex => {}
                             grammar::TagAttributeType::String => {}

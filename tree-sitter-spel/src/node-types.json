@@ -4,7 +4,7 @@
     "named": true,
     "fields": {},
     "children": {
-      "multiple": true,
+      "multiple": false,
       "required": true,
       "types": [
         {
@@ -40,7 +40,7 @@
           "named": true
         },
         {
-          "type": "field",
+          "type": "field_access",
           "named": true
         },
         {
@@ -56,7 +56,7 @@
           "named": true
         },
         {
-          "type": "method",
+          "type": "method_access",
           "named": true
         },
         {
@@ -95,6 +95,14 @@
       "required": true,
       "types": [
         {
+          "type": "array_offset",
+          "named": true
+        },
+        {
+          "type": "boolean",
+          "named": true
+        },
+        {
           "type": "bracketed_expression",
           "named": true
         },
@@ -103,11 +111,19 @@
           "named": true
         },
         {
+          "type": "field_access",
+          "named": true
+        },
+        {
           "type": "global_function",
           "named": true
         },
         {
-          "type": "interpolated_string",
+          "type": "interpolated_anchor",
+          "named": true
+        },
+        {
+          "type": "method_access",
           "named": true
         },
         {
@@ -116,6 +132,10 @@
         },
         {
           "type": "object",
+          "named": true
+        },
+        {
+          "type": "string",
           "named": true
         },
         {
@@ -249,7 +269,7 @@
     "named": true,
     "fields": {},
     "children": {
-      "multiple": true,
+      "multiple": false,
       "required": true,
       "types": [
         {
@@ -261,7 +281,7 @@
           "named": true
         },
         {
-          "type": "field",
+          "type": "field_access",
           "named": true
         },
         {
@@ -273,11 +293,7 @@
           "named": true
         },
         {
-          "type": "interpolated_string",
-          "named": true
-        },
-        {
-          "type": "method",
+          "type": "method_access",
           "named": true
         },
         {
@@ -340,7 +356,7 @@
           "named": true
         },
         {
-          "type": "field",
+          "type": "field_access",
           "named": true
         },
         {
@@ -356,7 +372,7 @@
           "named": true
         },
         {
-          "type": "method",
+          "type": "method_access",
           "named": true
         },
         {
@@ -479,7 +495,68 @@
   {
     "type": "field",
     "named": true,
-    "fields": {}
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "interpolated_string",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "field_access",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "array_offset",
+          "named": true
+        },
+        {
+          "type": "boolean",
+          "named": true
+        },
+        {
+          "type": "field",
+          "named": true
+        },
+        {
+          "type": "field_access",
+          "named": true
+        },
+        {
+          "type": "global_function",
+          "named": true
+        },
+        {
+          "type": "interpolated_anchor",
+          "named": true
+        },
+        {
+          "type": "method_access",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "object",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        }
+      ]
+    }
   },
   {
     "type": "global_function",
@@ -516,7 +593,7 @@
     "named": true,
     "fields": {},
     "children": {
-      "multiple": true,
+      "multiple": false,
       "required": true,
       "types": [
         {
@@ -552,7 +629,7 @@
           "named": true
         },
         {
-          "type": "field",
+          "type": "field_access",
           "named": true
         },
         {
@@ -568,7 +645,7 @@
           "named": true
         },
         {
-          "type": "method",
+          "type": "method_access",
           "named": true
         },
         {
@@ -608,6 +685,57 @@
       "types": [
         {
           "type": "argument",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "method_access",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "array_offset",
+          "named": true
+        },
+        {
+          "type": "boolean",
+          "named": true
+        },
+        {
+          "type": "field_access",
+          "named": true
+        },
+        {
+          "type": "global_function",
+          "named": true
+        },
+        {
+          "type": "interpolated_anchor",
+          "named": true
+        },
+        {
+          "type": "method",
+          "named": true
+        },
+        {
+          "type": "method_access",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "object",
+          "named": true
+        },
+        {
+          "type": "string",
           "named": true
         }
       ]

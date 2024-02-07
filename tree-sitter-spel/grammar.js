@@ -1,5 +1,5 @@
 /**
- * @file SPML grammar for tree-sitter
+ * @file SPEL grammar for tree-sitter
  * @author Mario Schäper
  * @license MIT
  */
@@ -41,37 +41,25 @@ module.exports = grammar({
 
 		document: $ => $._object_item,
 
-		_object_item: $ => seq(
-			choice(
-				prec(2, $.global_function),
-				prec(1, $.object),
-				prec(1, $.interpolated_anchor),
-				prec(1, $.number),
-				prec(1, $.boolean),
-				$.string,
-			),
-			repeat(
-				choice(
-					$.array_offset,
-					seq(
-						'.',
-						choice(
-							prec(2, $.method),
-							prec(1, $.field),
-							$.interpolated_string,
-							$.interpolated_anchor,
-						),
-					),
-				),
-			),
+		_object_item: $ => choice(
+			prec(3, $.method_access),
+			prec(2, $.field_access),
+			prec(2, $.array_offset),
+			prec(2, $.global_function),
+			prec(1, $.object),
+			prec(1, $.interpolated_anchor),
+			prec(1, $.number),
+			prec(1, $.boolean),
+			$.string,
 		),
-		_expression_item: $ => prec(23, choice(
+
+		_expression_item: $ => choice(
 			$.bracketed_expression,
 			$.number,
 			$.expression,
 			$.unary_expression,
 			$.ternary_expression,
-		)),
+		),
 		_condition_item: $ => choice(
 			$.bracketed_condition,
 			$.boolean,
@@ -123,14 +111,23 @@ module.exports = grammar({
 			'false',
 		),
 		global_function: $ => $._function,
-		field: $ => $._word,
+		field: $ => choice(
+			$._word,
+			$.interpolated_string,
+		),
 		method: $ => $._function,
+		field_access: $ => seq(
+			$._object_item,
+			'.',
+			$.field,
+		),
+		method_access: $ => seq(
+			$._object_item,
+			'.',
+			$.method,
+		),
 		array_offset: $ => seq(
-			choice(
-				$.interpolated_string,
-				$.object,
-				$.global_function,
-			),
+			$._object_item,
 			'[',
 			$._expression_item,
 			']',
