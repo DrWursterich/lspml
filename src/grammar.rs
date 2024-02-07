@@ -23,6 +23,19 @@ pub(crate) struct TagAttribute {
     pub(crate) name: &'static str,
     pub(crate) detail: Option<&'static str>,
     pub(crate) documentation: Option<&'static str>,
+    pub(crate) r#type: TagAttributeType,
+}
+
+#[derive(Debug)]
+pub(crate) enum TagAttributeType {
+    Condition,
+    Expression,
+    Identifier,
+    Object, // TODO: needs to be more defined
+    Regex,
+    String,
+    Query,
+    // maybe UnionType?
 }
 
 #[derive(Debug)]
@@ -52,6 +65,9 @@ pub(crate) enum AttributeRule {
         &'static str,
         &'static [&'static str],
     ),
+    // Object(&'static str),
+    // Expression(&'static str),
+    // Condition(&'static str),
     // TODO: Renamed?
 }
 
@@ -160,6 +176,7 @@ Setzt ein Argument für ein sp:include"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "condition",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -168,6 +185,7 @@ Die Condition wird ausgewertet und als Bedingung in das Argument geschrieben."#,
         },
         TagAttribute {
             name: "default",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -176,6 +194,7 @@ Der Text, der verwendet wird, wenn die Inhalte von `value`, `expression` und bod
         },
         TagAttribute {
             name: "expression",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -184,6 +203,7 @@ Die Expression wird ausgewertet und als Wert in das Argument geschrieben."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -192,6 +212,7 @@ Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -200,6 +221,7 @@ Name des Arguments."#,
         },
         TagAttribute {
             name: "object",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -208,6 +230,7 @@ Evaluiert das Attribut und setzt den evaluierten Wert. Im Gegensatz zu `value` w
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -231,6 +254,7 @@ const SP_ATTRIBUTE: TagProperties = TagProperties {
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "dynamics",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -239,6 +263,7 @@ Evaluierung aller dynamischen Attribute."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -247,6 +272,7 @@ Name des Attributes, das als Objekt evaluiert werden soll."#,
         },
         TagAttribute {
             name: "object",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -255,6 +281,7 @@ Name des Attributes, das als Objekt evaluiert werden soll."#,
         },
         TagAttribute {
             name: "text",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -277,6 +304,7 @@ const SP_BARCODE: TagProperties = TagProperties {
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "height",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -285,6 +313,7 @@ Höhe des Bildes."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -293,6 +322,7 @@ Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachigen 
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -301,6 +331,7 @@ Name der Variable für den Zugriff auf das Ergebnis-Object. Je nach Angegebenen 
         },
         TagAttribute {
             name: "scope",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -309,6 +340,7 @@ Gültigkeitsbereich, in dem die Variable definiert ist. Möglich sind `page` und
         },
         TagAttribute {
             name: "text",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -317,6 +349,7 @@ Text aus dem der Barcode generiert werden soll."#,
         },
         TagAttribute {
             name: "type",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -358,6 +391,7 @@ CalendarSheet manage dates and objects"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "action",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -366,6 +400,7 @@ Aktion, die ausgeführt werden soll. Es existieren die Aktionen `add`, `clear` u
         },
         TagAttribute {
             name: "date",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -374,6 +409,7 @@ Zu setzender Wert. Hiermit kann direkt ein einzelnes Datum angegeben werden. Üb
         },
         TagAttribute {
             name: "from",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -382,6 +418,7 @@ Zu setzender Wert. Hiermit kann direkt ein einzelnes Datum angegeben werden. Üb
         },
         TagAttribute {
             name: "mode",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -390,6 +427,7 @@ Zu setzender Wert. Hiermit kann direkt ein einzelnes Datum angegeben werden. Üb
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -398,6 +436,7 @@ Name über den das `CalendarSheet` angesprochen werden kann."#,
         },
         TagAttribute {
             name: "object",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -406,6 +445,7 @@ Evaluiert das Attribut und setzt das entsprechende `CalendarInformation`-Objekt.
         },
         TagAttribute {
             name: "scope",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -414,6 +454,7 @@ Namensraum, in dem die Variable definiert ist. Für diesen Tag ist der Page- und
         },
         TagAttribute {
             name: "to",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -422,6 +463,7 @@ Namensraum, in dem die Variable definiert ist. Für diesen Tag ist der Page- und
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -458,6 +500,7 @@ Check-Box-Tag, erzeugt eine checkBox."#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "checked",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -466,6 +509,7 @@ Gibt an, ob der Radio-Button per default gechecked werden soll. Diese Einstellun
         },
         TagAttribute {
             name: "disabled",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -474,6 +518,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -482,6 +527,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -490,6 +536,7 @@ Bestimmt den Namen des Feldes."#,
         },
         TagAttribute {
             name: "readonly",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -498,6 +545,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "type",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -506,6 +554,7 @@ Der Typ des Eingabefeldes."#,
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -544,6 +593,7 @@ Collection tag offers certain operation that deal with a common collection. For 
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "action",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -563,6 +613,7 @@ Aktion, die ausgeführt werden soll. Es existieren die Aktionen `add`, `addAll`,
         },
         TagAttribute {
             name: "condition",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -571,6 +622,7 @@ Die `Condition` wird ausgewertet und als Bedingung in die Variable geschrieben."
         },
         TagAttribute {
             name: "default",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -579,6 +631,7 @@ Der Text, der verwendet wird, wenn die Inhalte von `value`, `expression` und bod
         },
         TagAttribute {
             name: "expression",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -587,6 +640,7 @@ Die `Expression` wird ausgewertet und als Wert in die Variable geschrieben."#,
         },
         TagAttribute {
             name: "index",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -595,6 +649,7 @@ Listen-Position mit der eine Aktion ausgeführt werden soll."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -603,6 +658,7 @@ Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachigen 
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -611,6 +667,7 @@ Name der Liste."#,
         },
         TagAttribute {
             name: "object",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -619,6 +676,7 @@ Ein `Objekt` das mit der Liste verarbeitet werden soll. Ist `object` vom Typ `Qu
         },
         TagAttribute {
             name: "publisher",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -631,6 +689,7 @@ Wird der Collection-Tag in Verbindung mit Suchabfragen verwendet (durch `query` 
         },
         TagAttribute {
             name: "query",
+            r#type: TagAttributeType::Query,
             detail: None,
             documentation: Some(
                 r#"
@@ -639,6 +698,7 @@ Fügt in die Collection die Ergebnisse der übergebenen Suchabfrage ein. Ist die
         },
         TagAttribute {
             name: "scope",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -647,6 +707,7 @@ Namensraum, in dem die Variable definiert ist. Für diesen Tag ist der Page- und
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -732,6 +793,7 @@ Vergleicht ein Attribute von zwei Versionen einer Information"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "from",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -740,6 +802,7 @@ Text der Verglichen werden soll. Wörter die hier enthalten und in to nicht mehr
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -748,6 +811,7 @@ Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachigen 
         },
         TagAttribute {
             name: "lookup",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -756,6 +820,7 @@ Gibt an, ob bei der der Auflösung von mehrsprachigen Variablen mit der, durch l
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -764,6 +829,7 @@ Name der Liste, in die das Ergebnis gespeichert wird. Die Liste enthält `DiffCh
         },
         TagAttribute {
             name: "to",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -804,6 +870,7 @@ ElseIf-Tag, schreibt Body wenn Bedingung ok ist und vorheriges if fehl schlug."#
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "condition",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -812,6 +879,7 @@ Es wird eine Condition erwartet, die den Wert `true` oder `false` zurückliefert
         },
         TagAttribute {
             name: "eq",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -820,6 +888,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` gleich der Variable in `
         },
         TagAttribute {
             name: "gt",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -828,6 +897,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` größer als der Variabl
         },
         TagAttribute {
             name: "gte",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -836,6 +906,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` größer oder gleich der
         },
         TagAttribute {
             name: "ic",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -844,6 +915,7 @@ Die Auswertung soll "ignore case" durchgeführt werden. Bezieht sich auf `eq`, `
         },
         TagAttribute {
             name: "iNull",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -852,6 +924,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` leer oder nicht vorhande
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -860,6 +933,7 @@ Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen
         },
         TagAttribute {
             name: "lt",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -868,6 +942,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` kleiner als in der Varia
         },
         TagAttribute {
             name: "lte",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -876,6 +951,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` kleiner oder gleich der 
         },
         TagAttribute {
             name: "match",
+            r#type: TagAttributeType::Regex,
             detail: None,
             documentation: Some(
                 r#"
@@ -884,6 +960,7 @@ Regulärer Ausdruck, der in der Variablen enthalten sein soll."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -892,6 +969,7 @@ Variablenname eines Objektes das verglichen werden soll."#,
         },
         TagAttribute {
             name: "neq",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -928,6 +1006,7 @@ Prüft ein Fehler aufgetreten ist, markiert ihn gegebenenfals als gefangen und f
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[TagAttribute {
         name: "code",
+        r#type: TagAttributeType::String,
         detail: None,
         documentation: Some(
             r#"
@@ -945,6 +1024,7 @@ const SP_EXPIRE: TagProperties = TagProperties {
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[TagAttribute {
         name: "date",
+        r#type: TagAttributeType::Expression,
         detail: None,
         documentation: Some(
             r#"
@@ -966,6 +1046,7 @@ Filtert eine Liste"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "attribute",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -974,6 +1055,7 @@ Attribut, auf das der Filter angewendet werden soll."#,
         },
         TagAttribute {
             name: "collection",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -982,6 +1064,7 @@ Name der zu filternden Liste."#,
         },
         TagAttribute {
             name: "filter",
+            r#type: TagAttributeType::Regex, // only if mode = "regex", otherwise String
             detail: None,
             documentation: Some(
                 r#"
@@ -990,6 +1073,7 @@ Die Filterdefinition für die Filtertypen Wildcard und regulärer Ausdruck. Der 
         },
         TagAttribute {
             name: "format",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -998,6 +1082,7 @@ Das Format des Datums, wenn die `from` und `to` Werte als Datum interpretiert we
         },
         TagAttribute {
             name: "from",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1006,6 +1091,7 @@ Der Wert für den Beginn eines Bereiches, z.B. "Aa" oder "100". Ob der Wert als 
         },
         TagAttribute {
             name: "ic",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -1014,6 +1100,7 @@ Ist Ignore-Case auf `true` gesetzt, wird eine Groß- und Kleinschreibung nicht b
         },
         TagAttribute {
             name: "invert",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -1022,6 +1109,7 @@ Invertiert die Logik des Filters. Alle Elemente die normalerweise herausgefilter
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1030,6 +1118,7 @@ Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen
         },
         TagAttribute {
             name: "mode",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1049,6 +1138,7 @@ gefilterte Liste nur Elemente enthalten, die mit dem Buchstaben A, a, B, b, C, c
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -1057,6 +1147,7 @@ Name der gefilterten Liste."#,
         },
         TagAttribute {
             name: "scope",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1065,6 +1156,7 @@ Gültigkeitsbereich, in dem die Variable definiert ist. Möglich sind: `page`|`r
         },
         TagAttribute {
             name: "to",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1073,6 +1165,7 @@ Der Wert für das Ende eines Bereiches, z.B. "Zz" oder "999". Ob der Wert als Te
         },
         TagAttribute {
             name: "type",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1107,6 +1200,7 @@ For-Tag, wiederholt solange wie angegeben."#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "condition",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -1115,6 +1209,7 @@ Die For-Schleife wird solange durchlaufen, bis die Bedingung `false` ergibt"#,
         },
         TagAttribute {
             name: "from",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -1123,6 +1218,7 @@ Startwert des Zählers"#,
         },
         TagAttribute {
             name: "index",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -1131,6 +1227,7 @@ Name der Variable, die den aktuellen Zählerstand enthält"#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1139,6 +1236,7 @@ Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachigen 
         },
         TagAttribute {
             name: "step",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -1147,6 +1245,7 @@ Schrittweite, in der gezählt werden soll. `step` kann für einen Rückwärtszä
         },
         TagAttribute {
             name: "to",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -1173,6 +1272,7 @@ Erzeugt ein HTML-Form-Tag mit einem angepassten Kommando"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "command",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1182,6 +1282,7 @@ Existierendes Command. Muss im GUI definiert worden sein."#,
         },
         TagAttribute {
             name: "context",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1190,6 +1291,7 @@ SPML-Seiten sind immer Teil einer Webapplikation. Jede Webapplikation besitzt ei
         },
         TagAttribute {
             name: "enctype",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1200,6 +1302,7 @@ Bestimmt den Typ der zu übertragenden Daten:
         },
         TagAttribute {
             name: "handler",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1208,6 +1311,7 @@ Handler, an den das Formular gesendet werden soll. Handler werden vor der, mit `
         },
         TagAttribute {
             name: "id",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1216,6 +1320,7 @@ Optionale id für den erzeugten HTML-Form-Tag. Ist dieses Attribut nicht gesetzt
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1224,6 +1329,7 @@ Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachiger 
         },
         TagAttribute {
             name: "method",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1232,6 +1338,7 @@ Bestimmt die Übertragungsmethode: get oder post. Bei get werden die Parameter o
         },
         TagAttribute {
             name: "module",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1240,6 +1347,7 @@ SPML-Seiten sind immer Teil einer Webapplikation. Jede Webapplikation besitzt ei
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -1248,6 +1356,7 @@ Optionaler Name für das erzeugte Formular."#,
         },
         TagAttribute {
             name: "nameencoding",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1258,6 +1367,7 @@ Die innerhalb von sp:form liegenden Input-Tags (`sp:text`, `spt:text`, `sp:check
         },
         TagAttribute {
             name: "template",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1266,6 +1376,7 @@ Template, an das das Formular gesendet werden soll. Dieses Attribut sollte nur f
         },
         TagAttribute {
             name: "uri",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1296,6 +1407,7 @@ Hidden-Tag, erzeugt ein Hiddenfeld."#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "fixvalue",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1304,6 +1416,7 @@ Hidden-Tag, erzeugt ein Hiddenfeld."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1312,6 +1425,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -1320,6 +1434,7 @@ Bestimmt den Namen des Feldes."#,
         },
         TagAttribute {
             name: "type",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1328,6 +1443,7 @@ Der Typ des Eingabefeldes."#,
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1353,6 +1469,7 @@ If-Tag, schreibt Body wenn Bedingung ok ist."#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "condition",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -1361,6 +1478,7 @@ Es wird eine Condition erwartet, die den Wert `true` oder `false` zurückliefert
         },
         TagAttribute {
             name: "eq",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1369,6 +1487,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` gleich der Variable in `
         },
         TagAttribute {
             name: "gt",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1377,6 +1496,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` größer als der Variabl
         },
         TagAttribute {
             name: "gte",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1385,6 +1505,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` größer oder gleich der
         },
         TagAttribute {
             name: "ic",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -1393,6 +1514,7 @@ Die Auswertung soll "ignore case" durchgeführt werden. Bezieht sich auf `eq`, `
         },
         TagAttribute {
             name: "iNull",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -1401,6 +1523,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` leer oder nicht vorhande
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1409,6 +1532,7 @@ Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen
         },
         TagAttribute {
             name: "lt",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1417,6 +1541,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` kleiner als in der Varia
         },
         TagAttribute {
             name: "lte",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1425,6 +1550,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` kleiner oder gleich der 
         },
         TagAttribute {
             name: "match",
+            r#type: TagAttributeType::Regex,
             detail: None,
             documentation: Some(
                 r#"
@@ -1433,6 +1559,7 @@ Regulärer Ausdruck, der in der Variablen enthalten sein soll."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1441,6 +1568,7 @@ Variablenname eines Objektes das verglichen werden soll."#,
         },
         TagAttribute {
             name: "neq",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1478,6 +1606,7 @@ includiert ein anderes bereits im System gespeichertes Template."#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "anchor",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1486,6 +1615,7 @@ Anchor-Name des zu includenden Templates."#,
         },
         TagAttribute {
             name: "arguments",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1494,6 +1624,7 @@ Mit diesem Attribut können Argumente in Form einer Map übergeben, die mit `sys
         },
         TagAttribute {
             name: "context",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1502,6 +1633,7 @@ SPML-Seiten sind immer Teil einer Webapplikation. Die mit dem Attribut `uri` ang
         },
         TagAttribute {
             name: "mode",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1512,6 +1644,7 @@ Mit diesem Attribut kann angegeben werden, in welchem Modus die includete SPML-S
         },
         TagAttribute {
             name: "module",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1520,6 +1653,7 @@ SPML-Seiten sind immer Teil einer Webapplikation. Die mit dem Attribut `uri` ang
         },
         TagAttribute {
             name: "return",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -1528,6 +1662,7 @@ Mit diesem Attribut wird der Name der Variable definiert, in der der Rückgabe-W
         },
         TagAttribute {
             name: "template",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1536,6 +1671,7 @@ Zu includendes Template (Variable mit einer Template-ID)."#,
         },
         TagAttribute {
             name: "uri",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1565,6 +1701,7 @@ IO-Tag"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "contenttype",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1573,6 +1710,7 @@ Mit Hilfe dieses Attributes kann der Content-Typ für einen bestimmten Bereich n
         },
         TagAttribute {
             name: "type",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1598,6 +1736,7 @@ Wird für den Aufbau von Wiederholfeldern verwendet."#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "collection",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1606,6 +1745,7 @@ Die zu iterierende Liste. Dieses Attribut entspricht dem `name`-Attribut des `sp
         },
         TagAttribute {
             name: "item",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -1614,6 +1754,7 @@ Die in `collection` angegebene Liste wird Element für Element durchlaufen. Mit 
         },
         TagAttribute {
             name: "max",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -1622,6 +1763,7 @@ Die Anzahl der maximal zu iterierenden Elemente. Enthält die zu iterierende Lis
         },
         TagAttribute {
             name: "min",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -1641,6 +1783,7 @@ const SP_JSON: TagProperties = TagProperties {
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "indent",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -1649,6 +1792,7 @@ Initiale Einrückung für eine formatierte Ausgabe."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1657,6 +1801,7 @@ Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -1665,6 +1810,7 @@ Name der neuen Variable."#,
         },
         TagAttribute {
             name: "object",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1673,6 +1819,7 @@ Objekt, das als `JSONObject` in die Variable gespeichert werden soll oder bodyCo
         },
         TagAttribute {
             name: "overwrite",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -1681,6 +1828,7 @@ Bestimmt, ob eine evtl. vorhandene Variable überschrieben werden soll. `true` b
         },
         TagAttribute {
             name: "scope",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1718,6 +1866,7 @@ const SP_LINKTREE: TagProperties = TagProperties {
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "attributes",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1727,6 +1876,7 @@ Eine Kommaseparierte Liste von Attributen, die der Artikel enthalten und auf des
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1735,6 +1885,7 @@ Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachigen 
         },
         TagAttribute {
             name: "localelink",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -1743,6 +1894,7 @@ Mit diesem Attribut kann angegeben werden, ob ein Linktree sprachabhängig aufge
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -1751,6 +1903,7 @@ Name der Variable für das LinkTree-Objekt."#,
         },
         TagAttribute {
             name: "parentlink",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1759,6 +1912,7 @@ Name des Links, der auf einen, in der zu erstellenden Struktur, übergeordneten 
         },
         TagAttribute {
             name: "rootelement",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1767,6 +1921,7 @@ Das Root-Element des Baums. Ist kein Root-Element angegeben, wird der dazugehör
         },
         TagAttribute {
             name: "sortkeys",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1775,6 +1930,7 @@ Attribute des Artikels, nach denen der Baum sortiert werden soll. Jede Ebene des
         },
         TagAttribute {
             name: "sortsequences",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1783,6 +1939,7 @@ Für jedes Sortierkriterium muss eine Sortierreihenfolge festgelegt werden, mit 
         },
         TagAttribute {
             name: "sorttypes",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1808,6 +1965,7 @@ const SP_LIVETREE: TagProperties = TagProperties {
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "action",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1821,6 +1979,7 @@ Das Kommando, das auf das Element in `node` angewendet werden soll.
         },
         TagAttribute {
             name: "leaflink",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1829,6 +1988,7 @@ Name des Links, der Kinder, die auf Artikel in dem Baum verweisen, selber aber n
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1837,6 +1997,7 @@ Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachigen 
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -1845,6 +2006,7 @@ Name der Variable für die `Collection`, die den Baum in Form von `ElementNodes`
         },
         TagAttribute {
             name: "node",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -1853,6 +2015,7 @@ Der Name der Variablen, Element dessen Wert eine Element-ID des Elementes sein m
         },
         TagAttribute {
             name: "parentlink",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1861,6 +2024,7 @@ Name des Links, der auf einen, in der zu erstellenden Struktur, übergeordneten 
         },
         TagAttribute {
             name: "publisher",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1869,6 +2033,7 @@ Name des Links, der auf einen, in der zu erstellenden Struktur, übergeordneten 
         },
         TagAttribute {
             name: "rootElement",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1877,6 +2042,7 @@ Das Root-Element des Baumes."#,
         },
         TagAttribute {
             name: "sortkeys",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1885,6 +2051,7 @@ Attribute des Artikels, nach denen der Baum sortiert werden soll. Jede Ebene des
         },
         TagAttribute {
             name: "sortsequences",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1893,6 +2060,7 @@ Attribute des Artikels, nach denen der Baum sortiert werden soll. Jede Ebene des
         },
         TagAttribute {
             name: "sorttypes",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1920,6 +2088,7 @@ const SP_LOG: TagProperties = TagProperties {
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[TagAttribute {
         name: "level",
+        r#type: TagAttributeType::String,
         detail: None,
         documentation: Some(
             r#"
@@ -1944,6 +2113,7 @@ const SP_LOGIN: TagProperties = TagProperties {
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "captcharequired",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -1952,6 +2122,7 @@ Dieses Attribut wird verwendet um eine Session zu erzeugen, die Handler-Aufrufe 
         },
         TagAttribute {
             name: "client",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1960,6 +2131,7 @@ Dieses Attribut wird verwendet um eine Session zu erzeugen, die Handler-Aufrufe 
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -1968,6 +2140,7 @@ Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachigen 
         },
         TagAttribute {
             name: "login",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1976,6 +2149,7 @@ Nutzer-Login."#,
         },
         TagAttribute {
             name: "password",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1984,6 +2158,7 @@ Nutzer-Passwort."#,
         },
         TagAttribute {
             name: "scope",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -1996,6 +2171,7 @@ Bereich in dem die erzeugte Verbindung zum IES gespeichert werden soll.
         },
         TagAttribute {
             name: "session",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2021,6 +2197,7 @@ Dient zur Ausgabe eines oder mehrerer Elemente."#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "collection",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -2029,6 +2206,7 @@ Die zu iterierende Liste."#,
         },
         TagAttribute {
             name: "item",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -2037,6 +2215,7 @@ Die in `collection` angegebene Liste wird Element für Element durchlaufen. Mit 
         },
         TagAttribute {
             name: "list",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2045,6 +2224,7 @@ Eine Zeichenkette mit dem in `separator` angegebenen Trennzeichen."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -2053,6 +2233,7 @@ Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen
         },
         TagAttribute {
             name: "separator",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2075,6 +2256,7 @@ const SP_MAP: TagProperties = TagProperties {
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "action",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2091,6 +2273,7 @@ Aktion, die ausgeführt werden soll. Die folgenden Aktionen sind möglich: `put`
         },
         TagAttribute {
             name: "condition",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -2099,6 +2282,7 @@ Die Condition wird ausgewertet und als Bedingung in die Variable geschrieben."#,
         },
         TagAttribute {
             name: "default",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2107,6 +2291,7 @@ Der Text, der verwendet wird, wenn die Inhalte von value, expression und body le
         },
         TagAttribute {
             name: "expression",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -2115,6 +2300,7 @@ Die Expression wird ausgewertet und als Wert in die Variable geschrieben."#,
         },
         TagAttribute {
             name: "key",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2123,6 +2309,7 @@ Schlüssel, über den auf die Werte der Map zugegriffen werden soll."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2131,6 +2318,7 @@ Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -2139,6 +2327,7 @@ Name der Map. Ein Punkt trennt die Namen für verschachtelte Maps."#,
         },
         TagAttribute {
             name: "object",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -2147,6 +2336,7 @@ Kennzeichnet das Objekt, das eingefügt, ersetzt oder gelöscht werden soll."#,
         },
         TagAttribute {
             name: "overwrite",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -2155,6 +2345,7 @@ Bestimmt, ob eine evtl. vorhandene Variable überschrieben werden soll. `true` b
         },
         TagAttribute {
             name: "scope",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2163,6 +2354,7 @@ Namensraum, in dem die Variable definiert ist. Für diesen Tag ist der Page- und
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2225,6 +2417,7 @@ Option-Tag, für das Select Tag."#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "disabled",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -2233,6 +2426,7 @@ Gibt an, ob die Option deaktiviert werden soll."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2241,6 +2435,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
         },
         TagAttribute {
             name: "selected",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -2249,6 +2444,7 @@ Gibt an, ob die Option per default ausgewählt (selected) sein soll. Diese Einst
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2314,6 +2510,7 @@ Dient zur Ausgabe eines Attributes"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "arg",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -2326,6 +2523,7 @@ Mit diesem Attribut werden Werte für eine Formatierung im StringFormat angegebe
         },
         TagAttribute {
             name: "condition",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -2334,6 +2532,7 @@ Alternative zu name (Siehe „Condition“)."#,
         },
         TagAttribute {
             name: "convert",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2345,6 +2544,7 @@ Konvertiert die auszugebende Zeichenkette mit dem angegebenen Konverter. Es ist 
         },
         TagAttribute {
             name: "cryptkey",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2353,6 +2553,7 @@ Der bei 3DES bzw. AES zu verwendene Schlüssel. Wird keiner angegeben, wird der 
         },
         TagAttribute {
             name: "dateformat",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2367,6 +2568,7 @@ dd.MM.yyyy HH:mm|en
         },
         TagAttribute {
             name: "decimalformat",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2383,6 +2585,7 @@ __Hinweis__: *Bis Version 2.0.2 wurde der Doppelpunkt als Trennzeichen verwendet
         },
         TagAttribute {
             name: "decoding",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2401,6 +2604,7 @@ Decodiert die auszugebende Zeichenkette mit dem angegebenen Encoding. Es ist mö
         },
         TagAttribute {
             name: "decrypt",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2412,6 +2616,7 @@ Decryptet die auszugebende Zeichenkette mit dem angegebenen Crypt-Algorithmus. E
         },
         TagAttribute {
             name: "default",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2420,6 +2625,7 @@ Auszugebender Default-Wert, wenn das Ergebnis von name bzw. `text` bzw. `express
         },
         TagAttribute {
             name: "encoding",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2489,6 +2695,7 @@ Encodiert die auszugebende Zeichenkette mit dem angegebenen Encoding. Es ist mö
         },
         TagAttribute {
             name: "encrypt",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2502,6 +2709,7 @@ Encryptet die auszugebende Zeichenkette mit dem angegebenen Crypt-Algorithmus. E
         },
         TagAttribute {
             name: "expression",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -2510,6 +2718,7 @@ Alternative zu name (Siehe „Expression“)."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2518,6 +2727,7 @@ Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachiger 
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -2526,6 +2736,7 @@ Attribut das ausgegeben werden soll (Siehe „Attribute“)."#,
         },
         TagAttribute {
             name: "text",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2566,6 +2777,7 @@ Radio Button-Tag, erzeugt einen RadioButton."#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "checked",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -2574,6 +2786,7 @@ Gibt an, ob der Radio-Button per default gechecked werden soll. Diese Einstellun
         },
         TagAttribute {
             name: "disabled",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -2582,6 +2795,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -2590,6 +2804,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -2598,6 +2813,7 @@ Bestimmt den Namen des Feldes."#,
         },
         TagAttribute {
             name: "readonly",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -2606,6 +2822,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "type",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2614,6 +2831,7 @@ Der Typ des Eingabefeldes."#,
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2633,6 +2851,7 @@ const SP_RANGE: TagProperties = TagProperties {
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "collection",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -2641,6 +2860,7 @@ Name der Liste die verarbeitet werden soll."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -2649,6 +2869,7 @@ Name der Liste die aus der Auswahl erstellt wird."#,
         },
         TagAttribute {
             name: "range",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2657,6 +2878,7 @@ Bereichsdefinition."#,
         },
         TagAttribute {
             name: "scope",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2684,6 +2906,7 @@ Verlässt die SPML-Seite und setzt ggf. einen Rückgabewert für sp:include"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "condition",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -2692,6 +2915,7 @@ Die Condition wird ausgewertet und als Bedingung in den Rückgabe-Wert geschrieb
         },
         TagAttribute {
             name: "default",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2700,6 +2924,7 @@ Der Text, der verwendet wird, wenn die Inhalte von value, expression und body le
         },
         TagAttribute {
             name: "expression",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -2708,6 +2933,7 @@ Die Expression wird ausgewertet und als Rückgabe-Wert geschrieben."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -2716,6 +2942,7 @@ Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen
         },
         TagAttribute {
             name: "object",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -2724,6 +2951,7 @@ Evaluiert das Attribut und setzt den evaluierten Wert. Im Gegensatz zu `value` w
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2746,6 +2974,7 @@ const SP_SASS: TagProperties = TagProperties {
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -2754,6 +2983,7 @@ Name der Variable für den Zugriff auf das erzeugte CSS."#,
         },
         TagAttribute {
             name: "options",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -2765,6 +2995,7 @@ Die Optionen sind
         },
         TagAttribute {
             name: "source",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2788,6 +3019,7 @@ const SP_SCALEIMAGE: TagProperties = TagProperties {
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "background",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2800,6 +3032,7 @@ Transparente Farben funktionieren nur bei PNG-Bildern.
         },
         TagAttribute {
             name: "height",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -2808,6 +3041,7 @@ Höhe des zu berechnenden Bildes."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -2816,6 +3050,7 @@ Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachigen 
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -2824,6 +3059,7 @@ Name der Variable für den Zugriff auf das `ScaleImage`-Objekt."#,
         },
         TagAttribute {
             name: "object",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -2832,6 +3068,7 @@ Original-Bild."#,
         },
         TagAttribute {
             name: "options",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -2844,6 +3081,7 @@ Mit diesem Attribut können Bild-Optionen für die Berechnung des Bildes überge
         },
         TagAttribute {
             name: "padding",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2855,6 +3093,7 @@ Mit `"fit/no"` wird der größtmögliche Ausschnitt aus dem Originalbild bzw. au
         },
         TagAttribute {
             name: "quality",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2871,6 +3110,7 @@ gif:70,png:50,jpg:62
         },
         TagAttribute {
             name: "scalesteps",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -2879,6 +3119,7 @@ Schalter um das Optimierungsverhalten im In-Modus auszuschalten. *(deprecated ab
         },
         TagAttribute {
             name: "scope",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -2887,6 +3128,7 @@ Gültigkeitsbereich, in dem die Variable definiert ist. Möglich sind `page` und
         },
         TagAttribute {
             name: "width",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -2914,6 +3156,7 @@ Setzt bereichsweise oder global den Scope für die folgenden Tags"#,
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[TagAttribute {
         name: "scope",
+        r#type: TagAttributeType::String,
         detail: None,
         documentation: Some(
             r#"
@@ -2951,6 +3194,7 @@ Select-Tag, erzeugt den Rahmen einen Auswahlliste."#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "disabled",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -2959,6 +3203,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -2967,6 +3212,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
         },
         TagAttribute {
             name: "multiple",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -2975,6 +3221,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -2983,6 +3230,7 @@ Bestimmt den Namen des Feldes."#,
         },
         TagAttribute {
             name: "type",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3005,6 +3253,7 @@ Setzt ein Attribute"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "condition",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -3013,6 +3262,7 @@ Die Condition wird ausgewertet und als Bedingung in die Variable geschrieben."#,
         },
         TagAttribute {
             name: "contentType",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3021,6 +3271,7 @@ Hier kann zZ nur der Wert `json` gesetzt werden, um den angegebenen Content als 
         },
         TagAttribute {
             name: "default",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3029,6 +3280,7 @@ Der Text, der verwendet wird, wenn die Inhalte von value, expression und body le
         },
         TagAttribute {
             name: "expression",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -3037,6 +3289,7 @@ Die Expression wird ausgewertet und als Wert in die Variable geschrieben."#,
         },
         TagAttribute {
             name: "insert",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3048,6 +3301,7 @@ Definiert wie der Wert gesetzt werden soll. Die folgenden Werte sind möglich: `
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -3056,6 +3310,7 @@ Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -3064,6 +3319,7 @@ Name der neuen Variable."#,
         },
         TagAttribute {
             name: "object",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -3072,6 +3328,7 @@ Evaluiert das Attribut und setzt den evaluierten Wert. Im Gegensatz zu `value` w
         },
         TagAttribute {
             name: "overwrite",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -3080,6 +3337,7 @@ Bestimmt, ob eine evtl. vorhandene Variable überschrieben werden soll. `true` b
         },
         TagAttribute {
             name: "scope",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3088,6 +3346,7 @@ Gültigkeitsbereich, in dem die Variable definiert ist. Möglich sind `page` und
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3118,6 +3377,7 @@ Sortiert eine Liste"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "collection",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -3126,6 +3386,7 @@ Name der zu sortierenden Liste."#,
         },
         TagAttribute {
             name: "keys",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3134,6 +3395,7 @@ Die Sortierkriterien nach denen die Elemente der Liste sortiert werden sollen. D
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -3142,6 +3404,7 @@ Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -3150,6 +3413,7 @@ Name der sortierten Liste."#,
         },
         TagAttribute {
             name: "scope",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3158,6 +3422,7 @@ Gültigkeitsbereich, in dem die Variable definiert ist. Möglich sind: `page`|`r
         },
         TagAttribute {
             name: "sequences",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3166,6 +3431,7 @@ Für jedes Sortierkriterium muss eine Sortierreihenfolge festgelegt werden, mit 
         },
         TagAttribute {
             name: "types",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3189,6 +3455,7 @@ const SP_SUBINFORMATION: TagProperties = TagProperties {
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -3197,6 +3464,7 @@ Name der Subinformation."#,
         },
         TagAttribute {
             name: "type",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3232,6 +3500,7 @@ Text-Tag, erzeugt ein Eingabefeld."#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "disabled",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -3240,6 +3509,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "fixvalue",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3248,6 +3518,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "format",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3256,6 +3527,7 @@ Wenn bei `type` beispielsweise `date` oder `number` angegeben wurde, kann `forma
         },
         TagAttribute {
             name: "inputType",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3264,6 +3536,7 @@ Setzt den [Typ](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input#
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -3272,6 +3545,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -3280,6 +3554,7 @@ Bestimmt den Namen des Feldes."#,
         },
         TagAttribute {
             name: "readonly",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -3288,6 +3563,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "type",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3296,6 +3572,7 @@ Der Typ des Eingabefeldes."#,
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3323,6 +3600,7 @@ Textarea-Tag, erzeugt einen Einabebereich."#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "disabled",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -3331,6 +3609,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "fixvalue",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3339,6 +3618,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -3347,6 +3627,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -3355,6 +3636,7 @@ Bestimmt den Namen des Feldes."#,
         },
         TagAttribute {
             name: "readonly",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -3363,6 +3645,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "type",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3371,6 +3654,7 @@ Der Typ des Eingabefeldes."#,
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3393,6 +3677,7 @@ const SP_TEXTIMAGE: TagProperties = TagProperties {
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "background",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3401,6 +3686,7 @@ Hintergrundfarbe."#,
         },
         TagAttribute {
             name: "fontcolor",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3409,6 +3695,7 @@ Schriftfarbe."#,
         },
         TagAttribute {
             name: "fontname",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3417,6 +3704,7 @@ Name des zu verwendenden Zeichensatzes - muss unter dem angegebenem Namen auf de
         },
         TagAttribute {
             name: "fontsize",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -3425,6 +3713,7 @@ Schriftgröße."#,
         },
         TagAttribute {
             name: "fontstyle",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3433,6 +3722,7 @@ Schriftstil. Mögliche Werte sind `plain`, `bold` und `italic`."#,
         },
         TagAttribute {
             name: "gravity",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3450,6 +3740,7 @@ Ausrichtung der Schrift auf dem Bild.
         },
         TagAttribute {
             name: "height",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -3458,6 +3749,7 @@ Höhe des Bildes."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -3466,6 +3758,7 @@ Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachigen 
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -3474,6 +3767,7 @@ Name der Variable für den Zugriff auf das `TextImage`-Objekt."#,
         },
         TagAttribute {
             name: "offset",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3482,6 +3776,7 @@ Der Offset wird mit zwei Kommata getrennten Zahlen angegeben. Der erste Wert gib
         },
         TagAttribute {
             name: "scope",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3490,6 +3785,7 @@ Gültigkeitsbereich, in dem die Variable definiert ist. Möglich sind `page` und
         },
         TagAttribute {
             name: "text",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3498,6 +3794,7 @@ Text der in ein Bild umgewandelt werden soll."#,
         },
         TagAttribute {
             name: "width",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -3559,6 +3856,7 @@ Toggle-Tag erzeugt einen toggle der einen einzigen boolischen Wert speichert"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "disabled",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -3567,6 +3865,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "fixvalue",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3575,6 +3874,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -3583,6 +3883,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -3591,6 +3892,7 @@ Bestimmt den Namen des Feldes."#,
         },
         TagAttribute {
             name: "offValue",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3599,6 +3901,7 @@ Wert der gesetzt wird, wenn die Checkbox nicht gechecked ist"#,
         },
         TagAttribute {
             name: "onValue",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3607,6 +3910,7 @@ Wert der gesetzt wird, wenn die Checkbox gechecked ist"#,
         },
         TagAttribute {
             name: "readonly",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -3615,6 +3919,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "type",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3623,6 +3928,7 @@ Der Typ des Eingabefeldes."#,
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3648,6 +3954,7 @@ Das Tag, erzeugt ein Eingabefeld zum Herunderladen von Dateien."#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -3656,6 +3963,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -3678,6 +3986,7 @@ Fügt den ContextPath vor die angegebene URL und hängt, falls nötig die Sessio
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "absolute",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -3687,6 +3996,7 @@ Gibt an, ob die URL die durch das Attribut information ermittelt wurde mit absol
         },
         TagAttribute {
             name: "command",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3696,6 +4006,7 @@ Existierendes Command. Muss im GUI definiert worden sein."#,
         },
         TagAttribute {
             name: "context",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3704,6 +4015,7 @@ SPML-Seiten sind immer Teil einer Webapplikation. Jede Webapplikation besitzt ei
         },
         TagAttribute {
             name: "gui",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -3713,6 +4025,7 @@ Steuert, ob das aktuelle GUI an die URL angefügt werden soll (nur in Verbindung
         },
         TagAttribute {
             name: "handler",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3721,6 +4034,7 @@ Handler der vor dem Aufruf, der mit `uri` oder `template` angegebenen Seite, aus
         },
         TagAttribute {
             name: "information",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -3730,6 +4044,7 @@ Artikel dessen URL geschrieben werden soll."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -3738,6 +4053,7 @@ Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachiger 
         },
         TagAttribute {
             name: "module",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3746,6 +4062,7 @@ SPML-Seiten sind immer Teil einer Webapplikation. Jede Webapplikation besitzt ei
         },
         TagAttribute {
             name: "publisher",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -3755,6 +4072,7 @@ Wird in Verbindung mit information verwendet, um zu bestimmen, aus welchem Publi
         },
         TagAttribute {
             name: "template",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3763,6 +4081,7 @@ Template aus dem eine URL generiert werden soll. Alle Templates des IES liegen a
         },
         TagAttribute {
             name: "uri",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3771,6 +4090,7 @@ Dies kann ein beliebiger Pfad zu einer Seite sein. sp:url sorgt dafür, dass all
         },
         TagAttribute {
             name: "window",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -3803,6 +4123,7 @@ Prüft, ob eine Warnung aufgetreten ist, markiert sie gegebenenfalls als gefange
     children: TagChildren::Any,
     attributes: TagAttributes::These(&[TagAttribute {
         name: "code",
+        r#type: TagAttributeType::String,
         detail: None,
         documentation: Some(
             r#"
@@ -3824,6 +4145,7 @@ Findet die gewünschte Workliste"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "element",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -3832,6 +4154,7 @@ Elemente, für die alle Worklist-Items geladen werden sollen. Mit diesem Paramet
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -3840,6 +4163,7 @@ Der Name, über den auf die Collection zugegriffen werden kann."#,
         },
         TagAttribute {
             name: "role",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -3848,6 +4172,7 @@ Rolle, für die die Worklist-Items geladen werden sollen."#,
         },
         TagAttribute {
             name: "user",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -3882,6 +4207,7 @@ Zählt Zugriffe auf publizierte Informationen"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "language",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3892,6 +4218,7 @@ Gibt an in welcher Programmiersprache der Code generiert werden soll. Mögliche 
         },
         TagAttribute {
             name: "mode",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3903,6 +4230,7 @@ Der Zähler kann in verschiedenen Modi betrieben werden. Gültige Modi sind:
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -3911,6 +4239,7 @@ Name der Variable in der der Zugriffswert gespeichert wird."#,
         },
         TagAttribute {
             name: "varName",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -3920,6 +4249,7 @@ der Name der Variable, in die der aktuelle Counterwert ausgegeben wird [default=
         },
         TagAttribute {
             name: "varname",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -3947,6 +4277,7 @@ Datums- und Uhrzeiteingabe mit Prüfung auf Gültigkeit"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "disabled",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -3955,6 +4286,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "fixvalue",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3963,6 +4295,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -3971,6 +4304,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -3979,6 +4313,7 @@ Bestimmt den Namen des Feldes."#,
         },
         TagAttribute {
             name: "nowButton",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -3987,6 +4322,7 @@ Zeigt bei true eine Schaltfläche zum setzen des aktuellen Zeitpunkts an"#,
         },
         TagAttribute {
             name: "placeholder",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -3995,6 +4331,7 @@ Muss ein Datum sind und wird als Placeholder eingesetzt"#,
         },
         TagAttribute {
             name: "readonly",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -4003,6 +4340,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "size",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4011,6 +4349,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "type",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4021,6 +4360,7 @@ Der Typ des Eingabefeldes.
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4047,6 +4387,7 @@ Vergleicht zwei Zeichenketten und zeigt die Unterschiede an"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "from",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4055,6 +4396,7 @@ Text der verglichen werden soll. Wörter die hier enthalten und in `to` nicht me
         },
         TagAttribute {
             name: "style",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4063,6 +4405,7 @@ CSS Styleangaben, die noch in den umschließenden div-Tag eingetragen werden."#,
         },
         TagAttribute {
             name: "to",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4089,6 +4432,7 @@ Ersetzt E-Mail-Adressen durch Bilder"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "alt",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4097,6 +4441,7 @@ Alternativtext der in die `alt`-Attribute der `<img>`-Tags eingetragen wird."#,
         },
         TagAttribute {
             name: "bgcolor",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4105,6 +4450,7 @@ Hintergrundfarbe, die für den E-Mail-Text in dem generierten Bild verwendet wer
         },
         TagAttribute {
             name: "bgcolor2",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4113,6 +4459,7 @@ Hintergrundfarbe, die für den E-Mail-Text in dem generierten Bild für das Mail
         },
         TagAttribute {
             name: "color",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4121,6 +4468,7 @@ Schriftfarbe, die für den E-Mail-Text in dem generierten Bild verwendet werden 
         },
         TagAttribute {
             name: "color2",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4129,6 +4477,7 @@ Schriftfarbe, die für den E-Mail-Text in dem generierten Bild für das Mailform
         },
         TagAttribute {
             name: "font",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4138,6 +4487,7 @@ In der Standardinstallalation enthaltene Fonts sind: `Arial` `Lucida` `Verdana` 
         },
         TagAttribute {
             name: "font2",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4147,6 +4497,7 @@ In der Standardinstallalation enthaltene Fonts sind: `Arial` `Lucida` `Verdana` 
         },
         TagAttribute {
             name: "fontsize",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4155,6 +4506,7 @@ Schriftgröße, die für den E-Mail-Text in dem generierten Bild verwendet werde
         },
         TagAttribute {
             name: "fontsize2",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4163,6 +4515,7 @@ Schriftgröße, die für den E-Mail-Text in dem generierten Bild für das Mailfo
         },
         TagAttribute {
             name: "fontweight",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4172,6 +4525,7 @@ Mögliche Werte sind: `plain` `bold` `italic`"#,
         },
         TagAttribute {
             name: "fontweight2",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4181,6 +4535,7 @@ Mögliche Werte sind: `plain` `bold` `italic`"#,
         },
         TagAttribute {
             name: "form",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -4189,6 +4544,7 @@ Artikel, der das Kontaktformular bereitstellt."#,
         },
         TagAttribute {
             name: "linkcolor",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4197,6 +4553,7 @@ Schriftfarbe, die für den E-Mail-Text in dem generierten und verlinkten Bild ve
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -4205,6 +4562,7 @@ Variable, in der der ersetzte Text abgelegt wird."#,
         },
         TagAttribute {
             name: "object",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -4213,6 +4571,7 @@ Objekt das den zu ersetzenden Text enhält."#,
         },
         TagAttribute {
             name: "onclick",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4221,6 +4580,7 @@ JavaScript-Funktion die nach dem Klick auf eine E-Mail-Adresse ausgeführt werde
         },
         TagAttribute {
             name: "popupheight",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4229,6 +4589,7 @@ Höhe des Popup-Fensters für das Kontaktformular."#,
         },
         TagAttribute {
             name: "popupwidth",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4237,6 +4598,7 @@ Breite des Popup-Fensters für das Kontaktformular."#,
         },
         TagAttribute {
             name: "title",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4245,6 +4607,7 @@ Alternativtext der in die `title`-Attribute der `<img>`-Tags eingetragen wird."#
         },
         TagAttribute {
             name: "urlparam",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4274,6 +4637,7 @@ Verschlüsselt Email-Adressen so, dass sie auch für Responsive-Design-Anforderu
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "form",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -4282,6 +4646,7 @@ Artikel, der das Kontaktformular bereitstellt."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -4290,6 +4655,7 @@ Variable, in der der ersetzte Text abgelegt wird."#,
         },
         TagAttribute {
             name: "object",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -4298,6 +4664,7 @@ Objekt das den zu ersetzenden Text enhält."#,
         },
         TagAttribute {
             name: "popupheight",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4306,6 +4673,7 @@ Höhe des Popup-Fensters für das Kontaktformular."#,
         },
         TagAttribute {
             name: "popupwidth",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4314,6 +4682,7 @@ Breite des Popup-Fensters für das Kontaktformular."#,
         },
         TagAttribute {
             name: "urlparam",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4339,6 +4708,7 @@ Ersetzt Email-Adressen durch Bilder"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "alt",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4347,6 +4717,7 @@ Alternativtext der in die `alt`-Attribute der `<img>`-Tags eingetragen wird."#,
         },
         TagAttribute {
             name: "bgcolor",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4355,6 +4726,7 @@ Hintergrundfarbe, die für den E-Mail-Text in dem generierten Bild verwendet wer
         },
         TagAttribute {
             name: "color",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4363,6 +4735,7 @@ Schriftfarbe, die für den E-Mail-Text in dem generierten Bild verwendet werden 
         },
         TagAttribute {
             name: "font",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4372,6 +4745,7 @@ In der Standardinstallalation enthaltene Fonts sind: `Arial` `Lucida` `Verdana` 
         },
         TagAttribute {
             name: "fontsize",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4380,6 +4754,7 @@ Schriftgröße, die für den E-Mail-Text in dem generierten Bild verwendet werde
         },
         TagAttribute {
             name: "fontweight",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4389,6 +4764,7 @@ Mögliche Werte sind: `plain` `bold` `italic`"#,
         },
         TagAttribute {
             name: "form",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -4397,6 +4773,7 @@ Artikel, der das Kontaktformular bereitstellt."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -4405,6 +4782,7 @@ Variable, in der der ersetzte Text abgelegt wird."#,
         },
         TagAttribute {
             name: "object",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -4413,6 +4791,7 @@ Objekt das den zu ersetzenden Text enhält."#,
         },
         TagAttribute {
             name: "onclick",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4421,6 +4800,7 @@ JavaScript-Funktion die nach dem Klick auf eine E-Mail-Adresse ausgeführt werde
         },
         TagAttribute {
             name: "popupheight",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4429,6 +4809,7 @@ Höhe des Popup-Fensters für das Kontaktformular."#,
         },
         TagAttribute {
             name: "popupwidth",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4437,6 +4818,7 @@ Breite des Popup-Fensters für das Kontaktformular."#,
         },
         TagAttribute {
             name: "title",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4463,6 +4845,7 @@ Erzeugt eine eindeutige Url auf PDF-Dokumente des Form-Solutions Formular Server
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -4471,6 +4854,7 @@ Diese Attribut bestimmt die Mehrsprachigkeit der Variable."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -4493,6 +4877,7 @@ Durchsucht einen Text nach ID-Signaturen von Artikeln und ersetzt die IDs durch 
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "classname",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4501,6 +4886,7 @@ Setzt oder ergänzt das class-Attribut des `<a>`-Tags für die Links, bei denen 
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -4509,6 +4895,7 @@ Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -4517,6 +4904,7 @@ Name der Variablen, unter der die ersetzte Zeichenkette gespeichert werden soll.
         },
         TagAttribute {
             name: "objekt",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -4525,6 +4913,7 @@ Variablenname des Objektes, das die Zeichenkette enthält."#,
         },
         TagAttribute {
             name: "querystring",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4533,6 +4922,7 @@ Mit diesem Attribut kann für die eingesetzten URL noch ein Querystring (Paramet
         },
         TagAttribute {
             name: "url",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4561,6 +4951,7 @@ Erzeugt einen Link auf das CMS"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "action",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4569,6 +4960,7 @@ Gibt an ob das Objekt in der Bearbeitungsansicht (`edit`) oder in der Listen-Ans
         },
         TagAttribute {
             name: "information",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -4577,6 +4969,7 @@ Optionale Angabe eines Artikels, auf den der Link zeigen soll (z.B. für Listen)
         },
         TagAttribute {
             name: "step",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4585,6 +4978,7 @@ Bei Templates, die mit mehreren Steps aufgebaut sind ist hiermit der Sprung an e
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4607,6 +5001,7 @@ Erzeugt eine Bearbeitungsoberfläche für Bilder"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "delete",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -4615,6 +5010,7 @@ Aktiviert die Möglichkeit das Bild im Editor löschen zu können"#,
         },
         TagAttribute {
             name: "focalpoint",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -4623,6 +5019,7 @@ Aktiviert die Bearbeitung des Fokus-Punktes"#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -4631,6 +5028,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -4639,6 +5037,7 @@ Bestimmt den Namen des Feldes."#,
         },
         TagAttribute {
             name: "object",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -4647,6 +5046,7 @@ Referenz zu einem Bild. Wenn eine Referenz zu einem Bild übergeben wird, ist de
         },
         TagAttribute {
             name: "width",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4669,6 +5069,7 @@ Erzeugt einen <img src="...">-Tag für kleingerechnete, sowie aus Texten generie
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "alt",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4677,6 +5078,7 @@ Der Alternativtext für Bilder. Die Ausgabe erfolgt automatisch mit `encoding=as
         },
         TagAttribute {
             name: "background",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4685,6 +5087,7 @@ Die Farbe des Hintergrunds kann durch Hexadezimalwerte gesetzt werden (z.B. `e3a
         },
         TagAttribute {
             name: "color",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4694,6 +5097,7 @@ Die Farbe der Schrift. Beispielsweise `AA00DD` oder `ff77ff`"#,
         },
         TagAttribute {
             name: "excerpt",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4707,6 +5111,7 @@ Mit northwest, northeast, southwest oder southeast wird ein in der jeweiligen Hi
         },
         TagAttribute {
             name: "font",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4716,6 +5121,7 @@ Der Font (z.B. `Arial`)"#,
         },
         TagAttribute {
             name: "font-size",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4725,6 +5131,7 @@ Punkt-Größe des zu verwendenden Fonts (z.b.: `12`) "#,
         },
         TagAttribute {
             name: "font-weight",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4734,6 +5141,7 @@ Die Dicke (Wichtung) des angegebenen Fonts (z.b.: `bold`, `200` oder `900`)."#,
         },
         TagAttribute {
             name: "fontcolor",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4742,6 +5150,7 @@ Die Farbe der Schrift. Beispielsweise `AA00DD` oder `ff77ff`"#,
         },
         TagAttribute {
             name: "fontname",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4750,6 +5159,7 @@ Der Font (z.B. `Arial`)"#,
         },
         TagAttribute {
             name: "fontsize",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4758,6 +5168,7 @@ Punkt-Größe des zu verwendenden Fonts (z.b.: `12`) "#,
         },
         TagAttribute {
             name: "fontweight",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4766,6 +5177,7 @@ Die Dicke (Wichtung) des angegebenen Fonts (z.b.: `bold`, `200` oder `900`)."#,
         },
         TagAttribute {
             name: "format",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4774,6 +5186,7 @@ Die Formate `png` und `jpeg` können für Thumbnails verwendet werden"#,
         },
         TagAttribute {
             name: "gravity",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4782,6 +5195,7 @@ Mit den Werten `n`, `w`, `e`, `s`, `nw`, `ne`, `sw`, `se` oder `Center`, `North`
         },
         TagAttribute {
             name: "height",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4790,6 +5204,7 @@ Die gewünschte Bildhöhe z.B. `100`. Die Breite wird unter Beibehaltung des Sei
         },
         TagAttribute {
             name: "image",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -4798,6 +5213,7 @@ Bild-Object, das mit dem `spt:imp`-Tag verarbeitet werden soll."#,
         },
         TagAttribute {
             name: "manipulate",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4807,6 +5223,7 @@ Erzeugt verschiedene Effekte wie weichzeichnen oder schärfen über `sharp1`, `s
         },
         TagAttribute {
             name: "offset",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4815,6 +5232,7 @@ Der Anfangspunkt des auszugebenden Textes, die über die Option `gravity` angege
         },
         TagAttribute {
             name: "padding",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4826,6 +5244,7 @@ Um eine Abwärtskompatibilität zu gewährleisten, wird auch der Wert `"yes"` (e
         },
         TagAttribute {
             name: "paddingcolor",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4835,6 +5254,7 @@ Mit `paddingcolor` kann durch Hexadezimalwerte oder `X`-Window-Namen die Farbe d
         },
         TagAttribute {
             name: "scalesteps",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -4843,6 +5263,7 @@ Schalter um das Optimierungsverhalten im `In`-Modus auszuschalten."#,
         },
         TagAttribute {
             name: "text",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4851,6 +5272,7 @@ Der auszugebende Text in URL-encodeter Form."#,
         },
         TagAttribute {
             name: "text-transform",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4862,6 +5284,7 @@ Manipulation des Textes, bevor das Bild berechnet wird. Mögliche Werte sind
         },
         TagAttribute {
             name: "transform",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4873,6 +5296,7 @@ Manipulation des Textes, bevor das Bild berechnet wird. Mögliche Werte sind
         },
         TagAttribute {
             name: "urlonly",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -4882,6 +5306,7 @@ schreibt nur die URL ohne `<img>`-Tag heraus"#,
         },
         TagAttribute {
             name: "width",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4951,6 +5376,7 @@ Erzeugt Wiederholfelder"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "disabled",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -4959,6 +5385,7 @@ Liste von Elementen (beginnend mit `1` für das erste Listenelement: `1,2,4,5,8,
         },
         TagAttribute {
             name: "invert",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -4967,6 +5394,7 @@ Mit diesem Attribut (`true`, `false`) kann die Darstellung der Liste beeinflusst
         },
         TagAttribute {
             name: "item",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -4975,6 +5403,7 @@ Die in `name` angegebene Liste wird Element für Element durchlaufen. Mit dem, i
         },
         TagAttribute {
             name: "itemtext",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4983,6 +5412,7 @@ Mit diesem Attribut kann ein Text definiert werden, der an Stelle der Listennumm
         },
         TagAttribute {
             name: "layout",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -4991,6 +5421,7 @@ Dieses Attribut bestimmt die Darstellung der Liste. Wenn `plain`, werden die Lis
         },
         TagAttribute {
             name: "max",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -4999,6 +5430,7 @@ Die Anzahl der maximal zu iterierenden Elemente. Enthält die zu iterierende Lis
         },
         TagAttribute {
             name: "min",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -5007,6 +5439,7 @@ Die Anzahl der mindestens zu iterierenden Elemente. Enthält die zu iterierende 
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -5015,6 +5448,7 @@ Name der Variablen, unter der die Liste auch für die Ausgabe erreichbar ist. Di
         },
         TagAttribute {
             name: "readonly",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5040,6 +5474,7 @@ Erzeugt Links auf Informationen und bindet Bildmedien ein."#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "filter",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5048,6 +5483,7 @@ Die Filterdefinition für die Filtertypen Wildcard und regulärer Ausdruck. Der 
         },
         TagAttribute {
             name: "filterattribute",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5056,6 +5492,7 @@ Attribut, auf das der Filter angewendet werden soll."#,
         },
         TagAttribute {
             name: "filteric",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5064,6 +5501,7 @@ Ist Ignore-Case auf `true` gesetzt, wird eine Groß- und Kleinschreibung nicht b
         },
         TagAttribute {
             name: "filterinvert",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5072,6 +5510,7 @@ Invertiert die Logik des Filters. Alle Elemente die normalerweise herausgefilter
         },
         TagAttribute {
             name: "filtermode",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5091,14 +5530,16 @@ gefilterte Liste nur Elemente enthalten, die mit dem Buchstaben A, a, B, b, C, c
         },
         TagAttribute {
             name: "filterquery",
+            r#type: TagAttributeType::Query,
             detail: None,
             documentation: Some(
                 r#"
-mit diesem Parameter kann eine Suchabfrage definiert werden, welche die anzuzeigenden Elemente für jeden Pool filtert. Als Ergänzung zu den folgenden 5 Parametern, die mit sp:filter arbeiten, ist es so auch möglich, Artikel herauszufiltern, deren Informationen sich in Iteratoren befinden."#,
+mit diesem Parameter kann eine Suchabfrage definiert werden, welche die anzuzeigenden Elemente für jeden Pool filtert. Als Ergänzung zu den 5 Parametern, die mit sp:filter arbeiten (`filter`, `filterattribute`, `filteric`, `filterinvert` und `filtermode`), ist es so auch möglich, Artikel herauszufiltern, deren Informationen sich in Iteratoren befinden."#,
             ),
         },
         TagAttribute {
             name: "fixvalue",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5107,6 +5548,7 @@ mit diesem Parameter kann eine Suchabfrage definiert werden, welche die anzuzeig
         },
         TagAttribute {
             name: "height",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -5115,6 +5557,7 @@ Bei `type="image"` kann durch dieses Attribut der `'height'`-Wert des generierte
         },
         TagAttribute {
             name: "hidden",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5123,6 +5566,7 @@ Macht das Feld unsichtbar."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -5131,6 +5575,7 @@ Diese Attribut bestimmt die Mehrsprachigkeit der Variable."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -5139,6 +5584,7 @@ Name der Variable, unter der der Systemlink in die Datenbank geschrieben wird."#
         },
         TagAttribute {
             name: "pools",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5147,6 +5593,7 @@ Kommaseparierte Liste mit `Anchor`s von Artikelpools oder mit `ID`s von Artikelp
         },
         TagAttribute {
             name: "previewimage",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5155,6 +5602,7 @@ Kommaseparierte Liste mit `Anchor`s von Artikelpools oder mit `ID`s von Artikelp
         },
         TagAttribute {
             name: "showtree",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5163,6 +5611,7 @@ wenn `false`, werden nur die im Attribut pools übergebenen Einsprungpunkte in d
         },
         TagAttribute {
             name: "size",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -5171,6 +5620,7 @@ HTML-size Wert des von `spt:link` erzeugten Eingabefeldes."#,
         },
         TagAttribute {
             name: "type",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5185,6 +5635,7 @@ Typ der Verlinkung
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5193,6 +5644,7 @@ Vorgabefeld für das erzeugte Eingabefeld."#,
         },
         TagAttribute {
             name: "width",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -5229,6 +5681,7 @@ Zahleneingabe mit Prüfung auf Gültigkeit"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "align",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5237,6 +5690,7 @@ Ausrichtung des Inhalts für das erzeugte Eingabefeld."#,
         },
         TagAttribute {
             name: "disabled",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5245,6 +5699,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "fixvalue",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5253,6 +5708,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -5261,6 +5717,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -5269,6 +5726,7 @@ Bestimmt den Namen des Feldes."#,
         },
         TagAttribute {
             name: "readonly",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5277,6 +5735,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "size",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -5285,6 +5744,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5310,6 +5770,7 @@ Definiert personalisierte Bereiche"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "information",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -5318,6 +5779,7 @@ Artikel dessen Personalisierungs-Daten für das Apache-Personalisierungsmodul au
         },
         TagAttribute {
             name: "mode",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5328,6 +5790,7 @@ Unterstützte Werte derzeit: `php`"#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -5336,6 +5799,7 @@ Variablenname, unter dem die Rechte gespeichert werden."#,
         },
         TagAttribute {
             name: "publisher",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: None,
         },
@@ -5355,6 +5819,7 @@ HTML-Code nachbearbeiten."#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -5363,6 +5828,7 @@ Name der Variablen, unter der die ersetzte Zeichenkette gespeichert werden soll.
         },
         TagAttribute {
             name: "object",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -5388,6 +5854,7 @@ Integriert den WYSIWYG-SmartEditor ins CMS"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "cols",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -5396,6 +5863,7 @@ Breite des Eingabefeldes in Spalten."#,
         },
         TagAttribute {
             name: "hide",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5404,6 +5872,7 @@ Ist `hide="false"` gesetzt, so wird eine Textarea generiert, die den vom SmartEd
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -5412,6 +5881,7 @@ Bestimmt den Namen des Eingabefeldes."#,
         },
         TagAttribute {
             name: "options",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -5420,6 +5890,7 @@ Optionen, die beim Aufruf des Smarteditors an diesen übergeben werden."#,
         },
         TagAttribute {
             name: "rows",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -5428,6 +5899,7 @@ Höhe des Eingabefeldes in Zeilen."#,
         },
         TagAttribute {
             name: "textlabel",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5436,6 +5908,7 @@ Beschriftung des Smarteditorfeldes, oberhalb."#,
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5457,6 +5930,7 @@ schreibt den Header für SPML-Live Seiten"#,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[TagAttribute {
         name: "api",
+        r#type: TagAttributeType::String,
         detail: None,
         documentation: Some(
             r#"
@@ -5481,6 +5955,7 @@ Einzeiliges Textfeld, das Versionierung unterstützt"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "disabled",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5489,6 +5964,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "editablePlaceholder",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5497,6 +5973,7 @@ Mit dem Setzen von `false`, kann die Editierbarkeit von Placeholdern deaktiviert
         },
         TagAttribute {
             name: "fixvalue",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5505,6 +5982,7 @@ Mit dem Setzen von `false`, kann die Editierbarkeit von Placeholdern deaktiviert
         },
         TagAttribute {
             name: "format",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5513,6 +5991,7 @@ Wenn bei type beispielsweise `date` oder `number` angegeben wurde, kann format e
         },
         TagAttribute {
             name: "hyphenEditor",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5521,6 +6000,7 @@ Deaktiviert bei `false` den Hyphen-Editor"#,
         },
         TagAttribute {
             name: "inputType",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5529,6 +6009,7 @@ Setzt den [Typ](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input#
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -5537,6 +6018,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -5545,6 +6027,7 @@ Bestimmt den Namen des Feldes."#,
         },
         TagAttribute {
             name: "readonly",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5553,6 +6036,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "size",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -5561,6 +6045,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "type",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5569,6 +6054,7 @@ Der Typ des Eingabefeldes."#,
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5596,6 +6082,7 @@ Erzeugt ein mehrzeiliges Textfeld, das Versionierung unterstützt"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "disabled",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5604,6 +6091,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "editablePlaceholder",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5612,6 +6100,7 @@ Mit dem Setzen von `false`, kann die Editierbarkeit von Placeholdern deaktiviert
         },
         TagAttribute {
             name: "fixvalue",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5620,6 +6109,7 @@ Mit dem Setzen von `false`, kann die Editierbarkeit von Placeholdern deaktiviert
         },
         TagAttribute {
             name: "format",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5628,6 +6118,7 @@ Wenn bei type beispielsweise `date` oder `number` angegeben wurde, kann format e
         },
         TagAttribute {
             name: "hyphenEditor",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5636,6 +6127,7 @@ Deaktiviert bei `false` den Hyphen-Editor"#,
         },
         TagAttribute {
             name: "inputType",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5644,6 +6136,7 @@ Setzt den [Typ](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input#
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -5652,6 +6145,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -5660,6 +6154,7 @@ Bestimmt den Namen des Feldes."#,
         },
         TagAttribute {
             name: "readonly",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5668,6 +6163,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "size",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -5676,6 +6172,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "type",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5684,6 +6181,7 @@ Der Typ des Eingabefeldes."#,
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5708,6 +6206,7 @@ Zeitstempel in ein Eingabefeld schreiben"#,
     children: TagChildren::None,
     attributes: TagAttributes::These(&[TagAttribute {
         name: "connect",
+        r#type: TagAttributeType::Identifier,
         detail: None,
         documentation: Some(
             r#"
@@ -5729,6 +6228,7 @@ Integriert einen Editor"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "cols",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -5737,6 +6237,7 @@ Breite des Eingabefeldes in Spalten."#,
         },
         TagAttribute {
             name: "config",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -5745,6 +6246,7 @@ Mit diesem Attribut wird der Name einer Konfiguration angegeben. Die in dieser K
         },
         TagAttribute {
             name: "configextension",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -5753,6 +6255,7 @@ Mit diesem Attribut wird der Name einer Konfigurations-Ergänzung angegeben. Die
         },
         TagAttribute {
             name: "configvalues",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -5761,6 +6264,7 @@ Mit diesem Attribut wird der Name einer Konfigurations-Ergänzung angegeben. Die
         },
         TagAttribute {
             name: "disabled",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5769,6 +6273,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "fixvalue",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5777,6 +6282,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -5785,6 +6291,7 @@ Bestimmt den Namen des Feldes."#,
         },
         TagAttribute {
             name: "pools",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5793,6 +6300,7 @@ Kommaseparierte Liste von `Anchor` von Artikelpools oder von `ID`s von Artikelpo
         },
         TagAttribute {
             name: "readonly",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5801,6 +6309,7 @@ HTML-Attribut (`true`, `false`)."#,
         },
         TagAttribute {
             name: "rows",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -5809,6 +6318,7 @@ Höhe des Eingabefeldes in Zeilen."#,
         },
         TagAttribute {
             name: "theme",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5817,14 +6327,16 @@ Konfigurationstypen, die den Funktionsumfang für den Editor beschreiben. Mögli
         },
         TagAttribute {
             name: "toggle",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
-Mit diesem Attribut lässt sich angeben, wie der TinyMce eingeschaltet werden soll. `true` für einen Toggle Button, False für keinen Toggle-Button, auto für automatisches togglen"#,
+Mit diesem Attribut lässt sich angeben, wie der TinyMce eingeschaltet werden soll. `true` für einen Toggle Button, `false` für keinen Toggle-Button, `auto` für automatisches togglen"#,
             ),
         },
         TagAttribute {
             name: "type",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5833,6 +6345,7 @@ Der Typ des Eingabefeldes."#,
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5860,6 +6373,7 @@ Zahlenfeld, das per Klick auf- und abwärts gezählt werden kann"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "from",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -5868,6 +6382,7 @@ Startwert des Bereichs (Minimalwert)."#,
         },
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -5876,6 +6391,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -5884,6 +6400,7 @@ Bestimmt den Namen des Feldes."#,
         },
         TagAttribute {
             name: "to",
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"
@@ -5892,6 +6409,7 @@ Endwert des Bereichs (Maximalwert, es folgt `'unendlich'`)."#,
         },
         TagAttribute {
             name: "value",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5914,6 +6432,7 @@ Upload von Dateien"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "locale",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -5922,6 +6441,7 @@ Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen."#,
         },
         TagAttribute {
             name: "name",
+            r#type: TagAttributeType::Identifier,
             detail: None,
             documentation: Some(
                 r#"
@@ -5930,6 +6450,7 @@ Bestimmt den Namen des Feldes."#,
         },
         TagAttribute {
             name: "previewimage",
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -5952,6 +6473,7 @@ Workflow Management einbinden"#,
     attributes: TagAttributes::These(&[
         TagAttribute {
             name: "command",
+            r#type: TagAttributeType::String,
             detail: None,
             documentation: Some(
                 r#"
@@ -5962,6 +6484,7 @@ Aktion, die der Worklist-Dialog ausführen soll. Mögliche Aktionen sind:
         },
         TagAttribute {
             name: "informationID",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -5970,6 +6493,7 @@ Artikel, zu dem der Worklisteintrag gehören soll."#,
         },
         TagAttribute {
             name: "poolID",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"
@@ -5978,6 +6502,7 @@ Pool des Artikels, zu dem der Worklisteintrag gehören soll."#,
         },
         TagAttribute {
             name: "worklistID",
+            r#type: TagAttributeType::Object,
             detail: None,
             documentation: Some(
                 r#"

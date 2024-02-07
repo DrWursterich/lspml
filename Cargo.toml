@@ -17,3 +17,9 @@ structured-logger = "1.0.3"
 tree-sitter = "0.20.10"
 tree-sitter-html = "0.19.0"
 tree-sitter-spml = { path = "local/path/to/tree-sitter-spml" }
+tree-sitter-spel = { path = "./tree-sitter-spel/" }
+
+[workspace]
+members = [
+    "tree-sitter-spel",
+]

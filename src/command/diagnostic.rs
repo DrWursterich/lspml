@@ -6,7 +6,7 @@ use crate::parser;
 use anyhow::Result;
 use lsp_types::{Diagnostic, DiagnosticSeverity, DocumentDiagnosticParams, Position, Range, Url};
 use std::{collections::HashMap, path::Path, str::FromStr};
-use tree_sitter::Node;
+use tree_sitter::{Node, Parser};
 
 pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnostic>, LsError> {
     let document = match document_store::get(&params.text_document.uri) {
@@ -103,6 +103,61 @@ fn validate_tag(
             "html_tag" | "html_option_tag" => validate_children(child, text, diagnositcs, file)?,
             kind if kind.ends_with("_attribute") => {
                 let attribute = parser::attribute_name_of(child, text).to_string();
+                let value = parser::attribute_value_of(child, text).to_string();
+                if let grammar::TagAttributes::These(definitions) = tag.attributes {
+                    if let Some(definition) = definitions
+                        .iter()
+                        .find(|definition| definition.name == attribute)
+                    {
+                        match definition.r#type {
+                            grammar::TagAttributeType::Condition => {}
+                            grammar::TagAttributeType::Expression => {}
+                            grammar::TagAttributeType::Identifier => {}
+                            grammar::TagAttributeType::Object => {
+                                let mut parser = Parser::new();
+                                parser.set_language(tree_sitter_spel::language())?;
+                                let range = child
+                                            .child(2)
+                                            .expect(
+                                                format!(
+                                                    "attribute {:?} did not have a attribute-value child",
+                                                    attribute
+                                                )
+                                                .as_str(),
+                                            )
+                                            .child(1)
+                                            .expect(
+                                                format!(
+                                                    "attribute {:?} did not have a child in its attribute-value",
+                                                    attribute
+                                                )
+                                                .as_str(),
+                                            )
+                                            .range();
+                                parser.set_included_ranges(&[range])?;
+                                parser.print_dot_graphs(
+                                    &std::fs::File::create(
+                                        "/home/schaeper/git/lspml/tree-sitter-spel/spel-graph.html",
+                                    )
+                                    .expect("failed to create debugging dot file"),
+                                );
+                                let tree = parser.parse(&text, None).expect(
+                                    format!("failed to parse spel object in {:?}", child).as_str(),
+                                );
+                                log::debug!(
+                                    "parsed spel object in {:?} ({}) to {:?} ({})",
+                                    child,
+                                    value,
+                                    tree,
+                                    tree.root_node().utf8_text(&text.as_bytes())?
+                                );
+                            }
+                            grammar::TagAttributeType::Regex => {}
+                            grammar::TagAttributeType::String => {}
+                            grammar::TagAttributeType::Query => {}
+                        }
+                    };
+                }
                 if attributes.contains_key(&attribute) {
                     diagnositcs.push(Diagnostic {
                         message: format!("duplicate {} attribute", attribute),
@@ -112,10 +167,7 @@ fn validate_tag(
                         ..Default::default()
                     });
                 } else {
-                    attributes.insert(
-                        attribute,
-                        parser::attribute_value_of(child, text).to_string(),
-                    );
+                    attributes.insert(attribute, value);
                 }
             }
             kind if kind.ends_with("_tag") => match &grammar::Tag::from_str(kind) {
