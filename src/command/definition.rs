@@ -37,10 +37,11 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
         })?;
     return match node.kind() {
         // check if string is evaluated ?
-        "string" => match node.parent().map(|p| p.kind()) {
+        "string_content" => match node.parent().and_then(|p| p.parent()).map(|p| p.kind()) {
             Some("uri_attribute")
                 if node
                     .parent()
+                    .and_then(|parent| parent.parent())
                     .and_then(|parent| parent.parent())
                     .is_some_and(|tag| tag.kind() == "include_tag") =>
             {
@@ -51,6 +52,7 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                     })
                     .map(|path| {
                         node.parent()
+                            .and_then(|p| p.parent())
                             .and_then(|p| p.parent())
                             .and_then(|p| {
                                 p.children(&mut document.tree.walk())
@@ -64,7 +66,7 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                                     |module| modules::find_module_for_file(module.as_path()),
                                 )
                             })
-                            .map(|module| module.path + &path[1..path.len() - 1])
+                            .map(|module| module.path + &path)
                             .filter(|file| Path::new(&file).exists())
                             .and_then(|file| Url::parse(format!("file://{}", &file).as_str()).ok())
                             .map(|uri| Location {
