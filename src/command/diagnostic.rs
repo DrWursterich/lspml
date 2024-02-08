@@ -40,7 +40,7 @@ fn validate_document(
     for node in root.children(&mut root.walk()) {
         match node.kind() {
             "page_header" | "import_header" | "taglib_header" | "html_doctype" | "text"
-            | "comment" => continue,
+            | "comment" | "xml_entity" => continue,
             "ERROR" => diagnositcs.push(Diagnostic {
                 source: Some("lspml".to_string()),
                 message: format!("unexpected \"{}\"", node.utf8_text(text.as_bytes())?),
