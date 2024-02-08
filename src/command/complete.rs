@@ -83,43 +83,6 @@ fn search_completions_in_document(
         match node.kind() {
             // ignore for now
             "page_header" | "import_header" | "taglib_header" | "text" | "comment" => return Ok(()),
-            _ if node.is_error()
-                && node
-                    .utf8_text(&text.as_bytes())
-                    .is_ok_and(|text| text.starts_with("</")) =>
-            {
-                log::trace!("found </ error in document (node: {:?})", root);
-                let mut current = node;
-                loop {
-                    match current.prev_sibling().or_else(|| current.parent()) {
-                        Some(next) => current = next,
-                        None => return Ok(()),
-                    };
-                    let tag;
-                    match current.kind() {
-                        "html_tag_open" => tag = Some(current),
-                        "html_option_tag" => tag = current.child(0),
-                        _ => continue,
-                    }
-                    match tag
-                        .and_then(|tag| tag.utf8_text(text.as_bytes()).ok())
-                        .map(|tag| tag[1..].to_string() + ">")
-                    {
-                        Some(tag) => completions.push(CompletionItem {
-                            label: "</".to_string() + &tag,
-                            kind: Some(CompletionItemKind::SNIPPET),
-                            detail: None,
-                            documentation: None,
-                            insert_text: Some(tag),
-                            insert_text_mode: Some(InsertTextMode::AS_IS),
-                            ..Default::default()
-                        }),
-                        None => {}
-                    };
-                    break;
-                }
-                return Ok(());
-            }
             _ if node.is_error() => match node.child(0) {
                 Some(child) if child.kind().ends_with("_tag_open") => {
                     let kind = child.kind();
@@ -143,11 +106,43 @@ fn search_completions_in_document(
                         )
                     });
                 }
-                _ => log::trace!(
-                    "cursor {} is in erronous {:?} without tag children",
-                    cursor,
-                    node
-                ),
+                _ if node
+                    .utf8_text(&text.as_bytes())
+                    .map(|text| cut_text_up_to_cursor(node, text, *cursor))
+                    .is_ok_and(|text| text.ends_with("</")) =>
+                {
+                    let mut current = node;
+                    loop {
+                        match current.prev_sibling().or_else(|| current.parent()) {
+                            Some(next) => current = next,
+                            None => return Ok(()),
+                        };
+                        let tag;
+                        match current.kind() {
+                            "html_tag_open" => tag = Some(current),
+                            "html_option_tag" => tag = current.child(0),
+                            _ => continue,
+                        }
+                        match tag
+                            .and_then(|tag| tag.utf8_text(text.as_bytes()).ok())
+                            .map(|tag| tag[1..].to_string() + ">")
+                        {
+                            Some(tag) => completions.push(CompletionItem {
+                                label: "</".to_string() + &tag,
+                                kind: Some(CompletionItemKind::SNIPPET),
+                                detail: None,
+                                documentation: None,
+                                insert_text: Some(tag),
+                                insert_text_mode: Some(InsertTextMode::AS_IS),
+                                ..Default::default()
+                            }),
+                            None => {}
+                        };
+                        break;
+                    }
+                    return Ok(());
+                }
+                _ => {}
             },
             // is there a way to "include" other lsps?
             "java_tag" | "script_tag" | "style_tag" | "html_void_tag" => {
@@ -234,52 +229,6 @@ fn search_completions_in_tag(
             completion_type = CompletionType::Tags;
         }
         match child.kind() {
-            _ if child.is_error()
-                && child
-                    .utf8_text(&text.as_bytes())
-                    .is_ok_and(|text| text.starts_with("</")) =>
-            {
-                log::trace!("found </ error in {} (node: {:?})", tag.name, node);
-                let mut current = child;
-                loop {
-                    match current.prev_sibling().or_else(|| current.parent()) {
-                        Some(next) => current = next,
-                        None => return Ok(()),
-                    };
-                    let tag;
-                    match current.kind() {
-                        "html_tag_open" => {
-                            tag = current.utf8_text(text.as_bytes()).ok().map(|tag| &tag[1..])
-                        }
-                        "html_option_tag" => {
-                            tag = current
-                                .child(0)
-                                .and_then(|tag| tag.utf8_text(text.as_bytes()).ok())
-                                .map(|tag| &tag[1..])
-                        }
-                        kind if kind.ends_with("_tag_open") => {
-                            tag = grammar::Tag::from_str(&kind[..kind.len() - "_open".len()])
-                                .ok()
-                                .map(|tag| tag.properties().name)
-                        }
-                        _ => continue,
-                    }
-                    match tag.map(|tag| tag.to_string() + ">") {
-                        Some(tag) => completions.push(CompletionItem {
-                            label: "</".to_string() + &tag,
-                            kind: Some(CompletionItemKind::SNIPPET),
-                            detail: None,
-                            documentation: None,
-                            insert_text: Some(tag),
-                            insert_text_mode: Some(InsertTextMode::AS_IS),
-                            ..Default::default()
-                        }),
-                        None => {}
-                    };
-                    break;
-                }
-                return Ok(());
-            }
             _ if child.is_error() => match child.child(0) {
                 Some(child) if child.kind().ends_with("_tag_open") => {
                     let kind = child.kind();
@@ -303,15 +252,52 @@ fn search_completions_in_tag(
                         )
                     });
                 }
-                _ => {
-                    log::trace!(
-                        "cursor {} is in erronous {:?} tag without children. content: {}",
-                        cursor,
-                        child,
-                        child.utf8_text(&text.as_bytes()).unwrap(),
-                    );
-                    break;
+                _ if child
+                    .utf8_text(&text.as_bytes())
+                    .map(|text| cut_text_up_to_cursor(child, text, *cursor))
+                    .is_ok_and(|text| text.ends_with("</")) =>
+                {
+                    let mut current = child;
+                    loop {
+                        match current.prev_sibling().or_else(|| current.parent()) {
+                            Some(next) => current = next,
+                            None => return Ok(()),
+                        };
+                        let tag;
+                        match current.kind() {
+                            "html_tag_open" => {
+                                tag = current.utf8_text(text.as_bytes()).ok().map(|tag| &tag[1..])
+                            }
+                            "html_option_tag" => {
+                                tag = current
+                                    .child(0)
+                                    .and_then(|tag| tag.utf8_text(text.as_bytes()).ok())
+                                    .map(|tag| &tag[1..])
+                            }
+                            kind if kind.ends_with("_tag_open") => {
+                                tag = grammar::Tag::from_str(&kind[..kind.len() - "_open".len()])
+                                    .ok()
+                                    .map(|tag| tag.properties().name)
+                            }
+                            _ => continue,
+                        }
+                        match tag.map(|tag| tag.to_string() + ">") {
+                            Some(tag) => completions.push(CompletionItem {
+                                label: "</".to_string() + &tag,
+                                kind: Some(CompletionItemKind::SNIPPET),
+                                detail: None,
+                                documentation: None,
+                                insert_text: Some(tag),
+                                insert_text_mode: Some(InsertTextMode::AS_IS),
+                                ..Default::default()
+                            }),
+                            None => {}
+                        };
+                        break;
+                    }
+                    return Ok(());
                 }
+                _ => {}
             },
             ">" => {
                 if child.is_missing() {
@@ -392,6 +378,22 @@ fn search_completions_in_tag(
             return complete_children_of(tag, completions);
         }
     };
+}
+
+fn cut_text_up_to_cursor<'a>(node: Node, text: &'a str, cursor: Point) -> &'a str {
+    let expected_new_lines = cursor.row - node.start_position().row;
+    if expected_new_lines == 0 {
+        return &text[0..cursor.column - node.start_position().column];
+    }
+    let mut position = 0;
+    for (index, line) in text.splitn(expected_new_lines + 1, '\n').enumerate() {
+        match index {
+            0 => position = line.len(),
+            n if n == expected_new_lines => return &text[0..position + 1 + cursor.column],
+            _ => position += 1 + line.len(),
+        }
+    }
+    return text;
 }
 
 fn complete_values_of_attribute(
