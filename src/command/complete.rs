@@ -103,18 +103,19 @@ fn search_completions_in_document(
                     }
                     match tag
                         .and_then(|tag| tag.utf8_text(text.as_bytes()).ok())
-                        .map(|tag| tag[1..].to_string() + ">") {
-                            Some(tag) => completions.push(CompletionItem {
-                                label: "</".to_string() + &tag,
-                                kind: Some(CompletionItemKind::SNIPPET),
-                                detail: None,
-                                documentation: None,
-                                insert_text: Some(tag),
-                                insert_text_mode: Some(InsertTextMode::AS_IS),
-                                ..Default::default()
-                            }),
-                            None => {},
-                        };
+                        .map(|tag| tag[1..].to_string() + ">")
+                    {
+                        Some(tag) => completions.push(CompletionItem {
+                            label: "</".to_string() + &tag,
+                            kind: Some(CompletionItemKind::SNIPPET),
+                            detail: None,
+                            documentation: None,
+                            insert_text: Some(tag),
+                            insert_text_mode: Some(InsertTextMode::AS_IS),
+                            ..Default::default()
+                        }),
+                        None => {}
+                    };
                     break;
                 }
                 return Ok(());

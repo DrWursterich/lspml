@@ -9,27 +9,22 @@ use std::{collections::HashMap, path::Path, str::FromStr};
 use tree_sitter::{Node, Parser};
 
 pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnostic>, LsError> {
-    let document = match document_store::get(&params.text_document.uri) {
+    let uri = params.text_document.uri;
+    let document = match document_store::get(&uri) {
         Some(document) => Ok(document),
-        None => document_store::Document::new(&params.text_document.uri)
-            .map(|document| document_store::put(&params.text_document.uri, document))
+        None => document_store::Document::new(&uri)
+            .map(|document| document_store::put(&uri, document))
             .map_err(|err| {
-                log::error!("failed to read {}: {}", params.text_document.uri, err);
+                log::error!("failed to read {}: {}", uri, err);
                 return LsError {
-                    message: format!("cannot read file {}", params.text_document.uri),
+                    message: format!("cannot read file {}", uri),
                     code: ResponseErrorCode::RequestFailed,
                 };
             }),
     }?;
     let mut diagnositcs: Vec<Diagnostic> = Vec::new();
     let root = document.tree.root_node();
-    validate_document(
-        root,
-        &document.text,
-        &mut diagnositcs,
-        &params.text_document.uri,
-    )
-    .map_err(|err| LsError {
+    validate_document(root, &document.text, &mut diagnositcs, &uri).map_err(|err| LsError {
         message: format!("failed to validate document: {}", err),
         code: ResponseErrorCode::RequestFailed,
     })?;

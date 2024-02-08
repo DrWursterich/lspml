@@ -1,11 +1,16 @@
 use anyhow::{Error, Result};
 use lsp_server::{Message, Request, RequestId, Response, ResponseError};
-use lsp_types::{CompletionResponse, FullDocumentDiagnosticReport, GotoDefinitionResponse};
+use lsp_types::{
+    CompletionResponse, FullDocumentDiagnosticReport, GotoDefinitionResponse, SemanticTokens,
+    SemanticTokensResult,
+};
 use std::fmt;
 mod complete;
 mod definition;
 mod diagnostic;
+mod highlight;
 mod hover;
+mod semantics;
 
 #[derive(Debug)]
 struct LsError {
@@ -109,6 +114,22 @@ pub(crate) fn diagnostic(request: Request) -> Result<Message> {
         .map_err(|err| Error::from(err));
 }
 
+pub(crate) fn highlight(request: Request) -> Result<Message> {
+    log::trace!("got highlight request: {request:?}");
+    return serde_json::from_value(request.params)
+        .map(|params| {
+            Message::Response(match highlight::highlight(params) {
+                Ok(highlights) => Response {
+                    id: request.id,
+                    result: serde_json::to_value(highlights).ok(),
+                    error: None,
+                },
+                Err(err) => err.to_response(request.id),
+            })
+        })
+        .map_err(|err| Error::from(err));
+}
+
 pub(crate) fn hover(request: Request) -> Result<Message> {
     log::trace!("got hover request: {request:?}");
     return serde_json::from_value(request.params)
@@ -117,6 +138,26 @@ pub(crate) fn hover(request: Request) -> Result<Message> {
                 Ok(hover) => Response {
                     id: request.id,
                     result: hover.and_then(|hover| serde_json::to_value(hover).ok()),
+                    error: None,
+                },
+                Err(err) => err.to_response(request.id),
+            })
+        })
+        .map_err(|err| Error::from(err));
+}
+
+pub(crate) fn semantics(request: Request) -> Result<Message> {
+    log::trace!("got semantics request: {request:?}");
+    return serde_json::from_value(request.params)
+        .map(|params| {
+            Message::Response(match semantics::semantics(params) {
+                Ok(tokens) => Response {
+                    id: request.id,
+                    result: serde_json::to_value(SemanticTokensResult::Tokens(SemanticTokens {
+                        result_id: None,
+                        data: tokens,
+                    }))
+                    .ok(),
                     error: None,
                 },
                 Err(err) => err.to_response(request.id),

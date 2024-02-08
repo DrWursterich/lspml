@@ -3,9 +3,11 @@ use clap::Parser;
 use lsp_server::{Connection, Message};
 use lsp_types::{
     CancelParams, CompletionOptions, CompletionOptionsCompletionItem, DiagnosticOptions,
-    DiagnosticServerCapabilities, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, HoverOptions, HoverProviderCapability, InitializeParams, OneOf,
-    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions,
+    DiagnosticServerCapabilities, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, HoverOptions, HoverProviderCapability,
+    InitializeParams, OneOf, SemanticTokensFullOptions, SemanticTokensOptions,
+    SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability,
+    TextDocumentSyncKind, WorkDoneProgressOptions, SemanticTokensLegend, SemanticTokenType, SemanticTokenModifier,
 };
 use std::{error::Error, fs::File, str::FromStr};
 use structured_logger::Builder;
@@ -25,6 +27,25 @@ struct CommandLineOpts {
     #[clap(long)]
     modules_file: Option<String>,
 }
+
+pub(crate) const TOKEN_TYPES: &'static [SemanticTokenType] = &[
+    SemanticTokenType::ENUM,
+    SemanticTokenType::FUNCTION,
+    SemanticTokenType::METHOD,
+    SemanticTokenType::NUMBER,
+    SemanticTokenType::OPERATOR,
+    SemanticTokenType::PROPERTY,
+    SemanticTokenType::STRING,
+    SemanticTokenType::VARIABLE,
+];
+
+pub(crate) const TOKEN_MODIFIERS: &'static [SemanticTokenModifier] = &[
+    SemanticTokenModifier::DECLARATION,
+    SemanticTokenModifier::DEFINITION,
+    SemanticTokenModifier::DEPRECATED,
+    SemanticTokenModifier::DOCUMENTATION,
+    SemanticTokenModifier::MODIFICATION,
+];
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let opts = CommandLineOpts::parse();
@@ -50,6 +71,17 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
         definition_provider: Some(OneOf::Left(true)),
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
+        document_highlight_provider: Some(OneOf::Left(true)),
+        semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
+            SemanticTokensOptions {
+                full: Some(SemanticTokensFullOptions::Bool(true)),
+                legend: SemanticTokensLegend {
+                    token_types: TOKEN_TYPES.to_vec(),
+                    token_modifiers: TOKEN_MODIFIERS.to_vec(),
+                },
+                ..Default::default()
+            },
+        )),
         diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
             inter_file_dependencies: true,
             ..DiagnosticOptions::default()
@@ -100,6 +132,8 @@ fn main_loop(
                     "textDocument/completion" => command::complete(request),
                     "textDocument/definition" => command::definition(request),
                     "textDocument/diagnostic" => command::diagnostic(request),
+                    "textDocument/documentHighlight" => command::highlight(request), // stub
+                    "textDocument/semanticTokens/full" => command::semantics(request), // stub
                     "textDocument/hover" => command::hover(request),
                     _ => command::unknown(request),
                 }
@@ -123,6 +157,9 @@ fn main_loop(
                 "textDocument/didSave" => {
                     saved(serde_json::from_value(notification.params)?)?;
                 }
+                "textDocument/didClose" => {
+                    closed(serde_json::from_value(notification.params)?)?;
+                }
                 "$/cancelRequest" => {
                     let params: CancelParams = serde_json::from_value(notification.params).unwrap();
                     log::debug!("attempted to cancel request {:?}", params.id);
@@ -138,10 +175,7 @@ fn main_loop(
 fn changed(params: DidChangeTextDocumentParams) -> Result<()> {
     if let Some(change) = &params.content_changes.last() {
         return document_store::Document::from_str(&change.text).map(|document| {
-            log::debug!(
-                "updated {}",
-                params.text_document.uri
-            );
+            log::debug!("updated {}", params.text_document.uri);
             document_store::put(&params.text_document.uri, document);
             return ();
         });
@@ -154,10 +188,7 @@ fn opened(params: DidOpenTextDocumentParams) -> Result<()> {
         Some(_) => Result::Ok(()),
         None => document_store::Document::from_str(&params.text_document.text).map(|document| {
             document_store::put(&params.text_document.uri, document);
-            log::debug!(
-                "opened {}",
-                params.text_document.uri
-            );
+            log::debug!("opened {}", params.text_document.uri);
             return ();
         }),
     };
@@ -166,10 +197,12 @@ fn opened(params: DidOpenTextDocumentParams) -> Result<()> {
 fn saved(params: DidSaveTextDocumentParams) -> Result<()> {
     return document_store::Document::new(&params.text_document.uri).map(|document| {
         document_store::put(&params.text_document.uri, document);
-        log::debug!(
-            "saved {}",
-            params.text_document.uri
-        );
+        log::debug!("saved {}", params.text_document.uri);
         return ();
     });
+}
+
+fn closed(_: DidCloseTextDocumentParams) -> Result<()> {
+    // could free the document... ?
+    return Ok(());
 }
