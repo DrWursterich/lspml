@@ -381,10 +381,10 @@ fn search_completions_in_tag(
 }
 
 fn cut_text_up_to_cursor<'a>(node: Node, text: &'a str, cursor: Point) -> &'a str {
-    let expected_new_lines = cursor.row - node.start_position().row;
-    if expected_new_lines == 0 {
+    if cursor.row <= node.start_position().row {
         return &text[0..cursor.column - node.start_position().column];
     }
+    let expected_new_lines = cursor.row - node.start_position().row;
     let mut position = 0;
     for (index, line) in text.splitn(expected_new_lines + 1, '\n').enumerate() {
         match index {
