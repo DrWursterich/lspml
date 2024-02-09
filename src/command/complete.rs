@@ -109,7 +109,7 @@ fn search_completions_in_document(
                 _ if node
                     .utf8_text(&text.as_bytes())
                     .map(|text| cut_text_up_to_cursor(node, text, *cursor))
-                    .is_ok_and(|text| text.ends_with("</")) =>
+                    .is_ok_and(|text| text == "/" || text.ends_with("</")) =>
                 {
                     let mut current = node;
                     loop {
@@ -255,7 +255,7 @@ fn search_completions_in_tag(
                 _ if child
                     .utf8_text(&text.as_bytes())
                     .map(|text| cut_text_up_to_cursor(child, text, *cursor))
-                    .is_ok_and(|text| text.ends_with("</")) =>
+                    .is_ok_and(|text| text == "/" || text.ends_with("</")) =>
                 {
                     let mut current = child;
                     loop {
