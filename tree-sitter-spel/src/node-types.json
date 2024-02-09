@@ -16,30 +16,6 @@
           "named": true
         },
         {
-          "type": "bracketed_condition",
-          "named": true
-        },
-        {
-          "type": "bracketed_expression",
-          "named": true
-        },
-        {
-          "type": "condition",
-          "named": true
-        },
-        {
-          "type": "equality_comparison",
-          "named": true
-        },
-        {
-          "type": "expression",
-          "named": true
-        },
-        {
-          "type": "expression_comparison",
-          "named": true
-        },
-        {
           "type": "field_access",
           "named": true
         },
@@ -49,10 +25,6 @@
         },
         {
           "type": "interpolated_anchor",
-          "named": true
-        },
-        {
-          "type": "interpolated_string",
           "named": true
         },
         {
@@ -69,18 +41,6 @@
         },
         {
           "type": "string",
-          "named": true
-        },
-        {
-          "type": "ternary_expression",
-          "named": true
-        },
-        {
-          "type": "unary_condition",
-          "named": true
-        },
-        {
-          "type": "unary_expression",
           "named": true
         }
       ]
@@ -120,6 +80,10 @@
         },
         {
           "type": "interpolated_anchor",
+          "named": true
+        },
+        {
+          "type": "interpolated_string",
           "named": true
         },
         {
@@ -203,6 +167,10 @@
         },
         {
           "type": "expression",
+          "named": true
+        },
+        {
+          "type": "interpolated_string",
           "named": true
         },
         {
@@ -328,31 +296,7 @@
           "named": true
         },
         {
-          "type": "bracketed_condition",
-          "named": true
-        },
-        {
-          "type": "bracketed_expression",
-          "named": true
-        },
-        {
-          "type": "condition",
-          "named": true
-        },
-        {
-          "type": "equality_comparison",
-          "named": true
-        },
-        {
           "type": "equality_comparison_operator",
-          "named": true
-        },
-        {
-          "type": "expression",
-          "named": true
-        },
-        {
-          "type": "expression_comparison",
           "named": true
         },
         {
@@ -385,18 +329,6 @@
         },
         {
           "type": "string",
-          "named": true
-        },
-        {
-          "type": "ternary_expression",
-          "named": true
-        },
-        {
-          "type": "unary_condition",
-          "named": true
-        },
-        {
-          "type": "unary_expression",
           "named": true
         }
       ]
@@ -433,6 +365,10 @@
           "named": true
         },
         {
+          "type": "interpolated_string",
+          "named": true
+        },
+        {
           "type": "number",
           "named": true
         },
@@ -465,6 +401,10 @@
         },
         {
           "type": "expression_comparison_operator",
+          "named": true
+        },
+        {
+          "type": "interpolated_string",
           "named": true
         },
         {
@@ -559,15 +499,24 @@
     }
   },
   {
+    "type": "function_name",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "global_function",
     "named": true,
     "fields": {},
     "children": {
       "multiple": true,
-      "required": false,
+      "required": true,
       "types": [
         {
           "type": "argument",
+          "named": true
+        },
+        {
+          "type": "function_name",
           "named": true
         }
       ]
@@ -681,10 +630,14 @@
     "fields": {},
     "children": {
       "multiple": true,
-      "required": false,
+      "required": true,
       "types": [
         {
           "type": "argument",
+          "named": true
+        },
+        {
+          "type": "function_name",
           "named": true
         }
       ]
@@ -811,6 +764,10 @@
           "named": true
         },
         {
+          "type": "interpolated_string",
+          "named": true
+        },
+        {
           "type": "number",
           "named": true
         },
@@ -878,6 +835,10 @@
         },
         {
           "type": "expression",
+          "named": true
+        },
+        {
+          "type": "interpolated_string",
           "named": true
         },
         {

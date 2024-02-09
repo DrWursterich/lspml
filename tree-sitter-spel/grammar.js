@@ -42,31 +42,32 @@ module.exports = grammar({
 		document: $ => $._object_item,
 
 		_object_item: $ => choice(
-			prec(3, $.method_access),
-			prec(2, $.field_access),
-			prec(2, $.array_offset),
-			prec(2, $.global_function),
-			prec(1, $.object),
+			prec(2, $.method_access),
+			prec(1, $.field_access),
+			prec(1, $.array_offset),
+			prec(1, $.global_function),
 			prec(1, $.interpolated_anchor),
 			prec(1, $.number),
 			prec(1, $.boolean),
-			$.string,
+			prec(1, $.string),
+			$.object,
 		),
 
-		_expression_item: $ => choice(
+		_expression_item: $ => prec.left(choice(
+			$.interpolated_string,
 			$.bracketed_expression,
 			$.number,
 			$.expression,
 			$.unary_expression,
 			$.ternary_expression,
-		),
+		)),
 		_condition_item: $ => choice(
-			$.bracketed_condition,
-			$.boolean,
 			$.condition,
+			$.bracketed_condition,
 			$.unary_condition,
 			$.expression_comparison,
 			$.equality_comparison,
+			prec(-1, $.boolean),
 		),
 		bracketed_expression: $ => seq(
 			'(',
@@ -112,8 +113,8 @@ module.exports = grammar({
 		),
 		global_function: $ => $._function,
 		field: $ => choice(
+			prec(1, $.interpolated_string),
 			$._word,
-			$.interpolated_string,
 		),
 		method: $ => $._function,
 		field_access: $ => seq(
@@ -133,7 +134,7 @@ module.exports = grammar({
 			']',
 		),
 		_function: $ => seq(
-			$._word,
+			$.function_name,
 			'(',
 			optional(
 				seq(
@@ -148,12 +149,8 @@ module.exports = grammar({
 			),
 			')',
 		),
-		argument: $ => choice(
-			prec(3, $._expression_item),
-			prec(2, $._condition_item),
-			prec(1, $._object_item),
-			$.interpolated_string,
-		),
+		function_name: $ => $._word,
+		argument: $ => $._object_item,
 		expression: $ => prec.left(
 			prec(
 				2,
@@ -229,15 +226,11 @@ module.exports = grammar({
 				choice(
 					prec(2, $.interpolated_string),
 					prec(1, $._object_item),
-					prec(1, $._condition_item),
-					prec(1, $._expression_item),
 				),
 				$.equality_comparison_operator,
 				choice(
 					prec(2, $.interpolated_string),
 					prec(1, $._object_item),
-					prec(1, $._condition_item),
-					prec(1, $._expression_item),
 				),
 			),
 		),
@@ -245,16 +238,6 @@ module.exports = grammar({
 			prec(PREC.EQUALITY, '=='),
 			prec(PREC.EQUALITY, '!='),
 		),
-
-		_string_item: $ => repeat1(
-			choice(
-				$._string_content,
-				$.escaped_string,
-				$.interpolated_string,
-				$.interpolated_anchor,
-			),
-		),
-		_string_content: $ => prec(-1, /[^"$!]+/),
 
 		interpolated_string: $ => seq(
 			'${',
@@ -269,7 +252,7 @@ module.exports = grammar({
 
 		interpolated_anchor: $ => seq(
 			'!{',
-			repeat(
+			repeat1(
 				choice(
 					/[^"$\}]+/,
 					$.interpolated_string,

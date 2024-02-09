@@ -18,7 +18,7 @@ A proof-of-concept language server for the sitepark markup language (spml).
     - attribute values that either:
         - have a fixed set of possible values
         - point to another spml file
-
+- semantic highlighting for attribute values that expect objects
 ## commandline
 
 ```
