@@ -6516,7 +6516,7 @@ Worklisteintrag der geändert werden soll."#,
     ],
 };
 
-pub(crate) const TOP_LEVEL_TAGS: [Tag; 79] = [
+pub(crate) const TOP_LEVEL_TAGS: [Tag; 78] = [
     Tag::SpAttribute,
     Tag::SpBarcode,
     Tag::SpBreak,
@@ -6560,7 +6560,6 @@ pub(crate) const TOP_LEVEL_TAGS: [Tag; 79] = [
     Tag::SpSort,
     Tag::SpSubinformation,
     Tag::SpTagbody,
-    Tag::SpText,
     Tag::SpText,
     Tag::SpTextarea,
     Tag::SpTextimage,
