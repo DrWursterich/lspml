@@ -88,7 +88,6 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
             }
             Some(kind) if kind.ends_with("_attribute") => {
                 let variable = &node.utf8_text(document.text.as_bytes()).unwrap();
-                let variable = &variable[1..variable.len() - 1];
                 return match Query::new(
                     tree_sitter_spml::language(),
                     &create_definition_query(variable).as_str(),
@@ -103,11 +102,11 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                             range: Range {
                                 start: Position {
                                     line: result.start_position().row as u32,
-                                    character: result.start_position().column as u32 + 1,
+                                    character: result.start_position().column as u32,
                                 },
                                 end: Position {
                                     line: result.end_position().row as u32,
-                                    character: result.end_position().column as u32 - 1,
+                                    character: result.end_position().column as u32,
                                 },
                             },
                             uri: text_params.text_document.uri,
@@ -135,175 +134,230 @@ fn create_definition_query<'a>(variable: &'a str) -> String {
     [
         (attribute_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (barcode_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (calendarsheet_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (checkbox_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (
             (collection_tag
                 (name_attribute
-                    (string) @attribute)
+                    (string
+                    (string_content) @attribute))
                 (action_attribute
-                    (string) @action))
+                    (string
+                        (string_content) @action)))
             (.eq? @action "\"new\"")
         )
         (diff_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (filter_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (for_tag
             (index_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (hidden_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (include_tag
             (return_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (iterator_tag
             (item_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (json_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (linkedInformation_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (linktree_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (livetree_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (loop_tag
             (item_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (
             (map_tag
                 (name_attribute
-                    (string) @attribute)
+                    (string
+                        (string_content) @attribute))
                 (action_attribute
-                    (string) @action))
+                    (string
+                        (string_content) @action)))
             (.eq? @action "\"new\"")
         )
         (querytree_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (radio_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (range_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (sass_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (scaleimage_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (search_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (select_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (set_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (sort_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (subinformation_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (text_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (textarea_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (textimage_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (upload_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (worklist_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (zip_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_counter_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_date_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_email2img_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_encryptemail_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_escapeemail_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_formsolutions_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_id2url_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_imageeditor_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_iterator_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_link_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_number_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_personalization_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_prehtml_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_smarteditor_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_text_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_textarea_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_timestamp_tag
             (connect_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_tinymce_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_updown_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
         (spt_upload_tag
             (name_attribute
-                (string) @attribute))
+                (string
+                    (string_content) @attribute)))
     ]
-    (.eq? @attribute "\"{}\"")
+    (.eq? @attribute "{}")
 )"#,
         variable,
     );
