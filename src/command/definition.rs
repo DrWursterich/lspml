@@ -156,7 +156,7 @@ fn create_definition_query<'a>(variable: &'a str) -> String {
                 (action_attribute
                     (string
                         (string_content) @action)))
-            (.eq? @action "\"new\"")
+            (.eq? @action "new")
         )
         (diff_tag
             (name_attribute
@@ -210,7 +210,7 @@ fn create_definition_query<'a>(variable: &'a str) -> String {
                 (action_attribute
                     (string
                         (string_content) @action)))
-            (.eq? @action "\"new\"")
+            (.eq? @action "new")
         )
         (querytree_tag
             (name_attribute
