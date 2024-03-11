@@ -253,6 +253,46 @@ fn validate_tag(
                     }
                 }
             }
+            grammar::AttributeRule::ExactlyOneOfWithValue(names, attribute, value)
+                if attributes.get(*attribute).is_some_and(|v| v == value) =>
+            {
+                let present: Vec<&str> = names
+                    .iter()
+                    .map(|name| *name)
+                    .filter(|name| attributes.contains_key(*name))
+                    .collect();
+                match present.len() {
+                    0 => {
+                        diagnositcs.push(Diagnostic {
+                            message: format!(
+                                "requires one of these attributes with attribute {} containing the value {}: {}",
+                                attribute,
+                                value,
+                                names.join(", ")
+                            ),
+                            severity: Some(DiagnosticSeverity::ERROR),
+                            range: node_range(node),
+                            source: Some("lspml".to_string()),
+                            ..Default::default()
+                        });
+                    }
+                    1 => {}
+                    _ => {
+                        diagnositcs.push(Diagnostic {
+                            message: format!(
+                                "requires only one of these attributes with attribute {} containing the value {}: {}",
+                                attribute,
+                                value,
+                                present.join(", ")
+                            ),
+                            severity: Some(DiagnosticSeverity::ERROR),
+                            range: node_range(node),
+                            source: Some("lspml".to_string()),
+                            ..Default::default()
+                        });
+                    }
+                }
+            }
             grammar::AttributeRule::ExactlyOneOfOrBody(names) => {
                 let present: Vec<&str> = names
                     .iter()

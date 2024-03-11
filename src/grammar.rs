@@ -42,6 +42,7 @@ pub(crate) enum TagAttributeType {
 pub(crate) enum AttributeRule {
     Deprecated(&'static str),
     ExactlyOneOf(&'static [&'static str]),
+    ExactlyOneOfWithValue(&'static [&'static str], &'static str, &'static str),
     ExactlyOrBody(&'static str),
     OnlyOneOf(&'static [&'static str]),
     AtleastOneOf(&'static [&'static str]),
@@ -745,7 +746,7 @@ Ein Text, der mit der Liste verarbeitet werden soll."#,
             "action",
             &["remove", "replace"],
         ),
-        AttributeRule::RequiredWithValue("object", "action", "addAll"),
+        AttributeRule::ExactlyOneOfWithValue(&["object", "query"], "action", "addAll"),
         AttributeRule::BodyOnlyWithEitherValue(
             "action",
             &["add", "addNotEmpty", "remove", "replace"],
