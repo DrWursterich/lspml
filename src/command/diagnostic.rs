@@ -50,11 +50,17 @@ fn validate_document(
             }),
             "html_tag" | "html_option_tag" | "html_void_tag" | "xml_comment" | "java_tag"
             | "script_tag" | "style_tag" => validate_children(node, &text, diagnositcs, file)?,
-            _ => {
-                let _ = &grammar::Tag::from_str(node.kind()).and_then(|tag| {
-                    validate_tag(tag.properties(), node, &text, diagnositcs, file)
-                })?;
-            }
+            _ => match &grammar::Tag::from_str(node.kind()) {
+                Ok(tag) => validate_tag(tag.properties(), node, &text, diagnositcs, file),
+                Err(err) => {
+                    log::info!(
+                        "error while trying to interprete node \"{}\" as tag: {}",
+                        node.kind(),
+                        err
+                    );
+                    continue;
+                }
+            }?,
         }
     }
     return Ok(());

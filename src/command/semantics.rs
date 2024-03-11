@@ -70,10 +70,14 @@ fn parse_document(root: Node, text: &String, tokens: &mut Vec<SemanticToken>) ->
             | "comment" | "xml_entity" => continue,
             "html_tag" | "html_option_tag" | "html_void_tag" | "xml_comment" | "java_tag"
             | "script_tag" | "style_tag" => parse_children(node, &text, tokens)?,
-            _ => {
-                let _ = &grammar::Tag::from_str(node.kind())
-                    .and_then(|tag| parse_tag(tag.properties(), node, &text, tokens))?;
-            }
+            _ => match &grammar::Tag::from_str(node.kind()) {
+                Ok(tag) => parse_tag(tag.properties(), node, &text, tokens)?,
+                Err(err) => log::info!(
+                    "error while trying to interprete node \"{}\" as tag: {}",
+                    node.kind(),
+                    err
+                ),
+            },
         }
     }
     return Ok(());
