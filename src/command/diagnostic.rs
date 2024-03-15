@@ -253,46 +253,6 @@ fn validate_tag(
                     }
                 }
             }
-            grammar::AttributeRule::ExactlyOneOfWithValue(names, attribute, value)
-                if attributes.get(*attribute).is_some_and(|v| v == value) =>
-            {
-                let present: Vec<&str> = names
-                    .iter()
-                    .map(|name| *name)
-                    .filter(|name| attributes.contains_key(*name))
-                    .collect();
-                match present.len() {
-                    0 => {
-                        diagnositcs.push(Diagnostic {
-                            message: format!(
-                                "requires one of these attributes with attribute {} containing the value {}: {}",
-                                attribute,
-                                value,
-                                names.join(", ")
-                            ),
-                            severity: Some(DiagnosticSeverity::ERROR),
-                            range: node_range(node),
-                            source: Some("lspml".to_string()),
-                            ..Default::default()
-                        });
-                    }
-                    1 => {}
-                    _ => {
-                        diagnositcs.push(Diagnostic {
-                            message: format!(
-                                "requires only one of these attributes with attribute {} containing the value {}: {}",
-                                attribute,
-                                value,
-                                present.join(", ")
-                            ),
-                            severity: Some(DiagnosticSeverity::ERROR),
-                            range: node_range(node),
-                            source: Some("lspml".to_string()),
-                            ..Default::default()
-                        });
-                    }
-                }
-            }
             grammar::AttributeRule::ExactlyOneOfOrBody(names) => {
                 let present: Vec<&str> = names
                     .iter()
@@ -611,6 +571,41 @@ fn validate_tag(
                     ..Default::default()
                 });
             }
+            grammar::AttributeRule::RequiredOrBodyWithValue(name, attribute, value)
+                if attributes.get(*attribute).is_some_and(|v| v == value) =>
+            {
+                let has_attribute = attributes.contains_key(*name);
+                let has_body = node
+                    .child(node.child_count() - 1)
+                    .is_some_and(|tag| tag.kind().ends_with("_tag_close"));
+                if !has_attribute && !has_body {
+                    diagnositcs.push(Diagnostic {
+                        message: format!(
+                            "either attribute {} or a tag-body is required when attribute {} is \"{}\"",
+                            name,
+                            attribute,
+                            value
+                        ),
+                        severity: Some(DiagnosticSeverity::ERROR),
+                        range: node_range(node),
+                        source: Some("lspml".to_string()),
+                        ..Default::default()
+                    });
+                } else if has_attribute && has_body {
+                    diagnositcs.push(Diagnostic {
+                        message: format!(
+                            "exactly one of attribute {} or a tag-body is required when attribute {} is \"{}\"",
+                            name,
+                            attribute,
+                            value
+                        ),
+                        severity: Some(DiagnosticSeverity::ERROR),
+                        range: node_range(node),
+                        source: Some("lspml".to_string()),
+                        ..Default::default()
+                    });
+                }
+            }
             grammar::AttributeRule::RequiredWithEitherValue(name, attribute, values)
                 if attributes
                     .get(*attribute)
@@ -629,6 +624,46 @@ fn validate_tag(
                     source: Some("lspml".to_string()),
                     ..Default::default()
                 });
+            }
+            grammar::AttributeRule::ExactlyOneOfOrBodyWithValue(names, attribute, value)
+                if attributes.get(*attribute).is_some_and(|v| v == value) =>
+            {
+                let present: Vec<&str> = names
+                    .iter()
+                    .map(|name| *name)
+                    .filter(|name| attributes.contains_key(*name))
+                    .collect();
+                let has_body = node
+                    .child(node.child_count() - 1)
+                    .is_some_and(|tag| tag.kind().ends_with("_tag_close"));
+                match present.len() {
+                    0 if !has_body => {
+                        diagnositcs.push(Diagnostic {
+                            message: format!(
+                                "when attribute {} is \"{}\" either a tag-body or exactly one of these attributes is required: [{}]",
+                                attribute, value, names.join(", ")
+                            ),
+                            severity: Some(DiagnosticSeverity::ERROR),
+                            range: node_range(node),
+                            source: Some("lspml".to_string()),
+                            ..Default::default()
+                        });
+                    }
+                    0 if has_body => {}
+                    1 if !has_body => {}
+                    _ => {
+                        diagnositcs.push(Diagnostic {
+                            message: format!(
+                                "when attribute {} is \"{}\" only one of a tag-body and these attributes is required: [{}]",
+                                attribute, value, names.join(", ")
+                            ),
+                            severity: Some(DiagnosticSeverity::ERROR),
+                            range: node_range(node),
+                            source: Some("lspml".to_string()),
+                            ..Default::default()
+                        });
+                    }
+                }
             }
             grammar::AttributeRule::ExactlyOneOfOrBodyWithEitherValue(names, attribute, values)
                 if attributes
