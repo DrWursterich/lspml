@@ -16,6 +16,7 @@ mod document_store;
 mod grammar;
 mod modules;
 mod parser;
+mod spel;
 
 #[derive(Parser, Debug)]
 #[clap(name = "lspml")]

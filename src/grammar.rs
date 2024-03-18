@@ -196,7 +196,7 @@ Der Text, der verwendet wird, wenn die Inhalte von `value`, `expression` und bod
         },
         TagAttribute {
             name: "expression",
-            r#type: TagAttributeType::String,
+            r#type: TagAttributeType::Expression,
             detail: None,
             documentation: Some(
                 r#"

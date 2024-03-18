@@ -3,10 +3,11 @@ use crate::document_store;
 use crate::grammar;
 use crate::modules;
 use crate::parser;
+use crate::spel::parser::Parser;
 use anyhow::Result;
 use lsp_types::{Diagnostic, DiagnosticSeverity, DocumentDiagnosticParams, Position, Range, Url};
 use std::{collections::HashMap, path::Path, str::FromStr};
-use tree_sitter::{Node, Parser};
+use tree_sitter::Node;
 
 pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnostic>, LsError> {
     let uri = params.text_document.uri;
@@ -110,48 +111,81 @@ fn validate_tag(
                         .iter()
                         .find(|definition| definition.name == attribute)
                     {
+                        let value_node = child
+                            .child(2)
+                            .expect(
+                                format!(
+                                    "attribute {:?} did not have a attribute-value child",
+                                    attribute
+                                )
+                                .as_str(),
+                            )
+                            .child(1)
+                            .expect(
+                                format!(
+                                    "attribute {:?} did not have a child in its attribute-value",
+                                    attribute
+                                )
+                                .as_str(),
+                            );
+                        let parser = &mut Parser::new(value_node.utf8_text(&text.as_bytes())?);
                         match definition.r#type {
                             grammar::TagAttributeType::Condition => {}
-                            grammar::TagAttributeType::Expression => {}
-                            grammar::TagAttributeType::Identifier => {}
-                            grammar::TagAttributeType::Object => {
-                                let mut parser = Parser::new();
-                                parser.set_language(tree_sitter_spel::language())?;
-                                let value_node = child
-                                    .child(2)
-                                    .expect(
-                                        format!(
-                                            "attribute {:?} did not have a attribute-value child",
-                                            attribute
-                                        )
-                                        .as_str(),
-                                    )
-                                    .child(1)
-                                    .expect(
-                                        format!(
-                                            "attribute {:?} did not have a child in its attribute-value",
-                                            attribute
-                                        )
-                                        .as_str(),
+                            grammar::TagAttributeType::Expression => {
+                                match parser.parse_expression_ast() {
+                                    Ok(_result) => {}
+                                    Err(err) => {
+                                        log::error!(
+                                            "parse expression \"{}\" failed: {}",
+                                            value_node.utf8_text(&text.as_bytes())?,
+                                            err
+                                        );
+                                        diagnositcs.push(Diagnostic {
+                                            message: format!("invalid expression: {}", err),
+                                            severity: Some(DiagnosticSeverity::ERROR),
+                                            range: node_range(value_node),
+                                            source: Some("lspml".to_string()),
+                                            ..Default::default()
+                                        });
+                                    }
+                                }
+                            }
+                            grammar::TagAttributeType::Identifier => {
+                                match parser.parse_identifier() {
+                                    Ok(_result) => {}
+                                    Err(err) => {
+                                        log::error!(
+                                            "parse identifier \"{}\" failed: {}",
+                                            value_node.utf8_text(&text.as_bytes())?,
+                                            err
+                                        );
+                                        diagnositcs.push(Diagnostic {
+                                            message: format!("invalid identifier: {}", err),
+                                            severity: Some(DiagnosticSeverity::ERROR),
+                                            range: node_range(value_node),
+                                            source: Some("lspml".to_string()),
+                                            ..Default::default()
+                                        });
+                                    }
+                                }
+                            }
+                            grammar::TagAttributeType::Object => match parser.parse_object_ast() {
+                                Ok(_result) => {}
+                                Err(err) => {
+                                    log::error!(
+                                        "parse object \"{}\" failed: {}",
+                                        value_node.utf8_text(&text.as_bytes())?,
+                                        err
                                     );
-                                parser.set_included_ranges(&[value_node.range()])?;
-                                let tree = parser.parse(&text, None).expect(
-                                    format!("failed to parse spel object in {:?}", child).as_str(),
-                                );
-                                let root = tree.root_node();
-                                if root.has_error() {
                                     diagnositcs.push(Diagnostic {
-                                        message: format!(
-                                            "{} expects an object, this is not a valid one",
-                                            attribute
-                                        ),
+                                        message: format!("invalid object: {}", err),
                                         severity: Some(DiagnosticSeverity::ERROR),
-                                        range: node_range(root),
+                                        range: node_range(value_node),
                                         source: Some("lspml".to_string()),
                                         ..Default::default()
                                     });
                                 }
-                            }
+                            },
                             grammar::TagAttributeType::Regex => {}
                             grammar::TagAttributeType::String => {}
                             grammar::TagAttributeType::Query => {}
