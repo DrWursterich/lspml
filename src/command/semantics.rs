@@ -2,11 +2,14 @@ use super::{
     super::{TOKEN_MODIFIERS, TOKEN_TYPES},
     LsError, ResponseErrorCode,
 };
-use crate::{document_store, grammar, parser};
+use crate::{
+    document_store, grammar, parser,
+    spel::parser::Parser,
+};
 use anyhow::Result;
 use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensParams};
 use std::str::FromStr;
-use tree_sitter::{Node, Parser};
+use tree_sitter::Node;
 
 /**
  * this adds highlighting details for small tokens - not the entire file!
@@ -108,39 +111,68 @@ fn parse_tag(
                         .iter()
                         .find(|definition| definition.name == attribute)
                     {
+                        let value_node = child
+                            .child(2)
+                            .expect(
+                                format!(
+                                    "attribute {:?} did not have a attribute-value child",
+                                    attribute
+                                )
+                                .as_str(),
+                            )
+                            .child(1)
+                            .expect(
+                                format!(
+                                    "attribute {:?} did not have a child in its attribute-value",
+                                    attribute
+                                )
+                                .as_str(),
+                            );
+                        let parser = &mut Parser::new(value_node.utf8_text(&text.as_bytes())?);
                         match definition.r#type {
                             grammar::TagAttributeType::Condition => {}
-                            grammar::TagAttributeType::Expression => {}
-                            grammar::TagAttributeType::Identifier => {}
-                            grammar::TagAttributeType::Object => {
-                                let mut parser = Parser::new();
-                                parser.set_language(tree_sitter_spel::language())?;
-                                let value_node = child
-                                    .child(2)
-                                    .expect(
-                                        format!(
-                                            "attribute {:?} did not have a attribute-value child",
-                                            attribute
-                                        )
-                                        .as_str(),
-                                    )
-                                    .child(1)
-                                    .expect(
-                                        format!(
-                                            "attribute {:?} did not have a child in its attribute-value",
-                                            attribute
-                                        )
-                                        .as_str(),
+                            grammar::TagAttributeType::Expression => match parser.parse_expression_ast() {
+                                Ok(_result) => tokens.push(create_token(
+                                    value_node,
+                                    SemanticTokenType::NUMBER,
+                                    vec![]
+                                )),
+                                Err(err) => {
+                                    log::error!(
+                                        "unparsable expression \"{}\": {}",
+                                        value_node.utf8_text(&text.as_bytes())?,
+                                        err
                                     );
-                                parser.set_included_ranges(&[value_node.range()])?;
-                                let tree = parser.parse(&text, None).expect(
-                                    format!("failed to parse spel object in {:?}", child).as_str(),
-                                );
-                                let root = tree.root_node();
-                                for child in root.children(&mut root.walk()) {
-                                    parse_object(child, tokens)?;
                                 }
                             }
+                            grammar::TagAttributeType::Identifier => match parser.parse_identifier() {
+                                Ok(_result) => tokens.push(create_token(
+                                    value_node,
+                                    SemanticTokenType::VARIABLE,
+                                    vec![]
+                                )),
+                                Err(err) => {
+                                    log::error!(
+                                        "unparsable identifier \"{}\": {}",
+                                        value_node.utf8_text(&text.as_bytes())?,
+                                        err
+                                    );
+                                }
+                            }
+                            grammar::TagAttributeType::Object => match parser.parse_object_ast() {
+                                Ok(_result) => tokens.push(create_token(
+                                    value_node,
+                                    SemanticTokenType::VARIABLE,
+                                    vec![]
+                                )),
+                                Err(err) => {
+                                    log::error!(
+                                        "unparsable object \"{}\": {}",
+                                        value_node.utf8_text(&text.as_bytes())?,
+                                        err
+                                    );
+                                }
+                            },
                             grammar::TagAttributeType::Regex => {}
                             grammar::TagAttributeType::String => {}
                             grammar::TagAttributeType::Query => {}
