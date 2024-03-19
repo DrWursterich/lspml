@@ -415,11 +415,12 @@ fn index_expression(node: &ast::Expression, tokenizer: &mut SpelTokenCollector) 
         }
         ast::Expression::BinaryOperation {
             left,
-            operation: _operation,
             right,
+            operation_location,
+            ..
         } => {
             index_expression(left, tokenizer);
-            // tokens.push(create_token(operation_location, SemanticTokenType::OPERATOR, vec![]));
+            tokenizer.add(operation_location, SemanticTokenType::OPERATOR, vec![]);
             index_expression(right, tokenizer);
         }
         ast::Expression::BracketedExpression {

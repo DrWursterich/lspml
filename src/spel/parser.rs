@@ -133,9 +133,18 @@ impl Parser {
                 _ => None,
             }) {
                 Some(operation) => {
+                    let operation_location = Location::SingleCharacter {
+                        char: self.scanner.cursor as u16 - 1,
+                        line: 0,
+                    };
                     self.scanner.skip_whitespace();
                     let expression = self.parse_expression()?;
-                    self.resolve_binary_operation_precidence(result, operation, expression)
+                    self.resolve_binary_operation_precidence(
+                        result,
+                        operation,
+                        expression,
+                        operation_location,
+                    )
                 }
                 None => result,
             },
@@ -198,25 +207,30 @@ impl Parser {
         left_expression: ast::Expression,
         left_operation: ast::Operation,
         right_expression: ast::Expression,
+        left_operation_location: Location,
     ) -> ast::Expression {
         match right_expression {
             ast::Expression::BinaryOperation {
                 left,
                 operation: right_operation,
                 right,
+                operation_location: right_operation_location,
             } if left_operation <= right_operation => ast::Expression::BinaryOperation {
                 left: Box::new(self.resolve_binary_operation_precidence(
                     left_expression,
                     left_operation,
                     *left,
+                    left_operation_location,
                 )),
                 operation: right_operation,
                 right,
+                operation_location: right_operation_location,
             },
             _ => ast::Expression::BinaryOperation {
                 left: Box::new(left_expression),
                 operation: left_operation,
                 right: Box::new(right_expression),
+                operation_location: left_operation_location,
             },
         }
     }
@@ -367,7 +381,7 @@ impl Parser {
                                     char: start,
                                     line: 0,
                                 },
-                                closing_bracket_location: Location ::SingleCharacter{
+                                closing_bracket_location: Location::SingleCharacter {
                                     char: self.scanner.cursor as u16 - 1,
                                     line: 0,
                                 },
@@ -606,14 +620,8 @@ mod tests {
                             length: 4,
                         }
                     },
-                    opening_bracket_location: Location::DoubleCharacter {
-                        char: 0,
-                        line: 0,
-                    },
-                    closing_bracket_location: Location::SingleCharacter {
-                        char: 6,
-                        line: 0,
-                    },
+                    opening_bracket_location: Location::DoubleCharacter { char: 0, line: 0 },
+                    closing_bracket_location: Location::SingleCharacter { char: 6, line: 0 },
                 }
             }
         );
@@ -700,14 +708,8 @@ mod tests {
                         },
                     },
                     arguments: vec![],
-                    opening_bracket_location: Location::SingleCharacter {
-                        char: 5,
-                        line: 0,
-                    },
-                    closing_bracket_location: Location::SingleCharacter {
-                        char: 6,
-                        line: 0,
-                    },
+                    opening_bracket_location: Location::SingleCharacter { char: 5, line: 0 },
+                    closing_bracket_location: Location::SingleCharacter { char: 6, line: 0 },
                 }
             }
         );
@@ -736,14 +738,8 @@ mod tests {
                             length: 6,
                         },
                     }],
-                    opening_bracket_location: Location::SingleCharacter {
-                        char: 9,
-                        line: 0,
-                    },
-                    closing_bracket_location: Location::SingleCharacter {
-                        char: 16,
-                        line: 0,
-                    },
+                    opening_bracket_location: Location::SingleCharacter { char: 9, line: 0 },
+                    closing_bracket_location: Location::SingleCharacter { char: 16, line: 0 },
                 }
             }
         );
@@ -785,14 +781,8 @@ mod tests {
                         },
                     },
                     arguments: vec![],
-                    opening_bracket_location: Location::SingleCharacter {
-                        char: 11,
-                        line: 0,
-                    },
-                    closing_bracket_location: Location::SingleCharacter {
-                        char: 12,
-                        line: 0,
-                    },
+                    opening_bracket_location: Location::SingleCharacter { char: 11, line: 0 },
+                    closing_bracket_location: Location::SingleCharacter { char: 12, line: 0 },
                 }
             }
         );
@@ -831,14 +821,8 @@ mod tests {
                             },
                         }
                     ],
-                    opening_bracket_location: Location::SingleCharacter {
-                        char: 11,
-                        line: 0,
-                    },
-                    closing_bracket_location: Location::SingleCharacter {
-                        char: 31,
-                        line: 0,
-                    },
+                    opening_bracket_location: Location::SingleCharacter { char: 11, line: 0 },
+                    closing_bracket_location: Location::SingleCharacter { char: 31, line: 0 },
                 }
             }
         );
@@ -887,23 +871,11 @@ mod tests {
                                 },
                             }
                         ],
-                        opening_bracket_location: Location::SingleCharacter {
-                            char: 16,
-                            line: 0,
-                        },
-                        closing_bracket_location: Location::SingleCharacter {
-                            char: 33,
-                            line: 0,
-                        },
+                        opening_bracket_location: Location::SingleCharacter { char: 16, line: 0 },
+                        closing_bracket_location: Location::SingleCharacter { char: 33, line: 0 },
                     }],
-                    opening_bracket_location: Location::SingleCharacter {
-                        char: 9,
-                        line: 0,
-                    },
-                    closing_bracket_location: Location::SingleCharacter {
-                        char: 34,
-                        line: 0,
-                    },
+                    opening_bracket_location: Location::SingleCharacter { char: 9, line: 0 },
+                    closing_bracket_location: Location::SingleCharacter { char: 34, line: 0 },
                 }
             }
         );
@@ -935,10 +907,7 @@ mod tests {
                             length: 6,
                         },
                     },
-                    dot_location: Location::SingleCharacter {
-                        char: 7,
-                        line: 0,
-                    },
+                    dot_location: Location::SingleCharacter { char: 7, line: 0 },
                 }
             }
         );
@@ -982,18 +951,9 @@ mod tests {
                         },
                     },
                     arguments: vec![],
-                    dot_location: Location::SingleCharacter {
-                        char: 7,
-                        line: 0,
-                    },
-                    opening_bracket_location: Location::SingleCharacter {
-                        char: 14,
-                        line: 0,
-                    },
-                    closing_bracket_location: Location::SingleCharacter {
-                        char: 15,
-                        line: 0,
-                    },
+                    dot_location: Location::SingleCharacter { char: 7, line: 0 },
+                    opening_bracket_location: Location::SingleCharacter { char: 14, line: 0 },
+                    closing_bracket_location: Location::SingleCharacter { char: 15, line: 0 },
                 }
             }
         );
@@ -1024,14 +984,8 @@ mod tests {
                             length: 1,
                         }
                     },
-                    opening_bracket_location: Location::SingleCharacter {
-                        char: 8,
-                        line: 0,
-                    },
-                    closing_bracket_location: Location::SingleCharacter {
-                        char: 10,
-                        line: 0,
-                    }
+                    opening_bracket_location: Location::SingleCharacter { char: 8, line: 0 },
+                    closing_bracket_location: Location::SingleCharacter { char: 10, line: 0 }
                 }
             }
         );
@@ -1064,20 +1018,11 @@ mod tests {
                             }
                         }),
                         sign: Sign::Plus {
-                            location: Location::SingleCharacter {
-                                char: 9,
-                                line: 0,
-                            }
+                            location: Location::SingleCharacter { char: 9, line: 0 }
                         },
                     },
-                    opening_bracket_location: Location::SingleCharacter {
-                        char: 8,
-                        line: 0,
-                    },
-                    closing_bracket_location: Location::SingleCharacter {
-                        char: 11,
-                        line: 0,
-                    }
+                    opening_bracket_location: Location::SingleCharacter { char: 8, line: 0 },
+                    closing_bracket_location: Location::SingleCharacter { char: 11, line: 0 }
                 }
             }
         );
@@ -1115,10 +1060,7 @@ mod tests {
                         }
                     }),
                     sign: Sign::Minus {
-                        location: Location::SingleCharacter {
-                            char: 0,
-                            line: 0,
-                        }
+                        location: Location::SingleCharacter { char: 0, line: 0 }
                     }
                 }
             }
@@ -1142,26 +1084,14 @@ mod tests {
                                 }
                             }),
                             sign: Sign::Minus {
-                                location: Location::SingleCharacter {
-                                    char: 4,
-                                    line: 0,
-                                }
+                                location: Location::SingleCharacter { char: 4, line: 0 }
                             }
                         }),
-                        opening_bracket_location: Location::SingleCharacter {
-                            char: 2,
-                            line: 0,
-                        },
-                        closing_bracket_location: Location::SingleCharacter {
-                            char: 10,
-                            line: 0,
-                        }
+                        opening_bracket_location: Location::SingleCharacter { char: 2, line: 0 },
+                        closing_bracket_location: Location::SingleCharacter { char: 10, line: 0 }
                     }),
                     sign: Sign::Minus {
-                        location: Location::SingleCharacter {
-                            char: 1,
-                            line: 0,
-                        }
+                        location: Location::SingleCharacter { char: 1, line: 0 }
                     }
                 }
             }
@@ -1191,6 +1121,7 @@ mod tests {
                             length: 1,
                         }
                     }),
+                    operation_location: Location::SingleCharacter { char: 2, line: 0 }
                 }
             }
         );
@@ -1230,7 +1161,8 @@ mod tests {
                                 line: 0,
                                 length: 1,
                             }
-                        })
+                        }),
+                        operation_location: Location::SingleCharacter { char: 2, line: 0 }
                     }),
                     operation: Operation::Addition,
                     right: Box::new(Expression::SignedExpression {
@@ -1243,12 +1175,10 @@ mod tests {
                             }
                         }),
                         sign: Sign::Minus {
-                            location: Location::SingleCharacter {
-                                char: 8,
-                                line: 0,
-                            }
+                            location: Location::SingleCharacter { char: 8, line: 0 }
                         }
-                    })
+                    }),
+                    operation_location: Location::SingleCharacter { char: 6, line: 0 }
                 }
             }
         );
@@ -1287,7 +1217,9 @@ mod tests {
                                 length: 1,
                             }
                         }),
-                    })
+                        operation_location: Location::SingleCharacter { char: 7, line: 0 }
+                    }),
+                    operation_location: Location::SingleCharacter { char: 2, line: 0 }
                 }
             }
         );
@@ -1327,7 +1259,8 @@ mod tests {
                                         line: 0,
                                         length: 1,
                                     }
-                                })
+                                }),
+                                operation_location: Location::SingleCharacter { char: 6, line: 0 }
                             }),
                             operation: Operation::Multiplication,
                             right: Box::new(Expression::BinaryOperation {
@@ -1347,8 +1280,10 @@ mod tests {
                                         line: 0,
                                         length: 1,
                                     }
-                                })
-                            })
+                                }),
+                                operation_location: Location::SingleCharacter { char: 14, line: 0 }
+                            }),
+                            operation_location: Location::SingleCharacter { char: 10, line: 0 }
                         }),
                         operation: Operation::Modulo,
                         right: Box::new(Expression::Number {
@@ -1359,7 +1294,9 @@ mod tests {
                                 length: 1,
                             }
                         }),
-                    })
+                        operation_location: Location::SingleCharacter { char: 18, line: 0 }
+                    }),
+                    operation_location: Location::SingleCharacter { char: 2, line: 0 }
                 }
             }
         );
