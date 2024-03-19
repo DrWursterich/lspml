@@ -87,24 +87,21 @@ impl Parser {
                 }
                 ast::Expression::BracketedExpression {
                     expression: Box::new(expression),
-                    opening_bracket_location: Location {
+                    opening_bracket_location: Location::SingleCharacter {
                         char: start,
                         line: 0,
-                        length: 1,
                     },
-                    closing_bracket_location: Location {
+                    closing_bracket_location: Location::SingleCharacter {
                         char: self.scanner.cursor as u16 - 1,
                         line: 0,
-                        length: 1,
                     },
                 }
             }
             Some('0'..='9') => self.parse_number()?,
             _ => {
-                let location = Location {
+                let location = Location::SingleCharacter {
                     char: self.scanner.cursor as u16,
                     line: 0,
-                    length: 1,
                 };
                 let sign = match self.scanner.pop() {
                     Some('+') => ast::Sign::Plus { location },
@@ -167,7 +164,7 @@ impl Parser {
                 _ => {
                     return Ok(ast::Expression::Number {
                         content: result,
-                        location: Location {
+                        location: Location::VariableLength {
                             char: start,
                             line: 0,
                             length: self.scanner.cursor as u16 - start,
@@ -226,7 +223,6 @@ impl Parser {
 
     fn parse_string(&mut self) -> Result<ast::Object> {
         let mut result = String::new();
-        let mut interpolations = Vec::new();
         let start = self.scanner.cursor as u16;
         if !self.scanner.take(&'\'') {
             return Err(anyhow::anyhow!("expected string"));
@@ -249,13 +245,11 @@ impl Parser {
                         None => return Err(anyhow::anyhow!("unexpected end")),
                     }
                 }
-                Some('$') => interpolations.push(self.parse_interpolation()?),
                 Some('\'') => {
                     self.scanner.pop();
                     return Ok(ast::Object::String {
                         content: result.clone(),
-                        interpolations,
-                        location: Location {
+                        location: Location::VariableLength {
                             char: start,
                             line: 0,
                             length: result.len() as u16 + 2,
@@ -289,15 +283,13 @@ impl Parser {
         return match self.scanner.take(&'}') {
             true => Ok(ast::Interpolation {
                 content: result,
-                opening_bracket_location: Location {
+                opening_bracket_location: Location::DoubleCharacter {
                     char: start,
                     line: 0,
-                    length: 2,
                 },
-                closing_bracket_location: Location {
+                closing_bracket_location: Location::SingleCharacter {
                     char: self.scanner.cursor as u16 - 1,
                     line: 0,
-                    length: 1,
                 },
             }),
             false => Err(anyhow::anyhow!("unclosed interpolation")),
@@ -318,15 +310,13 @@ impl Parser {
         return match self.scanner.take(&'}') {
             true => Ok(ast::Object::Anchor {
                 name: result,
-                opening_bracket_location: Location {
+                opening_bracket_location: Location::DoubleCharacter {
                     char: start,
                     line: 0,
-                    length: 2,
                 },
-                closing_bracket_location: Location {
+                closing_bracket_location: Location::SingleCharacter {
                     char: self.scanner.cursor as u16 - 1,
                     line: 0,
-                    length: 1,
                 },
             }),
             false => Err(anyhow::anyhow!("unclosed interpolated anchor")),
@@ -348,15 +338,13 @@ impl Parser {
                 ast::Object::Function {
                     name,
                     arguments,
-                    opening_bracket_location: Location {
+                    opening_bracket_location: Location::SingleCharacter {
                         char: start,
                         line: 0,
-                        length: 1,
                     },
-                    closing_bracket_location: Location {
+                    closing_bracket_location: Location::SingleCharacter {
                         char: self.scanner.cursor as u16 - 1,
                         line: 0,
-                        length: 1,
                     },
                 }
             }
@@ -375,15 +363,13 @@ impl Parser {
                             result = ast::Object::ArrayAccess {
                                 object: Box::new(result),
                                 index: expression,
-                                opening_bracket_location: Location {
+                                opening_bracket_location: Location::SingleCharacter {
                                     char: start,
                                     line: 0,
-                                    length: 1,
                                 },
-                                closing_bracket_location: Location {
+                                closing_bracket_location: Location ::SingleCharacter{
                                     char: self.scanner.cursor as u16 - 1,
                                     line: 0,
-                                    length: 1,
                                 },
                             }
                         }
@@ -391,10 +377,9 @@ impl Parser {
                     }
                 }
                 Some('.') => {
-                    let dot_location = Location {
+                    let dot_location = Location::SingleCharacter {
                         char: self.scanner.cursor as u16,
                         line: 0,
-                        length: 1,
                     };
                     self.scanner.pop();
                     self.scanner.skip_whitespace();
@@ -409,15 +394,13 @@ impl Parser {
                                 method: name,
                                 arguments,
                                 dot_location,
-                                opening_bracket_location: Location {
+                                opening_bracket_location: Location::SingleCharacter {
                                     char: start,
                                     line: 0,
-                                    length: 1,
                                 },
-                                closing_bracket_location: Location {
+                                closing_bracket_location: Location::SingleCharacter {
                                     char: self.scanner.cursor as u16 - 1,
                                     line: 0,
-                                    length: 1,
                                 },
                             }
                         }
@@ -447,15 +430,21 @@ impl Parser {
                 _ => break,
             }
         }
-        return Ok(ast::Word {
-            name: result.clone(),
-            interpolations,
-            location: Location {
-                char: start,
-                line: 0,
-                length: result.len() as u16,
-            },
-        });
+        return match result.len() > 0 || interpolations.len() > 0 {
+            true => Ok(ast::Word {
+                name: result.clone(),
+                interpolations,
+                location: Location::VariableLength {
+                    char: start,
+                    line: 0,
+                    length: result.len() as u16,
+                },
+            }),
+            false => Err(match self.scanner.peek() {
+                Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
+                _ => anyhow::anyhow!("unexpected end"),
+            }),
+        };
     }
 
     fn parse_function_arguments(&mut self) -> Result<Vec<ast::Object>> {
@@ -494,8 +483,7 @@ mod tests {
             ObjectAst {
                 root: Object::String {
                     content: "test".to_string(),
-                    interpolations: vec![],
-                    location: Location {
+                    location: Location::VariableLength {
                         char: 0,
                         line: 0,
                         length: 6,
@@ -512,8 +500,7 @@ mod tests {
             ObjectAst {
                 root: Object::String {
                     content: "test".to_string(),
-                    interpolations: vec![],
-                    location: Location {
+                    location: Location::VariableLength {
                         char: 1,
                         line: 0,
                         length: 6,
@@ -530,8 +517,7 @@ mod tests {
             ObjectAst {
                 root: Object::String {
                     content: "tes\\\'t".to_string(),
-                    interpolations: vec![],
-                    location: Location {
+                    location: Location::VariableLength {
                         char: 0,
                         line: 0,
                         length: 8,
@@ -547,7 +533,7 @@ mod tests {
             parse_object("null"),
             ObjectAst {
                 root: Object::Null {
-                    location: Location {
+                    location: Location::VariableLength {
                         char: 0,
                         line: 0,
                         length: 4,
@@ -568,25 +554,22 @@ mod tests {
                         interpolations: vec![Interpolation {
                             content: Object::String {
                                 content: "notNull".to_string(),
-                                interpolations: vec![],
-                                location: Location {
+                                location: Location::VariableLength {
                                     char: 6,
                                     line: 0,
                                     length: 9,
                                 }
                             },
-                            opening_bracket_location: Location {
+                            opening_bracket_location: Location::DoubleCharacter {
                                 char: 4,
                                 line: 0,
-                                length: 2,
                             },
-                            closing_bracket_location: Location {
+                            closing_bracket_location: Location::SingleCharacter {
                                 char: 15,
                                 line: 0,
-                                length: 1,
                             },
                         }],
-                        location: Location {
+                        location: Location::VariableLength {
                             char: 0,
                             line: 0,
                             length: 4,
@@ -617,21 +600,19 @@ mod tests {
                     name: Word {
                         name: "home".to_string(),
                         interpolations: vec![],
-                        location: Location {
+                        location: Location::VariableLength {
                             char: 2,
                             line: 0,
                             length: 4,
                         }
                     },
-                    opening_bracket_location: Location {
+                    opening_bracket_location: Location::DoubleCharacter {
                         char: 0,
                         line: 0,
-                        length: 2,
                     },
-                    closing_bracket_location: Location {
+                    closing_bracket_location: Location::SingleCharacter {
                         char: 6,
                         line: 0,
-                        length: 1,
                     },
                 }
             }
@@ -639,39 +620,64 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_interpolated_string_object() {
+    fn test_parse_nested_interpolated_anchor() {
+        assert_eq!(
+            parse_object("${!{home}}"),
+            ObjectAst {
+                root: Object::Name {
+                    name: Word {
+                        name: "".to_string(),
+                        interpolations: vec![Interpolation {
+                            content: Object::Anchor {
+                                name: Word {
+                                    name: "home".to_string(),
+                                    interpolations: vec![],
+                                    location: Location::VariableLength {
+                                        char: 4,
+                                        line: 0,
+                                        length: 4,
+                                    }
+                                },
+                                opening_bracket_location: Location::DoubleCharacter {
+                                    char: 2,
+                                    line: 0,
+                                },
+                                closing_bracket_location: Location::SingleCharacter {
+                                    char: 8,
+                                    line: 0,
+                                },
+                            },
+                            opening_bracket_location: Location::DoubleCharacter {
+                                char: 0,
+                                line: 0,
+                            },
+                            closing_bracket_location: Location::SingleCharacter {
+                                char: 9,
+                                line: 0,
+                            }
+                        }],
+                        location: Location::VariableLength {
+                            char: 0,
+                            line: 0,
+                            length: 0,
+                        }
+                    }
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_string_not_interpolating() {
         assert_eq!(
             parse_object("'hello, ${world}'"),
             ObjectAst {
                 root: Object::String {
-                    content: "hello, ".to_string(),
-                    interpolations: vec![Interpolation {
-                        content: Object::Name {
-                            name: Word {
-                                name: "world".to_string(),
-                                interpolations: vec![],
-                                location: Location {
-                                    char: 10,
-                                    line: 0,
-                                    length: 5,
-                                }
-                            }
-                        },
-                        opening_bracket_location: Location {
-                            char: 8,
-                            line: 0,
-                            length: 2,
-                        },
-                        closing_bracket_location: Location {
-                            char: 15,
-                            line: 0,
-                            length: 1,
-                        },
-                    }],
-                    location: Location {
+                    content: "hello, ${world}".to_string(),
+                    location: Location::VariableLength {
                         char: 0,
                         line: 0,
-                        length: 9,
+                        length: 17,
                     },
                 }
             }
@@ -687,22 +693,20 @@ mod tests {
                     name: Word {
                         name: "flush".to_string(),
                         interpolations: vec![],
-                        location: Location {
+                        location: Location::VariableLength {
                             char: 0,
                             line: 0,
                             length: 5,
                         },
                     },
                     arguments: vec![],
-                    opening_bracket_location: Location {
+                    opening_bracket_location: Location::SingleCharacter {
                         char: 5,
                         line: 0,
-                        length: 1,
                     },
-                    closing_bracket_location: Location {
+                    closing_bracket_location: Location::SingleCharacter {
                         char: 6,
                         line: 0,
-                        length: 1,
                     },
                 }
             }
@@ -718,7 +722,7 @@ mod tests {
                     name: Word {
                         name: "is_string".to_string(),
                         interpolations: vec![],
-                        location: Location {
+                        location: Location::VariableLength {
                             char: 0,
                             line: 0,
                             length: 9,
@@ -726,22 +730,19 @@ mod tests {
                     },
                     arguments: vec![Object::String {
                         content: "test".to_string(),
-                        interpolations: vec![],
-                        location: Location {
+                        location: Location::VariableLength {
                             char: 10,
                             line: 0,
                             length: 6,
                         },
                     }],
-                    opening_bracket_location: Location {
+                    opening_bracket_location: Location::SingleCharacter {
                         char: 9,
                         line: 0,
-                        length: 1,
                     },
-                    closing_bracket_location: Location {
+                    closing_bracket_location: Location::SingleCharacter {
                         char: 16,
                         line: 0,
-                        length: 1,
                     },
                 }
             }
@@ -761,40 +762,36 @@ mod tests {
                                 name: Word {
                                     name: "_type".to_string(),
                                     interpolations: vec![],
-                                    location: Location {
+                                    location: Location::VariableLength {
                                         char: 5,
                                         line: 0,
                                         length: 5,
                                     },
                                 },
                             },
-                            opening_bracket_location: Location {
+                            opening_bracket_location: Location::DoubleCharacter {
                                 char: 3,
                                 line: 0,
-                                length: 2,
                             },
-                            closing_bracket_location: Location {
+                            closing_bracket_location: Location::SingleCharacter {
                                 char: 10,
                                 line: 0,
-                                length: 1,
                             },
                         }],
-                        location: Location {
+                        location: Location::VariableLength {
                             char: 0,
                             line: 0,
                             length: 3,
                         },
                     },
                     arguments: vec![],
-                    opening_bracket_location: Location {
+                    opening_bracket_location: Location::SingleCharacter {
                         char: 11,
                         line: 0,
-                        length: 1,
                     },
-                    closing_bracket_location: Location {
+                    closing_bracket_location: Location::SingleCharacter {
                         char: 12,
                         line: 0,
-                        length: 1,
                     },
                 }
             }
@@ -810,7 +807,7 @@ mod tests {
                     name: Word {
                         name: "is_string".to_string(),
                         interpolations: vec![],
-                        location: Location {
+                        location: Location::VariableLength {
                             char: 1,
                             line: 0,
                             length: 9,
@@ -819,8 +816,7 @@ mod tests {
                     arguments: vec![
                         Object::String {
                             content: "test".to_string(),
-                            interpolations: vec![],
-                            location: Location {
+                            location: Location::VariableLength {
                                 char: 13,
                                 line: 0,
                                 length: 6,
@@ -828,23 +824,20 @@ mod tests {
                         },
                         Object::String {
                             content: "test2".to_string(),
-                            interpolations: vec![],
-                            location: Location {
+                            location: Location::VariableLength {
                                 char: 23,
                                 line: 0,
                                 length: 7,
                             },
                         }
                     ],
-                    opening_bracket_location: Location {
+                    opening_bracket_location: Location::SingleCharacter {
                         char: 11,
                         line: 0,
-                        length: 1,
                     },
-                    closing_bracket_location: Location {
+                    closing_bracket_location: Location::SingleCharacter {
                         char: 31,
                         line: 0,
-                        length: 1,
                     },
                 }
             }
@@ -860,7 +853,7 @@ mod tests {
                     name: Word {
                         name: "is_string".to_string(),
                         interpolations: vec![],
-                        location: Location {
+                        location: Location::VariableLength {
                             char: 0,
                             line: 0,
                             length: 9,
@@ -870,7 +863,7 @@ mod tests {
                         name: Word {
                             name: "concat".to_string(),
                             interpolations: vec![],
-                            location: Location {
+                            location: Location::VariableLength {
                                 char: 10,
                                 line: 0,
                                 length: 6,
@@ -879,8 +872,7 @@ mod tests {
                         arguments: vec![
                             Object::String {
                                 content: "hello".to_string(),
-                                interpolations: vec![],
-                                location: Location {
+                                location: Location::VariableLength {
                                     char: 17,
                                     line: 0,
                                     length: 7,
@@ -888,34 +880,29 @@ mod tests {
                             },
                             Object::String {
                                 content: "world".to_string(),
-                                interpolations: vec![],
-                                location: Location {
+                                location: Location::VariableLength {
                                     char: 26,
                                     line: 0,
                                     length: 7,
                                 },
                             }
                         ],
-                        opening_bracket_location: Location {
+                        opening_bracket_location: Location::SingleCharacter {
                             char: 16,
                             line: 0,
-                            length: 1,
                         },
-                        closing_bracket_location: Location {
+                        closing_bracket_location: Location::SingleCharacter {
                             char: 33,
                             line: 0,
-                            length: 1,
                         },
                     }],
-                    opening_bracket_location: Location {
+                    opening_bracket_location: Location::SingleCharacter {
                         char: 9,
                         line: 0,
-                        length: 1,
                     },
-                    closing_bracket_location: Location {
+                    closing_bracket_location: Location::SingleCharacter {
                         char: 34,
                         line: 0,
-                        length: 1,
                     },
                 }
             }
@@ -932,7 +919,7 @@ mod tests {
                         name: Word {
                             name: "_string".to_string(),
                             interpolations: vec![],
-                            location: Location {
+                            location: Location::VariableLength {
                                 char: 0,
                                 line: 0,
                                 length: 7,
@@ -942,20 +929,30 @@ mod tests {
                     field: Word {
                         name: "length".to_string(),
                         interpolations: vec![],
-                        location: Location {
+                        location: Location::VariableLength {
                             char: 8,
                             line: 0,
                             length: 6,
                         },
                     },
-                    dot_location: Location {
+                    dot_location: Location::SingleCharacter {
                         char: 7,
                         line: 0,
-                        length: 1,
                     },
                 }
             }
         );
+    }
+
+    #[test]
+    fn test_parse_invalid_field_access() {
+        let string = "_string..length";
+        if let Ok(result) = (&mut super::Parser::new(&string)).parse_object_ast() {
+            panic!(
+                "successfully parsed invalid string \"{}\" into {:?}",
+                string, result
+            );
+        }
     }
 
     #[test]
@@ -968,7 +965,7 @@ mod tests {
                         name: Word {
                             name: "_string".to_string(),
                             interpolations: vec![],
-                            location: Location {
+                            location: Location::VariableLength {
                                 char: 0,
                                 line: 0,
                                 length: 7,
@@ -978,27 +975,24 @@ mod tests {
                     method: Word {
                         name: "length".to_string(),
                         interpolations: vec![],
-                        location: Location {
+                        location: Location::VariableLength {
                             char: 8,
                             line: 0,
                             length: 6,
                         },
                     },
                     arguments: vec![],
-                    dot_location: Location {
+                    dot_location: Location::SingleCharacter {
                         char: 7,
                         line: 0,
-                        length: 1,
                     },
-                    opening_bracket_location: Location {
+                    opening_bracket_location: Location::SingleCharacter {
                         char: 14,
                         line: 0,
-                        length: 1,
                     },
-                    closing_bracket_location: Location {
+                    closing_bracket_location: Location::SingleCharacter {
                         char: 15,
                         line: 0,
-                        length: 1,
                     },
                 }
             }
@@ -1015,7 +1009,7 @@ mod tests {
                         name: Word {
                             name: "_strings".to_string(),
                             interpolations: vec![],
-                            location: Location {
+                            location: Location::VariableLength {
                                 char: 0,
                                 line: 0,
                                 length: 8,
@@ -1024,21 +1018,19 @@ mod tests {
                     }),
                     index: Expression::Number {
                         content: "0".to_string(),
-                        location: Location {
+                        location: Location::VariableLength {
                             char: 9,
                             line: 0,
                             length: 1,
                         }
                     },
-                    opening_bracket_location: Location {
+                    opening_bracket_location: Location::SingleCharacter {
                         char: 8,
                         line: 0,
-                        length: 1,
                     },
-                    closing_bracket_location: Location {
+                    closing_bracket_location: Location::SingleCharacter {
                         char: 10,
                         line: 0,
-                        length: 1,
                     }
                 }
             }
@@ -1055,7 +1047,7 @@ mod tests {
                         name: Word {
                             name: "_strings".to_string(),
                             interpolations: vec![],
-                            location: Location {
+                            location: Location::VariableLength {
                                 char: 0,
                                 line: 0,
                                 length: 8,
@@ -1065,29 +1057,26 @@ mod tests {
                     index: Expression::SignedExpression {
                         expression: Box::new(Expression::Number {
                             content: "1".to_string(),
-                            location: Location {
+                            location: Location::VariableLength {
                                 char: 10,
                                 line: 0,
                                 length: 1,
                             }
                         }),
                         sign: Sign::Plus {
-                            location: Location {
+                            location: Location::SingleCharacter {
                                 char: 9,
                                 line: 0,
-                                length: 1,
                             }
                         },
                     },
-                    opening_bracket_location: Location {
+                    opening_bracket_location: Location::SingleCharacter {
                         char: 8,
                         line: 0,
-                        length: 1,
                     },
-                    closing_bracket_location: Location {
+                    closing_bracket_location: Location::SingleCharacter {
                         char: 11,
                         line: 0,
-                        length: 1,
                     }
                 }
             }
@@ -1101,7 +1090,7 @@ mod tests {
             ExpressionAst {
                 root: Expression::Number {
                     content: "123".to_string(),
-                    location: Location {
+                    location: Location::VariableLength {
                         char: 0,
                         line: 0,
                         length: 3,
@@ -1119,17 +1108,16 @@ mod tests {
                 root: Expression::SignedExpression {
                     expression: Box::new(Expression::Number {
                         content: "13.5e-2".to_string(),
-                        location: Location {
+                        location: Location::VariableLength {
                             char: 1,
                             line: 0,
                             length: 7,
                         }
                     }),
                     sign: Sign::Minus {
-                        location: Location {
+                        location: Location::SingleCharacter {
                             char: 0,
                             line: 0,
-                            length: 1,
                         }
                     }
                 }
@@ -1147,36 +1135,32 @@ mod tests {
                         expression: Box::new(Expression::SignedExpression {
                             expression: Box::new(Expression::Number {
                                 content: "6E+2".to_string(),
-                                location: Location {
+                                location: Location::VariableLength {
                                     char: 5,
                                     line: 0,
                                     length: 4,
                                 }
                             }),
                             sign: Sign::Minus {
-                                location: Location {
+                                location: Location::SingleCharacter {
                                     char: 4,
                                     line: 0,
-                                    length: 1,
                                 }
                             }
                         }),
-                        opening_bracket_location: Location {
+                        opening_bracket_location: Location::SingleCharacter {
                             char: 2,
                             line: 0,
-                            length: 1,
                         },
-                        closing_bracket_location: Location {
+                        closing_bracket_location: Location::SingleCharacter {
                             char: 10,
                             line: 0,
-                            length: 1,
                         }
                     }),
                     sign: Sign::Minus {
-                        location: Location {
+                        location: Location::SingleCharacter {
                             char: 1,
                             line: 0,
-                            length: 1,
                         }
                     }
                 }
@@ -1192,7 +1176,7 @@ mod tests {
                 root: Expression::BinaryOperation {
                     left: Box::new(Expression::Number {
                         content: "6".to_string(),
-                        location: Location {
+                        location: Location::VariableLength {
                             char: 0,
                             line: 0,
                             length: 1,
@@ -1201,7 +1185,7 @@ mod tests {
                     operation: Operation::Addition,
                     right: Box::new(Expression::Number {
                         content: "9".to_string(),
-                        location: Location {
+                        location: Location::VariableLength {
                             char: 4,
                             line: 0,
                             length: 1,
@@ -1232,7 +1216,7 @@ mod tests {
                     left: Box::new(Expression::BinaryOperation {
                         left: Box::new(Expression::Number {
                             content: "1".to_string(),
-                            location: Location {
+                            location: Location::VariableLength {
                                 char: 0,
                                 line: 0,
                                 length: 1,
@@ -1241,7 +1225,7 @@ mod tests {
                         operation: Operation::Addition,
                         right: Box::new(Expression::Number {
                             content: "2".to_string(),
-                            location: Location {
+                            location: Location::VariableLength {
                                 char: 4,
                                 line: 0,
                                 length: 1,
@@ -1252,17 +1236,16 @@ mod tests {
                     right: Box::new(Expression::SignedExpression {
                         expression: Box::new(Expression::Number {
                             content: "3".to_string(),
-                            location: Location {
+                            location: Location::VariableLength {
                                 char: 9,
                                 line: 0,
                                 length: 1,
                             }
                         }),
                         sign: Sign::Minus {
-                            location: Location {
+                            location: Location::SingleCharacter {
                                 char: 8,
                                 line: 0,
-                                length: 1,
                             }
                         }
                     })
@@ -1279,7 +1262,7 @@ mod tests {
                 root: Expression::BinaryOperation {
                     left: Box::new(Expression::Number {
                         content: "6".to_string(),
-                        location: Location {
+                        location: Location::VariableLength {
                             char: 0,
                             line: 0,
                             length: 1,
@@ -1289,7 +1272,7 @@ mod tests {
                     right: Box::new(Expression::BinaryOperation {
                         left: Box::new(Expression::Number {
                             content: "10".to_string(),
-                            location: Location {
+                            location: Location::VariableLength {
                                 char: 4,
                                 line: 0,
                                 length: 2,
@@ -1298,7 +1281,7 @@ mod tests {
                         operation: Operation::Division,
                         right: Box::new(Expression::Number {
                             content: "2".to_string(),
-                            location: Location {
+                            location: Location::VariableLength {
                                 char: 9,
                                 line: 0,
                                 length: 1,
@@ -1318,7 +1301,7 @@ mod tests {
                 root: Expression::BinaryOperation {
                     left: Box::new(Expression::Number {
                         content: "1".to_string(),
-                        location: Location {
+                        location: Location::VariableLength {
                             char: 0,
                             line: 0,
                             length: 1,
@@ -1330,7 +1313,7 @@ mod tests {
                             left: Box::new(Expression::BinaryOperation {
                                 left: Box::new(Expression::Number {
                                     content: "2".to_string(),
-                                    location: Location {
+                                    location: Location::VariableLength {
                                         char: 4,
                                         line: 0,
                                         length: 1,
@@ -1339,7 +1322,7 @@ mod tests {
                                 operation: Operation::Division,
                                 right: Box::new(Expression::Number {
                                     content: "3".to_string(),
-                                    location: Location {
+                                    location: Location::VariableLength {
                                         char: 8,
                                         line: 0,
                                         length: 1,
@@ -1350,7 +1333,7 @@ mod tests {
                             right: Box::new(Expression::BinaryOperation {
                                 left: Box::new(Expression::Number {
                                     content: "4".to_string(),
-                                    location: Location {
+                                    location: Location::VariableLength {
                                         char: 12,
                                         line: 0,
                                         length: 1,
@@ -1359,7 +1342,7 @@ mod tests {
                                 operation: Operation::Power,
                                 right: Box::new(Expression::Number {
                                     content: "5".to_string(),
-                                    location: Location {
+                                    location: Location::VariableLength {
                                         char: 16,
                                         line: 0,
                                         length: 1,
@@ -1370,7 +1353,7 @@ mod tests {
                         operation: Operation::Modulo,
                         right: Box::new(Expression::Number {
                             content: "6".to_string(),
-                            location: Location {
+                            location: Location::VariableLength {
                                 char: 20,
                                 line: 0,
                                 length: 1,

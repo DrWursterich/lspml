@@ -2,11 +2,49 @@ use core::cmp::Ordering;
 use core::fmt::Display;
 use std::fmt::Formatter;
 
-#[derive(Debug, PartialEq, Clone, Default)]
-pub(crate) struct Location {
-    pub(crate) char: u16,
-    pub(crate) line: u16,
-    pub(crate) length: u16,
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum Location {
+    SingleCharacter { char: u16, line: u16 },
+    DoubleCharacter { char: u16, line: u16 },
+    VariableLength { char: u16, line: u16, length: u16 },
+}
+
+impl Location {
+    pub(crate) fn char(&self) -> u16 {
+        return match self {
+            Location::SingleCharacter { char, .. } => *char,
+            Location::DoubleCharacter { char, .. } => *char,
+            Location::VariableLength { char, .. } => *char,
+        };
+    }
+
+    pub(crate) fn line(&self) -> u16 {
+        return match self {
+            Location::SingleCharacter { line, .. } => *line,
+            Location::DoubleCharacter { line, .. } => *line,
+            Location::VariableLength { line, .. } => *line,
+        };
+    }
+
+    pub(crate) fn len(&self) -> u16 {
+        return match self {
+            Location::SingleCharacter { .. } => 1 as u16,
+            Location::DoubleCharacter { .. } => 2 as u16,
+            Location::VariableLength { length, .. } => *length,
+        };
+    }
+}
+
+impl Display for Location {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "({}, {}, {})",
+            self.char(),
+            self.line(),
+            self.len()
+        )
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -25,12 +63,11 @@ pub(crate) enum Object {
     Name {
         name: Word,
     },
+    Null {
+        location: Location,
+    },
     String {
         content: String,
-        location: Location,
-        interpolations: Vec<Interpolation>,
-    },
-    Null {
         location: Location,
     },
     FieldAccess {
@@ -65,11 +102,7 @@ impl Display for Object {
                 fmt_arguments(formatter, arguments)
             }
             Object::Name { name } => name.fmt(formatter),
-            Object::String {
-                content,
-                interpolations,
-                location,
-            } => fmt_interpolations(formatter, &content, &interpolations, location.char as usize),
+            Object::String { content, .. } => formatter.write_str(content),
             Object::Null { .. } => formatter.write_str("null"),
             Object::FieldAccess { object, field, .. } => write!(formatter, "{}.{}", object, field),
             Object::MethodAccess {
@@ -96,7 +129,7 @@ fn fmt_interpolations(
     let mut last_index = 0;
     let indices = &mut string.char_indices();
     for interpolation in interpolations {
-        index = interpolation.opening_bracket_location.char as usize - offset;
+        index = interpolation.opening_bracket_location.char() as usize - offset;
         formatter.write_str(&string[last_index..indices.nth(index).unwrap().0])?;
         interpolation.fmt(formatter)?;
         last_index = index;
@@ -137,6 +170,7 @@ pub(crate) enum Expression {
         left: Box<Expression>,
         operation: Operation,
         right: Box<Expression>,
+        // operation_location: Location,
     },
 }
 
@@ -172,6 +206,15 @@ impl Display for Sign {
             Sign::Plus { .. } => "+",
             Sign::Minus { .. } => "-",
         });
+    }
+}
+
+impl Sign {
+    pub(crate) fn location(&self) -> &Location {
+        return match self {
+            Sign::Plus { location } => location,
+            Sign::Minus { location } => location,
+        };
     }
 }
 
@@ -220,7 +263,7 @@ impl PartialOrd for Operation {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Word {
     pub(crate) name: String,
     pub(crate) interpolations: Vec<Interpolation>,
@@ -233,7 +276,7 @@ impl Display for Word {
             formatter,
             &self.name,
             &self.interpolations,
-            self.location.char as usize,
+            self.location.char() as usize,
         );
     }
 }
@@ -280,7 +323,7 @@ mod tests {
     use crate::spel::ast::{Interpolation, Location, Object, Word};
 
     #[test]
-    fn test_parse_interpolated_word() {
+    fn test_format_interpolated_word() {
         assert_eq!(
             format!(
                 "{}",
@@ -291,25 +334,17 @@ mod tests {
                             name: Word {
                                 name: "nice".to_string(),
                                 interpolations: vec![],
-                                location: Location {
+                                location: Location::VariableLength {
                                     line: 0,
                                     char: 11,
                                     length: 4,
                                 }
                             }
                         },
-                        opening_bracket_location: Location {
-                            line: 0,
-                            char: 9,
-                            length: 2,
-                        },
-                        closing_bracket_location: Location {
-                            line: 0,
-                            char: 15,
-                            length: 1,
-                        }
+                        opening_bracket_location: Location::DoubleCharacter { line: 0, char: 9 },
+                        closing_bracket_location: Location::SingleCharacter { line: 0, char: 15 }
                     }],
-                    location: Location {
+                    location: Location::VariableLength {
                         line: 0,
                         char: 3,
                         length: 21,
@@ -321,43 +356,20 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_interpolated_string() {
+    fn test_format_string() {
         assert_eq!(
             format!(
                 "{}",
                 Object::String {
                     content: "'some  string'".to_string(),
-                    interpolations: vec![Interpolation {
-                        content: Object::Name {
-                            name: Word {
-                                name: "nice".to_string(),
-                                interpolations: vec![],
-                                location: Location {
-                                    line: 0,
-                                    char: 11,
-                                    length: 4,
-                                }
-                            }
-                        },
-                        opening_bracket_location: Location {
-                            line: 0,
-                            char: 6,
-                            length: 2,
-                        },
-                        closing_bracket_location: Location {
-                            line: 0,
-                            char: 12,
-                            length: 1,
-                        }
-                    }],
-                    location: Location {
+                    location: Location::VariableLength {
                         line: 0,
                         char: 0,
                         length: 15,
                     }
                 }
             ),
-            "'some ${nice} string'"
+            "'some  string'"
         );
     }
 }

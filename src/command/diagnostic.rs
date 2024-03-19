@@ -111,23 +111,10 @@ fn validate_tag(
                         .iter()
                         .find(|definition| definition.name == attribute)
                     {
-                        let value_node = child
-                            .child(2)
-                            .expect(
-                                format!(
-                                    "attribute {:?} did not have a attribute-value child",
-                                    attribute
-                                )
-                                .as_str(),
-                            )
-                            .child(1)
-                            .expect(
-                                format!(
-                                    "attribute {:?} did not have a child in its attribute-value",
-                                    attribute
-                                )
-                                .as_str(),
-                            );
+                        let value_node = match child.child(2).and_then(|child| child.child(1)) {
+                            Some(node) => node,
+                            _ => continue,
+                        };
                         let parser = &mut Parser::new(value_node.utf8_text(&text.as_bytes())?);
                         match definition.r#type {
                             grammar::TagAttributeType::Condition => {}

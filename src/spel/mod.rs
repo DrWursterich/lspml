@@ -1,5 +1,5 @@
 // use anyhow::{Error, Result};
-mod ast;
+pub(crate) mod ast;
 pub(crate) mod parser;
 
 pub(crate) struct Scanner {
