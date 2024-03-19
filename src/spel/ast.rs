@@ -2,54 +2,175 @@ use core::cmp::Ordering;
 use core::fmt::Display;
 use std::fmt::Formatter;
 
+#[derive(Debug, PartialEq, Clone, Default)]
+pub(crate) struct Location {
+    pub(crate) char: u16,
+    pub(crate) line: u16,
+    pub(crate) length: u16,
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Object {
-    Anchor(Word),
-    Function(Word, Vec<Object>),
-    Name(Word),
-    String(String, Vec<Interpolation>),
-    Null,
-    FieldAccess(Box<Object>, Word),
-    MethodAccess(Box<Object>, Word, Vec<Object>),
-    ArrayAccess(Box<Object>, Expression),
+    Anchor {
+        name: Word,
+        opening_bracket_location: Location,
+        closing_bracket_location: Location,
+    },
+    Function {
+        name: Word,
+        arguments: Vec<Object>,
+        opening_bracket_location: Location,
+        closing_bracket_location: Location,
+    },
+    Name {
+        name: Word,
+    },
+    String {
+        content: String,
+        location: Location,
+        interpolations: Vec<Interpolation>,
+    },
+    Null {
+        location: Location,
+    },
+    FieldAccess {
+        object: Box<Object>,
+        field: Word,
+        dot_location: Location,
+    },
+    MethodAccess {
+        object: Box<Object>,
+        method: Word,
+        arguments: Vec<Object>,
+        dot_location: Location,
+        opening_bracket_location: Location,
+        closing_bracket_location: Location,
+    },
+    ArrayAccess {
+        object: Box<Object>,
+        index: Expression,
+        opening_bracket_location: Location,
+        closing_bracket_location: Location,
+    },
+}
+
+impl Display for Object {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        return match self {
+            Object::Anchor { name, .. } => name.fmt(formatter),
+            Object::Function {
+                name, arguments, ..
+            } => {
+                name.fmt(formatter)?;
+                fmt_arguments(formatter, arguments)
+            }
+            Object::Name { name } => name.fmt(formatter),
+            Object::String {
+                content,
+                interpolations,
+                location,
+            } => fmt_interpolations(formatter, &content, &interpolations, location.char as usize),
+            Object::Null { .. } => formatter.write_str("null"),
+            Object::FieldAccess { object, field, .. } => write!(formatter, "{}.{}", object, field),
+            Object::MethodAccess {
+                object,
+                method,
+                arguments,
+                ..
+            } => {
+                write!(formatter, "{}.{}", object, method)?;
+                fmt_arguments(formatter, arguments)
+            }
+            Object::ArrayAccess { object, index, .. } => write!(formatter, "{}[{}]", object, index),
+        };
+    }
+}
+
+fn fmt_interpolations(
+    formatter: &mut Formatter<'_>,
+    string: &String,
+    interpolations: &Vec<Interpolation>,
+    offset: usize,
+) -> core::fmt::Result {
+    let mut index;
+    let mut last_index = 0;
+    let indices = &mut string.char_indices();
+    for interpolation in interpolations {
+        index = interpolation.opening_bracket_location.char as usize - offset;
+        formatter.write_str(&string[last_index..indices.nth(index).unwrap().0])?;
+        interpolation.fmt(formatter)?;
+        last_index = index;
+    }
+    formatter.write_str(&string[last_index..])
+}
+
+fn fmt_arguments(formatter: &mut Formatter<'_>, arguments: &Vec<Object>) -> core::fmt::Result {
+    match arguments.len() {
+        0 => formatter.write_str("()"),
+        len => {
+            formatter.write_str("(")?;
+            for argument in &arguments[1..len] {
+                formatter.write_str(",")?;
+                argument.fmt(formatter)?;
+            }
+            formatter.write_str(")")
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Expression {
-    Number(String),
-    SignedExpression(Box<Expression>, Sign),
-    BracketedExpression(Box<Expression>),
-    BinaryOperation(Box<Expression>, Operation, Box<Expression>),
+    Number {
+        content: String,
+        location: Location,
+    },
+    SignedExpression {
+        expression: Box<Expression>,
+        sign: Sign,
+    },
+    BracketedExpression {
+        expression: Box<Expression>,
+        opening_bracket_location: Location,
+        closing_bracket_location: Location,
+    },
+    BinaryOperation {
+        left: Box<Expression>,
+        operation: Operation,
+        right: Box<Expression>,
+    },
 }
 
 impl Display for Expression {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
         return match self {
-            Expression::Number(string) => formatter.write_str(string),
-            Expression::SignedExpression(expression, sign) => {
-                formatter.write_fmt(format_args!("{}{}", sign, expression))
-            }
-            Expression::BracketedExpression(expression) => {
+            Expression::Number { content, .. } => formatter.write_str(content),
+            Expression::SignedExpression {
+                expression, sign, ..
+            } => formatter.write_fmt(format_args!("{}{}", sign, expression)),
+            Expression::BracketedExpression { expression, .. } => {
                 formatter.write_fmt(format_args!("({})", expression))
             }
-            Expression::BinaryOperation(left, operation, right) => {
-                formatter.write_fmt(format_args!("{} {} {}", left, operation, right))
-            }
+            Expression::BinaryOperation {
+                left,
+                operation,
+                right,
+                ..
+            } => formatter.write_fmt(format_args!("{} {} {}", left, operation, right)),
         };
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Sign {
-    Plus,
-    Minus,
+    Plus { location: Location },
+    Minus { location: Location },
 }
 
 impl Display for Sign {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
         return formatter.write_str(match self {
-            Sign::Plus => "+",
-            Sign::Minus => "-",
+            Sign::Plus { .. } => "+",
+            Sign::Minus { .. } => "-",
         });
     }
 }
@@ -103,11 +224,33 @@ impl PartialOrd for Operation {
 pub(crate) struct Word {
     pub(crate) name: String,
     pub(crate) interpolations: Vec<Interpolation>,
+    pub(crate) location: Location,
+}
+
+impl Display for Word {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        return fmt_interpolations(
+            formatter,
+            &self.name,
+            &self.interpolations,
+            self.location.char as usize,
+        );
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Interpolation {
     pub(crate) content: Object,
+    pub(crate) opening_bracket_location: Location,
+    pub(crate) closing_bracket_location: Location,
+}
+
+impl Display for Interpolation {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("${")?;
+        self.content.fmt(formatter)?;
+        formatter.write_str("}")
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -129,5 +272,92 @@ pub(crate) struct ExpressionAst {
 impl ExpressionAst {
     pub(crate) fn new(expression: Expression) -> Self {
         return Self { root: expression };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::spel::ast::{Interpolation, Location, Object, Word};
+
+    #[test]
+    fn test_parse_interpolated_word() {
+        assert_eq!(
+            format!(
+                "{}",
+                Word {
+                    name: "hello--world".to_string(),
+                    interpolations: vec![Interpolation {
+                        content: Object::Name {
+                            name: Word {
+                                name: "nice".to_string(),
+                                interpolations: vec![],
+                                location: Location {
+                                    line: 0,
+                                    char: 11,
+                                    length: 4,
+                                }
+                            }
+                        },
+                        opening_bracket_location: Location {
+                            line: 0,
+                            char: 9,
+                            length: 2,
+                        },
+                        closing_bracket_location: Location {
+                            line: 0,
+                            char: 15,
+                            length: 1,
+                        }
+                    }],
+                    location: Location {
+                        line: 0,
+                        char: 3,
+                        length: 21,
+                    }
+                }
+            ),
+            "hello-${nice}-world"
+        );
+    }
+
+    #[test]
+    fn test_parse_interpolated_string() {
+        assert_eq!(
+            format!(
+                "{}",
+                Object::String {
+                    content: "'some  string'".to_string(),
+                    interpolations: vec![Interpolation {
+                        content: Object::Name {
+                            name: Word {
+                                name: "nice".to_string(),
+                                interpolations: vec![],
+                                location: Location {
+                                    line: 0,
+                                    char: 11,
+                                    length: 4,
+                                }
+                            }
+                        },
+                        opening_bracket_location: Location {
+                            line: 0,
+                            char: 6,
+                            length: 2,
+                        },
+                        closing_bracket_location: Location {
+                            line: 0,
+                            char: 12,
+                            length: 1,
+                        }
+                    }],
+                    location: Location {
+                        line: 0,
+                        char: 0,
+                        length: 15,
+                    }
+                }
+            ),
+            "'some ${nice} string'"
+        );
     }
 }
