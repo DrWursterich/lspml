@@ -170,7 +170,7 @@ pub(crate) enum Expression {
         left: Box<Expression>,
         operation: Operation,
         right: Box<Expression>,
-        // operation_location: Location,
+        operation_location: Location,
     },
 }
 
