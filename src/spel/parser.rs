@@ -1,5 +1,5 @@
 use super::{
-    ast::{self, ExpressionAst, Location},
+    ast::{self, ConditionAst, ExpressionAst, Location},
     Scanner,
 };
 use crate::spel::ast::ObjectAst;
@@ -41,6 +41,22 @@ impl Parser {
         self.scanner.skip_whitespace();
         return match self.scanner.is_done() {
             true => root.map(ExpressionAst::new),
+            false => Err(anyhow::anyhow!(
+                "trailing character \"{}\"",
+                self.scanner.peek().unwrap()
+            )),
+        };
+    }
+
+    pub(crate) fn parse_condition_ast(&mut self) -> Result<ConditionAst> {
+        self.scanner.skip_whitespace();
+        if self.scanner.is_done() {
+            return Err(anyhow::anyhow!("string is empty"));
+        }
+        let root = self.parse_condition();
+        self.scanner.skip_whitespace();
+        return match self.scanner.is_done() {
+            true => root.map(ConditionAst::new),
             false => Err(anyhow::anyhow!(
                 "trailing character \"{}\"",
                 self.scanner.peek().unwrap()
@@ -149,6 +165,41 @@ impl Parser {
                 None => result,
             },
         );
+    }
+
+    fn parse_condition(&mut self) -> Result<ast::Condition> {
+        let mut name = String::new();
+        let start = self.scanner.cursor as u16;
+        loop {
+            match self.scanner.peek() {
+                Some(char @ ('a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-')) => {
+                    name.push(*char);
+                    self.scanner.pop();
+                }
+                _ => break,
+            }
+        }
+        return match name.as_str() {
+            "true" => Ok(ast::Condition::True {
+                location: Location::VariableLength {
+                    char: start,
+                    line: 0,
+                    length: 4,
+                },
+            }),
+            "false" => Ok(ast::Condition::False {
+                location: Location::VariableLength {
+                    char: start,
+                    line: 0,
+                    length: 5,
+                },
+            }),
+            "" => Err(match self.scanner.peek() {
+                Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
+                _ => anyhow::anyhow!("unexpected end"),
+            }),
+            str => Err(anyhow::anyhow!("unexpected \"{}\"", str)),
+        };
     }
 
     fn parse_number(&mut self) -> Result<ast::Expression> {
@@ -339,12 +390,12 @@ impl Parser {
 
     fn parse_name_or_global_function(&mut self) -> Result<ast::Object> {
         let name = self.parse_word()?;
-        self.scanner.skip_whitespace();
         if name.name == "null" && name.interpolations.len() == 0 {
             return Ok(ast::Object::Null {
                 location: name.location,
             });
         }
+        self.scanner.skip_whitespace();
         let mut result = match self.scanner.peek() {
             Some(&'(') => {
                 let start = self.scanner.cursor as u16;
@@ -436,7 +487,7 @@ impl Parser {
         let start = self.scanner.cursor as u16;
         loop {
             match self.scanner.peek() {
-                Some(char @ ('a'..='z' | 'A'..='Z' | '_' | '-')) => {
+                Some(char @ ('a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-')) => {
                     result.push(*char);
                     self.scanner.pop();
                 }
@@ -487,7 +538,7 @@ impl Parser {
 mod tests {
     use crate::spel::ast::{
         Expression, ExpressionAst, Interpolation, Location, Object, ObjectAst, Operation, Sign,
-        Word,
+        Word, ConditionAst, Condition,
     };
 
     #[test]
@@ -1302,15 +1353,45 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_parse_simple_condition() {
+        assert_eq!(
+            parse_condition("true"),
+            ConditionAst {
+                root: Condition::True {
+                    location: Location::VariableLength { char: 0, line: 0, length: 4 }
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_condition_with_whitespace() {
+        assert_eq!(
+            parse_condition("\t\tfalse "),
+            ConditionAst {
+                root: Condition::False {
+                    location: Location::VariableLength { char: 2, line: 0, length: 5 }
+                }
+            }
+        );
+    }
+
     fn parse_object(string: &str) -> ObjectAst {
         return (&mut super::Parser::new(&string))
             .parse_object_ast()
-            .expect(&format!("error parsing \"{}\"", string));
+            .expect(&format!("error parsing object \"{}\"", string));
     }
 
     fn parse_expression(string: &str) -> ExpressionAst {
         return (&mut super::Parser::new(&string))
             .parse_expression_ast()
-            .expect(&format!("error parsing \"{}\"", string));
+            .expect(&format!("error parsing expression \"{}\"", string));
+    }
+
+    fn parse_condition(string: &str) -> ConditionAst {
+        return (&mut super::Parser::new(&string))
+            .parse_condition_ast()
+            .expect(&format!("error parsing condition \"{}\"", string));
     }
 }

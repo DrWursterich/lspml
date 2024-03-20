@@ -3,51 +3,6 @@ use core::fmt::Display;
 use std::fmt::Formatter;
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Location {
-    SingleCharacter { char: u16, line: u16 },
-    DoubleCharacter { char: u16, line: u16 },
-    VariableLength { char: u16, line: u16, length: u16 },
-}
-
-impl Location {
-    pub(crate) fn char(&self) -> u16 {
-        return match self {
-            Location::SingleCharacter { char, .. } => *char,
-            Location::DoubleCharacter { char, .. } => *char,
-            Location::VariableLength { char, .. } => *char,
-        };
-    }
-
-    pub(crate) fn line(&self) -> u16 {
-        return match self {
-            Location::SingleCharacter { line, .. } => *line,
-            Location::DoubleCharacter { line, .. } => *line,
-            Location::VariableLength { line, .. } => *line,
-        };
-    }
-
-    pub(crate) fn len(&self) -> u16 {
-        return match self {
-            Location::SingleCharacter { .. } => 1 as u16,
-            Location::DoubleCharacter { .. } => 2 as u16,
-            Location::VariableLength { length, .. } => *length,
-        };
-    }
-}
-
-impl Display for Location {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            formatter,
-            "({}, {}, {})",
-            self.char(),
-            self.line(),
-            self.len()
-        )
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Object {
     Anchor {
         name: Word,
@@ -119,6 +74,38 @@ impl Display for Object {
     }
 }
 
+fn fmt_arguments(formatter: &mut Formatter<'_>, arguments: &Vec<Object>) -> core::fmt::Result {
+    match arguments.len() {
+        0 => formatter.write_str("()"),
+        len => {
+            formatter.write_str("(")?;
+            for argument in &arguments[1..len] {
+                formatter.write_str(",")?;
+                argument.fmt(formatter)?;
+            }
+            formatter.write_str(")")
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct Word {
+    pub(crate) name: String,
+    pub(crate) interpolations: Vec<Interpolation>,
+    pub(crate) location: Location,
+}
+
+impl Display for Word {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        return fmt_interpolations(
+            formatter,
+            &self.name,
+            &self.interpolations,
+            self.location.char() as usize,
+        );
+    }
+}
+
 fn fmt_interpolations(
     formatter: &mut Formatter<'_>,
     string: &String,
@@ -137,17 +124,18 @@ fn fmt_interpolations(
     formatter.write_str(&string[last_index..])
 }
 
-fn fmt_arguments(formatter: &mut Formatter<'_>, arguments: &Vec<Object>) -> core::fmt::Result {
-    match arguments.len() {
-        0 => formatter.write_str("()"),
-        len => {
-            formatter.write_str("(")?;
-            for argument in &arguments[1..len] {
-                formatter.write_str(",")?;
-                argument.fmt(formatter)?;
-            }
-            formatter.write_str(")")
-        }
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct Interpolation {
+    pub(crate) content: Object,
+    pub(crate) opening_bracket_location: Location,
+    pub(crate) closing_bracket_location: Location,
+}
+
+impl Display for Interpolation {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("${")?;
+        self.content.fmt(formatter)?;
+        formatter.write_str("}")
     }
 }
 
@@ -264,35 +252,57 @@ impl PartialOrd for Operation {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Word {
-    pub(crate) name: String,
-    pub(crate) interpolations: Vec<Interpolation>,
-    pub(crate) location: Location,
-}
-
-impl Display for Word {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
-        return fmt_interpolations(
-            formatter,
-            &self.name,
-            &self.interpolations,
-            self.location.char() as usize,
-        );
-    }
+pub(crate) enum Condition {
+    True {
+        location: Location,
+    },
+    False {
+        location: Location,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Interpolation {
-    pub(crate) content: Object,
-    pub(crate) opening_bracket_location: Location,
-    pub(crate) closing_bracket_location: Location,
+pub(crate) enum Location {
+    SingleCharacter { char: u16, line: u16 },
+    DoubleCharacter { char: u16, line: u16 },
+    VariableLength { char: u16, line: u16, length: u16 },
 }
 
-impl Display for Interpolation {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
-        formatter.write_str("${")?;
-        self.content.fmt(formatter)?;
-        formatter.write_str("}")
+impl Location {
+    pub(crate) fn char(&self) -> u16 {
+        return match self {
+            Location::SingleCharacter { char, .. } => *char,
+            Location::DoubleCharacter { char, .. } => *char,
+            Location::VariableLength { char, .. } => *char,
+        };
+    }
+
+    pub(crate) fn line(&self) -> u16 {
+        return match self {
+            Location::SingleCharacter { line, .. } => *line,
+            Location::DoubleCharacter { line, .. } => *line,
+            Location::VariableLength { line, .. } => *line,
+        };
+    }
+
+    pub(crate) fn len(&self) -> u16 {
+        return match self {
+            Location::SingleCharacter { .. } => 1 as u16,
+            Location::DoubleCharacter { .. } => 2 as u16,
+            Location::VariableLength { length, .. } => *length,
+        };
+    }
+}
+
+impl Display for Location {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "({}, {}, {})",
+            self.char(),
+            self.line(),
+            self.len()
+        )
     }
 }
 
@@ -315,6 +325,17 @@ pub(crate) struct ExpressionAst {
 impl ExpressionAst {
     pub(crate) fn new(expression: Expression) -> Self {
         return Self { root: expression };
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct ConditionAst {
+    pub(crate) root: Condition,
+}
+
+impl ConditionAst {
+    pub(crate) fn new(condition: Condition) -> Self {
+        return Self { root: condition };
     }
 }
 
