@@ -29,13 +29,13 @@ pub(crate) struct TagAttribute {
 #[derive(Debug)]
 pub(crate) enum TagAttributeType {
     Condition,
+    // Enum(Vec<String>), e.g. for action="put|putAll|remove|..."
     Expression,
     Identifier,
-    Object, // TODO: needs to be more defined
+    Object,
+    Query,
     Regex,
     String,
-    Query,
-    // maybe UnionType?
 }
 
 #[derive(Debug)]
@@ -916,7 +916,7 @@ Die Auswertung soll "ignore case" durchgeführt werden. Bezieht sich auf `eq`, `
             ),
         },
         TagAttribute {
-            name: "iNull",
+            name: "isNull",
             r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
@@ -1515,7 +1515,7 @@ Die Auswertung soll "ignore case" durchgeführt werden. Bezieht sich auf `eq`, `
             ),
         },
         TagAttribute {
-            name: "iNull",
+            name: "isNull",
             r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(

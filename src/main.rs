@@ -30,9 +30,11 @@ struct CommandLineOpts {
 }
 
 pub(crate) const TOKEN_TYPES: &'static [SemanticTokenType] = &[
-    SemanticTokenType::MACRO,
     SemanticTokenType::ENUM,
+    SemanticTokenType::ENUM_MEMBER,
     SemanticTokenType::FUNCTION,
+    SemanticTokenType::KEYWORD,
+    SemanticTokenType::MACRO,
     SemanticTokenType::METHOD,
     SemanticTokenType::NUMBER,
     SemanticTokenType::OPERATOR,

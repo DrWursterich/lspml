@@ -206,7 +206,28 @@ fn index_tag(
                         };
                         let parser = &mut Parser::new(value_node.utf8_text(&text.as_bytes())?);
                         match definition.r#type {
-                            grammar::TagAttributeType::Condition => {}
+                            grammar::TagAttributeType::Condition => {
+                                match parser.parse_condition_ast() {
+                                    Ok(result) => {
+                                        let position = value_node.start_position();
+                                        index_condition(
+                                            &result.root,
+                                            &mut SpelTokenCollector::new(
+                                                tokenizer,
+                                                position.row as u32,
+                                                position.column as u32,
+                                            ),
+                                        );
+                                    }
+                                    Err(err) => {
+                                        log::error!(
+                                            "unparsable condition \"{}\": {}",
+                                            value_node.utf8_text(&text.as_bytes())?,
+                                            err
+                                        );
+                                    }
+                                }
+                            }
                             grammar::TagAttributeType::Expression => {
                                 match parser.parse_expression_ast() {
                                     Ok(result) => {
@@ -334,8 +355,6 @@ fn index_object(node: &ast::Object, tokenizer: &mut SpelTokenCollector) {
         ast::Object::String { location, .. } => {
             tokenizer.add(location, SemanticTokenType::STRING, vec![])
         }
-        // "number" => tokens.push(create_token(node, SemanticTokenType::NUMBER, Vec::new())),
-        // "boolean" => tokens.push(create_token(node, SemanticTokenType::ENUM, Vec::new())),
         ast::Object::FieldAccess {
             object,
             field,
@@ -401,7 +420,7 @@ fn index_object(node: &ast::Object, tokenizer: &mut SpelTokenCollector) {
           //         Vec::new(),
           //     ));
           // }
-    }
+    };
 }
 
 fn index_expression(node: &ast::Expression, tokenizer: &mut SpelTokenCollector) {
@@ -467,56 +486,57 @@ fn index_expression(node: &ast::Expression, tokenizer: &mut SpelTokenCollector) 
           //         Vec::new(),
           //     ));
           // }
-    }
+    };
 }
 
-// fn index_condition(node: Node, tokens: &mut Vec<SemanticToken>) -> Result<()> {
-//     match node.kind() {
-//         "boolean" => tokens.push(create_token(node, SemanticTokenType::ENUM, Vec::new())),
-//         "condition" => {
-//             index_condition(node.child(0).unwrap(), tokens)?;
-//             tokens.push(create_token(
-//                 node.child(1).unwrap(),
-//                 SemanticTokenType::OPERATOR,
-//                 Vec::new(),
-//             ));
-//             index_condition(node.child(2).unwrap(), tokens)?;
-//         }
-//         "bracketed_condition" => {
-//             tokens.push(create_token(
-//                 node.child(0).unwrap(),
-//                 SemanticTokenType::OPERATOR,
-//                 Vec::new(),
-//             ));
-//             index_condition(node.child(1).unwrap(), tokens)?;
-//             tokens.push(create_token(
-//                 node.child(2).unwrap(),
-//                 SemanticTokenType::OPERATOR,
-//                 Vec::new(),
-//             ));
-//         }
-//         "equality_comparison" => {
-//             index_object(node.child(0).unwrap(), tokens)?;
-//             tokens.push(create_token(
-//                 node.child(1).unwrap(),
-//                 SemanticTokenType::OPERATOR,
-//                 Vec::new(),
-//             ));
-//             index_object(node.child(2).unwrap(), tokens)?;
-//         }
-//         "expression_comparison" => {
-//             index_expression(node.child(0).unwrap(), tokens)?;
-//             tokens.push(create_token(
-//                 node.child(1).unwrap(),
-//                 SemanticTokenType::OPERATOR,
-//                 Vec::new(),
-//             ));
-//             index_expression(node.child(2).unwrap(), tokens)?;
-//         }
-//         _ => {}
-//     }
-//     return Ok(());
-// }
+fn index_condition(node: &ast::Condition, tokenizer: &mut SpelTokenCollector) {
+    match node {
+        ast::Condition::True { location } | ast::Condition::False { location } => {
+            tokenizer.add(location, SemanticTokenType::ENUM_MEMBER, vec![])
+        }
+        // "condition" => {
+        //     index_condition(node.child(0).unwrap(), tokens)?;
+        //     tokens.push(create_token(
+        //         node.child(1).unwrap(),
+        //         SemanticTokenType::OPERATOR,
+        //         Vec::new(),
+        //     ));
+        //     index_condition(node.child(2).unwrap(), tokens)?;
+        // }
+        // "bracketed_condition" => {
+        //     tokens.push(create_token(
+        //         node.child(0).unwrap(),
+        //         SemanticTokenType::OPERATOR,
+        //         Vec::new(),
+        //     ));
+        //     index_condition(node.child(1).unwrap(), tokens)?;
+        //     tokens.push(create_token(
+        //         node.child(2).unwrap(),
+        //         SemanticTokenType::OPERATOR,
+        //         Vec::new(),
+        //     ));
+        // }
+        // "equality_comparison" => {
+        //     index_object(node.child(0).unwrap(), tokens)?;
+        //     tokens.push(create_token(
+        //         node.child(1).unwrap(),
+        //         SemanticTokenType::OPERATOR,
+        //         Vec::new(),
+        //     ));
+        //     index_object(node.child(2).unwrap(), tokens)?;
+        // }
+        // "expression_comparison" => {
+        //     index_expression(node.child(0).unwrap(), tokens)?;
+        //     tokens.push(create_token(
+        //         node.child(1).unwrap(),
+        //         SemanticTokenType::OPERATOR,
+        //         Vec::new(),
+        //     ));
+        //     index_expression(node.child(2).unwrap(), tokens)?;
+        // }
+        // _ => {}
+    };
+}
 
 fn index_children(node: Node, text: &String, tokens: &mut Tokenizer) -> Result<()> {
     for child in node.children(&mut node.walk()) {
