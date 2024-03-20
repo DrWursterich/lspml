@@ -3,7 +3,7 @@ use crate::document_store;
 use crate::modules;
 use crate::parser;
 use lsp_types::{GotoDefinitionParams, Location, Position, Range, Url};
-use std::{path::Path, result::Result};
+use std::path::Path;
 use tree_sitter::{Query, QueryCursor};
 
 /**
