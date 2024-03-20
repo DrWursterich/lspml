@@ -148,6 +148,7 @@ pub(crate) enum Expression {
     SignedExpression {
         expression: Box<Expression>,
         sign: Sign,
+        sign_location: Location,
     },
     BracketedExpression {
         expression: Box<Expression>,
@@ -156,9 +157,9 @@ pub(crate) enum Expression {
     },
     BinaryOperation {
         left: Box<Expression>,
-        operation: Operation,
+        operator: ExpressionOperator,
         right: Box<Expression>,
-        operation_location: Location,
+        operator_location: Location,
     },
 }
 
@@ -174,7 +175,7 @@ impl Display for Expression {
             }
             Expression::BinaryOperation {
                 left,
-                operation,
+                operator: operation,
                 right,
                 ..
             } => formatter.write_fmt(format_args!("{} {} {}", left, operation, right)),
@@ -184,8 +185,8 @@ impl Display for Expression {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Sign {
-    Plus { location: Location },
-    Minus { location: Location },
+    Plus,
+    Minus,
 }
 
 impl Display for Sign {
@@ -197,17 +198,8 @@ impl Display for Sign {
     }
 }
 
-impl Sign {
-    pub(crate) fn location(&self) -> &Location {
-        return match self {
-            Sign::Plus { location } => location,
-            Sign::Minus { location } => location,
-        };
-    }
-}
-
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Operation {
+pub(crate) enum ExpressionOperator {
     Addition,
     Subtraction,
     Division,
@@ -216,35 +208,37 @@ pub(crate) enum Operation {
     Power,
 }
 
-impl Display for Operation {
+impl Display for ExpressionOperator {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
         return formatter.write_str(match self {
-            Operation::Addition => "+",
-            Operation::Subtraction => "-",
-            Operation::Division => "/",
-            Operation::Multiplication => "*",
-            Operation::Modulo => "%",
-            Operation::Power => "^",
+            ExpressionOperator::Addition => "+",
+            ExpressionOperator::Subtraction => "-",
+            ExpressionOperator::Division => "/",
+            ExpressionOperator::Multiplication => "*",
+            ExpressionOperator::Modulo => "%",
+            ExpressionOperator::Power => "^",
         });
     }
 }
 
-impl PartialOrd for Operation {
+impl PartialOrd for ExpressionOperator {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(match self {
-            Operation::Addition | Operation::Subtraction => match other {
-                Operation::Addition | Operation::Subtraction => Ordering::Equal,
+            ExpressionOperator::Addition | ExpressionOperator::Subtraction => match other {
+                ExpressionOperator::Addition | ExpressionOperator::Subtraction => Ordering::Equal,
                 _ => Ordering::Greater,
             },
-            Operation::Division | Operation::Multiplication | Operation::Modulo => match other {
-                Operation::Addition | Operation::Subtraction => Ordering::Less,
-                Operation::Division | Operation::Multiplication | Operation::Modulo => {
-                    Ordering::Equal
-                }
+            ExpressionOperator::Division
+            | ExpressionOperator::Multiplication
+            | ExpressionOperator::Modulo => match other {
+                ExpressionOperator::Addition | ExpressionOperator::Subtraction => Ordering::Less,
+                ExpressionOperator::Division
+                | ExpressionOperator::Multiplication
+                | ExpressionOperator::Modulo => Ordering::Equal,
                 _ => Ordering::Greater,
             },
-            Operation::Power => match other {
-                Operation::Power => Ordering::Equal,
+            ExpressionOperator::Power => match other {
+                ExpressionOperator::Power => Ordering::Equal,
                 _ => Ordering::Less,
             },
         })
@@ -259,6 +253,27 @@ pub(crate) enum Condition {
     False {
         location: Location,
     },
+    BinaryOperation {
+        left: Box<Condition>,
+        operator: ConditionOperator,
+        right: Box<Condition>,
+        operator_location: Location,
+    },
+}
+
+impl Display for ConditionOperator {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        return formatter.write_str(match self {
+            ConditionOperator::And => "&&",
+            ConditionOperator::Or => "||",
+        });
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum ConditionOperator {
+    And,
+    Or,
 }
 
 #[derive(Debug, PartialEq, Clone)]

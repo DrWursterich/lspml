@@ -21,10 +21,10 @@ impl Parser {
         if self.scanner.is_done() {
             return Err(anyhow::anyhow!("string is empty"));
         }
-        let root = self.parse_object();
+        let root = self.parse_object()?;
         self.scanner.skip_whitespace();
         return match self.scanner.is_done() {
-            true => root.map(ObjectAst::new),
+            true => Ok(ObjectAst::new(root)),
             false => Err(anyhow::anyhow!(
                 "trailing character \"{}\"",
                 self.scanner.peek().unwrap()
@@ -37,10 +37,10 @@ impl Parser {
         if self.scanner.is_done() {
             return Err(anyhow::anyhow!("string is empty"));
         }
-        let root = self.parse_expression();
+        let root = self.parse_expression()?;
         self.scanner.skip_whitespace();
         return match self.scanner.is_done() {
-            true => root.map(ExpressionAst::new),
+            true => Ok(ExpressionAst::new(root)),
             false => Err(anyhow::anyhow!(
                 "trailing character \"{}\"",
                 self.scanner.peek().unwrap()
@@ -53,10 +53,10 @@ impl Parser {
         if self.scanner.is_done() {
             return Err(anyhow::anyhow!("string is empty"));
         }
-        let root = self.parse_condition();
+        let root = self.parse_condition()?;
         self.scanner.skip_whitespace();
         return match self.scanner.is_done() {
-            true => root.map(ConditionAst::new),
+            true => Ok(ConditionAst::new(root)),
             false => Err(anyhow::anyhow!(
                 "trailing character \"{}\"",
                 self.scanner.peek().unwrap()
@@ -69,10 +69,10 @@ impl Parser {
         if self.scanner.is_done() {
             return Err(anyhow::anyhow!("string is empty"));
         }
-        let word = self.parse_word();
+        let word = self.parse_word()?;
         self.scanner.skip_whitespace();
         return match self.scanner.is_done() {
-            true => word,
+            true => Ok(word),
             false => Err(anyhow::anyhow!(
                 "trailing character \"{}\"",
                 self.scanner.peek().unwrap()
@@ -115,13 +115,13 @@ impl Parser {
             }
             Some('0'..='9') => self.parse_number()?,
             _ => {
-                let location = Location::SingleCharacter {
+                let sign_location = Location::SingleCharacter {
                     char: self.scanner.cursor as u16,
                     line: 0,
                 };
                 let sign = match self.scanner.pop() {
-                    Some('+') => ast::Sign::Plus { location },
-                    Some('-') => ast::Sign::Minus { location },
+                    Some('+') => ast::Sign::Plus,
+                    Some('-') => ast::Sign::Minus,
                     Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
                     _ => return Err(anyhow::anyhow!("unexpected end")),
                 };
@@ -133,6 +133,7 @@ impl Parser {
                     expression => ast::Expression::SignedExpression {
                         expression: Box::new(expression),
                         sign,
+                        sign_location,
                     },
                 }
             }
@@ -140,16 +141,16 @@ impl Parser {
         self.scanner.skip_whitespace();
         return Ok(
             match self.scanner.transform(|c| match c {
-                '+' => Some(ast::Operation::Addition),
-                '-' => Some(ast::Operation::Subtraction),
-                '/' => Some(ast::Operation::Division),
-                '*' => Some(ast::Operation::Multiplication),
-                '^' => Some(ast::Operation::Power),
-                '%' => Some(ast::Operation::Modulo),
+                '+' => Some(ast::ExpressionOperator::Addition),
+                '-' => Some(ast::ExpressionOperator::Subtraction),
+                '/' => Some(ast::ExpressionOperator::Division),
+                '*' => Some(ast::ExpressionOperator::Multiplication),
+                '^' => Some(ast::ExpressionOperator::Power),
+                '%' => Some(ast::ExpressionOperator::Modulo),
                 _ => None,
             }) {
                 Some(operation) => {
-                    let operation_location = Location::SingleCharacter {
+                    let operator_location = Location::SingleCharacter {
                         char: self.scanner.cursor as u16 - 1,
                         line: 0,
                     };
@@ -159,7 +160,7 @@ impl Parser {
                         result,
                         operation,
                         expression,
-                        operation_location,
+                        operator_location,
                     )
                 }
                 None => result,
@@ -179,27 +180,86 @@ impl Parser {
                 _ => break,
             }
         }
-        return match name.as_str() {
-            "true" => Ok(ast::Condition::True {
+        let result = match name.as_str() {
+            "true" => ast::Condition::True {
                 location: Location::VariableLength {
                     char: start,
                     line: 0,
                     length: 4,
                 },
-            }),
-            "false" => Ok(ast::Condition::False {
+            },
+            "false" => ast::Condition::False {
                 location: Location::VariableLength {
                     char: start,
                     line: 0,
                     length: 5,
                 },
-            }),
-            "" => Err(match self.scanner.peek() {
-                Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
-                _ => anyhow::anyhow!("unexpected end"),
-            }),
-            str => Err(anyhow::anyhow!("unexpected \"{}\"", str)),
+            },
+            "" => {
+                return Err(match self.scanner.peek() {
+                    Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
+                    _ => anyhow::anyhow!("unexpected end"),
+                })
+            }
+            str => return Err(anyhow::anyhow!("unexpected \"{}\"", str)),
         };
+        self.scanner.skip_whitespace();
+        return match self.scanner.peek() {
+            Some(char @ ('&' | '|')) => {
+                let first = &char.clone();
+                let operator = match first == &'&' {
+                    true => ast::ConditionOperator::And,
+                    false => ast::ConditionOperator::Or,
+                };
+                let operator_location = Location::DoubleCharacter {
+                    char: self.scanner.cursor as u16,
+                    line: 0,
+                };
+                self.scanner.pop();
+                if !self.scanner.take(first) {
+                    return Err(anyhow::anyhow!(
+                        "unexpected char \"{}\"",
+                        match self.scanner.pop() {
+                            Some(char) => char,
+                            None => first,
+                        }
+                    ));
+                }
+                self.scanner.skip_whitespace();
+                Ok(ast::Condition::BinaryOperation {
+                    left: Box::new(result),
+                    operator,
+                    right: Box::new(self.parse_condition()?),
+                    operator_location,
+                })
+            }
+            _ => Ok(result),
+        };
+        // match self.scanner.transform(|c| match c {
+        //     '+' => Some(ast::ExpressionOperator::Addition),
+        //     '-' => Some(ast::ExpressionOperator::Subtraction),
+        //     '/' => Some(ast::ExpressionOperator::Division),
+        //     '*' => Some(ast::ExpressionOperator::Multiplication),
+        //     '^' => Some(ast::ExpressionOperator::Power),
+        //     '%' => Some(ast::ExpressionOperator::Modulo),
+        //     _ => None,
+        // }) {
+        //     Some(operation) => {
+        //         let operation_location = Location::SingleCharacter {
+        //             char: self.scanner.cursor as u16 - 1,
+        //             line: 0,
+        //         };
+        //         self.scanner.skip_whitespace();
+        //         let expression = self.parse_expression()?;
+        //         self.resolve_binary_operation_precidence(
+        //             result,
+        //             operation,
+        //             expression,
+        //             operation_location,
+        //         )
+        //     }
+        //     None => result,
+        // },
     }
 
     fn parse_number(&mut self) -> Result<ast::Expression> {
@@ -256,16 +316,16 @@ impl Parser {
     fn resolve_binary_operation_precidence(
         &mut self,
         left_expression: ast::Expression,
-        left_operation: ast::Operation,
+        left_operation: ast::ExpressionOperator,
         right_expression: ast::Expression,
         left_operation_location: Location,
     ) -> ast::Expression {
         match right_expression {
             ast::Expression::BinaryOperation {
                 left,
-                operation: right_operation,
+                operator: right_operation,
                 right,
-                operation_location: right_operation_location,
+                operator_location: right_operation_location,
             } if left_operation <= right_operation => ast::Expression::BinaryOperation {
                 left: Box::new(self.resolve_binary_operation_precidence(
                     left_expression,
@@ -273,15 +333,15 @@ impl Parser {
                     *left,
                     left_operation_location,
                 )),
-                operation: right_operation,
+                operator: right_operation,
                 right,
-                operation_location: right_operation_location,
+                operator_location: right_operation_location,
             },
             _ => ast::Expression::BinaryOperation {
                 left: Box::new(left_expression),
-                operation: left_operation,
+                operator: left_operation,
                 right: Box::new(right_expression),
-                operation_location: left_operation_location,
+                operator_location: left_operation_location,
             },
         }
     }
@@ -537,8 +597,8 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use crate::spel::ast::{
-        Expression, ExpressionAst, Interpolation, Location, Object, ObjectAst, Operation, Sign,
-        Word, ConditionAst, Condition,
+        Condition, ConditionAst, ConditionOperator, Expression, ExpressionAst, ExpressionOperator,
+        Interpolation, Location, Object, ObjectAst, Sign, Word,
     };
 
     #[test]
@@ -1068,9 +1128,8 @@ mod tests {
                                 length: 1,
                             }
                         }),
-                        sign: Sign::Plus {
-                            location: Location::SingleCharacter { char: 9, line: 0 }
-                        },
+                        sign: Sign::Plus,
+                        sign_location: Location::SingleCharacter { char: 9, line: 0 },
                     },
                     opening_bracket_location: Location::SingleCharacter { char: 8, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 11, line: 0 }
@@ -1110,9 +1169,8 @@ mod tests {
                             length: 7,
                         }
                     }),
-                    sign: Sign::Minus {
-                        location: Location::SingleCharacter { char: 0, line: 0 }
-                    }
+                    sign: Sign::Minus,
+                    sign_location: Location::SingleCharacter { char: 0, line: 0 },
                 }
             }
         );
@@ -1134,16 +1192,14 @@ mod tests {
                                     length: 4,
                                 }
                             }),
-                            sign: Sign::Minus {
-                                location: Location::SingleCharacter { char: 4, line: 0 }
-                            }
+                            sign: Sign::Minus,
+                            sign_location: Location::SingleCharacter { char: 4, line: 0 },
                         }),
                         opening_bracket_location: Location::SingleCharacter { char: 2, line: 0 },
                         closing_bracket_location: Location::SingleCharacter { char: 10, line: 0 }
                     }),
-                    sign: Sign::Minus {
-                        location: Location::SingleCharacter { char: 1, line: 0 }
-                    }
+                    sign: Sign::Minus,
+                    sign_location: Location::SingleCharacter { char: 1, line: 0 },
                 }
             }
         );
@@ -1163,7 +1219,7 @@ mod tests {
                             length: 1,
                         }
                     }),
-                    operation: Operation::Addition,
+                    operator: ExpressionOperator::Addition,
                     right: Box::new(Expression::Number {
                         content: "9".to_string(),
                         location: Location::VariableLength {
@@ -1172,7 +1228,7 @@ mod tests {
                             length: 1,
                         }
                     }),
-                    operation_location: Location::SingleCharacter { char: 2, line: 0 }
+                    operator_location: Location::SingleCharacter { char: 2, line: 0 }
                 }
             }
         );
@@ -1204,7 +1260,7 @@ mod tests {
                                 length: 1,
                             }
                         }),
-                        operation: Operation::Addition,
+                        operator: ExpressionOperator::Addition,
                         right: Box::new(Expression::Number {
                             content: "2".to_string(),
                             location: Location::VariableLength {
@@ -1213,9 +1269,9 @@ mod tests {
                                 length: 1,
                             }
                         }),
-                        operation_location: Location::SingleCharacter { char: 2, line: 0 }
+                        operator_location: Location::SingleCharacter { char: 2, line: 0 }
                     }),
-                    operation: Operation::Addition,
+                    operator: ExpressionOperator::Addition,
                     right: Box::new(Expression::SignedExpression {
                         expression: Box::new(Expression::Number {
                             content: "3".to_string(),
@@ -1225,11 +1281,10 @@ mod tests {
                                 length: 1,
                             }
                         }),
-                        sign: Sign::Minus {
-                            location: Location::SingleCharacter { char: 8, line: 0 }
-                        }
+                        sign: Sign::Minus,
+                        sign_location: Location::SingleCharacter { char: 8, line: 0 },
                     }),
-                    operation_location: Location::SingleCharacter { char: 6, line: 0 }
+                    operator_location: Location::SingleCharacter { char: 6, line: 0 }
                 }
             }
         );
@@ -1249,7 +1304,7 @@ mod tests {
                             length: 1,
                         }
                     }),
-                    operation: Operation::Addition,
+                    operator: ExpressionOperator::Addition,
                     right: Box::new(Expression::BinaryOperation {
                         left: Box::new(Expression::Number {
                             content: "10".to_string(),
@@ -1259,7 +1314,7 @@ mod tests {
                                 length: 2,
                             }
                         }),
-                        operation: Operation::Division,
+                        operator: ExpressionOperator::Division,
                         right: Box::new(Expression::Number {
                             content: "2".to_string(),
                             location: Location::VariableLength {
@@ -1268,9 +1323,9 @@ mod tests {
                                 length: 1,
                             }
                         }),
-                        operation_location: Location::SingleCharacter { char: 7, line: 0 }
+                        operator_location: Location::SingleCharacter { char: 7, line: 0 }
                     }),
-                    operation_location: Location::SingleCharacter { char: 2, line: 0 }
+                    operator_location: Location::SingleCharacter { char: 2, line: 0 }
                 }
             }
         );
@@ -1290,7 +1345,7 @@ mod tests {
                             length: 1,
                         }
                     }),
-                    operation: Operation::Addition,
+                    operator: ExpressionOperator::Addition,
                     right: Box::new(Expression::BinaryOperation {
                         left: Box::new(Expression::BinaryOperation {
                             left: Box::new(Expression::BinaryOperation {
@@ -1302,7 +1357,7 @@ mod tests {
                                         length: 1,
                                     }
                                 }),
-                                operation: Operation::Division,
+                                operator: ExpressionOperator::Division,
                                 right: Box::new(Expression::Number {
                                     content: "3".to_string(),
                                     location: Location::VariableLength {
@@ -1311,9 +1366,9 @@ mod tests {
                                         length: 1,
                                     }
                                 }),
-                                operation_location: Location::SingleCharacter { char: 6, line: 0 }
+                                operator_location: Location::SingleCharacter { char: 6, line: 0 }
                             }),
-                            operation: Operation::Multiplication,
+                            operator: ExpressionOperator::Multiplication,
                             right: Box::new(Expression::BinaryOperation {
                                 left: Box::new(Expression::Number {
                                     content: "4".to_string(),
@@ -1323,7 +1378,7 @@ mod tests {
                                         length: 1,
                                     }
                                 }),
-                                operation: Operation::Power,
+                                operator: ExpressionOperator::Power,
                                 right: Box::new(Expression::Number {
                                     content: "5".to_string(),
                                     location: Location::VariableLength {
@@ -1332,11 +1387,11 @@ mod tests {
                                         length: 1,
                                     }
                                 }),
-                                operation_location: Location::SingleCharacter { char: 14, line: 0 }
+                                operator_location: Location::SingleCharacter { char: 14, line: 0 }
                             }),
-                            operation_location: Location::SingleCharacter { char: 10, line: 0 }
+                            operator_location: Location::SingleCharacter { char: 10, line: 0 }
                         }),
-                        operation: Operation::Modulo,
+                        operator: ExpressionOperator::Modulo,
                         right: Box::new(Expression::Number {
                             content: "6".to_string(),
                             location: Location::VariableLength {
@@ -1345,9 +1400,9 @@ mod tests {
                                 length: 1,
                             }
                         }),
-                        operation_location: Location::SingleCharacter { char: 18, line: 0 }
+                        operator_location: Location::SingleCharacter { char: 18, line: 0 }
                     }),
-                    operation_location: Location::SingleCharacter { char: 2, line: 0 }
+                    operator_location: Location::SingleCharacter { char: 2, line: 0 }
                 }
             }
         );
@@ -1359,7 +1414,11 @@ mod tests {
             parse_condition("true"),
             ConditionAst {
                 root: Condition::True {
-                    location: Location::VariableLength { char: 0, line: 0, length: 4 }
+                    location: Location::VariableLength {
+                        char: 0,
+                        line: 0,
+                        length: 4
+                    }
                 }
             }
         );
@@ -1371,7 +1430,76 @@ mod tests {
             parse_condition("\t\tfalse "),
             ConditionAst {
                 root: Condition::False {
-                    location: Location::VariableLength { char: 2, line: 0, length: 5 }
+                    location: Location::VariableLength {
+                        char: 2,
+                        line: 0,
+                        length: 5
+                    }
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_simple_or_condition() {
+        assert_eq!(
+            parse_condition("false || true"),
+            ConditionAst {
+                root: Condition::BinaryOperation {
+                    left: Box::new(Condition::False {
+                        location: Location::VariableLength {
+                            char: 0,
+                            line: 0,
+                            length: 5
+                        }
+                    }),
+                    operator: ConditionOperator::Or,
+                    right: Box::new(Condition::True {
+                        location: Location::VariableLength {
+                            char: 9,
+                            line: 0,
+                            length: 4
+                        }
+                    }),
+                    operator_location: Location::DoubleCharacter { char: 6, line: 0 }
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_nested_conditions() {
+        assert_eq!(
+            parse_condition("false || true && false"),
+            ConditionAst {
+                root: Condition::BinaryOperation {
+                    left: Box::new(Condition::False {
+                        location: Location::VariableLength {
+                            char: 0,
+                            line: 0,
+                            length: 5
+                        }
+                    }),
+                    operator: ConditionOperator::Or,
+                    right: Box::new(Condition::BinaryOperation {
+                        left: Box::new(Condition::True {
+                            location: Location::VariableLength {
+                                char: 9,
+                                line: 0,
+                                length: 4
+                            }
+                        }),
+                        operator: ConditionOperator::And,
+                        right: Box::new(Condition::False {
+                            location: Location::VariableLength {
+                                char: 17,
+                                line: 0,
+                                length: 5
+                            }
+                        }),
+                        operator_location: Location::DoubleCharacter { char: 14, line: 0 }
+                    }),
+                    operator_location: Location::DoubleCharacter { char: 6, line: 0 }
                 }
             }
         );

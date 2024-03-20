@@ -5,9 +5,9 @@ use lsp_types::{
     CancelParams, CompletionOptions, CompletionOptionsCompletionItem, DiagnosticOptions,
     DiagnosticServerCapabilities, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DidSaveTextDocumentParams, HoverOptions, HoverProviderCapability,
-    InitializeParams, OneOf, SemanticTokensFullOptions, SemanticTokensOptions,
-    SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability,
-    TextDocumentSyncKind, WorkDoneProgressOptions, SemanticTokensLegend, SemanticTokenType, SemanticTokenModifier,
+    InitializeParams, OneOf, SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
+    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions,
 };
 use std::{error::Error, fs::File, str::FromStr};
 use structured_logger::Builder;
