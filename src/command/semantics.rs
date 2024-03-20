@@ -305,21 +305,40 @@ fn index_tag(
     return Ok(());
 }
 
-fn index_object(node: &ast::Object, tokenizer: &mut SpelTokenCollector) {
+fn index_children(node: Node, text: &String, tokenizer: &mut Tokenizer) -> Result<()> {
+    for child in node.children(&mut node.walk()) {
+        match child.kind() {
+            "text" | "java_tag" | "html_void_tag" => {}
+            "ERROR" | "html_tag" | "html_option_tag" | "script_tag" | "style_tag" => {
+                index_children(child, text, tokenizer)?;
+            }
+            kind if kind.ends_with("_tag") => match &grammar::Tag::from_str(kind) {
+                Ok(child_tag) => index_tag(child_tag.properties(), child, text, tokenizer)?,
+                Err(err) => {
+                    log::info!("expected sp or spt tag: {}", err);
+                }
+            },
+            _ => index_children(child, text, tokenizer)?,
+        }
+    }
+    return Ok(());
+}
+
+fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) {
     // TODO: index_word
-    match node {
+    match object {
         ast::Object::Anchor {
             opening_bracket_location,
             closing_bracket_location,
             ..
         } => {
-            tokenizer.add(
+            token_collector.add(
                 opening_bracket_location,
                 SemanticTokenType::OPERATOR,
                 vec![],
             );
             // index_object(name, tokens);
-            tokenizer.add(
+            token_collector.add(
                 closing_bracket_location,
                 SemanticTokenType::OPERATOR,
                 vec![],
@@ -331,38 +350,38 @@ fn index_object(node: &ast::Object, tokenizer: &mut SpelTokenCollector) {
             opening_bracket_location,
             closing_bracket_location,
         } => {
-            tokenizer.add(&name.location, SemanticTokenType::METHOD, Vec::new());
-            tokenizer.add(
+            token_collector.add(&name.location, SemanticTokenType::METHOD, Vec::new());
+            token_collector.add(
                 opening_bracket_location,
                 SemanticTokenType::OPERATOR,
                 vec![],
             );
             arguments
                 .iter()
-                .for_each(|arg| index_object(arg, tokenizer));
-            tokenizer.add(
+                .for_each(|arg| index_object(arg, token_collector));
+            token_collector.add(
                 closing_bracket_location,
                 SemanticTokenType::OPERATOR,
                 vec![],
             );
         }
         ast::Object::Name { name, .. } => {
-            tokenizer.add(&name.location, SemanticTokenType::VARIABLE, vec![])
+            token_collector.add(&name.location, SemanticTokenType::VARIABLE, vec![])
         }
         ast::Object::Null { location } => {
-            tokenizer.add(location, SemanticTokenType::VARIABLE, vec![])
+            token_collector.add(location, SemanticTokenType::VARIABLE, vec![])
         }
         ast::Object::String { location, .. } => {
-            tokenizer.add(location, SemanticTokenType::STRING, vec![])
+            token_collector.add(location, SemanticTokenType::STRING, vec![])
         }
         ast::Object::FieldAccess {
             object,
             field,
             dot_location,
         } => {
-            index_object(object, tokenizer);
-            tokenizer.add(dot_location, SemanticTokenType::OPERATOR, vec![]);
-            tokenizer.add(&field.location, SemanticTokenType::PROPERTY, Vec::new());
+            index_object(object, token_collector);
+            token_collector.add(dot_location, SemanticTokenType::OPERATOR, vec![]);
+            token_collector.add(&field.location, SemanticTokenType::PROPERTY, Vec::new());
         }
         ast::Object::MethodAccess {
             object,
@@ -372,18 +391,18 @@ fn index_object(node: &ast::Object, tokenizer: &mut SpelTokenCollector) {
             opening_bracket_location,
             closing_bracket_location,
         } => {
-            index_object(object, tokenizer);
-            tokenizer.add(dot_location, SemanticTokenType::OPERATOR, vec![]);
-            tokenizer.add(&method.location, SemanticTokenType::METHOD, Vec::new());
-            tokenizer.add(
+            index_object(object, token_collector);
+            token_collector.add(dot_location, SemanticTokenType::OPERATOR, vec![]);
+            token_collector.add(&method.location, SemanticTokenType::METHOD, Vec::new());
+            token_collector.add(
                 opening_bracket_location,
                 SemanticTokenType::OPERATOR,
                 vec![],
             );
             arguments
                 .iter()
-                .for_each(|arg| index_object(arg, tokenizer));
-            tokenizer.add(
+                .for_each(|arg| index_object(arg, token_collector));
+            token_collector.add(
                 closing_bracket_location,
                 SemanticTokenType::OPERATOR,
                 vec![],
@@ -395,14 +414,14 @@ fn index_object(node: &ast::Object, tokenizer: &mut SpelTokenCollector) {
             opening_bracket_location,
             closing_bracket_location,
         } => {
-            index_object(object, tokenizer);
-            tokenizer.add(
+            index_object(object, token_collector);
+            token_collector.add(
                 opening_bracket_location,
                 SemanticTokenType::OPERATOR,
                 vec![],
             );
-            index_expression(index, tokenizer);
-            tokenizer.add(
+            index_expression(index, token_collector);
+            token_collector.add(
                 closing_bracket_location,
                 SemanticTokenType::OPERATOR,
                 vec![],
@@ -423,37 +442,41 @@ fn index_object(node: &ast::Object, tokenizer: &mut SpelTokenCollector) {
     };
 }
 
-fn index_expression(node: &ast::Expression, tokenizer: &mut SpelTokenCollector) {
-    match node {
+fn index_expression(expression: &ast::Expression, token_collector: &mut SpelTokenCollector) {
+    match expression {
         ast::Expression::Number { location, .. } => {
-            tokenizer.add(location, SemanticTokenType::NUMBER, vec![]);
+            token_collector.add(location, SemanticTokenType::NUMBER, vec![]);
         }
-        ast::Expression::SignedExpression { expression, sign } => {
-            tokenizer.add(&sign.location(), SemanticTokenType::OPERATOR, vec![]);
-            index_expression(expression, tokenizer);
+        ast::Expression::SignedExpression {
+            expression,
+            sign_location,
+            ..
+        } => {
+            token_collector.add(&sign_location, SemanticTokenType::OPERATOR, vec![]);
+            index_expression(expression, token_collector);
         }
         ast::Expression::BinaryOperation {
             left,
             right,
-            operation_location,
+            operator_location: operation_location,
             ..
         } => {
-            index_expression(left, tokenizer);
-            tokenizer.add(operation_location, SemanticTokenType::OPERATOR, vec![]);
-            index_expression(right, tokenizer);
+            index_expression(left, token_collector);
+            token_collector.add(operation_location, SemanticTokenType::OPERATOR, vec![]);
+            index_expression(right, token_collector);
         }
         ast::Expression::BracketedExpression {
             expression,
             opening_bracket_location,
             closing_bracket_location,
         } => {
-            tokenizer.add(
+            token_collector.add(
                 opening_bracket_location,
                 SemanticTokenType::OPERATOR,
                 vec![],
             );
-            index_expression(expression, tokenizer);
-            tokenizer.add(
+            index_expression(expression, token_collector);
+            token_collector.add(
                 closing_bracket_location,
                 SemanticTokenType::OPERATOR,
                 vec![],
@@ -489,72 +512,62 @@ fn index_expression(node: &ast::Expression, tokenizer: &mut SpelTokenCollector) 
     };
 }
 
-fn index_condition(node: &ast::Condition, tokenizer: &mut SpelTokenCollector) {
-    match node {
+fn index_condition(condition: &ast::Condition, token_collector: &mut SpelTokenCollector) {
+    match condition {
         ast::Condition::True { location } | ast::Condition::False { location } => {
-            tokenizer.add(location, SemanticTokenType::ENUM_MEMBER, vec![])
+            token_collector.add(location, SemanticTokenType::ENUM_MEMBER, vec![])
         }
-        // "condition" => {
-        //     index_condition(node.child(0).unwrap(), tokens)?;
-        //     tokens.push(create_token(
-        //         node.child(1).unwrap(),
-        //         SemanticTokenType::OPERATOR,
-        //         Vec::new(),
-        //     ));
-        //     index_condition(node.child(2).unwrap(), tokens)?;
-        // }
-        // "bracketed_condition" => {
-        //     tokens.push(create_token(
-        //         node.child(0).unwrap(),
-        //         SemanticTokenType::OPERATOR,
-        //         Vec::new(),
-        //     ));
-        //     index_condition(node.child(1).unwrap(), tokens)?;
-        //     tokens.push(create_token(
-        //         node.child(2).unwrap(),
-        //         SemanticTokenType::OPERATOR,
-        //         Vec::new(),
-        //     ));
-        // }
-        // "equality_comparison" => {
-        //     index_object(node.child(0).unwrap(), tokens)?;
-        //     tokens.push(create_token(
-        //         node.child(1).unwrap(),
-        //         SemanticTokenType::OPERATOR,
-        //         Vec::new(),
-        //     ));
-        //     index_object(node.child(2).unwrap(), tokens)?;
-        // }
-        // "expression_comparison" => {
-        //     index_expression(node.child(0).unwrap(), tokens)?;
-        //     tokens.push(create_token(
-        //         node.child(1).unwrap(),
-        //         SemanticTokenType::OPERATOR,
-        //         Vec::new(),
-        //     ));
-        //     index_expression(node.child(2).unwrap(), tokens)?;
-        // }
-        // _ => {}
+        ast::Condition::BinaryOperation {
+            left,
+            right,
+            operator_location,
+            ..
+        } => {
+            index_condition(left, token_collector);
+            token_collector.add(operator_location, SemanticTokenType::OPERATOR, vec![]);
+            index_condition(right, token_collector);
+        } // "condition" => {
+          //     index_condition(node.child(0).unwrap(), tokens)?;
+          //     tokens.push(create_token(
+          //         node.child(1).unwrap(),
+          //         SemanticTokenType::OPERATOR,
+          //         Vec::new(),
+          //     ));
+          //     index_condition(node.child(2).unwrap(), tokens)?;
+          // }
+          // "bracketed_condition" => {
+          //     tokens.push(create_token(
+          //         node.child(0).unwrap(),
+          //         SemanticTokenType::OPERATOR,
+          //         Vec::new(),
+          //     ));
+          //     index_condition(node.child(1).unwrap(), tokens)?;
+          //     tokens.push(create_token(
+          //         node.child(2).unwrap(),
+          //         SemanticTokenType::OPERATOR,
+          //         Vec::new(),
+          //     ));
+          // }
+          // "equality_comparison" => {
+          //     index_object(node.child(0).unwrap(), tokens)?;
+          //     tokens.push(create_token(
+          //         node.child(1).unwrap(),
+          //         SemanticTokenType::OPERATOR,
+          //         Vec::new(),
+          //     ));
+          //     index_object(node.child(2).unwrap(), tokens)?;
+          // }
+          // "expression_comparison" => {
+          //     index_expression(node.child(0).unwrap(), tokens)?;
+          //     tokens.push(create_token(
+          //         node.child(1).unwrap(),
+          //         SemanticTokenType::OPERATOR,
+          //         Vec::new(),
+          //     ));
+          //     index_expression(node.child(2).unwrap(), tokens)?;
+          // }
+          // _ => {}
     };
-}
-
-fn index_children(node: Node, text: &String, tokens: &mut Tokenizer) -> Result<()> {
-    for child in node.children(&mut node.walk()) {
-        match child.kind() {
-            "text" | "java_tag" | "html_void_tag" => {}
-            "ERROR" | "html_tag" | "html_option_tag" | "script_tag" | "style_tag" => {
-                index_children(child, text, tokens)?;
-            }
-            kind if kind.ends_with("_tag") => match &grammar::Tag::from_str(kind) {
-                Ok(child_tag) => index_tag(child_tag.properties(), child, text, tokens)?,
-                Err(err) => {
-                    log::info!("expected sp or spt tag: {}", err);
-                }
-            },
-            _ => index_children(child, text, tokens)?,
-        }
-    }
-    return Ok(());
 }
 
 #[cfg(test)]
