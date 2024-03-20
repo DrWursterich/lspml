@@ -89,7 +89,7 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
             Some(kind) if kind.ends_with("_attribute") => {
                 let variable = &node.utf8_text(document.text.as_bytes()).unwrap();
                 return match Query::new(
-                    tree_sitter_spml::language(),
+                    &tree_sitter_spml::language(),
                     &create_definition_query(variable).as_str(),
                 ) {
                     Ok(query) => Ok(QueryCursor::new()

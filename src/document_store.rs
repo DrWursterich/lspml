@@ -30,7 +30,7 @@ impl FromStr for Document {
 
     fn from_str(text: &str) -> Result<Document> {
         let mut parser = Parser::new();
-        parser.set_language(tree_sitter_spml::language())?;
+        parser.set_language(&tree_sitter_spml::language())?;
         return parser
             .parse(&text, None)
             .map(|tree| Document {
