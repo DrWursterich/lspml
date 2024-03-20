@@ -3895,7 +3895,7 @@ Bestimmt den Namen des Feldes."#,
         },
         TagAttribute {
             name: "offValue",
-            r#type: TagAttributeType::String,
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
@@ -3904,7 +3904,7 @@ Wert der gesetzt wird, wenn die Checkbox nicht gechecked ist"#,
         },
         TagAttribute {
             name: "onValue",
-            r#type: TagAttributeType::String,
+            r#type: TagAttributeType::Condition,
             detail: None,
             documentation: Some(
                 r#"
