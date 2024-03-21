@@ -259,6 +259,11 @@ pub(crate) enum Condition {
         right: Box<Condition>,
         operator_location: Location,
     },
+    BracketedCondition {
+        condition: Box<Condition>,
+        opening_bracket_location: Location,
+        closing_bracket_location: Location,
+    },
 }
 
 impl Display for ConditionOperator {

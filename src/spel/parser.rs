@@ -98,19 +98,20 @@ impl Parser {
                 self.scanner.skip_whitespace();
                 let expression = self.parse_expression()?;
                 self.scanner.skip_whitespace();
-                if self.scanner.pop() != Some(&')') {
-                    return Err(anyhow::anyhow!("unclosed bracket"));
-                }
-                ast::Expression::BracketedExpression {
-                    expression: Box::new(expression),
-                    opening_bracket_location: Location::SingleCharacter {
-                        char: start,
-                        line: 0,
+                match self.scanner.pop() {
+                    Some(')') => ast::Expression::BracketedExpression {
+                        expression: Box::new(expression),
+                        opening_bracket_location: Location::SingleCharacter {
+                            char: start,
+                            line: 0,
+                        },
+                        closing_bracket_location: Location::SingleCharacter {
+                            char: self.scanner.cursor as u16 - 1,
+                            line: 0,
+                        },
                     },
-                    closing_bracket_location: Location::SingleCharacter {
-                        char: self.scanner.cursor as u16 - 1,
-                        line: 0,
-                    },
+                    Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
+                    None => return Err(anyhow::anyhow!("unclosed bracket")),
                 }
             }
             Some('0'..='9') => self.parse_number()?,
@@ -169,39 +170,65 @@ impl Parser {
     }
 
     fn parse_condition(&mut self) -> Result<ast::Condition> {
-        let mut name = String::new();
         let start = self.scanner.cursor as u16;
-        loop {
-            match self.scanner.peek() {
-                Some(char @ ('a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-')) => {
-                    name.push(*char);
-                    self.scanner.pop();
+        let result = match self.scanner.peek() {
+            Some('(') => {
+                self.scanner.pop();
+                self.scanner.skip_whitespace();
+                let condition = self.parse_condition()?;
+                self.scanner.skip_whitespace();
+                match self.scanner.pop() {
+                    Some(')') => ast::Condition::BracketedCondition {
+                        condition: Box::new(condition),
+                        opening_bracket_location: Location::SingleCharacter {
+                            char: start,
+                            line: 0,
+                        },
+                        closing_bracket_location: Location::SingleCharacter {
+                            char: self.scanner.cursor as u16 - 1,
+                            line: 0,
+                        },
+                    },
+                    Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
+                    None => return Err(anyhow::anyhow!("unclosed bracket")),
                 }
-                _ => break,
             }
-        }
-        let result = match name.as_str() {
-            "true" => ast::Condition::True {
-                location: Location::VariableLength {
-                    char: start,
-                    line: 0,
-                    length: 4,
-                },
-            },
-            "false" => ast::Condition::False {
-                location: Location::VariableLength {
-                    char: start,
-                    line: 0,
-                    length: 5,
-                },
-            },
-            "" => {
-                return Err(match self.scanner.peek() {
-                    Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
-                    _ => anyhow::anyhow!("unexpected end"),
-                })
+            Some(_) => {
+                let mut name = String::new();
+                loop {
+                    match self.scanner.peek() {
+                        Some(char @ 'a'..='z') => {
+                            name.push(*char);
+                            self.scanner.pop();
+                        }
+                        _ => break,
+                    }
+                }
+                match name.as_str() {
+                    "true" => ast::Condition::True {
+                        location: Location::VariableLength {
+                            char: start,
+                            line: 0,
+                            length: 4,
+                        },
+                    },
+                    "false" => ast::Condition::False {
+                        location: Location::VariableLength {
+                            char: start,
+                            line: 0,
+                            length: 5,
+                        },
+                    },
+                    "" => {
+                        return Err(match self.scanner.peek() {
+                            Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
+                            _ => anyhow::anyhow!("unexpected end"),
+                        })
+                    }
+                    str => return Err(anyhow::anyhow!("unexpected \"{}\"", str)),
+                }
             }
-            str => return Err(anyhow::anyhow!("unexpected \"{}\"", str)),
+            None => return Err(anyhow::anyhow!("unexpected end")),
         };
         self.scanner.skip_whitespace();
         return match self.scanner.peek() {
@@ -235,31 +262,6 @@ impl Parser {
             }
             _ => Ok(result),
         };
-        // match self.scanner.transform(|c| match c {
-        //     '+' => Some(ast::ExpressionOperator::Addition),
-        //     '-' => Some(ast::ExpressionOperator::Subtraction),
-        //     '/' => Some(ast::ExpressionOperator::Division),
-        //     '*' => Some(ast::ExpressionOperator::Multiplication),
-        //     '^' => Some(ast::ExpressionOperator::Power),
-        //     '%' => Some(ast::ExpressionOperator::Modulo),
-        //     _ => None,
-        // }) {
-        //     Some(operation) => {
-        //         let operation_location = Location::SingleCharacter {
-        //             char: self.scanner.cursor as u16 - 1,
-        //             line: 0,
-        //         };
-        //         self.scanner.skip_whitespace();
-        //         let expression = self.parse_expression()?;
-        //         self.resolve_binary_operation_precidence(
-        //             result,
-        //             operation,
-        //             expression,
-        //             operation_location,
-        //         )
-        //     }
-        //     None => result,
-        // },
     }
 
     fn parse_number(&mut self) -> Result<ast::Expression> {
@@ -1500,6 +1502,37 @@ mod tests {
                         operator_location: Location::DoubleCharacter { char: 14, line: 0 }
                     }),
                     operator_location: Location::DoubleCharacter { char: 6, line: 0 }
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_simple_bracketed_condition() {
+        assert_eq!(
+            parse_condition("(false || true)"),
+            ConditionAst {
+                root: Condition::BracketedCondition {
+                    condition: Box::new(Condition::BinaryOperation {
+                        left: Box::new(Condition::False {
+                            location: Location::VariableLength {
+                                char: 1,
+                                line: 0,
+                                length: 5
+                            }
+                        }),
+                        operator: ConditionOperator::Or,
+                        right: Box::new(Condition::True {
+                            location: Location::VariableLength {
+                                char: 10,
+                                line: 0,
+                                length: 4
+                            }
+                        }),
+                        operator_location: Location::DoubleCharacter { char: 7, line: 0 }
+                    }),
+                    opening_bracket_location: Location::SingleCharacter { char: 0, line: 0 },
+                    closing_bracket_location: Location::SingleCharacter { char: 14, line: 0 },
                 }
             }
         );

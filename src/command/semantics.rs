@@ -481,34 +481,7 @@ fn index_expression(expression: &ast::Expression, token_collector: &mut SpelToke
                 SemanticTokenType::OPERATOR,
                 vec![],
             );
-        } // "ternary_expression" => {
-          //     index_condition(node.child(0).unwrap(), tokens)?;
-          //     tokens.push(create_token(
-          //         node.child(1).unwrap(),
-          //         SemanticTokenType::OPERATOR,
-          //         Vec::new(),
-          //     ));
-          //     index_expression(node.child(2).unwrap(), tokens)?;
-          //     tokens.push(create_token(
-          //         node.child(3).unwrap(),
-          //         SemanticTokenType::OPERATOR,
-          //         Vec::new(),
-          //     ));
-          //     index_expression(node.child(4).unwrap(), tokens)?;
-          // }
-          // "interpolated_string" => {
-          //     tokens.push(create_token(
-          //         node.child(0).unwrap(),
-          //         SemanticTokenType::OPERATOR,
-          //         Vec::new(),
-          //     ));
-          //     index_object(node.child(1).unwrap(), tokens)?;
-          //     tokens.push(create_token(
-          //         node.child(2).unwrap(),
-          //         SemanticTokenType::OPERATOR,
-          //         Vec::new(),
-          //     ));
-          // }
+        }
     };
 }
 
@@ -526,47 +499,16 @@ fn index_condition(condition: &ast::Condition, token_collector: &mut SpelTokenCo
             index_condition(left, token_collector);
             token_collector.add(operator_location, SemanticTokenType::OPERATOR, vec![]);
             index_condition(right, token_collector);
-        } // "condition" => {
-          //     index_condition(node.child(0).unwrap(), tokens)?;
-          //     tokens.push(create_token(
-          //         node.child(1).unwrap(),
-          //         SemanticTokenType::OPERATOR,
-          //         Vec::new(),
-          //     ));
-          //     index_condition(node.child(2).unwrap(), tokens)?;
-          // }
-          // "bracketed_condition" => {
-          //     tokens.push(create_token(
-          //         node.child(0).unwrap(),
-          //         SemanticTokenType::OPERATOR,
-          //         Vec::new(),
-          //     ));
-          //     index_condition(node.child(1).unwrap(), tokens)?;
-          //     tokens.push(create_token(
-          //         node.child(2).unwrap(),
-          //         SemanticTokenType::OPERATOR,
-          //         Vec::new(),
-          //     ));
-          // }
-          // "equality_comparison" => {
-          //     index_object(node.child(0).unwrap(), tokens)?;
-          //     tokens.push(create_token(
-          //         node.child(1).unwrap(),
-          //         SemanticTokenType::OPERATOR,
-          //         Vec::new(),
-          //     ));
-          //     index_object(node.child(2).unwrap(), tokens)?;
-          // }
-          // "expression_comparison" => {
-          //     index_expression(node.child(0).unwrap(), tokens)?;
-          //     tokens.push(create_token(
-          //         node.child(1).unwrap(),
-          //         SemanticTokenType::OPERATOR,
-          //         Vec::new(),
-          //     ));
-          //     index_expression(node.child(2).unwrap(), tokens)?;
-          // }
-          // _ => {}
+        }
+        ast::Condition::BracketedCondition {
+            condition,
+            opening_bracket_location,
+            closing_bracket_location,
+        } => {
+            token_collector.add(opening_bracket_location, SemanticTokenType::OPERATOR, vec![]);
+            index_condition(condition, token_collector);
+            token_collector.add(closing_bracket_location, SemanticTokenType::OPERATOR, vec![]);
+        }
     };
 }
 
