@@ -1,6 +1,6 @@
 # lspml
 
-A proof-of-concept language server for the sitepark markup language (spml).
+A work-in-progress language server for the sitepark markup language (spml).
 
 ## features
 
@@ -8,6 +8,7 @@ A proof-of-concept language server for the sitepark markup language (spml).
 - hover for documentation of most tags and attributes
 - diagnostics on:
     - syntax errors
+    - spel syntax errors in attributes values
     - misplaced, unclosed and deprecated tags
     - duplicate, required and deprecated attributes / tag-bodies
     - nonexistent files in `<sp:include>` and similar tags
@@ -18,7 +19,10 @@ A proof-of-concept language server for the sitepark markup language (spml).
     - attribute values that either:
         - have a fixed set of possible values
         - point to another spml file
-- semantic highlighting for attribute values that expect objects or expressions
+- semantic highlighting for attribute values that expect:
+    - objects
+    - expressions
+    - conditions
 ## commandline
 
 ```
@@ -48,7 +52,7 @@ The `modules-file` is a `json` file, in which module names can be mapped to loca
 Currently you will have to set a local path to [tree-sitter-spml](https://github.com/DrWursterich/tree-sitter-spml) in `Cargo.toml` in order to be able to build this with:
 
 ```bash
-cargo build
+cargo +nightly build
 ```
 
 ## install
@@ -95,3 +99,4 @@ The `lspml` executable is best found with
 ```bash
 find . -name lspml -executable
 ```
+
