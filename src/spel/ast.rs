@@ -145,6 +145,7 @@ pub(crate) enum Expression {
         content: String,
         location: Location,
     },
+    Object(Box<Interpolation>),
     SignedExpression {
         expression: Box<Expression>,
         sign: Sign,
@@ -167,18 +168,19 @@ impl Display for Expression {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
         return match self {
             Expression::Number { content, .. } => formatter.write_str(content),
+            Expression::Object(interpolation) => interpolation.fmt(formatter),
             Expression::SignedExpression {
                 expression, sign, ..
             } => formatter.write_fmt(format_args!("{}{}", sign, expression)),
             Expression::BracketedExpression { expression, .. } => {
-                formatter.write_fmt(format_args!("({})", expression))
+                write!(formatter, "({})", expression)
             }
             Expression::BinaryOperation {
                 left,
                 operator: operation,
                 right,
                 ..
-            } => formatter.write_fmt(format_args!("{} {} {}", left, operation, right)),
+            } => write!(formatter, "{} {} {}", left, operation, right),
         };
     }
 }
@@ -253,6 +255,7 @@ pub(crate) enum Condition {
     False {
         location: Location,
     },
+    Object(Box<Interpolation>),
     BinaryOperation {
         left: Box<Condition>,
         operator: ConditionOperator,
@@ -266,6 +269,22 @@ pub(crate) enum Condition {
     },
 }
 
+impl Display for Condition {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        return match self {
+            Condition::True { .. } => formatter.write_str("true"),
+            Condition::False { .. } => formatter.write_str("false"),
+            Condition::Object(interpolation) => interpolation.fmt(formatter),
+            Condition::BracketedCondition { condition, .. } => write!(formatter, "({})", condition),
+            Condition::BinaryOperation {
+                left,
+                operator: operation,
+                right,
+                ..
+            } => write!(formatter, "{} {} {}", left, operation, right),
+        };
+    }
+}
 impl Display for ConditionOperator {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
         return formatter.write_str(match self {

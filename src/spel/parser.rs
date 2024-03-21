@@ -92,6 +92,7 @@ impl Parser {
 
     fn parse_expression(&mut self) -> Result<ast::Expression> {
         let result = match self.scanner.peek() {
+            Some('$') => ast::Expression::Object(Box::new(self.parse_interpolation()?)),
             Some('(') => {
                 let start = self.scanner.cursor as u16;
                 self.scanner.pop();
@@ -172,6 +173,7 @@ impl Parser {
     fn parse_condition(&mut self) -> Result<ast::Condition> {
         let start = self.scanner.cursor as u16;
         let result = match self.scanner.peek() {
+            Some('$') => ast::Condition::Object(Box::new(self.parse_interpolation()?)),
             Some('(') => {
                 self.scanner.pop();
                 self.scanner.skip_whitespace();

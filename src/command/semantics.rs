@@ -328,16 +328,17 @@ fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) 
     // TODO: index_word
     match object {
         ast::Object::Anchor {
+            name: _name,
             opening_bracket_location,
             closing_bracket_location,
-            ..
         } => {
             token_collector.add(
                 opening_bracket_location,
                 SemanticTokenType::OPERATOR,
                 vec![],
             );
-            // index_object(name, tokens);
+            // TODO: name is not an object!
+            // index_object(name, token_collector);
             token_collector.add(
                 closing_bracket_location,
                 SemanticTokenType::OPERATOR,
@@ -426,19 +427,7 @@ fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) 
                 SemanticTokenType::OPERATOR,
                 vec![],
             );
-        } // "interpolated_string" => {
-          //     tokens.push(create_token(
-          //         node.child(0).unwrap(),
-          //         SemanticTokenType::OPERATOR,
-          //         Vec::new(),
-          //     ));
-          //     index_object(node.child(1).unwrap(), tokens)?;
-          //     tokens.push(create_token(
-          //         node.child(2).unwrap(),
-          //         SemanticTokenType::OPERATOR,
-          //         Vec::new(),
-          //     ));
-          // }
+        }
     };
 }
 
@@ -446,6 +435,19 @@ fn index_expression(expression: &ast::Expression, token_collector: &mut SpelToke
     match expression {
         ast::Expression::Number { location, .. } => {
             token_collector.add(location, SemanticTokenType::NUMBER, vec![]);
+        }
+        ast::Expression::Object(interpolation) => {
+            token_collector.add(
+                &interpolation.opening_bracket_location,
+                SemanticTokenType::OPERATOR,
+                vec![],
+            );
+            index_object(&interpolation.content, token_collector);
+            token_collector.add(
+                &interpolation.closing_bracket_location,
+                SemanticTokenType::OPERATOR,
+                vec![],
+            );
         }
         ast::Expression::SignedExpression {
             expression,
@@ -489,6 +491,19 @@ fn index_condition(condition: &ast::Condition, token_collector: &mut SpelTokenCo
     match condition {
         ast::Condition::True { location } | ast::Condition::False { location } => {
             token_collector.add(location, SemanticTokenType::ENUM_MEMBER, vec![])
+        }
+        ast::Condition::Object(location) => {
+            token_collector.add(
+                &location.opening_bracket_location,
+                SemanticTokenType::OPERATOR,
+                vec![],
+            );
+            index_object(&location.content, token_collector);
+            token_collector.add(
+                &location.closing_bracket_location,
+                SemanticTokenType::OPERATOR,
+                vec![],
+            );
         }
         ast::Condition::BinaryOperation {
             left,
