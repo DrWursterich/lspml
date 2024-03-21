@@ -505,9 +505,17 @@ fn index_condition(condition: &ast::Condition, token_collector: &mut SpelTokenCo
             opening_bracket_location,
             closing_bracket_location,
         } => {
-            token_collector.add(opening_bracket_location, SemanticTokenType::OPERATOR, vec![]);
+            token_collector.add(
+                opening_bracket_location,
+                SemanticTokenType::OPERATOR,
+                vec![],
+            );
             index_condition(condition, token_collector);
-            token_collector.add(closing_bracket_location, SemanticTokenType::OPERATOR, vec![]);
+            token_collector.add(
+                closing_bracket_location,
+                SemanticTokenType::OPERATOR,
+                vec![],
+            );
         }
     };
 }
