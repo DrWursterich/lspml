@@ -267,6 +267,10 @@ pub(crate) enum Condition {
         opening_bracket_location: Location,
         closing_bracket_location: Location,
     },
+    NegatedCondition {
+        condition: Box<Condition>,
+        exclamation_mark_location: Location,
+    },
 }
 
 impl Display for Condition {
@@ -278,19 +282,12 @@ impl Display for Condition {
             Condition::BracketedCondition { condition, .. } => write!(formatter, "({})", condition),
             Condition::BinaryOperation {
                 left,
-                operator: operation,
+                operator,
                 right,
                 ..
-            } => write!(formatter, "{} {} {}", left, operation, right),
+            } => write!(formatter, "{} {} {}", left, operator, right),
+            Condition::NegatedCondition { condition, .. } => write!(formatter, "!{}", condition),
         };
-    }
-}
-impl Display for ConditionOperator {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
-        return formatter.write_str(match self {
-            ConditionOperator::And => "&&",
-            ConditionOperator::Or => "||",
-        });
     }
 }
 
@@ -298,6 +295,15 @@ impl Display for ConditionOperator {
 pub(crate) enum ConditionOperator {
     And,
     Or,
+}
+
+impl Display for ConditionOperator {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        return formatter.write_str(match self {
+            ConditionOperator::And => "&&",
+            ConditionOperator::Or => "||",
+        });
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]

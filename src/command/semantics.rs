@@ -532,6 +532,10 @@ fn index_condition(condition: &ast::Condition, token_collector: &mut SpelTokenCo
                 vec![],
             );
         }
+        ast::Condition::NegatedCondition { condition, exclamation_mark_location } => {
+            token_collector.add(&exclamation_mark_location, SemanticTokenType::OPERATOR, vec![]);
+            index_condition(condition, token_collector);
+        },
     };
 }
 

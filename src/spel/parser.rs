@@ -195,41 +195,63 @@ impl Parser {
                     None => return Err(anyhow::anyhow!("unclosed bracket")),
                 }
             }
-            Some(_) => {
-                let mut name = String::new();
-                loop {
-                    match self.scanner.peek() {
-                        Some(char @ 'a'..='z') => {
-                            name.push(*char);
-                            self.scanner.pop();
-                        }
-                        _ => break,
-                    }
+            Some('f') => {
+                if !(self.scanner.take(&'f')
+                    && self.scanner.take(&'a')
+                    && self.scanner.take(&'l')
+                    && self.scanner.take(&'s')
+                    && self.scanner.take(&'e'))
+                {
+                    return Err(match self.scanner.pop() {
+                        Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
+                        None => anyhow::anyhow!("unexpected end"),
+                    });
                 }
-                match name.as_str() {
-                    "true" => ast::Condition::True {
-                        location: Location::VariableLength {
-                            char: start,
-                            line: 0,
-                            length: 4,
-                        },
+                ast::Condition::False {
+                    location: Location::VariableLength {
+                        char: start,
+                        line: 0,
+                        length: 5,
                     },
-                    "false" => ast::Condition::False {
-                        location: Location::VariableLength {
-                            char: start,
-                            line: 0,
-                            length: 5,
-                        },
-                    },
-                    "" => {
-                        return Err(match self.scanner.peek() {
-                            Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
-                            _ => anyhow::anyhow!("unexpected end"),
-                        })
-                    }
-                    str => return Err(anyhow::anyhow!("unexpected \"{}\"", str)),
                 }
             }
+            Some('t') => {
+                if !(self.scanner.take(&'t')
+                    && self.scanner.take(&'r')
+                    && self.scanner.take(&'u')
+                    && self.scanner.take(&'e'))
+                {
+                    return Err(match self.scanner.pop() {
+                        Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
+                        None => anyhow::anyhow!("unexpected end"),
+                    });
+                }
+                ast::Condition::True {
+                    location: Location::VariableLength {
+                        char: start,
+                        line: 0,
+                        length: 4,
+                    },
+                }
+            }
+            Some('!') => {
+                let exclamation_mark_location = Location::SingleCharacter {
+                    char: self.scanner.cursor as u16,
+                    line: 0,
+                };
+                self.scanner.pop();
+                self.scanner.skip_whitespace();
+                match self.parse_condition()? {
+                    ast::Condition::NegatedCondition { .. } => {
+                        return Err(anyhow::anyhow!("duplicate condition negation"));
+                    }
+                    condition => ast::Condition::NegatedCondition {
+                        condition: Box::new(condition),
+                        exclamation_mark_location,
+                    },
+                }
+            }
+            Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
             None => return Err(anyhow::anyhow!("unexpected end")),
         };
         self.scanner.skip_whitespace();
