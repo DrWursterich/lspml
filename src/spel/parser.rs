@@ -195,45 +195,36 @@ impl Parser {
                     None => return Err(anyhow::anyhow!("unclosed bracket")),
                 }
             }
-            Some('f') => {
-                if !(self.scanner.take(&'f')
-                    && self.scanner.take(&'a')
-                    && self.scanner.take(&'l')
-                    && self.scanner.take(&'s')
-                    && self.scanner.take(&'e'))
-                {
-                    return Err(match self.scanner.pop() {
-                        Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
-                        None => anyhow::anyhow!("unexpected end"),
-                    });
-                }
-                ast::Condition::False {
+            Some('f') => match self.scanner.take_str(&"false") {
+                true => ast::Condition::False {
                     location: Location::VariableLength {
                         char: start,
                         line: 0,
                         length: 5,
                     },
-                }
-            }
-            Some('t') => {
-                if !(self.scanner.take(&'t')
-                    && self.scanner.take(&'r')
-                    && self.scanner.take(&'u')
-                    && self.scanner.take(&'e'))
-                {
+                },
+                false => {
                     return Err(match self.scanner.pop() {
                         Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
                         None => anyhow::anyhow!("unexpected end"),
-                    });
+                    })
                 }
-                ast::Condition::True {
+            },
+            Some('t') => match self.scanner.take_str(&"true") {
+                true => ast::Condition::True {
                     location: Location::VariableLength {
                         char: start,
                         line: 0,
                         length: 4,
                     },
+                },
+                false => {
+                    return Err(match self.scanner.pop() {
+                        Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
+                        None => anyhow::anyhow!("unexpected end"),
+                    });
                 }
-            }
+            },
             Some('!') => {
                 let exclamation_mark_location = Location::SingleCharacter {
                     char: self.scanner.cursor as u16,
@@ -422,10 +413,7 @@ impl Parser {
 
     fn parse_interpolation(&mut self) -> Result<ast::Interpolation> {
         let start = self.scanner.cursor as u16;
-        if !self.scanner.take(&'$') {
-            return Err(anyhow::anyhow!("expected interpolation"));
-        }
-        if !self.scanner.take(&'{') {
+        if !self.scanner.take_str(&"${") {
             return Err(anyhow::anyhow!("expected interpolation"));
         }
         self.scanner.skip_whitespace();
@@ -449,10 +437,7 @@ impl Parser {
 
     fn parse_interpolated_anchor(&mut self) -> Result<ast::Object> {
         let start = self.scanner.cursor as u16;
-        if !self.scanner.take(&'!') {
-            return Err(anyhow::anyhow!("expected interpolated anchor"));
-        }
-        if !self.scanner.take(&'{') {
+        if !self.scanner.take_str(&"!{") {
             return Err(anyhow::anyhow!("expected interpolated anchor"));
         }
         self.scanner.skip_whitespace();

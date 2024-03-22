@@ -48,6 +48,22 @@ impl Scanner {
         return result;
     }
 
+    /// Returns true if the `target` is found at the current cursor position,
+    /// and advances the cursor.
+    /// Otherwise, returns false leaving the cursor unchanged.
+    pub(crate) fn take_str(&mut self, target: &str) -> bool {
+        let end = self.cursor + target.len();
+        if self.characters.len() < end {
+            return false;
+        }
+        let actual: String = String::from_iter(self.characters[self.cursor..end].iter());
+        if actual == target {
+            self.cursor = end;
+            return true;
+        }
+        return false;
+    }
+
     /// Returns true if the `target` any whitespace was skipped and the cursor
     /// advanced.
     /// Otherwise, returns false leaving the cursor unchanged.
