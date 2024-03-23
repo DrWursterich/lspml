@@ -18,13 +18,8 @@ pub(crate) enum Object {
     Name {
         name: Word,
     },
-    Null {
-        location: Location,
-    },
-    String {
-        content: String,
-        location: Location,
-    },
+    Null(Null),
+    String(StringLiteral),
     FieldAccess {
         object: Box<Object>,
         field: Word,
@@ -57,8 +52,8 @@ impl Display for Object {
                 fmt_arguments(formatter, arguments)
             }
             Object::Name { name } => name.fmt(formatter),
-            Object::String { content, .. } => formatter.write_str(content),
-            Object::Null { .. } => formatter.write_str("null"),
+            Object::String(inner) => inner.fmt(formatter),
+            Object::Null(inner) => inner.fmt(formatter),
             Object::FieldAccess { object, field, .. } => write!(formatter, "{}.{}", object, field),
             Object::MethodAccess {
                 object,
@@ -140,6 +135,29 @@ impl Display for Interpolation {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub(crate) struct StringLiteral {
+    pub(crate) content: String,
+    pub(crate) location: Location,
+}
+
+impl Display for StringLiteral {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        return formatter.write_str(&self.content);
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct Null {
+    pub(crate) location: Location,
+}
+
+impl Display for Null {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        return formatter.write_str("null");
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Expression {
     Number {
         content: String,
@@ -171,16 +189,16 @@ impl Display for Expression {
             Expression::Object(interpolation) => interpolation.fmt(formatter),
             Expression::SignedExpression {
                 expression, sign, ..
-            } => formatter.write_fmt(format_args!("{}{}", sign, expression)),
+            } => write!(formatter, "{}{}", sign, expression),
             Expression::BracketedExpression { expression, .. } => {
                 write!(formatter, "({})", expression)
             }
             Expression::BinaryOperation {
                 left,
-                operator: operation,
+                operator,
                 right,
                 ..
-            } => write!(formatter, "{} {} {}", left, operation, right),
+            } => write!(formatter, "{} {} {}", left, operator, right),
         };
     }
 }
@@ -271,6 +289,45 @@ pub(crate) enum Condition {
         condition: Box<Condition>,
         exclamation_mark_location: Location,
     },
+    Comparisson {
+        left: Box<Comparable>,
+        operator: ComparissonOperator,
+        right: Box<Comparable>,
+        operator_location: Location,
+    },
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum Comparable {
+    Condition(Condition),
+    Expression(Expression),
+    Object(Interpolation),
+    String(StringLiteral),
+    Null(Null),
+}
+
+impl Display for Comparable {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Comparable::Condition(inner) => inner.fmt(formatter),
+            Comparable::Expression(inner) => inner.fmt(formatter),
+            Comparable::Object(inner) => inner.fmt(formatter),
+            Comparable::String(inner) => inner.fmt(formatter),
+            Comparable::Null(inner) => inner.fmt(formatter),
+        }
+    }
+}
+
+impl Comparable {
+    pub(crate) fn r#type(&self) -> &str {
+        match self {
+            Comparable::Condition(_) => "condition",
+            Comparable::Expression(_) => "expression",
+            Comparable::Object(_) => "object",
+            Comparable::String(_) => "string",
+            Comparable::Null(_) => "null",
+        }
+    }
 }
 
 impl Display for Condition {
@@ -287,6 +344,12 @@ impl Display for Condition {
                 ..
             } => write!(formatter, "{} {} {}", left, operator, right),
             Condition::NegatedCondition { condition, .. } => write!(formatter, "!{}", condition),
+            Condition::Comparisson {
+                left,
+                operator,
+                right,
+                ..
+            } => write!(formatter, "{} {} {}", left, operator, right),
         };
     }
 }
@@ -302,6 +365,29 @@ impl Display for ConditionOperator {
         return formatter.write_str(match self {
             ConditionOperator::And => "&&",
             ConditionOperator::Or => "||",
+        });
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum ComparissonOperator {
+    Equal,
+    Unequal,
+    GreaterThan,
+    GreaterThanOrEqual,
+    LessThan,
+    LessThanOrEqual,
+}
+
+impl Display for ComparissonOperator {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        return formatter.write_str(match self {
+            ComparissonOperator::Equal => "==",
+            ComparissonOperator::Unequal => "!=",
+            ComparissonOperator::GreaterThan => ">",
+            ComparissonOperator::GreaterThanOrEqual => ">=",
+            ComparissonOperator::LessThan => "<",
+            ComparissonOperator::LessThanOrEqual => "<=",
         });
     }
 }
@@ -386,7 +472,7 @@ impl ConditionAst {
 
 #[cfg(test)]
 mod tests {
-    use crate::spel::ast::{Interpolation, Location, Object, Word};
+    use crate::spel::ast::{Interpolation, Location, Object, StringLiteral, Word};
 
     #[test]
     fn test_format_interpolated_word() {
@@ -426,14 +512,14 @@ mod tests {
         assert_eq!(
             format!(
                 "{}",
-                Object::String {
+                Object::String(StringLiteral {
                     content: "'some  string'".to_string(),
                     location: Location::VariableLength {
                         line: 0,
                         char: 0,
                         length: 15,
                     }
-                }
+                })
             ),
             "'some  string'"
         );

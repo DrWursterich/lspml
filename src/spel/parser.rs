@@ -82,7 +82,7 @@ impl Parser {
 
     fn parse_object(&mut self) -> Result<ast::Object> {
         return match self.scanner.peek() {
-            Some('\'') => self.parse_string(),
+            Some('\'') => self.parse_string().map(|s| ast::Object::String(s)),
             Some('!') => self.parse_interpolated_anchor(),
             Some('$' | 'a'..='z' | 'A'..='Z' | '_') => self.parse_name_or_global_function(),
             Some(char) => Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
@@ -93,159 +93,88 @@ impl Parser {
     fn parse_expression(&mut self) -> Result<ast::Expression> {
         let result = match self.scanner.peek() {
             Some('$') => ast::Expression::Object(Box::new(self.parse_interpolation()?)),
-            Some('(') => {
-                let start = self.scanner.cursor as u16;
-                self.scanner.pop();
-                self.scanner.skip_whitespace();
-                let expression = self.parse_expression()?;
-                self.scanner.skip_whitespace();
-                match self.scanner.pop() {
-                    Some(')') => ast::Expression::BracketedExpression {
-                        expression: Box::new(expression),
-                        opening_bracket_location: Location::SingleCharacter {
-                            char: start,
-                            line: 0,
-                        },
-                        closing_bracket_location: Location::SingleCharacter {
-                            char: self.scanner.cursor as u16 - 1,
-                            line: 0,
-                        },
-                    },
-                    Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
-                    None => return Err(anyhow::anyhow!("unclosed bracket")),
-                }
-            }
+            Some('(') => self.parse_bracketed_expression()?,
+            Some('+' | '-') => self.parse_signed_expression()?,
             Some('0'..='9') => self.parse_number()?,
-            _ => {
-                let sign_location = Location::SingleCharacter {
-                    char: self.scanner.cursor as u16,
-                    line: 0,
-                };
-                let sign = match self.scanner.pop() {
-                    Some('+') => ast::Sign::Plus,
-                    Some('-') => ast::Sign::Minus,
-                    Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
-                    _ => return Err(anyhow::anyhow!("unexpected end")),
-                };
-                self.scanner.skip_whitespace();
-                match self.parse_expression()? {
-                    ast::Expression::SignedExpression { .. } => {
-                        return Err(anyhow::anyhow!("duplicate sign"));
-                    }
-                    expression => ast::Expression::SignedExpression {
-                        expression: Box::new(expression),
-                        sign,
-                        sign_location,
-                    },
-                }
-            }
-        };
-        self.scanner.skip_whitespace();
-        return Ok(
-            match self.scanner.transform(|c| match c {
-                '+' => Some(ast::ExpressionOperator::Addition),
-                '-' => Some(ast::ExpressionOperator::Subtraction),
-                '/' => Some(ast::ExpressionOperator::Division),
-                '*' => Some(ast::ExpressionOperator::Multiplication),
-                '^' => Some(ast::ExpressionOperator::Power),
-                '%' => Some(ast::ExpressionOperator::Modulo),
-                _ => None,
-            }) {
-                Some(operation) => {
-                    let operator_location = Location::SingleCharacter {
-                        char: self.scanner.cursor as u16 - 1,
-                        line: 0,
-                    };
-                    self.scanner.skip_whitespace();
-                    let expression = self.parse_expression()?;
-                    self.resolve_binary_operation_precidence(
-                        result,
-                        operation,
-                        expression,
-                        operator_location,
-                    )
-                }
-                None => result,
-            },
-        );
-    }
-
-    fn parse_condition(&mut self) -> Result<ast::Condition> {
-        let start = self.scanner.cursor as u16;
-        let result = match self.scanner.peek() {
-            Some('$') => ast::Condition::Object(Box::new(self.parse_interpolation()?)),
-            Some('(') => {
-                self.scanner.pop();
-                self.scanner.skip_whitespace();
-                let condition = self.parse_condition()?;
-                self.scanner.skip_whitespace();
-                match self.scanner.pop() {
-                    Some(')') => ast::Condition::BracketedCondition {
-                        condition: Box::new(condition),
-                        opening_bracket_location: Location::SingleCharacter {
-                            char: start,
-                            line: 0,
-                        },
-                        closing_bracket_location: Location::SingleCharacter {
-                            char: self.scanner.cursor as u16 - 1,
-                            line: 0,
-                        },
-                    },
-                    Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
-                    None => return Err(anyhow::anyhow!("unclosed bracket")),
-                }
-            }
-            Some('f') => match self.scanner.take_str(&"false") {
-                true => ast::Condition::False {
-                    location: Location::VariableLength {
-                        char: start,
-                        line: 0,
-                        length: 5,
-                    },
-                },
-                false => {
-                    return Err(match self.scanner.pop() {
-                        Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
-                        None => anyhow::anyhow!("unexpected end"),
-                    })
-                }
-            },
-            Some('t') => match self.scanner.take_str(&"true") {
-                true => ast::Condition::True {
-                    location: Location::VariableLength {
-                        char: start,
-                        line: 0,
-                        length: 4,
-                    },
-                },
-                false => {
-                    return Err(match self.scanner.pop() {
-                        Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
-                        None => anyhow::anyhow!("unexpected end"),
-                    });
-                }
-            },
-            Some('!') => {
-                let exclamation_mark_location = Location::SingleCharacter {
-                    char: self.scanner.cursor as u16,
-                    line: 0,
-                };
-                self.scanner.pop();
-                self.scanner.skip_whitespace();
-                match self.parse_condition()? {
-                    ast::Condition::NegatedCondition { .. } => {
-                        return Err(anyhow::anyhow!("duplicate condition negation"));
-                    }
-                    condition => ast::Condition::NegatedCondition {
-                        condition: Box::new(condition),
-                        exclamation_mark_location,
-                    },
-                }
-            }
             Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
             None => return Err(anyhow::anyhow!("unexpected end")),
         };
         self.scanner.skip_whitespace();
+        return self.try_parse_binary_operation(result);
+    }
+
+    fn parse_condition(&mut self) -> Result<ast::Condition> {
+        let comparable = self.parse_comparable()?;
+        return self.resolve_comparable(comparable);
+    }
+
+    fn resolve_comparable(&mut self, comparable: ast::Comparable) -> Result<ast::Condition> {
+        self.scanner.skip_whitespace();
+        return match self.try_parse_comparisson(&comparable)? {
+            Some(comparisson) => self.resolve_comparable(comparisson),
+            None => {
+                let condition = match comparable {
+                    ast::Comparable::Condition(condition) => condition,
+                    ast::Comparable::Object(interpolation) => {
+                        ast::Condition::Object(Box::new(interpolation))
+                    }
+                    comparable => {
+                        return Err(anyhow::anyhow!("unexpected {}", comparable.r#type()))
+                    }
+                };
+                match self.try_parse_binary_condition(&condition)? {
+                    Some(condition) => {
+                        self.resolve_comparable(ast::Comparable::Condition(condition))
+                    }
+                    None => Ok(condition),
+                }
+            }
+        };
+    }
+
+    fn try_parse_comparisson(&mut self, left: &ast::Comparable) -> Result<Option<ast::Comparable>> {
+        return match self.scanner.peek() {
+            Some(char @ ('!' | '=' | '>' | '<')) => {
+                let char = char.clone();
+                self.scanner.pop();
+                let equals = self.scanner.take(&'=');
+                let operator = match (char, equals) {
+                    ('=', true) => ast::ComparissonOperator::Equal,
+                    ('!', true) => ast::ComparissonOperator::Unequal,
+                    ('>', false) => ast::ComparissonOperator::GreaterThan,
+                    ('>', true) => ast::ComparissonOperator::GreaterThanOrEqual,
+                    ('<', false) => ast::ComparissonOperator::LessThan,
+                    ('<', true) => ast::ComparissonOperator::LessThanOrEqual,
+                    (_, _) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
+                };
+                let operator_location = match equals {
+                    true => Location::DoubleCharacter {
+                        char: self.scanner.cursor as u16 - 2,
+                        line: 0,
+                    },
+                    false => Location::SingleCharacter {
+                        char: self.scanner.cursor as u16 - 1,
+                        line: 0,
+                    },
+                };
+                self.scanner.skip_whitespace();
+                Ok(Some(ast::Comparable::Condition(
+                    ast::Condition::Comparisson {
+                        left: Box::new(left.clone()),
+                        operator,
+                        right: Box::new(self.parse_comparable()?),
+                        operator_location,
+                    },
+                )))
+            }
+            _ => Ok(None),
+        };
+    }
+
+    fn try_parse_binary_condition(
+        &mut self,
+        left: &ast::Condition,
+    ) -> Result<Option<ast::Condition>> {
         return match self.scanner.peek() {
             Some(char @ ('&' | '|')) => {
                 let first = &char.clone();
@@ -268,15 +197,155 @@ impl Parser {
                     ));
                 }
                 self.scanner.skip_whitespace();
-                Ok(ast::Condition::BinaryOperation {
-                    left: Box::new(result),
+                Ok(Some(ast::Condition::BinaryOperation {
+                    left: Box::new(left.clone()),
                     operator,
                     right: Box::new(self.parse_condition()?),
                     operator_location,
+                }))
+            }
+            _ => Ok(None),
+        };
+    }
+
+    fn parse_comparable(&mut self) -> Result<ast::Comparable> {
+        return Ok(match self.scanner.peek() {
+            Some('\'') => ast::Comparable::String(self.parse_string()?),
+            Some('$') => match self.parse_expression()? {
+                ast::Expression::Object(interpolation) => ast::Comparable::Object(*interpolation),
+                expression => ast::Comparable::Expression(expression),
+            },
+            Some('+' | '-' | '0'..='9') => ast::Comparable::Expression(self.parse_expression()?),
+            Some('(') => self.parse_bracketed_comparable()?,
+            Some('n') => ast::Comparable::Null(self.parse_null_literal()?),
+            Some('f') => ast::Comparable::Condition(self.parse_false_literal()?),
+            Some('t') => ast::Comparable::Condition(self.parse_true_literal()?),
+            Some('!') => ast::Comparable::Condition(self.parse_negated_condition()?),
+            Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
+            None => return Err(anyhow::anyhow!("unexpected end")),
+        });
+    }
+
+    fn parse_bracketed_comparable(&mut self) -> Result<ast::Comparable> {
+        if !self.scanner.take(&'(') {
+            return Err(anyhow::anyhow!("expected opening bracket"));
+        }
+        let opening_bracket_location = Location::SingleCharacter {
+            char: self.scanner.cursor as u16 - 1,
+            line: 0,
+        };
+        self.scanner.skip_whitespace();
+        let mut comparable = self.parse_comparable()?;
+        self.scanner.skip_whitespace();
+        if let Some('&' | '|' | '=' | '!' | '<' | '>') = self.scanner.peek() {
+            let condition = self.resolve_comparable(comparable)?;
+            comparable = ast::Comparable::Condition(condition);
+            self.scanner.skip_whitespace();
+        }
+        return match self.scanner.pop() {
+            Some(')') => {
+                let closing_bracket_location = Location::SingleCharacter {
+                    char: self.scanner.cursor as u16 - 1,
+                    line: 0,
+                };
+                match comparable {
+                    ast::Comparable::Expression(expression) => Ok(ast::Comparable::Expression(
+                        ast::Expression::BracketedExpression {
+                            expression: Box::new(expression),
+                            opening_bracket_location,
+                            closing_bracket_location,
+                        },
+                    )),
+                    ast::Comparable::Condition(condition) => Ok(ast::Comparable::Condition(
+                        ast::Condition::BracketedCondition {
+                            condition: Box::new(condition),
+                            opening_bracket_location,
+                            closing_bracket_location,
+                        },
+                    )),
+                    comparable => {
+                        return Err(anyhow::anyhow!(
+                            "unsupported brackets aroun {}",
+                            comparable.r#type()
+                        ))
+                    }
+                }
+            }
+            Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
+            None => return Err(anyhow::anyhow!("unclosed bracket")),
+        };
+    }
+
+    fn parse_true_literal(&mut self) -> Result<ast::Condition> {
+        match self.scanner.take_str(&"true") {
+            true => Ok(ast::Condition::True {
+                location: Location::VariableLength {
+                    char: self.scanner.cursor as u16 - 4,
+                    line: 0,
+                    length: 4,
+                },
+            }),
+            false => {
+                return Err(match self.scanner.pop() {
+                    Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
+                    None => anyhow::anyhow!("unexpected end"),
                 })
             }
-            _ => Ok(result),
+        }
+    }
+
+    fn parse_false_literal(&mut self) -> Result<ast::Condition> {
+        match self.scanner.take_str(&"false") {
+            true => Ok(ast::Condition::False {
+                location: Location::VariableLength {
+                    char: self.scanner.cursor as u16 - 5,
+                    line: 0,
+                    length: 5,
+                },
+            }),
+            false => {
+                return Err(match self.scanner.pop() {
+                    Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
+                    None => anyhow::anyhow!("unexpected end"),
+                })
+            }
+        }
+    }
+
+    fn parse_null_literal(&mut self) -> Result<ast::Null> {
+        match self.scanner.take_str(&"null") {
+            true => Ok(ast::Null {
+                location: Location::VariableLength {
+                    char: self.scanner.cursor as u16 - 4,
+                    line: 0,
+                    length: 4,
+                },
+            }),
+            false => {
+                return Err(match self.scanner.pop() {
+                    Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
+                    None => anyhow::anyhow!("unexpected end"),
+                })
+            }
+        }
+    }
+
+    fn parse_negated_condition(&mut self) -> Result<ast::Condition> {
+        let exclamation_mark_location = Location::SingleCharacter {
+            char: self.scanner.cursor as u16,
+            line: 0,
         };
+        self.scanner.pop();
+        self.scanner.skip_whitespace();
+        match self.parse_condition()? {
+            ast::Condition::NegatedCondition { .. } => {
+                return Err(anyhow::anyhow!("duplicate condition negation"));
+            }
+            condition => Ok(ast::Condition::NegatedCondition {
+                condition: Box::new(condition),
+                exclamation_mark_location,
+            }),
+        }
     }
 
     fn parse_number(&mut self) -> Result<ast::Expression> {
@@ -330,6 +399,83 @@ impl Parser {
         }
     }
 
+    fn parse_bracketed_expression(&mut self) -> Result<ast::Expression> {
+        let start = self.scanner.cursor as u16;
+        self.scanner.pop();
+        self.scanner.skip_whitespace();
+        let expression = self.parse_expression()?;
+        self.scanner.skip_whitespace();
+        match self.scanner.pop() {
+            Some(')') => Ok(ast::Expression::BracketedExpression {
+                expression: Box::new(expression),
+                opening_bracket_location: Location::SingleCharacter {
+                    char: start,
+                    line: 0,
+                },
+                closing_bracket_location: Location::SingleCharacter {
+                    char: self.scanner.cursor as u16 - 1,
+                    line: 0,
+                },
+            }),
+            Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
+            None => return Err(anyhow::anyhow!("unclosed bracket")),
+        }
+    }
+
+    fn parse_signed_expression(&mut self) -> Result<ast::Expression> {
+        let sign = match self.scanner.pop() {
+            Some('+') => ast::Sign::Plus,
+            Some('-') => ast::Sign::Minus,
+            Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
+            None => return Err(anyhow::anyhow!("unexpected end")),
+        };
+        let sign_location = Location::SingleCharacter {
+            char: self.scanner.cursor as u16 - 1,
+            line: 0,
+        };
+        self.scanner.skip_whitespace();
+        match self.parse_expression()? {
+            ast::Expression::SignedExpression { .. } => {
+                return Err(anyhow::anyhow!("duplicate sign"));
+            }
+            expression => Ok(ast::Expression::SignedExpression {
+                expression: Box::new(expression),
+                sign,
+                sign_location,
+            }),
+        }
+    }
+
+    fn try_parse_binary_operation(&mut self, left: ast::Expression) -> Result<ast::Expression> {
+        return Ok(
+            match self.scanner.transform(|c| match c {
+                '+' => Some(ast::ExpressionOperator::Addition),
+                '-' => Some(ast::ExpressionOperator::Subtraction),
+                '/' => Some(ast::ExpressionOperator::Division),
+                '*' => Some(ast::ExpressionOperator::Multiplication),
+                '^' => Some(ast::ExpressionOperator::Power),
+                '%' => Some(ast::ExpressionOperator::Modulo),
+                _ => None,
+            }) {
+                Some(operation) => {
+                    let operator_location = Location::SingleCharacter {
+                        char: self.scanner.cursor as u16 - 1,
+                        line: 0,
+                    };
+                    self.scanner.skip_whitespace();
+                    let expression = self.parse_expression()?;
+                    self.resolve_binary_operation_precidence(
+                        left,
+                        operation,
+                        expression,
+                        operator_location,
+                    )
+                }
+                None => left,
+            },
+        );
+    }
+
     fn resolve_binary_operation_precidence(
         &mut self,
         left_expression: ast::Expression,
@@ -363,7 +509,7 @@ impl Parser {
         }
     }
 
-    fn parse_string(&mut self) -> Result<ast::Object> {
+    fn parse_string(&mut self) -> Result<ast::StringLiteral> {
         let mut result = String::new();
         let start = self.scanner.cursor as u16;
         if !self.scanner.take(&'\'') {
@@ -389,7 +535,7 @@ impl Parser {
                 }
                 Some('\'') => {
                     self.scanner.pop();
-                    return Ok(ast::Object::String {
+                    return Ok(ast::StringLiteral {
                         content: result.clone(),
                         location: Location::VariableLength {
                             char: start,
@@ -403,9 +549,7 @@ impl Parser {
                     result.push(*char);
                     self.scanner.pop();
                 }
-                Some(char) => {
-                    return Err(anyhow::anyhow!("invalid character \"{}\"", char));
-                }
+                Some(char) => return Err(anyhow::anyhow!("invalid character \"{}\"", char)),
                 None => return Err(anyhow::anyhow!("unexpected end")),
             }
         }
@@ -462,9 +606,9 @@ impl Parser {
     fn parse_name_or_global_function(&mut self) -> Result<ast::Object> {
         let name = self.parse_word()?;
         if name.name == "null" && name.interpolations.len() == 0 {
-            return Ok(ast::Object::Null {
+            return Ok(ast::Object::Null(ast::Null {
                 location: name.location,
-            });
+            }));
         }
         self.scanner.skip_whitespace();
         let mut result = match self.scanner.peek() {
@@ -608,8 +752,9 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use crate::spel::ast::{
-        Condition, ConditionAst, ConditionOperator, Expression, ExpressionAst, ExpressionOperator,
-        Interpolation, Location, Object, ObjectAst, Sign, Word,
+        Comparable, ComparissonOperator, Condition, ConditionAst, ConditionOperator, Expression,
+        ExpressionAst, ExpressionOperator, Interpolation, Location, Null, Object, ObjectAst, Sign,
+        StringLiteral, Word,
     };
 
     #[test]
@@ -617,14 +762,14 @@ mod tests {
         assert_eq!(
             parse_object("'test'"),
             ObjectAst {
-                root: Object::String {
+                root: Object::String(StringLiteral {
                     content: "test".to_string(),
                     location: Location::VariableLength {
                         char: 0,
                         line: 0,
                         length: 6,
                     }
-                }
+                })
             }
         );
     }
@@ -634,14 +779,14 @@ mod tests {
         assert_eq!(
             parse_object("\t'test'   "),
             ObjectAst {
-                root: Object::String {
+                root: Object::String(StringLiteral {
                     content: "test".to_string(),
                     location: Location::VariableLength {
                         char: 1,
                         line: 0,
                         length: 6,
                     }
-                }
+                })
             }
         );
     }
@@ -651,14 +796,14 @@ mod tests {
         assert_eq!(
             parse_object("'tes\\\'t'"),
             ObjectAst {
-                root: Object::String {
+                root: Object::String(StringLiteral {
                     content: "tes\\\'t".to_string(),
                     location: Location::VariableLength {
                         char: 0,
                         line: 0,
                         length: 8,
                     }
-                }
+                })
             }
         );
     }
@@ -668,13 +813,13 @@ mod tests {
         assert_eq!(
             parse_object("null"),
             ObjectAst {
-                root: Object::Null {
+                root: Object::Null(Null {
                     location: Location::VariableLength {
                         char: 0,
                         line: 0,
                         length: 4,
                     }
-                }
+                })
             }
         );
     }
@@ -688,14 +833,14 @@ mod tests {
                     name: Word {
                         name: "null".to_string(),
                         interpolations: vec![Interpolation {
-                            content: Object::String {
+                            content: Object::String(StringLiteral {
                                 content: "notNull".to_string(),
                                 location: Location::VariableLength {
                                     char: 6,
                                     line: 0,
                                     length: 9,
                                 }
-                            },
+                            }),
                             opening_bracket_location: Location::DoubleCharacter {
                                 char: 4,
                                 line: 0,
@@ -802,14 +947,14 @@ mod tests {
         assert_eq!(
             parse_object("'hello, ${world}'"),
             ObjectAst {
-                root: Object::String {
+                root: Object::String(StringLiteral {
                     content: "hello, ${world}".to_string(),
                     location: Location::VariableLength {
                         char: 0,
                         line: 0,
                         length: 17,
                     },
-                }
+                })
             }
         );
     }
@@ -852,14 +997,14 @@ mod tests {
                             length: 9,
                         },
                     },
-                    arguments: vec![Object::String {
+                    arguments: vec![Object::String(StringLiteral {
                         content: "test".to_string(),
                         location: Location::VariableLength {
                             char: 10,
                             line: 0,
                             length: 6,
                         },
-                    }],
+                    })],
                     opening_bracket_location: Location::SingleCharacter { char: 9, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 16, line: 0 },
                 }
@@ -926,22 +1071,22 @@ mod tests {
                         },
                     },
                     arguments: vec![
-                        Object::String {
+                        Object::String(StringLiteral {
                             content: "test".to_string(),
                             location: Location::VariableLength {
                                 char: 13,
                                 line: 0,
                                 length: 6,
                             },
-                        },
-                        Object::String {
+                        }),
+                        Object::String(StringLiteral {
                             content: "test2".to_string(),
                             location: Location::VariableLength {
                                 char: 23,
                                 line: 0,
                                 length: 7,
                             },
-                        }
+                        })
                     ],
                     opening_bracket_location: Location::SingleCharacter { char: 11, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 31, line: 0 },
@@ -976,22 +1121,22 @@ mod tests {
                             },
                         },
                         arguments: vec![
-                            Object::String {
+                            Object::String(StringLiteral {
                                 content: "hello".to_string(),
                                 location: Location::VariableLength {
                                     char: 17,
                                     line: 0,
                                     length: 7,
                                 },
-                            },
-                            Object::String {
+                            }),
+                            Object::String(StringLiteral {
                                 content: "world".to_string(),
                                 location: Location::VariableLength {
                                     char: 26,
                                     line: 0,
                                     length: 7,
                                 },
-                            }
+                            })
                         ],
                         opening_bracket_location: Location::SingleCharacter { char: 16, line: 0 },
                         closing_bracket_location: Location::SingleCharacter { char: 33, line: 0 },
@@ -1542,6 +1687,75 @@ mod tests {
                     }),
                     opening_bracket_location: Location::SingleCharacter { char: 0, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 14, line: 0 },
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_expression_comparisson() {
+        assert_eq!(
+            parse_condition("3 >= 4"),
+            ConditionAst {
+                root: Condition::Comparisson {
+                    left: Box::new(Comparable::Expression(Expression::Number {
+                        content: "3".to_string(),
+                        location: Location::VariableLength {
+                            char: 0,
+                            line: 0,
+                            length: 1
+                        }
+                    })),
+                    operator: ComparissonOperator::GreaterThanOrEqual,
+                    right: Box::new(Comparable::Expression(Expression::Number {
+                        content: "4".to_string(),
+                        location: Location::VariableLength {
+                            char: 5,
+                            line: 0,
+                            length: 1
+                        }
+                    })),
+                    operator_location: Location::DoubleCharacter { char: 2, line: 0 }
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_binary_condition() {
+        assert_eq!(
+            parse_condition("3 != 4 && true"),
+            ConditionAst {
+                root: Condition::BinaryOperation {
+                    left: Box::new(Condition::Comparisson {
+                        left: Box::new(Comparable::Expression(Expression::Number {
+                            content: "3".to_string(),
+                            location: Location::VariableLength {
+                                char: 0,
+                                line: 0,
+                                length: 1
+                            }
+                        })),
+                        operator: ComparissonOperator::Unequal,
+                        right: Box::new(Comparable::Expression(Expression::Number {
+                            content: "4".to_string(),
+                            location: Location::VariableLength {
+                                char: 5,
+                                line: 0,
+                                length: 1
+                            }
+                        })),
+                        operator_location: Location::DoubleCharacter { char: 2, line: 0 }
+                    }),
+                    operator: ConditionOperator::And,
+                    right: Box::new(Condition::True {
+                        location: Location::VariableLength {
+                            char: 10,
+                            line: 0,
+                            length: 4,
+                        }
+                    }),
+                    operator_location: Location::DoubleCharacter { char: 7, line: 0 }
                 }
             }
         );
