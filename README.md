@@ -20,9 +20,11 @@ A work-in-progress language server for the sitepark markup language (spml).
         - have a fixed set of possible values
         - point to another spml file
 - semantic highlighting for attribute values that expect:
-    - objects
-    - expressions
     - conditions
+    - expressions
+    - identifiers
+    - objects
+
 ## commandline
 
 ```

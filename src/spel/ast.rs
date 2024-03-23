@@ -85,38 +85,31 @@ fn fmt_arguments(formatter: &mut Formatter<'_>, arguments: &Vec<Object>) -> core
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Word {
-    pub(crate) name: String,
-    pub(crate) interpolations: Vec<Interpolation>,
-    pub(crate) location: Location,
+    pub(crate) fragments: Vec<WordFragment>,
 }
 
 impl Display for Word {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
-        return fmt_interpolations(
-            formatter,
-            &self.name,
-            &self.interpolations,
-            self.location.char() as usize,
-        );
+        for fragment in &self.fragments {
+            fragment.fmt(formatter)?;
+        }
+        return Ok(());
     }
 }
 
-fn fmt_interpolations(
-    formatter: &mut Formatter<'_>,
-    string: &String,
-    interpolations: &Vec<Interpolation>,
-    offset: usize,
-) -> core::fmt::Result {
-    let mut index;
-    let mut last_index = 0;
-    let indices = &mut string.char_indices();
-    for interpolation in interpolations {
-        index = interpolation.opening_bracket_location.char() as usize - offset;
-        formatter.write_str(&string[last_index..indices.nth(index).unwrap().0])?;
-        interpolation.fmt(formatter)?;
-        last_index = index;
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum WordFragment {
+    String(StringLiteral),
+    Interpolation(Interpolation),
+}
+
+impl Display for WordFragment {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            WordFragment::String(string) => string.fmt(formatter),
+            WordFragment::Interpolation(interpolation) => interpolation.fmt(formatter),
+        }
     }
-    formatter.write_str(&string[last_index..])
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -472,7 +465,7 @@ impl ConditionAst {
 
 #[cfg(test)]
 mod tests {
-    use crate::spel::ast::{Interpolation, Location, Object, StringLiteral, Word};
+    use crate::spel::ast::{Interpolation, Location, Object, StringLiteral, Word, WordFragment};
 
     #[test]
     fn test_format_interpolated_word() {
@@ -480,27 +473,46 @@ mod tests {
             format!(
                 "{}",
                 Word {
-                    name: "hello--world".to_string(),
-                    interpolations: vec![Interpolation {
-                        content: Object::Name {
-                            name: Word {
-                                name: "nice".to_string(),
-                                interpolations: vec![],
-                                location: Location::VariableLength {
-                                    line: 0,
-                                    char: 11,
-                                    length: 4,
-                                }
+                    fragments: vec![
+                        WordFragment::String(StringLiteral {
+                            content: "hello-".to_string(),
+                            location: Location::VariableLength {
+                                line: 0,
+                                char: 3,
+                                length: 6,
                             }
-                        },
-                        opening_bracket_location: Location::DoubleCharacter { line: 0, char: 9 },
-                        closing_bracket_location: Location::SingleCharacter { line: 0, char: 15 }
-                    }],
-                    location: Location::VariableLength {
-                        line: 0,
-                        char: 3,
-                        length: 21,
-                    }
+                        }),
+                        WordFragment::Interpolation(Interpolation {
+                            content: Object::Name {
+                                name: Word {
+                                    fragments: vec![WordFragment::String(StringLiteral {
+                                        content: "nice".to_string(),
+                                        location: Location::VariableLength {
+                                            line: 0,
+                                            char: 11,
+                                            length: 4,
+                                        }
+                                    })]
+                                }
+                            },
+                            opening_bracket_location: Location::DoubleCharacter {
+                                line: 0,
+                                char: 9
+                            },
+                            closing_bracket_location: Location::SingleCharacter {
+                                line: 0,
+                                char: 15
+                            }
+                        }),
+                        WordFragment::String(StringLiteral {
+                            content: "-world".to_string(),
+                            location: Location::VariableLength {
+                                line: 0,
+                                char: 16,
+                                length: 6,
+                            }
+                        }),
+                    ],
                 }
             ),
             "hello-${nice}-world"

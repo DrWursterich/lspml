@@ -605,13 +605,20 @@ impl Parser {
 
     fn parse_name_or_global_function(&mut self) -> Result<ast::Object> {
         let name = self.parse_word()?;
-        if name.name == "null" && name.interpolations.len() == 0 {
-            return Ok(ast::Object::Null(ast::Null {
-                location: name.location,
-            }));
+        // TODO: there probably is a better way...
+        match &name.fragments[0] {
+            ast::WordFragment::String(ast::StringLiteral { content, location })
+                if name.fragments.len() == 1 && content == "null" =>
+            {
+                return Ok(ast::Object::Null(ast::Null {
+                    location: location.clone(),
+                }));
+            }
+            _ => {}
         }
         self.scanner.skip_whitespace();
-        let mut result = match self.scanner.peek() {
+        let next = self.scanner.peek();
+        let mut result = match next {
             Some(&'(') => {
                 let start = self.scanner.cursor as u16;
                 let arguments = self.parse_function_arguments()?;
@@ -697,29 +704,48 @@ impl Parser {
     }
 
     fn parse_word(&mut self) -> Result<ast::Word> {
-        let mut result = String::new();
-        let mut interpolations = Vec::new();
-        let start = self.scanner.cursor as u16;
+        let mut string = String::new();
+        let mut fragments = Vec::new();
+        let mut start = self.scanner.cursor as u16;
         loop {
             match self.scanner.peek() {
                 Some(char @ ('a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-')) => {
-                    result.push(*char);
+                    string.push(*char);
                     self.scanner.pop();
                 }
-                Some('$') => interpolations.push(self.parse_interpolation()?),
+                Some('$') => {
+                    let interpolation = self.parse_interpolation()?;
+                    let length = string.len() as u16;
+                    if length > 0 {
+                        fragments.push(ast::WordFragment::String(ast::StringLiteral {
+                            content: string,
+                            location: Location::VariableLength {
+                                char: start,
+                                line: 0,
+                                length,
+                            },
+                        }));
+                        string = String::new();
+                        start = self.scanner.cursor as u16;
+                    }
+                    fragments.push(ast::WordFragment::Interpolation(interpolation))
+                }
                 _ => break,
             }
         }
-        return match result.len() > 0 || interpolations.len() > 0 {
-            true => Ok(ast::Word {
-                name: result.clone(),
-                interpolations,
+        let length = string.len() as u16;
+        if length > 0 {
+            fragments.push(ast::WordFragment::String(ast::StringLiteral {
+                content: string,
                 location: Location::VariableLength {
                     char: start,
                     line: 0,
-                    length: result.len() as u16,
+                    length,
                 },
-            }),
+            }));
+        }
+        return match fragments.len() > 0 {
+            true => Ok(ast::Word { fragments }),
             false => Err(match self.scanner.peek() {
                 Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
                 _ => anyhow::anyhow!("unexpected end"),
@@ -754,7 +780,7 @@ mod tests {
     use crate::spel::ast::{
         Comparable, ComparissonOperator, Condition, ConditionAst, ConditionOperator, Expression,
         ExpressionAst, ExpressionOperator, Interpolation, Location, Null, Object, ObjectAst, Sign,
-        StringLiteral, Word,
+        StringLiteral, Word, WordFragment,
     };
 
     #[test]
@@ -831,30 +857,34 @@ mod tests {
             ObjectAst {
                 root: Object::Name {
                     name: Word {
-                        name: "null".to_string(),
-                        interpolations: vec![Interpolation {
-                            content: Object::String(StringLiteral {
-                                content: "notNull".to_string(),
+                        fragments: vec![
+                            WordFragment::String(StringLiteral {
+                                content: "null".to_string(),
                                 location: Location::VariableLength {
-                                    char: 6,
+                                    char: 0,
                                     line: 0,
-                                    length: 9,
+                                    length: 4,
                                 }
                             }),
-                            opening_bracket_location: Location::DoubleCharacter {
-                                char: 4,
-                                line: 0,
-                            },
-                            closing_bracket_location: Location::SingleCharacter {
-                                char: 15,
-                                line: 0,
-                            },
-                        }],
-                        location: Location::VariableLength {
-                            char: 0,
-                            line: 0,
-                            length: 4,
-                        }
+                            WordFragment::Interpolation(Interpolation {
+                                content: Object::String(StringLiteral {
+                                    content: "notNull".to_string(),
+                                    location: Location::VariableLength {
+                                        char: 6,
+                                        line: 0,
+                                        length: 9,
+                                    }
+                                }),
+                                opening_bracket_location: Location::DoubleCharacter {
+                                    char: 4,
+                                    line: 0,
+                                },
+                                closing_bracket_location: Location::SingleCharacter {
+                                    char: 15,
+                                    line: 0,
+                                },
+                            })
+                        ],
                     }
                 }
             }
@@ -879,13 +909,14 @@ mod tests {
             ObjectAst {
                 root: Object::Anchor {
                     name: Word {
-                        name: "home".to_string(),
-                        interpolations: vec![],
-                        location: Location::VariableLength {
-                            char: 2,
-                            line: 0,
-                            length: 4,
-                        }
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "home".to_string(),
+                            location: Location::VariableLength {
+                                char: 2,
+                                line: 0,
+                                length: 4,
+                            }
+                        })]
                     },
                     opening_bracket_location: Location::DoubleCharacter { char: 0, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 6, line: 0 },
@@ -901,17 +932,17 @@ mod tests {
             ObjectAst {
                 root: Object::Name {
                     name: Word {
-                        name: "".to_string(),
-                        interpolations: vec![Interpolation {
+                        fragments: vec![WordFragment::Interpolation(Interpolation {
                             content: Object::Anchor {
                                 name: Word {
-                                    name: "home".to_string(),
-                                    interpolations: vec![],
-                                    location: Location::VariableLength {
-                                        char: 4,
-                                        line: 0,
-                                        length: 4,
-                                    }
+                                    fragments: vec![WordFragment::String(StringLiteral {
+                                        content: "home".to_string(),
+                                        location: Location::VariableLength {
+                                            char: 4,
+                                            line: 0,
+                                            length: 4,
+                                        }
+                                    })],
                                 },
                                 opening_bracket_location: Location::DoubleCharacter {
                                     char: 2,
@@ -930,13 +961,71 @@ mod tests {
                                 char: 9,
                                 line: 0,
                             }
-                        }],
-                        location: Location::VariableLength {
-                            char: 0,
-                            line: 0,
-                            length: 0,
-                        }
+                        })]
                     }
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_interpolated_anchor() {
+        assert_eq!(
+            parse_object("!{home-${_object}-content}"),
+            ObjectAst {
+                root: Object::Anchor {
+                    name: Word {
+                        fragments: vec![
+                            WordFragment::String(StringLiteral {
+                                content: "home-".to_string(),
+                                location: Location::VariableLength {
+                                    char: 2,
+                                    line: 0,
+                                    length: 5,
+                                }
+                            }),
+                            WordFragment::Interpolation(Interpolation {
+                                content: Object::Name {
+                                    name: Word {
+                                        fragments: vec![
+                                            WordFragment::String(StringLiteral {
+                                                content: "_object".to_string(),
+                                                location: Location::VariableLength {
+                                                    char: 9,
+                                                    line: 0,
+                                                    length: 7,
+                                                }
+                                            })
+                                        ]
+                                    }
+                                },
+                                opening_bracket_location: Location::DoubleCharacter {
+                                    char: 7,
+                                    line: 0,
+                                },
+                                closing_bracket_location: Location::SingleCharacter {
+                                    char: 16,
+                                    line: 0,
+                                },
+                            }),
+                            WordFragment::String(StringLiteral {
+                                content: "-content".to_string(),
+                                location: Location::VariableLength {
+                                    char: 17,
+                                    line: 0,
+                                    length: 8,
+                                }
+                            }),
+                        ],
+                    },
+                    opening_bracket_location: Location::DoubleCharacter {
+                        char: 0,
+                        line: 0,
+                    },
+                    closing_bracket_location: Location::SingleCharacter {
+                        char: 25,
+                        line: 0,
+                    },
                 }
             }
         );
@@ -966,13 +1055,14 @@ mod tests {
             ObjectAst {
                 root: Object::Function {
                     name: Word {
-                        name: "flush".to_string(),
-                        interpolations: vec![],
-                        location: Location::VariableLength {
-                            char: 0,
-                            line: 0,
-                            length: 5,
-                        },
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "flush".to_string(),
+                            location: Location::VariableLength {
+                                char: 0,
+                                line: 0,
+                                length: 5,
+                            },
+                        })]
                     },
                     arguments: vec![],
                     opening_bracket_location: Location::SingleCharacter { char: 5, line: 0 },
@@ -989,13 +1079,14 @@ mod tests {
             ObjectAst {
                 root: Object::Function {
                     name: Word {
-                        name: "is_string".to_string(),
-                        interpolations: vec![],
-                        location: Location::VariableLength {
-                            char: 0,
-                            line: 0,
-                            length: 9,
-                        },
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "is_string".to_string(),
+                            location: Location::VariableLength {
+                                char: 0,
+                                line: 0,
+                                length: 9,
+                            },
+                        })]
                     },
                     arguments: vec![Object::String(StringLiteral {
                         content: "test".to_string(),
@@ -1019,33 +1110,38 @@ mod tests {
             ObjectAst {
                 root: Object::Function {
                     name: Word {
-                        name: "is_".to_string(),
-                        interpolations: vec![Interpolation {
-                            content: Object::Name {
-                                name: Word {
-                                    name: "_type".to_string(),
-                                    interpolations: vec![],
-                                    location: Location::VariableLength {
-                                        char: 5,
-                                        line: 0,
-                                        length: 5,
+                        fragments: vec![
+                            WordFragment::String(StringLiteral {
+                                content: "is_".to_string(),
+                                location: Location::VariableLength {
+                                    char: 0,
+                                    line: 0,
+                                    length: 3,
+                                },
+                            }),
+                            WordFragment::Interpolation(Interpolation {
+                                content: Object::Name {
+                                    name: Word {
+                                        fragments: vec![WordFragment::String(StringLiteral {
+                                            content: "_type".to_string(),
+                                            location: Location::VariableLength {
+                                                char: 5,
+                                                line: 0,
+                                                length: 5,
+                                            },
+                                        })]
                                     },
                                 },
-                            },
-                            opening_bracket_location: Location::DoubleCharacter {
-                                char: 3,
-                                line: 0,
-                            },
-                            closing_bracket_location: Location::SingleCharacter {
-                                char: 10,
-                                line: 0,
-                            },
-                        }],
-                        location: Location::VariableLength {
-                            char: 0,
-                            line: 0,
-                            length: 3,
-                        },
+                                opening_bracket_location: Location::DoubleCharacter {
+                                    char: 3,
+                                    line: 0,
+                                },
+                                closing_bracket_location: Location::SingleCharacter {
+                                    char: 10,
+                                    line: 0,
+                                },
+                            })
+                        ]
                     },
                     arguments: vec![],
                     opening_bracket_location: Location::SingleCharacter { char: 11, line: 0 },
@@ -1062,13 +1158,14 @@ mod tests {
             ObjectAst {
                 root: Object::Function {
                     name: Word {
-                        name: "is_string".to_string(),
-                        interpolations: vec![],
-                        location: Location::VariableLength {
-                            char: 1,
-                            line: 0,
-                            length: 9,
-                        },
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "is_string".to_string(),
+                            location: Location::VariableLength {
+                                char: 1,
+                                line: 0,
+                                length: 9,
+                            },
+                        })]
                     },
                     arguments: vec![
                         Object::String(StringLiteral {
@@ -1102,23 +1199,25 @@ mod tests {
             ObjectAst {
                 root: Object::Function {
                     name: Word {
-                        name: "is_string".to_string(),
-                        interpolations: vec![],
-                        location: Location::VariableLength {
-                            char: 0,
-                            line: 0,
-                            length: 9,
-                        },
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "is_string".to_string(),
+                            location: Location::VariableLength {
+                                char: 0,
+                                line: 0,
+                                length: 9,
+                            },
+                        })]
                     },
                     arguments: vec![Object::Function {
                         name: Word {
-                            name: "concat".to_string(),
-                            interpolations: vec![],
-                            location: Location::VariableLength {
-                                char: 10,
-                                line: 0,
-                                length: 6,
-                            },
+                            fragments: vec![WordFragment::String(StringLiteral {
+                                content: "concat".to_string(),
+                                location: Location::VariableLength {
+                                    char: 10,
+                                    line: 0,
+                                    length: 6,
+                                },
+                            })]
                         },
                         arguments: vec![
                             Object::String(StringLiteral {
@@ -1156,23 +1255,25 @@ mod tests {
                 root: Object::FieldAccess {
                     object: Box::new(Object::Name {
                         name: Word {
-                            name: "_string".to_string(),
-                            interpolations: vec![],
-                            location: Location::VariableLength {
-                                char: 0,
-                                line: 0,
-                                length: 7,
-                            },
+                            fragments: vec![WordFragment::String(StringLiteral {
+                                content: "_string".to_string(),
+                                location: Location::VariableLength {
+                                    char: 0,
+                                    line: 0,
+                                    length: 7,
+                                },
+                            })]
                         }
                     }),
                     field: Word {
-                        name: "length".to_string(),
-                        interpolations: vec![],
-                        location: Location::VariableLength {
-                            char: 8,
-                            line: 0,
-                            length: 6,
-                        },
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "length".to_string(),
+                            location: Location::VariableLength {
+                                char: 8,
+                                line: 0,
+                                length: 6,
+                            },
+                        })]
                     },
                     dot_location: Location::SingleCharacter { char: 7, line: 0 },
                 }
@@ -1199,23 +1300,25 @@ mod tests {
                 root: Object::MethodAccess {
                     object: Box::new(Object::Name {
                         name: Word {
-                            name: "_string".to_string(),
-                            interpolations: vec![],
-                            location: Location::VariableLength {
-                                char: 0,
-                                line: 0,
-                                length: 7,
-                            },
+                            fragments: vec![WordFragment::String(StringLiteral {
+                                content: "_string".to_string(),
+                                location: Location::VariableLength {
+                                    char: 0,
+                                    line: 0,
+                                    length: 7,
+                                },
+                            })]
                         }
                     }),
                     method: Word {
-                        name: "length".to_string(),
-                        interpolations: vec![],
-                        location: Location::VariableLength {
-                            char: 8,
-                            line: 0,
-                            length: 6,
-                        },
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "length".to_string(),
+                            location: Location::VariableLength {
+                                char: 8,
+                                line: 0,
+                                length: 6,
+                            },
+                        })]
                     },
                     arguments: vec![],
                     dot_location: Location::SingleCharacter { char: 7, line: 0 },
@@ -1234,13 +1337,14 @@ mod tests {
                 root: Object::ArrayAccess {
                     object: Box::new(Object::Name {
                         name: Word {
-                            name: "_strings".to_string(),
-                            interpolations: vec![],
-                            location: Location::VariableLength {
-                                char: 0,
-                                line: 0,
-                                length: 8,
-                            },
+                            fragments: vec![WordFragment::String(StringLiteral {
+                                content: "_strings".to_string(),
+                                location: Location::VariableLength {
+                                    char: 0,
+                                    line: 0,
+                                    length: 8,
+                                },
+                            })]
                         }
                     }),
                     index: Expression::Number {
@@ -1266,13 +1370,14 @@ mod tests {
                 root: Object::ArrayAccess {
                     object: Box::new(Object::Name {
                         name: Word {
-                            name: "_strings".to_string(),
-                            interpolations: vec![],
-                            location: Location::VariableLength {
-                                char: 0,
-                                line: 0,
-                                length: 8,
-                            },
+                            fragments: vec![WordFragment::String(StringLiteral {
+                                content: "_strings".to_string(),
+                                location: Location::VariableLength {
+                                    char: 0,
+                                    line: 0,
+                                    length: 8,
+                                },
+                            })]
                         }
                     }),
                     index: Expression::SignedExpression {
@@ -1722,7 +1827,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_binary_condition() {
+    fn test_parse_binary_condition_comparisson() {
         assert_eq!(
             parse_condition("3 != 4 && true"),
             ConditionAst {

@@ -336,7 +336,12 @@ fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) 
                 SemanticTokenType::OPERATOR,
                 vec![],
             );
-            index_word(name, token_collector);
+            index_word(
+                name,
+                token_collector,
+                SemanticTokenType::ENUM_MEMBER,
+                vec![],
+            );
             token_collector.add(
                 closing_bracket_location,
                 SemanticTokenType::OPERATOR,
@@ -349,7 +354,7 @@ fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) 
             opening_bracket_location,
             closing_bracket_location,
         } => {
-            token_collector.add(&name.location, SemanticTokenType::METHOD, Vec::new());
+            index_word(name, token_collector, SemanticTokenType::METHOD, Vec::new());
             token_collector.add(
                 opening_bracket_location,
                 SemanticTokenType::OPERATOR,
@@ -365,10 +370,10 @@ fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) 
             );
         }
         ast::Object::Name { name } => {
-            index_word(name, token_collector);
+            index_word(name, token_collector, SemanticTokenType::VARIABLE, vec![]);
         }
         ast::Object::Null(ast::Null { location }) => {
-            token_collector.add(location, SemanticTokenType::VARIABLE, vec![])
+            token_collector.add(location, SemanticTokenType::ENUM_MEMBER, vec![])
         }
         ast::Object::String(ast::StringLiteral { location, .. }) => {
             token_collector.add(location, SemanticTokenType::STRING, vec![])
@@ -380,7 +385,7 @@ fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) 
         } => {
             index_object(object, token_collector);
             token_collector.add(dot_location, SemanticTokenType::OPERATOR, vec![]);
-            token_collector.add(&field.location, SemanticTokenType::PROPERTY, Vec::new());
+            index_word(&field, token_collector, SemanticTokenType::PROPERTY, vec![]);
         }
         ast::Object::MethodAccess {
             object,
@@ -392,7 +397,7 @@ fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) 
         } => {
             index_object(object, token_collector);
             token_collector.add(dot_location, SemanticTokenType::OPERATOR, vec![]);
-            token_collector.add(&method.location, SemanticTokenType::METHOD, Vec::new());
+            index_word(&method, token_collector, SemanticTokenType::METHOD, vec![]);
             token_collector.add(
                 opening_bracket_location,
                 SemanticTokenType::OPERATOR,
@@ -570,12 +575,22 @@ fn index_comparable(comparable: &ast::Comparable, token_collector: &mut SpelToke
     }
 }
 
-fn index_word(word: &ast::Word, token_collector: &mut SpelTokenCollector) {
-    // TODO: word.location.length is not the entire length!
-    //       should be WordFragements or something
-    token_collector.add(&word.location, SemanticTokenType::VARIABLE, vec![]);
-    for interpolation in &word.interpolations {
-        index_interpolation(&interpolation, token_collector);
+fn index_word(
+    word: &ast::Word,
+    token_collector: &mut SpelTokenCollector,
+    token_type: SemanticTokenType,
+    token_modifiers: Vec<SemanticTokenModifier>,
+) {
+    for fragment in &word.fragments {
+        match fragment {
+            ast::WordFragment::String(ast::StringLiteral { location, .. }) => {
+                // TODO: probably don't have to clone all of this..
+                token_collector.add(&location, token_type.clone(), token_modifiers.clone());
+            }
+            ast::WordFragment::Interpolation(interpolation) => {
+                index_interpolation(&interpolation, token_collector)
+            }
+        }
     }
 }
 
@@ -611,13 +626,14 @@ mod tests {
         let tokenizer = &mut Tokenizer::new();
         let root_object = ast::Object::Name {
             name: ast::Word {
-                name: "_someVariable".to_string(),
-                interpolations: vec![],
-                location: ast::Location::VariableLength {
-                    char: 0,
-                    line: 0,
-                    length: 13,
-                },
+                fragments: vec![ast::WordFragment::String(ast::StringLiteral {
+                    content: "_someVariable".to_string(),
+                    location: ast::Location::VariableLength {
+                        char: 0,
+                        line: 0,
+                        length: 13,
+                    },
+                })],
             },
         };
         crate::command::semantics::index_object(
@@ -652,30 +668,20 @@ mod tests {
     #[test]
     fn test_index_multiple_objects() {
         let tokenizer = &mut Tokenizer::new();
-        let root_object1 = ast::Object::Name {
+        let root_object = ast::Object::Name {
             name: ast::Word {
-                name: "_someVariable".to_string(),
-                interpolations: vec![],
-                location: ast::Location::VariableLength {
-                    char: 0,
-                    line: 0,
-                    length: 13,
-                },
-            },
-        };
-        let root_object2 = ast::Object::Name {
-            name: ast::Word {
-                name: "_someVariable".to_string(),
-                interpolations: vec![],
-                location: ast::Location::VariableLength {
-                    char: 0,
-                    line: 0,
-                    length: 13,
-                },
+                fragments: vec![ast::WordFragment::String(ast::StringLiteral {
+                    content: "_someVariable".to_string(),
+                    location: ast::Location::VariableLength {
+                        char: 0,
+                        line: 0,
+                        length: 13,
+                    },
+                })],
             },
         };
         crate::command::semantics::index_object(
-            &root_object1,
+            &root_object,
             &mut SpelTokenCollector {
                 tokenizer,
                 offset_line: 8,
@@ -683,7 +689,7 @@ mod tests {
             },
         );
         crate::command::semantics::index_object(
-            &root_object2,
+            &root_object,
             &mut SpelTokenCollector {
                 tokenizer,
                 offset_line: 9,
