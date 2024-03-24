@@ -130,20 +130,19 @@ pub(crate) fn highlight(request: Request) -> Result<Message> {
         .map_err(|err| Error::from(err));
 }
 
-pub(crate) fn hover(request: Request) -> Result<Message> {
+pub(crate) fn hover(request: Request) -> Result<Option<Message>> {
     log::trace!("got hover request: {request:?}");
-    return serde_json::from_value(request.params)
-        .map(|params| {
-            Message::Response(match hover::hover(params) {
-                Ok(hover) => Response {
-                    id: request.id,
-                    result: hover.and_then(|hover| serde_json::to_value(hover).ok()),
-                    error: None,
-                },
-                Err(err) => err.to_response(request.id),
-            })
-        })
-        .map_err(|err| Error::from(err));
+    return Ok(
+        match hover::hover(serde_json::from_value(request.params)?) {
+            Ok(Some(result)) => Some(Message::Response(Response {
+                id: request.id,
+                result: Some(serde_json::to_value(result)?),
+                error: None,
+            })),
+            Ok(None) => None,
+            Err(err) => Some(Message::Response(err.to_response(request.id))),
+        },
+    );
 }
 
 pub(crate) fn semantics(request: Request) -> Result<Message> {

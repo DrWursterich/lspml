@@ -133,19 +133,20 @@ fn main_loop(
                     return Ok(());
                 }
                 match request.method.as_str() {
-                    "textDocument/completion" => command::complete(request),
-                    "textDocument/definition" => command::definition(request),
-                    "textDocument/diagnostic" => command::diagnostic(request),
-                    "textDocument/documentHighlight" => command::highlight(request), // stub
-                    "textDocument/semanticTokens/full" => command::semantics(request), // stub
+                    "textDocument/completion" => command::complete(request).map(Some),
+                    "textDocument/definition" => command::definition(request).map(Some),
+                    "textDocument/diagnostic" => command::diagnostic(request).map(Some),
+                    "textDocument/documentHighlight" => command::highlight(request).map(Some), // stub
+                    "textDocument/semanticTokens/full" => command::semantics(request).map(Some),
                     "textDocument/hover" => command::hover(request),
-                    _ => command::unknown(request),
+                    _ => command::unknown(request).map(Some),
                 }
-                .and_then(|response| {
-                    connection
+                .and_then(|response| match response {
+                    Some(response) => connection
                         .sender
                         .send(response)
-                        .map_err(|err| anyhow::anyhow!(err))
+                        .map_err(|err| anyhow::anyhow!(err)),
+                    None => Ok(()),
                 })?;
             }
             Message::Response(response) => {
