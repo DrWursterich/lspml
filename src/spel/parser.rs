@@ -91,16 +91,227 @@ impl Parser {
     }
 
     fn parse_expression(&mut self) -> Result<ast::Expression> {
-        let result = match self.scanner.peek() {
-            Some('$') => ast::Expression::Object(Box::new(self.parse_interpolation()?)),
-            Some('(') => self.parse_bracketed_expression()?,
-            Some('+' | '-') => self.parse_signed_expression()?,
-            Some('0'..='9') => self.parse_number()?,
+        let result = self.parse_undecided_expression_content()?;
+        return self.resolve_expression_content(result);
+    }
+
+    fn parse_undecided_expression_content(&mut self) -> Result<ast::UndecidedExpressionContent> {
+        return match self.scanner.peek() {
+            Some('\'') => self
+                .parse_string()
+                .map(ast::UndecidedExpressionContent::String),
+            Some('$') => self
+                .parse_interpolation()
+                .map(ast::UndecidedExpressionContent::Name),
+            Some('(') => self.parse_bracketed_expression_content(),
+            Some('+' | '-') => self
+                .parse_signed_expression()
+                .map(ast::UndecidedExpressionContent::Expression),
+            Some('0'..='9') => self
+                .parse_number()
+                .map(ast::UndecidedExpressionContent::Expression),
+            Some('n') => self
+                .parse_null_literal()
+                .map(ast::UndecidedExpressionContent::Null),
+            Some('f') => self
+                .parse_false_literal()
+                .map(ast::UndecidedExpressionContent::Condition),
+            Some('t') => self
+                .parse_true_literal()
+                .map(ast::UndecidedExpressionContent::Condition),
+            Some('!') => self
+                .parse_negated_condition()
+                .map(ast::UndecidedExpressionContent::Condition),
             Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
             None => return Err(anyhow::anyhow!("unexpected end")),
         };
+    }
+
+    fn resolve_expression_content(
+        &mut self,
+        content: ast::UndecidedExpressionContent,
+    ) -> Result<ast::Expression> {
         self.scanner.skip_whitespace();
-        return self.try_parse_binary_operation(result);
+        return match self.resolve_undecided_expression_content(content)? {
+            ast::UndecidedExpressionContent::Expression(expression) => Ok(expression),
+            ast::UndecidedExpressionContent::Name(name) => {
+                Ok(ast::Expression::Object(Box::new(name)))
+            }
+            content => Err(anyhow::anyhow!("unexpected {}", content.r#type())),
+        };
+    }
+
+    fn resolve_undecided_expression_content(
+        &mut self,
+        content: ast::UndecidedExpressionContent,
+    ) -> Result<ast::UndecidedExpressionContent> {
+        // TODO: waaaaaay to many .clone()s!
+        match content {
+            ast::UndecidedExpressionContent::Expression(expression) => {
+                let expression = self.try_parse_binary_operation(expression)?;
+                return match self
+                    .try_parse_comparisson(&ast::Comparable::Expression(expression.clone()))?
+                {
+                    Some(comparison) => {
+                        let condition = self.resolve_comparable(comparison)?;
+                        self.resolve_undecided_expression_content(
+                            ast::UndecidedExpressionContent::Condition(condition),
+                        )
+                    }
+                    None => Ok(ast::UndecidedExpressionContent::Expression(expression)),
+                };
+            }
+            ast::UndecidedExpressionContent::Condition(condition) => {
+                return match self
+                    .try_parse_comparisson(&ast::Comparable::Condition(condition.clone()))?
+                {
+                    Some(comparison) => {
+                        let condition = self.resolve_comparable(comparison)?;
+                        self.resolve_undecided_expression_content(
+                            ast::UndecidedExpressionContent::Condition(condition),
+                        )
+                    }
+                    None => match self.try_parse_binary_condition(&condition)? {
+                        Some(condition) => self.resolve_undecided_expression_content(
+                            ast::UndecidedExpressionContent::Condition(condition),
+                        ),
+                        None => match self.try_parse_ternary(&condition)? {
+                            Some(expression) => self.resolve_undecided_expression_content(
+                                ast::UndecidedExpressionContent::Expression(expression),
+                            ),
+                            None => Ok(ast::UndecidedExpressionContent::Condition(condition)),
+                        },
+                    },
+                };
+            }
+            ast::UndecidedExpressionContent::Name(ref name) => {
+                return match self
+                    .try_parse_binary_operation(ast::Expression::Object(Box::new(name.clone())))?
+                {
+                    ast::Expression::Object(name) => {
+                        match self.try_parse_comparisson(&ast::Comparable::Object(*name.clone()))? {
+                            Some(comparison) => {
+                                let condition = self.resolve_comparable(comparison)?;
+                                self.resolve_undecided_expression_content(
+                                    ast::UndecidedExpressionContent::Condition(condition),
+                                )
+                            }
+                            None => {
+                                let condition = ast::Condition::Object(Box::new(*name));
+                                match self.try_parse_binary_condition(&condition)? {
+                                    Some(condition) => self.resolve_undecided_expression_content(
+                                        ast::UndecidedExpressionContent::Condition(condition),
+                                    ),
+                                    None => match self.try_parse_ternary(&condition)? {
+                                        Some(expression) => self
+                                            .resolve_undecided_expression_content(
+                                                ast::UndecidedExpressionContent::Expression(
+                                                    expression,
+                                                ),
+                                            ),
+                                        None => Ok(content),
+                                    },
+                                }
+                            }
+                        }
+                    }
+                    expression => self.resolve_undecided_expression_content(
+                        ast::UndecidedExpressionContent::Expression(expression),
+                    ),
+                };
+            }
+            ast::UndecidedExpressionContent::String(ref string) => {
+                return match self.try_parse_comparisson(&ast::Comparable::String(string.clone()))? {
+                    Some(comparison) => {
+                        let condition = self.resolve_comparable(comparison)?;
+                        self.resolve_undecided_expression_content(
+                            ast::UndecidedExpressionContent::Condition(condition),
+                        )
+                    }
+                    None => Ok(content),
+                };
+            }
+            ast::UndecidedExpressionContent::Null(ref null) => {
+                return match self.try_parse_comparisson(&ast::Comparable::Null(null.clone()))? {
+                    Some(comparison) => {
+                        let condition = self.resolve_comparable(comparison)?;
+                        self.resolve_undecided_expression_content(
+                            ast::UndecidedExpressionContent::Condition(condition),
+                        )
+                    }
+                    None => Ok(content),
+                };
+            }
+        };
+    }
+
+    fn try_parse_ternary(&mut self, condition: &ast::Condition) -> Result<Option<ast::Expression>> {
+        if !self.scanner.take(&'?') {
+            return Ok(None);
+        }
+        let question_mark_location = Location::SingleCharacter {
+            char: self.scanner.cursor as u16 - 1,
+            line: 0,
+        };
+        self.scanner.skip_whitespace();
+        let left = self.parse_expression()?;
+        if !self.scanner.take(&':') {
+            return Err(anyhow::anyhow!("missing \":\" in ternary"));
+        }
+        let colon_location = Location::SingleCharacter {
+            char: self.scanner.cursor as u16 - 1,
+            line: 0,
+        };
+        self.scanner.skip_whitespace();
+        let right = self.parse_expression()?;
+        return Ok(Some(ast::Expression::Ternary {
+            condition: Box::new(condition.clone()),
+            left: Box::new(left),
+            right: Box::new(right),
+            question_mark_location,
+            colon_location,
+        }));
+    }
+
+    fn parse_bracketed_expression_content(&mut self) -> Result<ast::UndecidedExpressionContent> {
+        if !self.scanner.take(&'(') {
+            return Err(anyhow::anyhow!("expected opening bracket"));
+        }
+        let opening_bracket_location = Location::SingleCharacter {
+            char: self.scanner.cursor as u16 - 1,
+            line: 0,
+        };
+        self.scanner.skip_whitespace();
+        let content = self.parse_undecided_expression_content()?;
+        self.scanner.skip_whitespace();
+        let content = self.resolve_undecided_expression_content(content)?;
+        self.scanner.skip_whitespace();
+        if !self.scanner.take(&')') {
+            return Err(anyhow::anyhow!("unclosed bracket"));
+        }
+        let closing_bracket_location = Location::SingleCharacter {
+            char: self.scanner.cursor as u16 - 1,
+            line: 0,
+        };
+        return Ok(match content {
+            ast::UndecidedExpressionContent::Expression(expression) => {
+                ast::UndecidedExpressionContent::Expression(ast::Expression::BracketedExpression {
+                    expression: Box::new(expression),
+                    opening_bracket_location,
+                    closing_bracket_location,
+                })
+            }
+            ast::UndecidedExpressionContent::Condition(condition) => {
+                ast::UndecidedExpressionContent::Condition(ast::Condition::BracketedCondition {
+                    condition: Box::new(condition),
+                    opening_bracket_location,
+                    closing_bracket_location,
+                })
+            }
+            ast::UndecidedExpressionContent::Name(_name) => todo!(),
+            ast::UndecidedExpressionContent::String(_string) => todo!(),
+            ast::UndecidedExpressionContent::Null(_null) => todo!(),
+        });
     }
 
     fn parse_condition(&mut self) -> Result<ast::Condition> {
@@ -133,7 +344,7 @@ impl Parser {
     }
 
     fn try_parse_comparisson(&mut self, left: &ast::Comparable) -> Result<Option<ast::Comparable>> {
-        return match self.scanner.peek() {
+        return Ok(match self.scanner.peek() {
             Some(char @ ('!' | '=' | '>' | '<')) => {
                 let char = char.clone();
                 self.scanner.pop();
@@ -158,24 +369,22 @@ impl Parser {
                     },
                 };
                 self.scanner.skip_whitespace();
-                Ok(Some(ast::Comparable::Condition(
-                    ast::Condition::Comparisson {
-                        left: Box::new(left.clone()),
-                        operator,
-                        right: Box::new(self.parse_comparable()?),
-                        operator_location,
-                    },
-                )))
+                Some(ast::Comparable::Condition(ast::Condition::Comparisson {
+                    left: Box::new(left.clone()),
+                    operator,
+                    right: Box::new(self.parse_comparable()?),
+                    operator_location,
+                }))
             }
-            _ => Ok(None),
-        };
+            _ => None,
+        });
     }
 
     fn try_parse_binary_condition(
         &mut self,
         left: &ast::Condition,
     ) -> Result<Option<ast::Condition>> {
-        return match self.scanner.peek() {
+        return Ok(match self.scanner.peek() {
             Some(char @ ('&' | '|')) => {
                 let first = &char.clone();
                 let operator = match first == &'&' {
@@ -197,25 +406,38 @@ impl Parser {
                     ));
                 }
                 self.scanner.skip_whitespace();
-                Ok(Some(ast::Condition::BinaryOperation {
+                Some(ast::Condition::BinaryOperation {
                     left: Box::new(left.clone()),
                     operator,
                     right: Box::new(self.parse_condition()?),
                     operator_location,
-                }))
+                })
             }
-            _ => Ok(None),
-        };
+            _ => None,
+        });
     }
 
     fn parse_comparable(&mut self) -> Result<ast::Comparable> {
         return Ok(match self.scanner.peek() {
             Some('\'') => ast::Comparable::String(self.parse_string()?),
-            Some('$') => match self.parse_expression()? {
-                ast::Expression::Object(interpolation) => ast::Comparable::Object(*interpolation),
-                expression => ast::Comparable::Expression(expression),
-            },
-            Some('+' | '-' | '0'..='9') => ast::Comparable::Expression(self.parse_expression()?),
+            Some('$') => {
+                let object = self.parse_interpolation()?;
+                self.scanner.skip_whitespace();
+                match self.try_parse_binary_operation(ast::Expression::Object(Box::new(object)))? {
+                    ast::Expression::Object(interpolation) => {
+                        ast::Comparable::Object(*interpolation)
+                    }
+                    expression => ast::Comparable::Expression(expression),
+                }
+            }
+            Some('+' | '-') => {
+                let expression = self.parse_signed_expression()?;
+                ast::Comparable::Expression(self.try_parse_binary_operation(expression)?)
+            }
+            Some('0'..='9') => {
+                let expression = self.parse_number()?;
+                ast::Comparable::Expression(self.try_parse_binary_operation(expression)?)
+            }
             Some('(') => self.parse_bracketed_comparable()?,
             Some('n') => ast::Comparable::Null(self.parse_null_literal()?),
             Some('f') => ast::Comparable::Condition(self.parse_false_literal()?),
@@ -987,16 +1209,14 @@ mod tests {
                             WordFragment::Interpolation(Interpolation {
                                 content: Object::Name {
                                     name: Word {
-                                        fragments: vec![
-                                            WordFragment::String(StringLiteral {
-                                                content: "_object".to_string(),
-                                                location: Location::VariableLength {
-                                                    char: 9,
-                                                    line: 0,
-                                                    length: 7,
-                                                }
-                                            })
-                                        ]
+                                        fragments: vec![WordFragment::String(StringLiteral {
+                                            content: "_object".to_string(),
+                                            location: Location::VariableLength {
+                                                char: 9,
+                                                line: 0,
+                                                length: 7,
+                                            }
+                                        })]
                                     }
                                 },
                                 opening_bracket_location: Location::DoubleCharacter {
@@ -1018,14 +1238,8 @@ mod tests {
                             }),
                         ],
                     },
-                    opening_bracket_location: Location::DoubleCharacter {
-                        char: 0,
-                        line: 0,
-                    },
-                    closing_bracket_location: Location::SingleCharacter {
-                        char: 25,
-                        line: 0,
-                    },
+                    opening_bracket_location: Location::DoubleCharacter { char: 0, line: 0 },
+                    closing_bracket_location: Location::SingleCharacter { char: 25, line: 0 },
                 }
             }
         );
@@ -1670,6 +1884,42 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_simple_ternary() {
+        assert_eq!(
+            parse_expression("true ? 1 : 2"),
+            ExpressionAst {
+                root: Expression::Ternary {
+                    condition: Box::new(Condition::True {
+                        location: Location::VariableLength {
+                            char: 0,
+                            line: 0,
+                            length: 4,
+                        }
+                    }),
+                    left: Box::new(Expression::Number {
+                        content: "1".to_string(),
+                        location: Location::VariableLength {
+                            char: 7,
+                            line: 0,
+                            length: 1
+                        }
+                    }),
+                    right: Box::new(Expression::Number {
+                        content: "2".to_string(),
+                        location: Location::VariableLength {
+                            char: 11,
+                            line: 0,
+                            length: 1
+                        }
+                    }),
+                    question_mark_location: Location::SingleCharacter { char: 5, line: 0 },
+                    colon_location: Location::SingleCharacter { char: 9, line: 0 },
+                },
+            }
+        );
+    }
+
+    #[test]
     fn test_parse_simple_condition() {
         assert_eq!(
             parse_condition("true"),
@@ -1792,6 +2042,42 @@ mod tests {
                     }),
                     opening_bracket_location: Location::SingleCharacter { char: 0, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 14, line: 0 },
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_object_comparisson() {
+        assert_eq!(
+            parse_condition("${test} == true"),
+            ConditionAst {
+                root: Condition::Comparisson {
+                    left: Box::new(Comparable::Object(Interpolation {
+                        opening_bracket_location: Location::DoubleCharacter { char: 0, line: 0 },
+                        closing_bracket_location: Location::SingleCharacter { char: 6, line: 0 },
+                        content: Object::Name {
+                            name: Word {
+                                fragments: vec![WordFragment::String(StringLiteral {
+                                    content: "test".to_string(),
+                                    location: Location::VariableLength {
+                                        char: 2,
+                                        line: 0,
+                                        length: 4
+                                    }
+                                })]
+                            }
+                        }
+                    })),
+                    operator: ComparissonOperator::Equal,
+                    right: Box::new(Comparable::Condition(Condition::True {
+                        location: Location::VariableLength {
+                            char: 11,
+                            line: 0,
+                            length: 4
+                        }
+                    })),
+                    operator_location: Location::DoubleCharacter { char: 8, line: 0 }
                 }
             }
         );

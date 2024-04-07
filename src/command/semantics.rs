@@ -487,6 +487,19 @@ fn index_expression(expression: &ast::Expression, token_collector: &mut SpelToke
                 vec![],
             );
         }
+        ast::Expression::Ternary {
+            condition,
+            left,
+            right,
+            question_mark_location,
+            colon_location,
+        } => {
+            index_condition(condition, token_collector);
+            token_collector.add(question_mark_location, SemanticTokenType::OPERATOR, vec![]);
+            index_expression(left, token_collector);
+            token_collector.add(colon_location, SemanticTokenType::OPERATOR, vec![]);
+            index_expression(right, token_collector);
+        }
     };
 }
 

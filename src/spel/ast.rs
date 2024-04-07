@@ -173,6 +173,13 @@ pub(crate) enum Expression {
         right: Box<Expression>,
         operator_location: Location,
     },
+    Ternary {
+        condition: Box<Condition>,
+        left: Box<Expression>,
+        right: Box<Expression>,
+        question_mark_location: Location,
+        colon_location: Location,
+    },
 }
 
 impl Display for Expression {
@@ -192,6 +199,12 @@ impl Display for Expression {
                 right,
                 ..
             } => write!(formatter, "{} {} {}", left, operator, right),
+            Expression::Ternary {
+                condition,
+                left,
+                right,
+                ..
+            } => write!(formatter, "{} ? {} : {}", condition, left, right),
         };
     }
 }
@@ -311,6 +324,34 @@ impl Display for Comparable {
     }
 }
 
+impl Into<UndecidedExpressionContent> for Comparable {
+    fn into(self) -> UndecidedExpressionContent {
+        return match self {
+            Comparable::Condition(condition) => UndecidedExpressionContent::Condition(condition),
+            Comparable::Expression(expression) => {
+                UndecidedExpressionContent::Expression(expression)
+            }
+            Comparable::Object(interpolation) => UndecidedExpressionContent::Name(interpolation),
+            Comparable::String(string) => UndecidedExpressionContent::String(string),
+            Comparable::Null(null) => UndecidedExpressionContent::Null(null),
+        };
+    }
+}
+
+impl Into<Comparable> for UndecidedExpressionContent {
+    fn into(self) -> Comparable {
+        return match self {
+            UndecidedExpressionContent::Expression(expression) => {
+                Comparable::Expression(expression)
+            }
+            UndecidedExpressionContent::Condition(condition) => Comparable::Condition(condition),
+            UndecidedExpressionContent::Name(interpolation) => Comparable::Object(interpolation),
+            UndecidedExpressionContent::String(string) => Comparable::String(string),
+            UndecidedExpressionContent::Null(null) => Comparable::Null(null),
+        };
+    }
+}
+
 impl Comparable {
     pub(crate) fn r#type(&self) -> &str {
         match self {
@@ -382,6 +423,40 @@ impl Display for ComparissonOperator {
             ComparissonOperator::LessThan => "<",
             ComparissonOperator::LessThanOrEqual => "<=",
         });
+    }
+}
+
+// TODO: better name!
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum UndecidedExpressionContent {
+    Expression(Expression),
+    Condition(Condition),
+    Name(Interpolation),
+    String(StringLiteral),
+    Null(Null),
+}
+
+impl Display for UndecidedExpressionContent {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        return match self {
+            UndecidedExpressionContent::Expression(expression) => expression.fmt(formatter),
+            UndecidedExpressionContent::Condition(condition) => condition.fmt(formatter),
+            UndecidedExpressionContent::Name(interpolation) => interpolation.fmt(formatter),
+            UndecidedExpressionContent::String(string) => string.fmt(formatter),
+            UndecidedExpressionContent::Null(null) => null.fmt(formatter),
+        };
+    }
+}
+
+impl UndecidedExpressionContent {
+    pub(crate) fn r#type(&self) -> &str {
+        return match self {
+            UndecidedExpressionContent::Expression(_) => "expression",
+            UndecidedExpressionContent::Condition(_) => "condition",
+            UndecidedExpressionContent::Name(_) => "object",
+            UndecidedExpressionContent::String(_) => "string",
+            UndecidedExpressionContent::Null(_) => "null",
+        };
     }
 }
 
