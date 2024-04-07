@@ -294,10 +294,6 @@ fn index_tag(
                                         if let ast::WordFragment::Interpolation(interpolation) =
                                             fragment
                                         {
-                                            log::info!(
-                                                "found interpolation in text: {:?}",
-                                                interpolation
-                                            );
                                             index_interpolation(
                                                 &interpolation,
                                                 &mut SpelTokenCollector::new(

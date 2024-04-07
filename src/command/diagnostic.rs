@@ -192,7 +192,23 @@ fn validate_tag(
                                 }
                             },
                             grammar::TagAttributeType::Regex => {}
-                            grammar::TagAttributeType::String => {}
+                            grammar::TagAttributeType::String => match parser.parse_text() {
+                                Ok(_result) => {}
+                                Err(err) => {
+                                    log::error!(
+                                        "parse text \"{}\" failed: {}",
+                                        value_node.utf8_text(&text.as_bytes())?,
+                                        err
+                                    );
+                                    diagnositcs.push(Diagnostic {
+                                        message: format!("invalid text: {}", err),
+                                        severity: Some(DiagnosticSeverity::ERROR),
+                                        range: node_range(value_node),
+                                        source: Some("lspml".to_string()),
+                                        ..Default::default()
+                                    });
+                                }
+                            }
                             grammar::TagAttributeType::Query => {}
                         }
                     };

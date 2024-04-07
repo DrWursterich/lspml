@@ -11,6 +11,7 @@ pub(crate) enum Object {
     },
     Function {
         name: Word,
+        // TODO: missing locations of commatas!
         arguments: Vec<Object>,
         opening_bracket_location: Location,
         closing_bracket_location: Location,
