@@ -552,11 +552,51 @@ impl Parser {
                 ast::Comparable::Expression(self.try_parse_binary_operation(expression)?)
             }
             Some('(') => self.parse_bracketed_comparable()?,
-            Some('n') => ast::Comparable::Null(self.parse_null_literal()?),
-            Some('f') => ast::Comparable::Condition(self.parse_false_literal()?),
-            Some('t') => ast::Comparable::Condition(self.parse_true_literal()?),
             Some('!') => ast::Comparable::Condition(self.parse_negated_condition()?),
-            Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
+            Some(_) => {
+                let func = self.parse_name_or_global_function()?;
+                match func {
+                    ast::Object::Name {
+                        name: ast::Word { fragments },
+                    } if fragments.len() == 1 => match &fragments[0] {
+                        ast::WordFragment::String(ast::StringLiteral { content, location }) => {
+                            match content.as_str() {
+                                "true" => ast::Comparable::Condition(ast::Condition::True {
+                                    location: location.clone(),
+                                }),
+                                "false" => ast::Comparable::Condition(ast::Condition::False {
+                                    location: location.clone(),
+                                }),
+                                name => {
+                                    return Err(anyhow::anyhow!(
+                                        "objects in comparissons have to be interpolated. Try \"${{{}}}\"",
+                                        name
+                                    ));
+                                }
+                            }
+                        }
+                        ast::WordFragment::Interpolation(interpolation) => {
+                            self.scanner.skip_whitespace();
+                            match self.try_parse_binary_operation(ast::Expression::Object(
+                                Box::new(interpolation.clone()),
+                            ))? {
+                                ast::Expression::Object(interpolation) => {
+                                    ast::Comparable::Object(*interpolation)
+                                }
+                                expression => ast::Comparable::Expression(expression),
+                            }
+                        }
+                    },
+                    ast::Object::Null(null) => ast::Comparable::Null(null),
+                    ast::Object::Function(function) => ast::Comparable::Function(function),
+                    object => {
+                        return Err(anyhow::anyhow!(
+                            "objects in comparissons have to be interpolated. Try \"${{{}}}\"",
+                            object
+                        ))
+                    }
+                }
+            }
             None => return Err(anyhow::anyhow!("unexpected end")),
         });
     }
@@ -934,7 +974,7 @@ impl Parser {
             Some(&'(') => {
                 let start = self.scanner.cursor as u16;
                 let arguments = self.parse_function_arguments()?;
-                ast::Object::Function {
+                ast::Object::Function(ast::Function {
                     name,
                     arguments,
                     opening_bracket_location: Location::SingleCharacter {
@@ -945,7 +985,7 @@ impl Parser {
                         char: self.scanner.cursor as u16 - 1,
                         line: 0,
                     },
-                }
+                })
             }
             _ => ast::Object::Name { name },
         };
@@ -990,17 +1030,19 @@ impl Parser {
                             let arguments = self.parse_function_arguments()?;
                             ast::Object::MethodAccess {
                                 object: Box::new(result),
-                                method: name,
-                                arguments,
                                 dot_location,
-                                opening_bracket_location: Location::SingleCharacter {
-                                    char: start,
-                                    line: 0,
-                                },
-                                closing_bracket_location: Location::SingleCharacter {
-                                    char: self.scanner.cursor as u16 - 1,
-                                    line: 0,
-                                },
+                                function: ast::Function {
+                                    name,
+                                    arguments,
+                                    opening_bracket_location: Location::SingleCharacter {
+                                        char: start,
+                                        line: 0,
+                                    },
+                                    closing_bracket_location: Location::SingleCharacter {
+                                        char: self.scanner.cursor as u16 - 1,
+                                        line: 0,
+                                    },
+                                }
                             }
                         }
                         _ => ast::Object::FieldAccess {
@@ -1091,8 +1133,8 @@ impl Parser {
 mod tests {
     use crate::spel::ast::{
         Comparable, ComparissonOperator, Condition, ConditionAst, ConditionOperator, Expression,
-        ExpressionAst, ExpressionOperator, Interpolation, Location, Null, Object, ObjectAst, Sign,
-        StringLiteral, Word, WordFragment,
+        ExpressionAst, ExpressionOperator, Function, Interpolation, Location, Null, Object,
+        ObjectAst, Sign, StringLiteral, Word, WordFragment,
     };
 
     #[test]
@@ -1357,7 +1399,7 @@ mod tests {
         assert_eq!(
             parse_object("flush()"),
             ObjectAst {
-                root: Object::Function {
+                root: Object::Function(Function {
                     name: Word {
                         fragments: vec![WordFragment::String(StringLiteral {
                             content: "flush".to_string(),
@@ -1371,7 +1413,7 @@ mod tests {
                     arguments: vec![],
                     opening_bracket_location: Location::SingleCharacter { char: 5, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 6, line: 0 },
-                }
+                })
             }
         );
     }
@@ -1381,7 +1423,7 @@ mod tests {
         assert_eq!(
             parse_object("is_string('test')"),
             ObjectAst {
-                root: Object::Function {
+                root: Object::Function(Function {
                     name: Word {
                         fragments: vec![WordFragment::String(StringLiteral {
                             content: "is_string".to_string(),
@@ -1402,7 +1444,7 @@ mod tests {
                     })],
                     opening_bracket_location: Location::SingleCharacter { char: 9, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 16, line: 0 },
-                }
+                })
             }
         );
     }
@@ -1412,7 +1454,7 @@ mod tests {
         assert_eq!(
             parse_object("is_${_type}()"),
             ObjectAst {
-                root: Object::Function {
+                root: Object::Function(Function {
                     name: Word {
                         fragments: vec![
                             WordFragment::String(StringLiteral {
@@ -1450,7 +1492,7 @@ mod tests {
                     arguments: vec![],
                     opening_bracket_location: Location::SingleCharacter { char: 11, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 12, line: 0 },
-                }
+                })
             }
         );
     }
@@ -1460,7 +1502,7 @@ mod tests {
         assert_eq!(
             parse_object("\tis_string (\t'test'  , 'test2' ) "),
             ObjectAst {
-                root: Object::Function {
+                root: Object::Function(Function {
                     name: Word {
                         fragments: vec![WordFragment::String(StringLiteral {
                             content: "is_string".to_string(),
@@ -1491,7 +1533,7 @@ mod tests {
                     ],
                     opening_bracket_location: Location::SingleCharacter { char: 11, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 31, line: 0 },
-                }
+                })
             }
         );
     }
@@ -1501,7 +1543,7 @@ mod tests {
         assert_eq!(
             parse_object("is_string(concat('hello', 'world'))"),
             ObjectAst {
-                root: Object::Function {
+                root: Object::Function(Function {
                     name: Word {
                         fragments: vec![WordFragment::String(StringLiteral {
                             content: "is_string".to_string(),
@@ -1512,7 +1554,7 @@ mod tests {
                             },
                         })]
                     },
-                    arguments: vec![Object::Function {
+                    arguments: vec![Object::Function(Function {
                         name: Word {
                             fragments: vec![WordFragment::String(StringLiteral {
                                 content: "concat".to_string(),
@@ -1543,10 +1585,10 @@ mod tests {
                         ],
                         opening_bracket_location: Location::SingleCharacter { char: 16, line: 0 },
                         closing_bracket_location: Location::SingleCharacter { char: 33, line: 0 },
-                    }],
+                    })],
                     opening_bracket_location: Location::SingleCharacter { char: 9, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 34, line: 0 },
-                }
+                })
             }
         );
     }
@@ -1614,20 +1656,22 @@ mod tests {
                             })]
                         }
                     }),
-                    method: Word {
-                        fragments: vec![WordFragment::String(StringLiteral {
-                            content: "length".to_string(),
-                            location: Location::VariableLength {
-                                char: 8,
-                                line: 0,
-                                length: 6,
-                            },
-                        })]
+                    function: Function {
+                        name: Word {
+                            fragments: vec![WordFragment::String(StringLiteral {
+                                content: "length".to_string(),
+                                location: Location::VariableLength {
+                                    char: 8,
+                                    line: 0,
+                                    length: 6,
+                                },
+                            })]
+                        },
+                        arguments: vec![],
+                        opening_bracket_location: Location::SingleCharacter { char: 14, line: 0 },
+                        closing_bracket_location: Location::SingleCharacter { char: 15, line: 0 },
                     },
-                    arguments: vec![],
                     dot_location: Location::SingleCharacter { char: 7, line: 0 },
-                    opening_bracket_location: Location::SingleCharacter { char: 14, line: 0 },
-                    closing_bracket_location: Location::SingleCharacter { char: 15, line: 0 },
                 }
             }
         );

@@ -30,13 +30,7 @@ pub(crate) enum Object {
         opening_bracket_location: Location,
         closing_bracket_location: Location,
     },
-    Function {
-        name: Word,
-        // TODO: missing locations of commatas!
-        arguments: Vec<Object>,
-        opening_bracket_location: Location,
-        closing_bracket_location: Location,
-    },
+    Function(Function),
     Name {
         name: Word,
     },
@@ -49,12 +43,8 @@ pub(crate) enum Object {
     },
     MethodAccess {
         object: Box<Object>,
-        method: Word,
-        // TODO: missing locations of commatas!
-        arguments: Vec<Object>,
+        function: Function,
         dot_location: Location,
-        opening_bracket_location: Location,
-        closing_bracket_location: Location,
     },
     ArrayAccess {
         object: Box<Object>,
@@ -68,27 +58,34 @@ impl Display for Object {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
         return match self {
             Object::Anchor { name, .. } => name.fmt(formatter),
-            Object::Function {
-                name, arguments, ..
-            } => {
-                name.fmt(formatter)?;
-                fmt_arguments(formatter, arguments)
-            }
+            Object::Function(function) => function.fmt(formatter),
             Object::Name { name } => name.fmt(formatter),
             Object::String(inner) => inner.fmt(formatter),
             Object::Null(inner) => inner.fmt(formatter),
             Object::FieldAccess { object, field, .. } => write!(formatter, "{}.{}", object, field),
-            Object::MethodAccess {
-                object,
-                method,
-                arguments,
-                ..
-            } => {
-                write!(formatter, "{}.{}", object, method)?;
-                fmt_arguments(formatter, arguments)
+            Object::MethodAccess { object, function, .. } => {
+                object.fmt(formatter)?;
+                formatter.write_str(".")?;
+                function.fmt(formatter)
             }
             Object::ArrayAccess { object, index, .. } => write!(formatter, "{}[{}]", object, index),
         };
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct Function {
+    pub(crate) name: Word,
+    // TODO: missing locations of commatas!
+    pub(crate) arguments: Vec<Object>,
+    pub(crate) opening_bracket_location: Location,
+    pub(crate) closing_bracket_location: Location,
+}
+
+impl Display for Function {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        self.name.fmt(formatter)?;
+        fmt_arguments(formatter, &self.arguments)
     }
 }
 
@@ -330,6 +327,7 @@ pub(crate) enum Condition {
 pub(crate) enum Comparable {
     Condition(Condition),
     Expression(Expression),
+    Function(Function),
     Object(Interpolation),
     String(StringLiteral),
     Null(Null),
@@ -340,24 +338,11 @@ impl Display for Comparable {
         match self {
             Comparable::Condition(inner) => inner.fmt(formatter),
             Comparable::Expression(inner) => inner.fmt(formatter),
+            Comparable::Function(inner) => inner.fmt(formatter),
             Comparable::Object(inner) => inner.fmt(formatter),
             Comparable::String(inner) => inner.fmt(formatter),
             Comparable::Null(inner) => inner.fmt(formatter),
         }
-    }
-}
-
-impl Into<UndecidedExpressionContent> for Comparable {
-    fn into(self) -> UndecidedExpressionContent {
-        return match self {
-            Comparable::Condition(condition) => UndecidedExpressionContent::Condition(condition),
-            Comparable::Expression(expression) => {
-                UndecidedExpressionContent::Expression(expression)
-            }
-            Comparable::Object(interpolation) => UndecidedExpressionContent::Name(interpolation),
-            Comparable::String(string) => UndecidedExpressionContent::String(string),
-            Comparable::Null(null) => UndecidedExpressionContent::Null(null),
-        };
     }
 }
 
@@ -380,6 +365,7 @@ impl Comparable {
         match self {
             Comparable::Condition(_) => "condition",
             Comparable::Expression(_) => "expression",
+            Comparable::Function(_) => "function",
             Comparable::Object(_) => "object",
             Comparable::String(_) => "string",
             Comparable::Null(_) => "null",

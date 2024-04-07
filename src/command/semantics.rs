@@ -377,9 +377,12 @@ fn index_children(node: Node, text: &String, tokenizer: &mut Tokenizer) -> Resul
 
 fn index_identifier(identifier: &ast::Identifier, token_collector: &mut SpelTokenCollector) {
     match identifier {
-        ast::Identifier::Name(name) => {
-            index_word(name, token_collector, Some(SemanticTokenType::VARIABLE), &vec![])
-        }
+        ast::Identifier::Name(name) => index_word(
+            name,
+            token_collector,
+            Some(SemanticTokenType::VARIABLE),
+            &vec![],
+        ),
         ast::Identifier::FieldAccess {
             identifier,
             field,
@@ -387,7 +390,12 @@ fn index_identifier(identifier: &ast::Identifier, token_collector: &mut SpelToke
         } => {
             index_identifier(identifier, token_collector);
             token_collector.add(dot_location, &SemanticTokenType::OPERATOR, &vec![]);
-            index_word(field, token_collector, Some(SemanticTokenType::VARIABLE), &vec![]);
+            index_word(
+                field,
+                token_collector,
+                Some(SemanticTokenType::VARIABLE),
+                &vec![],
+            );
         }
     };
 }
@@ -416,29 +424,14 @@ fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) 
                 &vec![],
             );
         }
-        ast::Object::Function {
-            name,
-            arguments,
-            opening_bracket_location,
-            closing_bracket_location,
-        } => {
-            index_word(name, token_collector, Some(SemanticTokenType::METHOD), &vec![]);
-            token_collector.add(
-                opening_bracket_location,
-                &SemanticTokenType::OPERATOR,
-                &vec![],
-            );
-            arguments
-                .iter()
-                .for_each(|arg| index_object(arg, token_collector));
-            token_collector.add(
-                closing_bracket_location,
-                &SemanticTokenType::OPERATOR,
-                &vec![],
-            );
-        }
+        ast::Object::Function(function) => index_function(function, token_collector),
         ast::Object::Name { name } => {
-            index_word(name, token_collector, Some( SemanticTokenType::VARIABLE ), &vec![]);
+            index_word(
+                name,
+                token_collector,
+                Some(SemanticTokenType::VARIABLE),
+                &vec![],
+            );
         }
         ast::Object::Null(ast::Null { location }) => {
             token_collector.add(location, &SemanticTokenType::ENUM_MEMBER, &vec![])
@@ -453,32 +446,21 @@ fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) 
         } => {
             index_object(object, token_collector);
             token_collector.add(dot_location, &SemanticTokenType::OPERATOR, &vec![]);
-            index_word(&field, token_collector, Some(SemanticTokenType::PROPERTY), &vec![]);
+            index_word(
+                &field,
+                token_collector,
+                Some(SemanticTokenType::PROPERTY),
+                &vec![],
+            );
         }
         ast::Object::MethodAccess {
             object,
-            method,
-            arguments,
             dot_location,
-            opening_bracket_location,
-            closing_bracket_location,
+            function,
         } => {
             index_object(object, token_collector);
             token_collector.add(dot_location, &SemanticTokenType::OPERATOR, &vec![]);
-            index_word(&method, token_collector, Some(SemanticTokenType::METHOD), &vec![]);
-            token_collector.add(
-                opening_bracket_location,
-                &SemanticTokenType::OPERATOR,
-                &vec![],
-            );
-            arguments
-                .iter()
-                .for_each(|arg| index_object(arg, token_collector));
-            token_collector.add(
-                closing_bracket_location,
-                &SemanticTokenType::OPERATOR,
-                &vec![],
-            );
+            index_function(function, token_collector);
         }
         ast::Object::ArrayAccess {
             object,
@@ -563,7 +545,11 @@ fn index_expression(expression: &ast::Expression, token_collector: &mut SpelToke
             colon_location,
         } => {
             index_condition(condition, token_collector);
-            token_collector.add(question_mark_location, &SemanticTokenType::OPERATOR, &vec![]);
+            token_collector.add(
+                question_mark_location,
+                &SemanticTokenType::OPERATOR,
+                &vec![],
+            );
             index_expression(left, token_collector);
             token_collector.add(colon_location, &SemanticTokenType::OPERATOR, &vec![]);
             index_expression(right, token_collector);
@@ -640,6 +626,29 @@ fn index_condition(condition: &ast::Condition, token_collector: &mut SpelTokenCo
     };
 }
 
+fn index_function(function: &ast::Function, token_collector: &mut SpelTokenCollector) {
+    index_word(
+        &function.name,
+        token_collector,
+        Some(SemanticTokenType::METHOD),
+        &vec![],
+    );
+    token_collector.add(
+        &function.opening_bracket_location,
+        &SemanticTokenType::OPERATOR,
+        &vec![],
+    );
+    function
+        .arguments
+        .iter()
+        .for_each(|arg| index_object(arg, token_collector));
+    token_collector.add(
+        &function.closing_bracket_location,
+        &SemanticTokenType::OPERATOR,
+        &vec![],
+    );
+}
+
 fn index_uri(uri: &ast::Uri, token_collector: &mut SpelTokenCollector) {
     match uri {
         ast::Uri::Literal(literal) => {
@@ -686,6 +695,7 @@ fn index_comparable(comparable: &ast::Comparable, token_collector: &mut SpelToke
     match comparable {
         ast::Comparable::Condition(condition) => index_condition(&condition, token_collector),
         ast::Comparable::Expression(expression) => index_expression(&expression, token_collector),
+        ast::Comparable::Function(function) => index_function(&function, token_collector),
         ast::Comparable::Object(interpolation) => {
             index_interpolation(interpolation, token_collector);
         }
