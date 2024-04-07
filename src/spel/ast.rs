@@ -12,6 +12,17 @@ pub(crate) enum Identifier {
     },
 }
 
+impl Display for Identifier {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        return match self {
+            Identifier::Name(name) => name.fmt(formatter),
+            Identifier::FieldAccess {
+                identifier, field, ..
+            } => write!(formatter, "{}.{}", identifier, field),
+        };
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Object {
     Anchor {
@@ -39,6 +50,7 @@ pub(crate) enum Object {
     MethodAccess {
         object: Box<Object>,
         method: Word,
+        // TODO: missing locations of commatas!
         arguments: Vec<Object>,
         dot_location: Location,
         opening_bracket_location: Location,
@@ -546,6 +558,65 @@ pub(crate) struct ConditionAst {
 impl ConditionAst {
     pub(crate) fn new(condition: Condition) -> Self {
         return Self { root: condition };
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum Uri {
+    Literal(UriLiteral),
+    Object(Interpolation),
+}
+
+impl Display for Uri {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        return match self {
+            Uri::Literal(literal) => literal.fmt(formatter),
+            Uri::Object(object) => object.fmt(formatter),
+        };
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct UriLiteral {
+    pub(crate) fragments: Vec<UriFragment>,
+    pub(crate) file_extension: Option<UriFileExtension>,
+}
+
+impl Display for UriLiteral {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        for fragment in &self.fragments {
+            fragment.fmt(formatter)?;
+        }
+        if let Some(extension) = &self.file_extension {
+            extension.fmt(formatter)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct UriFragment {
+    pub(crate) slash_location: Location,
+    pub(crate) content: Word,
+}
+
+impl Display for UriFragment {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("/")?;
+        return self.content.fmt(formatter);
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct UriFileExtension {
+    pub(crate) dot_location: Location,
+    pub(crate) content: Word,
+}
+
+impl Display for UriFileExtension {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(".")?;
+        return self.content.fmt(formatter);
     }
 }
 

@@ -31,11 +31,12 @@ pub(crate) enum TagAttributeType {
     Condition,
     // Enum(Vec<String>), e.g. for action="put|putAll|remove|..."
     Expression,
-    Identifier,
+    Identifier, // TODO: dotted field access allowed?
     Object,
     Query,
     Regex,
     String,
+    Uri,
 }
 
 #[derive(Debug)]
@@ -1378,7 +1379,7 @@ Template, an das das Formular gesendet werden soll. Dieses Attribut sollte nur f
         },
         TagAttribute {
             name: "uri",
-            r#type: TagAttributeType::String,
+            r#type: TagAttributeType::Uri,
             detail: None,
             documentation: Some(
                 r#"
@@ -1673,7 +1674,7 @@ Zu includendes Template (Variable mit einer Template-ID)."#,
         },
         TagAttribute {
             name: "uri",
-            r#type: TagAttributeType::String,
+            r#type: TagAttributeType::Uri,
             detail: None,
             documentation: Some(
                 r#"
@@ -4084,7 +4085,7 @@ Template aus dem eine URL generiert werden soll. Alle Templates des IES liegen a
         },
         TagAttribute {
             name: "uri",
-            r#type: TagAttributeType::String,
+            r#type: TagAttributeType::Uri,
             detail: None,
             documentation: Some(
                 r#"

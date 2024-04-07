@@ -108,6 +108,60 @@ impl Parser {
         return Ok(ast::Word { fragments });
     }
 
+    pub(crate) fn parse_uri(&mut self) -> Result<ast::Uri> {
+        let mut fragments = Vec::new();
+        self.scanner.skip_whitespace();
+        loop {
+            match self.scanner.peek() {
+                Some('/') => {
+                    let slash_location = Location::SingleCharacter {
+                        char: self.scanner.cursor as u16,
+                        line: 0,
+                    };
+                    self.scanner.pop();
+                    let content = self.parse_word()?;
+                    fragments.push(ast::UriFragment {
+                        content,
+                        slash_location,
+                    });
+                }
+                Some('.') if fragments.len() != 0 => {
+                    let dot_location = Location::SingleCharacter {
+                        char: self.scanner.cursor as u16,
+                        line: 0,
+                    };
+                    self.scanner.pop();
+                    let content = self.parse_word()?;
+                    return Ok(ast::Uri::Literal(ast::UriLiteral {
+                        fragments,
+                        file_extension: Some(ast::UriFileExtension {
+                            content,
+                            dot_location,
+                        }),
+                    }));
+                }
+                Some('$') if fragments.len() == 0 => {
+                    let interpolation = self.parse_interpolation()?;
+                    self.scanner.skip_whitespace();
+                    return match self.scanner.is_done() {
+                        true => Ok(ast::Uri::Object(interpolation)),
+                        false => Err(anyhow::anyhow!(
+                            "trailing character \"{}\"",
+                            self.scanner.peek().unwrap()
+                        )),
+                    };
+                }
+                Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
+                None => {
+                    return Ok(ast::Uri::Literal(ast::UriLiteral {
+                        fragments,
+                        file_extension: None,
+                    }))
+                }
+            }
+        }
+    }
+
     pub(crate) fn parse_identifier(&mut self) -> Result<ast::Identifier> {
         self.scanner.skip_whitespace();
         if self.scanner.is_done() {

@@ -210,6 +210,23 @@ fn validate_tag(
                                 }
                             }
                             grammar::TagAttributeType::Query => {}
+                            grammar::TagAttributeType::Uri => match parser.parse_uri() {
+                                Ok(_result) => {}
+                                Err(err) => {
+                                    log::error!(
+                                        "parse uri \"{}\" failed: {}",
+                                        value_node.utf8_text(&text.as_bytes())?,
+                                        err
+                                    );
+                                    diagnositcs.push(Diagnostic {
+                                        message: format!("invalid uri: {}", err),
+                                        severity: Some(DiagnosticSeverity::ERROR),
+                                        range: node_range(value_node),
+                                        source: Some("lspml".to_string()),
+                                        ..Default::default()
+                                    });
+                                }
+                            }
                         }
                     };
                 }
@@ -485,6 +502,9 @@ fn validate_tag(
             }
             grammar::AttributeRule::UriExists(uri_name, module_name) => {
                 if let Some(uri) = attributes.get(*uri_name) {
+                    if uri.contains("${") {
+                        continue;
+                    }
                     let module_value = attributes.get(*module_name).map(|str| str.as_str());
                     let module = match module_value {
                         Some("${module.id}") | None => file
@@ -523,7 +543,6 @@ fn validate_tag(
                             });
                         }
                     }
-                    // else check if arguments are ok?
                 }
             }
             grammar::AttributeRule::ValueOneOf(name, values)
