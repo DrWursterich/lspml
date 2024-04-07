@@ -39,6 +39,7 @@ pub(crate) const TOKEN_TYPES: &'static [SemanticTokenType] = &[
     SemanticTokenType::NUMBER,
     SemanticTokenType::OPERATOR,
     SemanticTokenType::PROPERTY,
+    SemanticTokenType::REGEXP,
     SemanticTokenType::STRING,
     SemanticTokenType::VARIABLE,
 ];

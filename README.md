@@ -24,6 +24,7 @@ A work-in-progress language server for the sitepark markup language (spml).
     - expressions
     - identifiers
     - objects
+    - regular expressions
     - text
     - uris
     - to be comparable (for `sp:if` and `sp:elseif` `eq`, `gt`, ...)

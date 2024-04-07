@@ -374,7 +374,7 @@ fn search_completions_in_tag(
         }
         CompletionType::Tags => {
             log::info!("complete child tags for {}", tag.name);
-            // TODO: maybe also propose cosing tag if not already present.
+            // TODO: maybe also propose closing tag if not already present.
             return complete_children_of(tag, completions);
         }
     };

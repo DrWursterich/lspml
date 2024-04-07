@@ -613,6 +613,11 @@ impl Display for UriFileExtension {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct Regex {
+    pub(crate) location: Location
+}
+
 #[cfg(test)]
 mod tests {
     use crate::spel::ast::{Interpolation, Location, Object, StringLiteral, Word, WordFragment};

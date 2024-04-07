@@ -162,6 +162,36 @@ impl Parser {
         }
     }
 
+    pub(crate) fn parse_regex(&mut self) -> Result<ast::Regex> {
+        if self.scanner.is_done() {
+            return Err(anyhow::anyhow!("string is empty"));
+        }
+        let start = self.scanner.cursor as u16;
+        let mut length = 0;
+        loop {
+            match self.scanner.peek() {
+                // TODO: ACTUALLY parse the regex
+                // Some('[') => todo!(),
+                // Some('(') => todo!(),
+                // Some('\\') => todo!(),
+                // ...
+                Some(_char) => {
+                    length += 1;
+                    self.scanner.pop();
+                },
+                None => {
+                    return Ok(ast::Regex {
+                        location: Location::VariableLength {
+                            char: start,
+                            line: 0,
+                            length,
+                        },
+                    })
+                }
+            }
+        }
+    }
+
     pub(crate) fn parse_identifier(&mut self) -> Result<ast::Identifier> {
         self.scanner.skip_whitespace();
         if self.scanner.is_done() {
@@ -1600,7 +1630,10 @@ mod tests {
                                             length: 7,
                                         },
                                     }),
-                                    comma_location: Some(Location::SingleCharacter { char: 24, line: 0 })
+                                    comma_location: Some(Location::SingleCharacter {
+                                        char: 24,
+                                        line: 0
+                                    })
                                 },
                                 FunctionArgument {
                                     object: Object::String(StringLiteral {
@@ -1614,8 +1647,14 @@ mod tests {
                                     comma_location: None,
                                 }
                             ],
-                            opening_bracket_location: Location::SingleCharacter { char: 16, line: 0 },
-                            closing_bracket_location: Location::SingleCharacter { char: 33, line: 0 },
+                            opening_bracket_location: Location::SingleCharacter {
+                                char: 16,
+                                line: 0
+                            },
+                            closing_bracket_location: Location::SingleCharacter {
+                                char: 33,
+                                line: 0
+                            },
                         }),
                         comma_location: None
                     }],

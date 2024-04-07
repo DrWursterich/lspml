@@ -314,7 +314,26 @@ fn index_tag(
                                     );
                                 }
                             },
-                            grammar::TagAttributeType::Regex => {}
+                            grammar::TagAttributeType::Regex => match parser.parse_regex() {
+                                Ok(result) => {
+                                    let position = value_node.start_position();
+                                    index_regex(
+                                        &result,
+                                        &mut SpelTokenCollector::new(
+                                            tokenizer,
+                                            position.row as u32,
+                                            position.column as u32,
+                                        ),
+                                    );
+                                }
+                                Err(err) => {
+                                    log::error!(
+                                        "unparsable text \"{}\": {}",
+                                        value_node.utf8_text(&text.as_bytes())?,
+                                        err
+                                    );
+                                }
+                            }
                             grammar::TagAttributeType::String => match parser.parse_text() {
                                 Ok(result) => {
                                     let position = value_node.start_position();
@@ -695,6 +714,19 @@ fn index_uri(uri: &ast::Uri, token_collector: &mut SpelTokenCollector) {
         ast::Uri::Object(object) => index_interpolation(object, token_collector),
     };
 }
+
+fn index_regex(
+    regex: &ast::Regex,
+    token_collector: &mut SpelTokenCollector,
+) {
+    token_collector.add(
+        &regex.location,
+        // &SemanticTokenType::ENUM_MEMBER,
+        &SemanticTokenType::REGEXP,
+        &vec![]
+    );
+}
+
 fn index_word(
     word: &ast::Word,
     token_collector: &mut SpelTokenCollector,
