@@ -3,6 +3,16 @@ use core::fmt::Display;
 use std::fmt::Formatter;
 
 #[derive(Debug, PartialEq, Clone)]
+pub(crate) enum Identifier {
+    Name(Word),
+    FieldAccess {
+        identifier: Box<Identifier>,
+        field: Word,
+        dot_location: Location,
+    },
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Object {
     Anchor {
         name: Word,

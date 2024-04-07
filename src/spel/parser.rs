@@ -108,21 +108,35 @@ impl Parser {
         return Ok(ast::Word { fragments });
     }
 
-    // TODO: can contain field-access! (_content.model.headline)...
-    pub(crate) fn parse_identifier(&mut self) -> Result<ast::Word> {
+    pub(crate) fn parse_identifier(&mut self) -> Result<ast::Identifier> {
         self.scanner.skip_whitespace();
         if self.scanner.is_done() {
             return Err(anyhow::anyhow!("string is empty"));
         }
-        let word = self.parse_word()?;
+        let name = self.parse_word()?;
         self.scanner.skip_whitespace();
-        return match self.scanner.is_done() {
-            true => Ok(word),
-            false => Err(anyhow::anyhow!(
-                "trailing character \"{}\"",
-                self.scanner.peek().unwrap()
-            )),
-        };
+        let mut result = ast::Identifier::Name(name);
+        loop {
+            match self.scanner.peek() {
+                Some('.') => {
+                    let dot_location = Location::SingleCharacter {
+                        char: self.scanner.cursor as u16,
+                        line: 0,
+                    };
+                    self.scanner.pop();
+                    self.scanner.skip_whitespace();
+                    let name = self.parse_word()?;
+                    self.scanner.skip_whitespace();
+                    result = ast::Identifier::FieldAccess {
+                        identifier: Box::new(result),
+                        field: name,
+                        dot_location,
+                    };
+                }
+                Some(char) => return Err(anyhow::anyhow!("trailing character \"{}\"", char)),
+                None => return Ok(result),
+            }
+        }
     }
 
     fn parse_object(&mut self) -> Result<ast::Object> {
@@ -663,29 +677,6 @@ impl Parser {
                 }
                 _ => return Ok(result),
             };
-        }
-    }
-
-    fn parse_bracketed_expression(&mut self) -> Result<ast::Expression> {
-        let start = self.scanner.cursor as u16;
-        self.scanner.pop();
-        self.scanner.skip_whitespace();
-        let expression = self.parse_expression()?;
-        self.scanner.skip_whitespace();
-        match self.scanner.pop() {
-            Some(')') => Ok(ast::Expression::BracketedExpression {
-                expression: Box::new(expression),
-                opening_bracket_location: Location::SingleCharacter {
-                    char: start,
-                    line: 0,
-                },
-                closing_bracket_location: Location::SingleCharacter {
-                    char: self.scanner.cursor as u16 - 1,
-                    line: 0,
-                },
-            }),
-            Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
-            None => return Err(anyhow::anyhow!("unclosed bracket")),
         }
     }
 

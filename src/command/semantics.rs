@@ -252,11 +252,17 @@ fn index_tag(
                             }
                             grammar::TagAttributeType::Identifier => {
                                 match parser.parse_identifier() {
-                                    Ok(_result) => tokenizer.add_node(
-                                        value_node,
-                                        SemanticTokenType::VARIABLE,
-                                        vec![],
-                                    ),
+                                    Ok(result) => {
+                                        let position = value_node.start_position();
+                                        index_identifier(
+                                            &result,
+                                            &mut SpelTokenCollector::new(
+                                                tokenizer,
+                                                position.row as u32,
+                                                position.column as u32,
+                                            ),
+                                        );
+                                    }
                                     Err(err) => {
                                         log::error!(
                                             "unparsable identifier \"{}\": {}",
@@ -347,6 +353,23 @@ fn index_children(node: Node, text: &String, tokenizer: &mut Tokenizer) -> Resul
         }
     }
     return Ok(());
+}
+
+fn index_identifier(identifier: &ast::Identifier, token_collector: &mut SpelTokenCollector) {
+    match identifier {
+        ast::Identifier::Name(name) => {
+            index_word(name, token_collector, SemanticTokenType::VARIABLE, vec![])
+        }
+        ast::Identifier::FieldAccess {
+            identifier,
+            field,
+            dot_location,
+        } => {
+            index_identifier(identifier, token_collector);
+            token_collector.add(dot_location, SemanticTokenType::OPERATOR, vec![]);
+            index_word(field, token_collector, SemanticTokenType::VARIABLE, vec![]);
+        }
+    };
 }
 
 fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) {
