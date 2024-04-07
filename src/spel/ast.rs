@@ -76,8 +76,7 @@ impl Display for Object {
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Function {
     pub(crate) name: Word,
-    // TODO: missing locations of commatas!
-    pub(crate) arguments: Vec<Object>,
+    pub(crate) arguments: Vec<FunctionArgument>,
     pub(crate) opening_bracket_location: Location,
     pub(crate) closing_bracket_location: Location,
 }
@@ -85,21 +84,29 @@ pub(crate) struct Function {
 impl Display for Function {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
         self.name.fmt(formatter)?;
-        fmt_arguments(formatter, &self.arguments)
+        match self.arguments.len() {
+            0 => formatter.write_str("()"),
+            len => {
+                formatter.write_str("(")?;
+                for argument in &self.arguments[1..len] {
+                    formatter.write_str(", ")?;
+                    argument.fmt(formatter)?;
+                }
+                formatter.write_str(")")
+            }
+        }
     }
 }
 
-fn fmt_arguments(formatter: &mut Formatter<'_>, arguments: &Vec<Object>) -> core::fmt::Result {
-    match arguments.len() {
-        0 => formatter.write_str("()"),
-        len => {
-            formatter.write_str("(")?;
-            for argument in &arguments[1..len] {
-                formatter.write_str(",")?;
-                argument.fmt(formatter)?;
-            }
-            formatter.write_str(")")
-        }
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct FunctionArgument {
+    pub(crate) object: Object,
+    pub(crate) comma_location: Option<Location>,
+}
+
+impl Display for FunctionArgument {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        self.object.fmt(formatter)
     }
 }
 

@@ -1042,7 +1042,7 @@ impl Parser {
                                         char: self.scanner.cursor as u16 - 1,
                                         line: 0,
                                     },
-                                }
+                                },
                             }
                         }
                         _ => ast::Object::FieldAccess {
@@ -1107,7 +1107,7 @@ impl Parser {
         };
     }
 
-    fn parse_function_arguments(&mut self) -> Result<Vec<ast::Object>> {
+    fn parse_function_arguments(&mut self) -> Result<Vec<ast::FunctionArgument>> {
         let mut arguments = Vec::new();
         if !self.scanner.take(&'(') {
             return Err(anyhow::anyhow!("expected opening brace"));
@@ -1117,11 +1117,26 @@ impl Parser {
             return Ok(arguments);
         }
         loop {
-            arguments.push(self.parse_object()?);
+            let object = self.parse_object()?;
             self.scanner.skip_whitespace();
             match self.scanner.pop() {
-                Some(')') => return Ok(arguments),
-                Some(',') => self.scanner.skip_whitespace(),
+                Some(')') => {
+                    arguments.push(ast::FunctionArgument {
+                        object,
+                        comma_location: None,
+                    });
+                    return Ok(arguments);
+                }
+                Some(',') => {
+                    arguments.push(ast::FunctionArgument {
+                        object,
+                        comma_location: Some(ast::Location::SingleCharacter {
+                            char: self.scanner.cursor as u16 - 1,
+                            line: 0,
+                        }),
+                    });
+                    self.scanner.skip_whitespace();
+                }
                 Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
                 None => return Err(anyhow::anyhow!("unclosed function arguments")),
             };
@@ -1133,8 +1148,8 @@ impl Parser {
 mod tests {
     use crate::spel::ast::{
         Comparable, ComparissonOperator, Condition, ConditionAst, ConditionOperator, Expression,
-        ExpressionAst, ExpressionOperator, Function, Interpolation, Location, Null, Object,
-        ObjectAst, Sign, StringLiteral, Word, WordFragment,
+        ExpressionAst, ExpressionOperator, Function, FunctionArgument, Interpolation, Location,
+        Null, Object, ObjectAst, Sign, StringLiteral, Word, WordFragment,
     };
 
     #[test]
@@ -1434,14 +1449,17 @@ mod tests {
                             },
                         })]
                     },
-                    arguments: vec![Object::String(StringLiteral {
-                        content: "test".to_string(),
-                        location: Location::VariableLength {
-                            char: 10,
-                            line: 0,
-                            length: 6,
-                        },
-                    })],
+                    arguments: vec![FunctionArgument {
+                        object: Object::String(StringLiteral {
+                            content: "test".to_string(),
+                            location: Location::VariableLength {
+                                char: 10,
+                                line: 0,
+                                length: 6,
+                            },
+                        }),
+                        comma_location: None
+                    }],
                     opening_bracket_location: Location::SingleCharacter { char: 9, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 16, line: 0 },
                 })
@@ -1514,22 +1532,28 @@ mod tests {
                         })]
                     },
                     arguments: vec![
-                        Object::String(StringLiteral {
-                            content: "test".to_string(),
-                            location: Location::VariableLength {
-                                char: 13,
-                                line: 0,
-                                length: 6,
-                            },
-                        }),
-                        Object::String(StringLiteral {
-                            content: "test2".to_string(),
-                            location: Location::VariableLength {
-                                char: 23,
-                                line: 0,
-                                length: 7,
-                            },
-                        })
+                        FunctionArgument {
+                            object: Object::String(StringLiteral {
+                                content: "test".to_string(),
+                                location: Location::VariableLength {
+                                    char: 13,
+                                    line: 0,
+                                    length: 6,
+                                },
+                            }),
+                            comma_location: Some(Location::SingleCharacter { char: 21, line: 0 })
+                        },
+                        FunctionArgument {
+                            object: Object::String(StringLiteral {
+                                content: "test2".to_string(),
+                                location: Location::VariableLength {
+                                    char: 23,
+                                    line: 0,
+                                    length: 7,
+                                },
+                            }),
+                            comma_location: None
+                        }
                     ],
                     opening_bracket_location: Location::SingleCharacter { char: 11, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 31, line: 0 },
@@ -1554,38 +1578,47 @@ mod tests {
                             },
                         })]
                     },
-                    arguments: vec![Object::Function(Function {
-                        name: Word {
-                            fragments: vec![WordFragment::String(StringLiteral {
-                                content: "concat".to_string(),
-                                location: Location::VariableLength {
-                                    char: 10,
-                                    line: 0,
-                                    length: 6,
+                    arguments: vec![FunctionArgument {
+                        object: Object::Function(Function {
+                            name: Word {
+                                fragments: vec![WordFragment::String(StringLiteral {
+                                    content: "concat".to_string(),
+                                    location: Location::VariableLength {
+                                        char: 10,
+                                        line: 0,
+                                        length: 6,
+                                    },
+                                })]
+                            },
+                            arguments: vec![
+                                FunctionArgument {
+                                    object: Object::String(StringLiteral {
+                                        content: "hello".to_string(),
+                                        location: Location::VariableLength {
+                                            char: 17,
+                                            line: 0,
+                                            length: 7,
+                                        },
+                                    }),
+                                    comma_location: Some(Location::SingleCharacter { char: 24, line: 0 })
                                 },
-                            })]
-                        },
-                        arguments: vec![
-                            Object::String(StringLiteral {
-                                content: "hello".to_string(),
-                                location: Location::VariableLength {
-                                    char: 17,
-                                    line: 0,
-                                    length: 7,
-                                },
-                            }),
-                            Object::String(StringLiteral {
-                                content: "world".to_string(),
-                                location: Location::VariableLength {
-                                    char: 26,
-                                    line: 0,
-                                    length: 7,
-                                },
-                            })
-                        ],
-                        opening_bracket_location: Location::SingleCharacter { char: 16, line: 0 },
-                        closing_bracket_location: Location::SingleCharacter { char: 33, line: 0 },
-                    })],
+                                FunctionArgument {
+                                    object: Object::String(StringLiteral {
+                                        content: "world".to_string(),
+                                        location: Location::VariableLength {
+                                            char: 26,
+                                            line: 0,
+                                            length: 7,
+                                        },
+                                    }),
+                                    comma_location: None,
+                                }
+                            ],
+                            opening_bracket_location: Location::SingleCharacter { char: 16, line: 0 },
+                            closing_bracket_location: Location::SingleCharacter { char: 33, line: 0 },
+                        }),
+                        comma_location: None
+                    }],
                     opening_bracket_location: Location::SingleCharacter { char: 9, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 34, line: 0 },
                 })

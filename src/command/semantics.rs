@@ -660,10 +660,12 @@ fn index_function(function: &ast::Function, token_collector: &mut SpelTokenColle
         &SemanticTokenType::OPERATOR,
         &vec![],
     );
-    function
-        .arguments
-        .iter()
-        .for_each(|arg| index_object(arg, token_collector));
+    for arg in function.arguments.iter() {
+        index_object(&arg.object, token_collector);
+        if let Some(comma_location) = &arg.comma_location {
+            token_collector.add(&comma_location, &SemanticTokenType::OPERATOR, &vec![]);
+        }
+    }
     token_collector.add(
         &function.closing_bracket_location,
         &SemanticTokenType::OPERATOR,
