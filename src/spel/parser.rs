@@ -432,6 +432,77 @@ impl Parser {
         return self.resolve_comparable(comparable);
     }
 
+    pub(crate) fn parse_comparable(&mut self) -> Result<ast::Comparable> {
+        return Ok(match self.scanner.peek() {
+            Some('\'') => ast::Comparable::String(self.parse_string()?),
+            Some('$') => {
+                let object = self.parse_interpolation()?;
+                self.scanner.skip_whitespace();
+                match self.try_parse_binary_operation(ast::Expression::Object(Box::new(object)))? {
+                    ast::Expression::Object(interpolation) => {
+                        ast::Comparable::Object(*interpolation)
+                    }
+                    expression => ast::Comparable::Expression(expression),
+                }
+            }
+            Some('+' | '-') => {
+                let expression = self.parse_signed_expression()?;
+                ast::Comparable::Expression(self.try_parse_binary_operation(expression)?)
+            }
+            Some('0'..='9') => {
+                let expression = self.parse_number()?;
+                ast::Comparable::Expression(self.try_parse_binary_operation(expression)?)
+            }
+            Some('(') => self.parse_bracketed_comparable()?,
+            Some('!') => ast::Comparable::Condition(self.parse_negated_condition()?),
+            Some(_) => {
+                let func = self.parse_name_or_global_function()?;
+                match func {
+                    ast::Object::Name {
+                        name: ast::Word { fragments },
+                    } if fragments.len() == 1 => match &fragments[0] {
+                        ast::WordFragment::String(ast::StringLiteral { content, location }) => {
+                            match content.as_str() {
+                                "true" => ast::Comparable::Condition(ast::Condition::True {
+                                    location: location.clone(),
+                                }),
+                                "false" => ast::Comparable::Condition(ast::Condition::False {
+                                    location: location.clone(),
+                                }),
+                                name => {
+                                    return Err(anyhow::anyhow!(
+                                        "objects in comparissons have to be interpolated. Try \"${{{}}}\"",
+                                        name
+                                    ));
+                                }
+                            }
+                        }
+                        ast::WordFragment::Interpolation(interpolation) => {
+                            self.scanner.skip_whitespace();
+                            match self.try_parse_binary_operation(ast::Expression::Object(
+                                Box::new(interpolation.clone()),
+                            ))? {
+                                ast::Expression::Object(interpolation) => {
+                                    ast::Comparable::Object(*interpolation)
+                                }
+                                expression => ast::Comparable::Expression(expression),
+                            }
+                        }
+                    },
+                    ast::Object::Null(null) => ast::Comparable::Null(null),
+                    ast::Object::Function(function) => ast::Comparable::Function(function),
+                    object => {
+                        return Err(anyhow::anyhow!(
+                            "objects in comparissons have to be interpolated. Try \"${{{}}}\"",
+                            object
+                        ))
+                    }
+                }
+            }
+            None => return Err(anyhow::anyhow!("unexpected end")),
+        });
+    }
+
     fn resolve_comparable(&mut self, comparable: ast::Comparable) -> Result<ast::Condition> {
         self.scanner.skip_whitespace();
         return match self.try_parse_comparisson(&comparable)? {
@@ -527,77 +598,6 @@ impl Parser {
                 })
             }
             _ => None,
-        });
-    }
-
-    fn parse_comparable(&mut self) -> Result<ast::Comparable> {
-        return Ok(match self.scanner.peek() {
-            Some('\'') => ast::Comparable::String(self.parse_string()?),
-            Some('$') => {
-                let object = self.parse_interpolation()?;
-                self.scanner.skip_whitespace();
-                match self.try_parse_binary_operation(ast::Expression::Object(Box::new(object)))? {
-                    ast::Expression::Object(interpolation) => {
-                        ast::Comparable::Object(*interpolation)
-                    }
-                    expression => ast::Comparable::Expression(expression),
-                }
-            }
-            Some('+' | '-') => {
-                let expression = self.parse_signed_expression()?;
-                ast::Comparable::Expression(self.try_parse_binary_operation(expression)?)
-            }
-            Some('0'..='9') => {
-                let expression = self.parse_number()?;
-                ast::Comparable::Expression(self.try_parse_binary_operation(expression)?)
-            }
-            Some('(') => self.parse_bracketed_comparable()?,
-            Some('!') => ast::Comparable::Condition(self.parse_negated_condition()?),
-            Some(_) => {
-                let func = self.parse_name_or_global_function()?;
-                match func {
-                    ast::Object::Name {
-                        name: ast::Word { fragments },
-                    } if fragments.len() == 1 => match &fragments[0] {
-                        ast::WordFragment::String(ast::StringLiteral { content, location }) => {
-                            match content.as_str() {
-                                "true" => ast::Comparable::Condition(ast::Condition::True {
-                                    location: location.clone(),
-                                }),
-                                "false" => ast::Comparable::Condition(ast::Condition::False {
-                                    location: location.clone(),
-                                }),
-                                name => {
-                                    return Err(anyhow::anyhow!(
-                                        "objects in comparissons have to be interpolated. Try \"${{{}}}\"",
-                                        name
-                                    ));
-                                }
-                            }
-                        }
-                        ast::WordFragment::Interpolation(interpolation) => {
-                            self.scanner.skip_whitespace();
-                            match self.try_parse_binary_operation(ast::Expression::Object(
-                                Box::new(interpolation.clone()),
-                            ))? {
-                                ast::Expression::Object(interpolation) => {
-                                    ast::Comparable::Object(*interpolation)
-                                }
-                                expression => ast::Comparable::Expression(expression),
-                            }
-                        }
-                    },
-                    ast::Object::Null(null) => ast::Comparable::Null(null),
-                    ast::Object::Function(function) => ast::Comparable::Function(function),
-                    object => {
-                        return Err(anyhow::anyhow!(
-                            "objects in comparissons have to be interpolated. Try \"${{{}}}\"",
-                            object
-                        ))
-                    }
-                }
-            }
-            None => return Err(anyhow::anyhow!("unexpected end")),
         });
     }
 

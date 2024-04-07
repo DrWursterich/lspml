@@ -26,6 +26,7 @@ A work-in-progress language server for the sitepark markup language (spml).
     - objects
     - text
     - uris
+    - to be comparable (for `sp:if` and `sp:elseif` `eq`, `gt`, ...)
 
 ## commandline
 

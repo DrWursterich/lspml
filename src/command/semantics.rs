@@ -206,6 +206,28 @@ fn index_tag(
                         };
                         let parser = &mut Parser::new(value_node.utf8_text(&text.as_bytes())?);
                         match definition.r#type {
+                            grammar::TagAttributeType::Comparable => {
+                                match parser.parse_comparable() {
+                                    Ok(result) => {
+                                        let position = value_node.start_position();
+                                        index_comparable(
+                                            &result,
+                                            &mut SpelTokenCollector::new(
+                                                tokenizer,
+                                                position.row as u32,
+                                                position.column as u32,
+                                            ),
+                                        );
+                                    }
+                                    Err(err) => {
+                                        log::error!(
+                                            "unparsable comparable \"{}\": {}",
+                                            value_node.utf8_text(&text.as_bytes())?,
+                                            err
+                                        );
+                                    }
+                                }
+                            }
                             grammar::TagAttributeType::Condition => {
                                 match parser.parse_condition_ast() {
                                     Ok(result) => {

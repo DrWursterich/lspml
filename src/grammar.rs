@@ -28,6 +28,7 @@ pub(crate) struct TagAttribute {
 
 #[derive(Debug)]
 pub(crate) enum TagAttributeType {
+    Comparable,
     Condition,
     // Enum(Vec<String>), e.g. for action="put|putAll|remove|..."
     Expression,
@@ -882,7 +883,7 @@ Es wird eine Condition erwartet, die den Wert `true` oder `false` zurückliefert
         },
         TagAttribute {
             name: "eq",
-            r#type: TagAttributeType::Object,
+            r#type: TagAttributeType::Comparable,
             detail: None,
             documentation: Some(
                 r#"
@@ -891,7 +892,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` gleich der Variable in `
         },
         TagAttribute {
             name: "gt",
-            r#type: TagAttributeType::Object,
+            r#type: TagAttributeType::Comparable,
             detail: None,
             documentation: Some(
                 r#"
@@ -900,7 +901,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` größer als der Variabl
         },
         TagAttribute {
             name: "gte",
-            r#type: TagAttributeType::Object,
+            r#type: TagAttributeType::Comparable,
             detail: None,
             documentation: Some(
                 r#"
@@ -936,7 +937,7 @@ Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen
         },
         TagAttribute {
             name: "lt",
-            r#type: TagAttributeType::Object,
+            r#type: TagAttributeType::Comparable,
             detail: None,
             documentation: Some(
                 r#"
@@ -945,7 +946,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` kleiner als in der Varia
         },
         TagAttribute {
             name: "lte",
-            r#type: TagAttributeType::Object,
+            r#type: TagAttributeType::Comparable,
             detail: None,
             documentation: Some(
                 r#"
@@ -972,7 +973,7 @@ Variablenname eines Objektes das verglichen werden soll."#,
         },
         TagAttribute {
             name: "neq",
-            r#type: TagAttributeType::Object,
+            r#type: TagAttributeType::Comparable,
             detail: None,
             documentation: Some(
                 r#"
@@ -1481,7 +1482,7 @@ Es wird eine Condition erwartet, die den Wert `true` oder `false` zurückliefert
         },
         TagAttribute {
             name: "eq",
-            r#type: TagAttributeType::Object,
+            r#type: TagAttributeType::Comparable,
             detail: None,
             documentation: Some(
                 r#"
@@ -1490,7 +1491,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` gleich der Variable in `
         },
         TagAttribute {
             name: "gt",
-            r#type: TagAttributeType::Object,
+            r#type: TagAttributeType::Comparable,
             detail: None,
             documentation: Some(
                 r#"
@@ -1499,7 +1500,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` größer als der Variabl
         },
         TagAttribute {
             name: "gte",
-            r#type: TagAttributeType::Object,
+            r#type: TagAttributeType::Comparable,
             detail: None,
             documentation: Some(
                 r#"
@@ -1535,7 +1536,7 @@ Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen
         },
         TagAttribute {
             name: "lt",
-            r#type: TagAttributeType::Object,
+            r#type: TagAttributeType::Comparable,
             detail: None,
             documentation: Some(
                 r#"
@@ -1544,7 +1545,7 @@ Die Bedingung ist erfüllt, wenn die Variable in `name` kleiner als in der Varia
         },
         TagAttribute {
             name: "lte",
-            r#type: TagAttributeType::Object,
+            r#type: TagAttributeType::Comparable,
             detail: None,
             documentation: Some(
                 r#"
@@ -1571,7 +1572,7 @@ Variablenname eines Objektes das verglichen werden soll."#,
         },
         TagAttribute {
             name: "neq",
-            r#type: TagAttributeType::Object,
+            r#type: TagAttributeType::Comparable,
             detail: None,
             documentation: Some(
                 r#"
