@@ -64,6 +64,51 @@ impl Parser {
         };
     }
 
+    pub(crate) fn parse_text(&mut self) -> Result<ast::Word> {
+        let mut string = String::new();
+        let mut fragments = Vec::new();
+        let mut start = self.scanner.cursor as u16;
+        loop {
+            match self.scanner.peek() {
+                Some('$') => {
+                    let interpolation = self.parse_interpolation()?;
+                    let length = string.len() as u16;
+                    if length > 0 {
+                        fragments.push(ast::WordFragment::String(ast::StringLiteral {
+                            content: string,
+                            location: Location::VariableLength {
+                                char: start,
+                                line: 0,
+                                length,
+                            },
+                        }));
+                        string = String::new();
+                        start = self.scanner.cursor as u16;
+                    }
+                    fragments.push(ast::WordFragment::Interpolation(interpolation))
+                }
+                Some(char) => {
+                    string.push(*char);
+                    self.scanner.pop();
+                }
+                None => break,
+            }
+        }
+        let length = string.len() as u16;
+        if length > 0 || fragments.len() == 0 {
+            fragments.push(ast::WordFragment::String(ast::StringLiteral {
+                content: string,
+                location: Location::VariableLength {
+                    char: start,
+                    line: 0,
+                    length,
+                },
+            }));
+        }
+        return Ok(ast::Word { fragments });
+    }
+
+    // TODO: can contain field-access! (_content.model.headline)...
     pub(crate) fn parse_identifier(&mut self) -> Result<ast::Word> {
         self.scanner.skip_whitespace();
         if self.scanner.is_done() {

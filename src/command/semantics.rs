@@ -287,7 +287,36 @@ fn index_tag(
                                 }
                             },
                             grammar::TagAttributeType::Regex => {}
-                            grammar::TagAttributeType::String => {}
+                            grammar::TagAttributeType::String => match parser.parse_text() {
+                                Ok(result) => {
+                                    let position = value_node.start_position();
+                                    for fragment in result.fragments {
+                                        if let ast::WordFragment::Interpolation(interpolation) =
+                                            fragment
+                                        {
+                                            log::info!(
+                                                "found interpolation in text: {:?}",
+                                                interpolation
+                                            );
+                                            index_interpolation(
+                                                &interpolation,
+                                                &mut SpelTokenCollector::new(
+                                                    tokenizer,
+                                                    position.row as u32,
+                                                    position.column as u32,
+                                                ),
+                                            );
+                                        }
+                                    }
+                                }
+                                Err(err) => {
+                                    log::error!(
+                                        "unparsable text \"{}\": {}",
+                                        value_node.utf8_text(&text.as_bytes())?,
+                                        err
+                                    );
+                                }
+                            },
                             grammar::TagAttributeType::Query => {}
                         }
                     };
