@@ -10,7 +10,7 @@ use crate::{
     command::ResponseErrorCode,
     document_store::{self, Document},
     spel::{
-        ast::{ComparissonOperator, Condition, ConditionAst},
+        ast::{Comparable, ComparissonOperator, Condition, ConditionAst},
         parser::Parser,
     },
     CODE_ACTIONS,
@@ -129,7 +129,7 @@ fn construct_name_to_condition<'a>(
                                             },
                                         },
                                         new_text: format!(
-                                            "condition=\"{} {} {}\"",
+                                            "condition=\"${{{}}} {} {}\"",
                                             name,
                                             match operator {
                                                 "gt" => ">",
@@ -177,16 +177,40 @@ fn construct_condition_to_name<'a>(
                     },
             }) = parser.parse_condition_ast()
             {
-                let operator = match operator {
-                    ComparissonOperator::Equal => "eq",
-                    ComparissonOperator::Unequal => "neq",
-                    ComparissonOperator::GreaterThan => "gt",
-                    ComparissonOperator::GreaterThanOrEqual => "gte",
-                    ComparissonOperator::LessThan => "lt",
-                    ComparissonOperator::LessThanOrEqual => "lte",
-                };
+                let operator_name;
+                let new_text;
+                if let Comparable::Object(inner) = *left {
+                    operator_name = match operator {
+                        ComparissonOperator::Equal => "eq",
+                        ComparissonOperator::Unequal => "neq",
+                        ComparissonOperator::GreaterThan => "gt",
+                        ComparissonOperator::GreaterThanOrEqual => "gte",
+                        ComparissonOperator::LessThan => "lt",
+                        ComparissonOperator::LessThanOrEqual => "lte",
+                    };
+                    new_text = format!(
+                        "name=\"{}\" {}=\"{}\"",
+                        inner.content, operator_name, *right
+                    );
+                } else if let Comparable::Object(inner) = *right {
+                    operator_name = match operator {
+                        ComparissonOperator::Equal => "eq",
+                        ComparissonOperator::Unequal => "neq",
+                        ComparissonOperator::GreaterThan => "lt",
+                        ComparissonOperator::GreaterThanOrEqual => "lte",
+                        ComparissonOperator::LessThan => "gt",
+                        ComparissonOperator::LessThanOrEqual => "gte",
+                    };
+                    new_text =
+                        format!("name=\"{}\" {}=\"{}\"", inner.content, operator_name, *left);
+                } else {
+                    return None;
+                }
                 return Some(CodeActionOrCommand::CodeAction(CodeAction {
-                    title: format!("transform \"condition\" to \"name\" and \"{}\"", operator),
+                    title: format!(
+                        "transform \"condition\" to \"name\" and \"{}\"",
+                        operator_name
+                    ),
                     kind: Some(CODE_ACTIONS[1].clone()),
                     edit: Some(WorkspaceEdit {
                         changes: Some(HashMap::from([(
@@ -202,7 +226,7 @@ fn construct_condition_to_name<'a>(
                                         character: condition_node.end_position().column as u32,
                                     },
                                 },
-                                new_text: format!("name=\"{}\" {}=\"{}\"", left, operator, right),
+                                new_text,
                             }],
                         )])),
                         ..WorkspaceEdit::default()
