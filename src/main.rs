@@ -2,12 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use lsp_server::{Connection, Message};
 use lsp_types::{
-    CancelParams, CompletionOptions, CompletionOptionsCompletionItem, DiagnosticOptions,
-    DiagnosticServerCapabilities, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams, DidSaveTextDocumentParams, HoverOptions, HoverProviderCapability,
-    InitializeParams, OneOf, SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions,
-    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
-    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions,
+    CancelParams, CodeActionKind, CodeActionOptions, CodeActionProviderCapability, CompletionOptions, CompletionOptionsCompletionItem, DiagnosticOptions, DiagnosticServerCapabilities, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams, HoverOptions, HoverProviderCapability, InitializeParams, OneOf, SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions
 };
 use std::{error::Error, fs::File, str::FromStr};
 use structured_logger::Builder;
@@ -50,6 +45,11 @@ pub(crate) const TOKEN_MODIFIERS: &'static [SemanticTokenModifier] = &[
     SemanticTokenModifier::DEPRECATED,
     SemanticTokenModifier::DOCUMENTATION,
     SemanticTokenModifier::MODIFICATION,
+];
+
+pub(crate) const CODE_ACTIONS: &'static [CodeActionKind] = &[
+    CodeActionKind::new("refactor.name_to_condition"),
+    CodeActionKind::new("refactor.condition_to_name")
 ];
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
@@ -102,6 +102,10 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
                 work_done_progress: Some(true),
             },
         })),
+        code_action_provider: Some(CodeActionProviderCapability::Options(CodeActionOptions {
+            code_action_kinds: Some(CODE_ACTIONS.to_vec()),
+            ..CodeActionOptions::default()
+        })),
         ..ServerCapabilities::default()
     })?;
     let initialization_params = match connection.initialize(server_capabilities) {
@@ -139,6 +143,7 @@ fn main_loop(
                     "textDocument/diagnostic" => command::diagnostic(request).map(Some),
                     "textDocument/documentHighlight" => command::highlight(request).map(Some), // stub
                     "textDocument/semanticTokens/full" => command::semantics(request).map(Some),
+                    "textDocument/codeAction" => command::action(request).map(Some),
                     "textDocument/hover" => command::hover(request),
                     _ => command::unknown(request).map(Some),
                 }

@@ -5,6 +5,7 @@ use lsp_types::{
     SemanticTokensResult,
 };
 use std::fmt;
+mod action;
 mod complete;
 mod definition;
 mod diagnostic;
@@ -158,6 +159,34 @@ pub(crate) fn semantics(request: Request) -> Result<Message> {
                     }))
                     .ok(),
                     error: None,
+                },
+                Err(err) => err.to_response(request.id),
+            })
+        })
+        .map_err(|err| Error::from(err));
+}
+
+pub(crate) fn action(request: Request) -> Result<Message> {
+    log::trace!("got code-action request: {request:?}");
+    return serde_json::from_value(request.params)
+        .map(|params| {
+            Message::Response(match action::action(params) {
+                Ok(actions) => match serde_json::to_value(actions) {
+                    Ok(result) => Response {
+                        id: request.id,
+                        result: Some(result),
+                        error: None,
+                    },
+                    // TODO: this might not be the way to handle json errors..
+                    Err(err) => Response {
+                        id: request.id,
+                        result: None,
+                        error: Some(ResponseError {
+                            message: format!("{}", err),
+                            code: ResponseErrorCode::RequestFailed as i32,
+                            data: None,
+                        })
+                    },
                 },
                 Err(err) => err.to_response(request.id),
             })

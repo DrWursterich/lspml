@@ -27,7 +27,10 @@ A work-in-progress language server for the sitepark markup language (spml).
     - regular expressions
     - text
     - uris
-    - to be comparable (for `sp:if` and `sp:elseif` `eq`, `gt`, ...)
+    - to be comparable (for `sp:if` and `sp:elseif` `eq`/`gt`/...)
+- code actions to:
+    - split `sp:if` `condition` into `name` and `eq`/`gt`/...
+    - join `sp:if` `name` and `eq`/`gt`/... into `condition`
 
 ## commandline
 
