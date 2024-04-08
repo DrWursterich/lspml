@@ -481,6 +481,7 @@ impl Parser {
             }
             Some('0'..='9') => {
                 let expression = self.parse_number()?;
+                self.scanner.skip_whitespace();
                 ast::Comparable::Expression(self.try_parse_binary_operation(expression)?)
             }
             Some('(') => self.parse_bracketed_comparable()?,
