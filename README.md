@@ -58,7 +58,8 @@ The `modules-file` is a `json` file, in which module names can be mapped to loca
 
 ## build
 
-Currently you will have to set a local path to [tree-sitter-spml](https://github.com/DrWursterich/tree-sitter-spml) in `Cargo.toml` in order to be able to build this with:
+Currently you will have to be able to access [tree-sitter-spml](https://github.com/DrWursterich/tree-sitter-spml) via ssh in order to be able to build this with:
+
 
 ```bash
 cargo +nightly build
