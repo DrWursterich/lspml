@@ -16,5 +16,5 @@ serde_json = "1.0.111"
 structured-logger = "1.0.3"
 tree-sitter = "0.22.2"
 tree-sitter-html = "0.20.0"
-tree-sitter-spml = { path = "local/path/to/tree-sitter-spml" }
+tree-sitter-spml = { git = "ssh://git@github.com/DrWursterich/tree-sitter-spml.git" }
 

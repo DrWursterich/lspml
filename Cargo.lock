@@ -658,6 +658,7 @@ dependencies = [
 [[package]]
 name = "tree-sitter-spml"
 version = "0.0.1"
+source = "git+ssh://git@github.com/DrWursterich/tree-sitter-spml.git#2014c92c4b246f24457cfbf400cd9baa740b3fd6"
 dependencies = [
  "cc",
  "tree-sitter 0.22.2",
