@@ -226,7 +226,7 @@ impl Parser {
     fn parse_object(&mut self) -> Result<ast::Object> {
         return match self.scanner.peek() {
             Some('\'') => self.parse_string().map(|s| ast::Object::String(s)),
-            Some('!') => self.parse_interpolated_anchor(),
+            Some('!') => self.parse_interpolated_anchor().map(ast::Object::Anchor),
             Some('$' | 'a'..='z' | 'A'..='Z' | '_') => self.parse_name_or_global_function(),
             Some(char) => Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
             None => Err(anyhow::anyhow!("unexpected end")),
@@ -252,6 +252,7 @@ impl Parser {
                 .map(ast::UndecidedExpressionContent::Expression),
             Some('0'..='9') => self
                 .parse_number()
+                .map(ast::Expression::Number)
                 .map(ast::UndecidedExpressionContent::Expression),
             Some('n') => self
                 .parse_null_literal()
@@ -340,7 +341,7 @@ impl Parser {
                                 )
                             }
                             None => {
-                                let condition = ast::Condition::Object(Box::new(*name));
+                                let condition = ast::Condition::Object(*name);
                                 match self.try_parse_binary_condition(&condition)? {
                                     Some(condition) => self.resolve_undecided_expression_content(
                                         ast::UndecidedExpressionContent::Condition(condition),
@@ -480,7 +481,7 @@ impl Parser {
                 ast::Comparable::Expression(self.try_parse_binary_operation(expression)?)
             }
             Some('0'..='9') => {
-                let expression = self.parse_number()?;
+                let expression = self.parse_number().map(ast::Expression::Number)?;
                 self.scanner.skip_whitespace();
                 ast::Comparable::Expression(self.try_parse_binary_operation(expression)?)
             }
@@ -489,37 +490,37 @@ impl Parser {
             Some(_) => {
                 let func = self.parse_name_or_global_function()?;
                 match func {
-                    ast::Object::Name {
-                        name: ast::Word { fragments },
-                    } if fragments.len() == 1 => match &fragments[0] {
-                        ast::WordFragment::String(ast::StringLiteral { content, location }) => {
-                            match content.as_str() {
-                                "true" => ast::Comparable::Condition(ast::Condition::True {
-                                    location: location.clone(),
-                                }),
-                                "false" => ast::Comparable::Condition(ast::Condition::False {
-                                    location: location.clone(),
-                                }),
-                                name => {
-                                    return Err(anyhow::anyhow!(
+                    ast::Object::Name(ast::Word { fragments }) if fragments.len() == 1 => {
+                        match &fragments[0] {
+                            ast::WordFragment::String(ast::StringLiteral { content, location }) => {
+                                match content.as_str() {
+                                    "true" => ast::Comparable::Condition(ast::Condition::True {
+                                        location: location.clone(),
+                                    }),
+                                    "false" => ast::Comparable::Condition(ast::Condition::False {
+                                        location: location.clone(),
+                                    }),
+                                    name => {
+                                        return Err(anyhow::anyhow!(
                                         "objects in comparissons have to be interpolated. Try \"${{{}}}\"",
                                         name
                                     ));
+                                    }
+                                }
+                            }
+                            ast::WordFragment::Interpolation(interpolation) => {
+                                self.scanner.skip_whitespace();
+                                match self.try_parse_binary_operation(ast::Expression::Object(
+                                    Box::new(interpolation.clone()),
+                                ))? {
+                                    ast::Expression::Object(interpolation) => {
+                                        ast::Comparable::Object(*interpolation)
+                                    }
+                                    expression => ast::Comparable::Expression(expression),
                                 }
                             }
                         }
-                        ast::WordFragment::Interpolation(interpolation) => {
-                            self.scanner.skip_whitespace();
-                            match self.try_parse_binary_operation(ast::Expression::Object(
-                                Box::new(interpolation.clone()),
-                            ))? {
-                                ast::Expression::Object(interpolation) => {
-                                    ast::Comparable::Object(*interpolation)
-                                }
-                                expression => ast::Comparable::Expression(expression),
-                            }
-                        }
-                    },
+                    }
                     ast::Object::Null(null) => ast::Comparable::Null(null),
                     ast::Object::Function(function) => ast::Comparable::Function(function),
                     object => {
@@ -542,7 +543,7 @@ impl Parser {
                 let condition = match comparable {
                     ast::Comparable::Condition(condition) => condition,
                     ast::Comparable::Object(interpolation) => {
-                        ast::Condition::Object(Box::new(interpolation))
+                        ast::Condition::Object(interpolation)
                     }
                     ast::Comparable::Function(function) => ast::Condition::Function(function),
                     comparable => {
@@ -755,7 +756,7 @@ impl Parser {
         }
     }
 
-    fn parse_number(&mut self) -> Result<ast::Expression> {
+    fn parse_number(&mut self) -> Result<ast::Number> {
         let start = self.scanner.cursor as u16;
         let mut result = self.parse_integer()?;
         loop {
@@ -775,7 +776,7 @@ impl Parser {
                     result.push_str(&self.parse_integer()?);
                 }
                 _ => {
-                    return Ok(ast::Expression::Number {
+                    return Ok(ast::Number {
                         content: result,
                         location: Location::VariableLength {
                             char: start,
@@ -963,7 +964,7 @@ impl Parser {
         };
     }
 
-    fn parse_interpolated_anchor(&mut self) -> Result<ast::Object> {
+    fn parse_interpolated_anchor(&mut self) -> Result<ast::Anchor> {
         let start = self.scanner.cursor as u16;
         if !self.scanner.take_str(&"!{") {
             return Err(anyhow::anyhow!("expected interpolated anchor"));
@@ -972,7 +973,7 @@ impl Parser {
         let result = self.parse_word()?;
         self.scanner.skip_whitespace();
         return match self.scanner.take(&'}') {
-            true => Ok(ast::Object::Anchor {
+            true => Ok(ast::Anchor {
                 name: result,
                 opening_bracket_location: Location::DoubleCharacter {
                     char: start,
@@ -1019,7 +1020,7 @@ impl Parser {
                     },
                 })
             }
-            _ => ast::Object::Name { name },
+            _ => ast::Object::Name(name),
         };
         loop {
             match self.scanner.peek() {
@@ -1149,19 +1150,46 @@ impl Parser {
             return Ok(arguments);
         }
         loop {
-            let object = self.parse_object()?;
+            let argument = match self.scanner.peek() {
+                Some('\'') => self.parse_string().map(ast::Argument::String),
+                Some('!') => self.parse_interpolated_anchor().map(ast::Argument::Anchor),
+                Some('$') => self.parse_interpolation().map(ast::Argument::Object),
+                Some('0'..='9') => self.parse_number().map(ast::Argument::Number),
+                Some(char @ ('-' | '+')) => {
+                    let sign = match char {
+                        '+' => ast::Sign::Plus,
+                        _ => ast::Sign::Minus,
+                    };
+                    let sign_location = Location::SingleCharacter {
+                        char: self.scanner.cursor as u16,
+                        line: 0,
+                    };
+                    self.scanner.pop();
+                    self.scanner.skip_whitespace();
+                    self.parse_number()
+                        .map(|number| ast::SignedNumber {
+                            sign,
+                            number,
+                            sign_location,
+                        })
+                        .map(ast::Argument::SignedNumber)
+                }
+                Some('n') => self.parse_null_literal().map(ast::Argument::Null),
+                Some(char) => Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
+                None => Err(anyhow::anyhow!("unexpected end")),
+            }?;
             self.scanner.skip_whitespace();
             match self.scanner.pop() {
                 Some(')') => {
                     arguments.push(ast::FunctionArgument {
-                        object,
+                        argument,
                         comma_location: None,
                     });
                     return Ok(arguments);
                 }
                 Some(',') => {
                     arguments.push(ast::FunctionArgument {
-                        object,
+                        argument,
                         comma_location: Some(ast::Location::SingleCharacter {
                             char: self.scanner.cursor as u16 - 1,
                             line: 0,
@@ -1179,9 +1207,10 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use crate::spel::ast::{
-        Comparable, ComparissonOperator, Condition, ConditionAst, ConditionOperator, Expression,
-        ExpressionAst, ExpressionOperator, Function, FunctionArgument, Interpolation, Location,
-        Null, Object, ObjectAst, Sign, StringLiteral, Word, WordFragment,
+        Anchor, Argument, Comparable, ComparissonOperator, Condition, ConditionAst,
+        ConditionOperator, Expression, ExpressionAst, ExpressionOperator, Function,
+        FunctionArgument, Interpolation, Location, Null, Number, Object, ObjectAst, Sign,
+        StringLiteral, Word, WordFragment,
     };
 
     #[test]
@@ -1256,38 +1285,36 @@ mod tests {
         assert_eq!(
             parse_object("null${'notNull'}"),
             ObjectAst {
-                root: Object::Name {
-                    name: Word {
-                        fragments: vec![
-                            WordFragment::String(StringLiteral {
-                                content: "null".to_string(),
+                root: Object::Name(Word {
+                    fragments: vec![
+                        WordFragment::String(StringLiteral {
+                            content: "null".to_string(),
+                            location: Location::VariableLength {
+                                char: 0,
+                                line: 0,
+                                length: 4,
+                            }
+                        }),
+                        WordFragment::Interpolation(Interpolation {
+                            content: Object::String(StringLiteral {
+                                content: "notNull".to_string(),
                                 location: Location::VariableLength {
-                                    char: 0,
+                                    char: 6,
                                     line: 0,
-                                    length: 4,
+                                    length: 9,
                                 }
                             }),
-                            WordFragment::Interpolation(Interpolation {
-                                content: Object::String(StringLiteral {
-                                    content: "notNull".to_string(),
-                                    location: Location::VariableLength {
-                                        char: 6,
-                                        line: 0,
-                                        length: 9,
-                                    }
-                                }),
-                                opening_bracket_location: Location::DoubleCharacter {
-                                    char: 4,
-                                    line: 0,
-                                },
-                                closing_bracket_location: Location::SingleCharacter {
-                                    char: 15,
-                                    line: 0,
-                                },
-                            })
-                        ],
-                    }
-                }
+                            opening_bracket_location: Location::DoubleCharacter {
+                                char: 4,
+                                line: 0,
+                            },
+                            closing_bracket_location: Location::SingleCharacter {
+                                char: 15,
+                                line: 0,
+                            },
+                        })
+                    ],
+                })
             }
         );
     }
@@ -1308,7 +1335,7 @@ mod tests {
         assert_eq!(
             parse_object("!{home}"),
             ObjectAst {
-                root: Object::Anchor {
+                root: Object::Anchor(Anchor {
                     name: Word {
                         fragments: vec![WordFragment::String(StringLiteral {
                             content: "home".to_string(),
@@ -1321,7 +1348,7 @@ mod tests {
                     },
                     opening_bracket_location: Location::DoubleCharacter { char: 0, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 6, line: 0 },
-                }
+                })
             }
         );
     }
@@ -1331,40 +1358,32 @@ mod tests {
         assert_eq!(
             parse_object("${!{home}}"),
             ObjectAst {
-                root: Object::Name {
-                    name: Word {
-                        fragments: vec![WordFragment::Interpolation(Interpolation {
-                            content: Object::Anchor {
-                                name: Word {
-                                    fragments: vec![WordFragment::String(StringLiteral {
-                                        content: "home".to_string(),
-                                        location: Location::VariableLength {
-                                            char: 4,
-                                            line: 0,
-                                            length: 4,
-                                        }
-                                    })],
-                                },
-                                opening_bracket_location: Location::DoubleCharacter {
-                                    char: 2,
-                                    line: 0,
-                                },
-                                closing_bracket_location: Location::SingleCharacter {
-                                    char: 8,
-                                    line: 0,
-                                },
+                root: Object::Name(Word {
+                    fragments: vec![WordFragment::Interpolation(Interpolation {
+                        content: Object::Anchor(Anchor {
+                            name: Word {
+                                fragments: vec![WordFragment::String(StringLiteral {
+                                    content: "home".to_string(),
+                                    location: Location::VariableLength {
+                                        char: 4,
+                                        line: 0,
+                                        length: 4,
+                                    }
+                                })],
                             },
                             opening_bracket_location: Location::DoubleCharacter {
-                                char: 0,
+                                char: 2,
                                 line: 0,
                             },
                             closing_bracket_location: Location::SingleCharacter {
-                                char: 9,
+                                char: 8,
                                 line: 0,
-                            }
-                        })]
-                    }
-                }
+                            },
+                        }),
+                        opening_bracket_location: Location::DoubleCharacter { char: 0, line: 0 },
+                        closing_bracket_location: Location::SingleCharacter { char: 9, line: 0 }
+                    })]
+                })
             }
         );
     }
@@ -1374,7 +1393,7 @@ mod tests {
         assert_eq!(
             parse_object("!{home-${_object}-content}"),
             ObjectAst {
-                root: Object::Anchor {
+                root: Object::Anchor(Anchor {
                     name: Word {
                         fragments: vec![
                             WordFragment::String(StringLiteral {
@@ -1386,18 +1405,16 @@ mod tests {
                                 }
                             }),
                             WordFragment::Interpolation(Interpolation {
-                                content: Object::Name {
-                                    name: Word {
-                                        fragments: vec![WordFragment::String(StringLiteral {
-                                            content: "_object".to_string(),
-                                            location: Location::VariableLength {
-                                                char: 9,
-                                                line: 0,
-                                                length: 7,
-                                            }
-                                        })]
-                                    }
-                                },
+                                content: Object::Name(Word {
+                                    fragments: vec![WordFragment::String(StringLiteral {
+                                        content: "_object".to_string(),
+                                        location: Location::VariableLength {
+                                            char: 9,
+                                            line: 0,
+                                            length: 7,
+                                        }
+                                    })]
+                                }),
                                 opening_bracket_location: Location::DoubleCharacter {
                                     char: 7,
                                     line: 0,
@@ -1419,7 +1436,7 @@ mod tests {
                     },
                     opening_bracket_location: Location::DoubleCharacter { char: 0, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 25, line: 0 },
-                }
+                })
             }
         );
     }
@@ -1482,7 +1499,7 @@ mod tests {
                         })]
                     },
                     arguments: vec![FunctionArgument {
-                        object: Object::String(StringLiteral {
+                        argument: Argument::String(StringLiteral {
                             content: "test".to_string(),
                             location: Location::VariableLength {
                                 char: 10,
@@ -1516,18 +1533,16 @@ mod tests {
                                 },
                             }),
                             WordFragment::Interpolation(Interpolation {
-                                content: Object::Name {
-                                    name: Word {
-                                        fragments: vec![WordFragment::String(StringLiteral {
-                                            content: "_type".to_string(),
-                                            location: Location::VariableLength {
-                                                char: 5,
-                                                line: 0,
-                                                length: 5,
-                                            },
-                                        })]
-                                    },
-                                },
+                                content: Object::Name(Word {
+                                    fragments: vec![WordFragment::String(StringLiteral {
+                                        content: "_type".to_string(),
+                                        location: Location::VariableLength {
+                                            char: 5,
+                                            line: 0,
+                                            length: 5,
+                                        },
+                                    })]
+                                }),
                                 opening_bracket_location: Location::DoubleCharacter {
                                     char: 3,
                                     line: 0,
@@ -1565,7 +1580,7 @@ mod tests {
                     },
                     arguments: vec![
                         FunctionArgument {
-                            object: Object::String(StringLiteral {
+                            argument: Argument::String(StringLiteral {
                                 content: "test".to_string(),
                                 location: Location::VariableLength {
                                     char: 13,
@@ -1576,7 +1591,7 @@ mod tests {
                             comma_location: Some(Location::SingleCharacter { char: 21, line: 0 })
                         },
                         FunctionArgument {
-                            object: Object::String(StringLiteral {
+                            argument: Argument::String(StringLiteral {
                                 content: "test2".to_string(),
                                 location: Location::VariableLength {
                                     char: 23,
@@ -1594,78 +1609,82 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_parse_nested_global_function() {
-        assert_eq!(
-            parse_object("is_string(concat('hello', 'world'))"),
-            ObjectAst {
-                root: Object::Function(Function {
-                    name: Word {
-                        fragments: vec![WordFragment::String(StringLiteral {
-                            content: "is_string".to_string(),
-                            location: Location::VariableLength {
-                                char: 0,
-                                line: 0,
-                                length: 9,
-                            },
-                        })]
-                    },
-                    arguments: vec![FunctionArgument {
-                        object: Object::Function(Function {
-                            name: Word {
-                                fragments: vec![WordFragment::String(StringLiteral {
-                                    content: "concat".to_string(),
-                                    location: Location::VariableLength {
-                                        char: 10,
-                                        line: 0,
-                                        length: 6,
-                                    },
-                                })]
-                            },
-                            arguments: vec![
-                                FunctionArgument {
-                                    object: Object::String(StringLiteral {
-                                        content: "hello".to_string(),
-                                        location: Location::VariableLength {
-                                            char: 17,
-                                            line: 0,
-                                            length: 7,
-                                        },
-                                    }),
-                                    comma_location: Some(Location::SingleCharacter {
-                                        char: 24,
-                                        line: 0
-                                    })
-                                },
-                                FunctionArgument {
-                                    object: Object::String(StringLiteral {
-                                        content: "world".to_string(),
-                                        location: Location::VariableLength {
-                                            char: 26,
-                                            line: 0,
-                                            length: 7,
-                                        },
-                                    }),
-                                    comma_location: None,
-                                }
-                            ],
-                            opening_bracket_location: Location::SingleCharacter {
-                                char: 16,
-                                line: 0
-                            },
-                            closing_bracket_location: Location::SingleCharacter {
-                                char: 33,
-                                line: 0
-                            },
-                        }),
-                        comma_location: None
-                    }],
-                    opening_bracket_location: Location::SingleCharacter { char: 9, line: 0 },
-                    closing_bracket_location: Location::SingleCharacter { char: 34, line: 0 },
-                })
-            }
-        );
-    }
+    // TODO: I don't think this is possible, it would have to be like this:
+    //
+    //       is_string(${concat('hello', 'world')})
+    //
+    // #[test]
+    // fn test_parse_nested_global_function() {
+    //     assert_eq!(
+    //         parse_object("is_string(concat('hello', 'world'))"),
+    //         ObjectAst {
+    //             root: Object::Function(Function {
+    //                 name: Word {
+    //                     fragments: vec![WordFragment::String(StringLiteral {
+    //                         content: "is_string".to_string(),
+    //                         location: Location::VariableLength {
+    //                             char: 0,
+    //                             line: 0,
+    //                             length: 9,
+    //                         },
+    //                     })]
+    //                 },
+    //                 arguments: vec![FunctionArgument {
+    //                     argument: Object::Function(Function {
+    //                         name: Word {
+    //                             fragments: vec![WordFragment::String(StringLiteral {
+    //                                 content: "concat".to_string(),
+    //                                 location: Location::VariableLength {
+    //                                     char: 10,
+    //                                     line: 0,
+    //                                     length: 6,
+    //                                 },
+    //                             })]
+    //                         },
+    //                         arguments: vec![
+    //                             FunctionArgument {
+    //                                 argument: Object::String(StringLiteral {
+    //                                     content: "hello".to_string(),
+    //                                     location: Location::VariableLength {
+    //                                         char: 17,
+    //                                         line: 0,
+    //                                         length: 7,
+    //                                     },
+    //                                 }),
+    //                                 comma_location: Some(Location::SingleCharacter {
+    //                                     char: 24,
+    //                                     line: 0
+    //                                 })
+    //                             },
+    //                             FunctionArgument {
+    //                                 argument: Object::String(StringLiteral {
+    //                                     content: "world".to_string(),
+    //                                     location: Location::VariableLength {
+    //                                         char: 26,
+    //                                         line: 0,
+    //                                         length: 7,
+    //                                     },
+    //                                 }),
+    //                                 comma_location: None,
+    //                             }
+    //                         ],
+    //                         opening_bracket_location: Location::SingleCharacter {
+    //                             char: 16,
+    //                             line: 0
+    //                         },
+    //                         closing_bracket_location: Location::SingleCharacter {
+    //                             char: 33,
+    //                             line: 0
+    //                         },
+    //                     }),
+    //                     comma_location: None
+    //                 }],
+    //                 opening_bracket_location: Location::SingleCharacter { char: 9, line: 0 },
+    //                 closing_bracket_location: Location::SingleCharacter { char: 34, line: 0 },
+    //             })
+    //         }
+    //     );
+    // }
 
     #[test]
     fn test_parse_simple_field_access() {
@@ -1673,18 +1692,16 @@ mod tests {
             parse_object("_string.length"),
             ObjectAst {
                 root: Object::FieldAccess {
-                    object: Box::new(Object::Name {
-                        name: Word {
-                            fragments: vec![WordFragment::String(StringLiteral {
-                                content: "_string".to_string(),
-                                location: Location::VariableLength {
-                                    char: 0,
-                                    line: 0,
-                                    length: 7,
-                                },
-                            })]
-                        }
-                    }),
+                    object: Box::new(Object::Name(Word {
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "_string".to_string(),
+                            location: Location::VariableLength {
+                                char: 0,
+                                line: 0,
+                                length: 7,
+                            },
+                        })]
+                    })),
                     field: Word {
                         fragments: vec![WordFragment::String(StringLiteral {
                             content: "length".to_string(),
@@ -1718,18 +1735,16 @@ mod tests {
             parse_object("_string.length()"),
             ObjectAst {
                 root: Object::MethodAccess {
-                    object: Box::new(Object::Name {
-                        name: Word {
-                            fragments: vec![WordFragment::String(StringLiteral {
-                                content: "_string".to_string(),
-                                location: Location::VariableLength {
-                                    char: 0,
-                                    line: 0,
-                                    length: 7,
-                                },
-                            })]
-                        }
-                    }),
+                    object: Box::new(Object::Name(Word {
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "_string".to_string(),
+                            location: Location::VariableLength {
+                                char: 0,
+                                line: 0,
+                                length: 7,
+                            },
+                        })]
+                    })),
                     function: Function {
                         name: Word {
                             fragments: vec![WordFragment::String(StringLiteral {
@@ -1757,26 +1772,24 @@ mod tests {
             parse_object("_strings[0]"),
             ObjectAst {
                 root: Object::ArrayAccess {
-                    object: Box::new(Object::Name {
-                        name: Word {
-                            fragments: vec![WordFragment::String(StringLiteral {
-                                content: "_strings".to_string(),
-                                location: Location::VariableLength {
-                                    char: 0,
-                                    line: 0,
-                                    length: 8,
-                                },
-                            })]
-                        }
-                    }),
-                    index: Expression::Number {
+                    object: Box::new(Object::Name(Word {
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "_strings".to_string(),
+                            location: Location::VariableLength {
+                                char: 0,
+                                line: 0,
+                                length: 8,
+                            },
+                        })]
+                    })),
+                    index: Expression::Number(Number {
                         content: "0".to_string(),
                         location: Location::VariableLength {
                             char: 9,
                             line: 0,
                             length: 1,
                         }
-                    },
+                    }),
                     opening_bracket_location: Location::SingleCharacter { char: 8, line: 0 },
                     closing_bracket_location: Location::SingleCharacter { char: 10, line: 0 }
                 }
@@ -1790,27 +1803,25 @@ mod tests {
             parse_object("_strings[+1]"),
             ObjectAst {
                 root: Object::ArrayAccess {
-                    object: Box::new(Object::Name {
-                        name: Word {
-                            fragments: vec![WordFragment::String(StringLiteral {
-                                content: "_strings".to_string(),
-                                location: Location::VariableLength {
-                                    char: 0,
-                                    line: 0,
-                                    length: 8,
-                                },
-                            })]
-                        }
-                    }),
+                    object: Box::new(Object::Name(Word {
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "_strings".to_string(),
+                            location: Location::VariableLength {
+                                char: 0,
+                                line: 0,
+                                length: 8,
+                            },
+                        })]
+                    })),
                     index: Expression::SignedExpression {
-                        expression: Box::new(Expression::Number {
+                        expression: Box::new(Expression::Number(Number {
                             content: "1".to_string(),
                             location: Location::VariableLength {
                                 char: 10,
                                 line: 0,
                                 length: 1,
                             }
-                        }),
+                        })),
                         sign: Sign::Plus,
                         sign_location: Location::SingleCharacter { char: 9, line: 0 },
                     },
@@ -1826,14 +1837,14 @@ mod tests {
         assert_eq!(
             parse_expression("123"),
             ExpressionAst {
-                root: Expression::Number {
+                root: Expression::Number(Number {
                     content: "123".to_string(),
                     location: Location::VariableLength {
                         char: 0,
                         line: 0,
                         length: 3,
                     }
-                }
+                })
             }
         );
     }
@@ -1844,14 +1855,14 @@ mod tests {
             parse_expression("-13.5e-2"),
             ExpressionAst {
                 root: Expression::SignedExpression {
-                    expression: Box::new(Expression::Number {
+                    expression: Box::new(Expression::Number(Number {
                         content: "13.5e-2".to_string(),
                         location: Location::VariableLength {
                             char: 1,
                             line: 0,
                             length: 7,
                         }
-                    }),
+                    })),
                     sign: Sign::Minus,
                     sign_location: Location::SingleCharacter { char: 0, line: 0 },
                 }
@@ -1867,14 +1878,14 @@ mod tests {
                 root: Expression::SignedExpression {
                     expression: Box::new(Expression::BracketedExpression {
                         expression: Box::new(Expression::SignedExpression {
-                            expression: Box::new(Expression::Number {
+                            expression: Box::new(Expression::Number(Number {
                                 content: "6E+2".to_string(),
                                 location: Location::VariableLength {
                                     char: 5,
                                     line: 0,
                                     length: 4,
                                 }
-                            }),
+                            })),
                             sign: Sign::Minus,
                             sign_location: Location::SingleCharacter { char: 4, line: 0 },
                         }),
@@ -1894,23 +1905,23 @@ mod tests {
             parse_expression("6 + 9"),
             ExpressionAst {
                 root: Expression::BinaryOperation {
-                    left: Box::new(Expression::Number {
+                    left: Box::new(Expression::Number(Number {
                         content: "6".to_string(),
                         location: Location::VariableLength {
                             char: 0,
                             line: 0,
                             length: 1,
                         }
-                    }),
+                    })),
                     operator: ExpressionOperator::Addition,
-                    right: Box::new(Expression::Number {
+                    right: Box::new(Expression::Number(Number {
                         content: "9".to_string(),
                         location: Location::VariableLength {
                             char: 4,
                             line: 0,
                             length: 1,
                         }
-                    }),
+                    })),
                     operator_location: Location::SingleCharacter { char: 2, line: 0 }
                 }
             }
@@ -1935,35 +1946,35 @@ mod tests {
             ExpressionAst {
                 root: Expression::BinaryOperation {
                     left: Box::new(Expression::BinaryOperation {
-                        left: Box::new(Expression::Number {
+                        left: Box::new(Expression::Number(Number {
                             content: "1".to_string(),
                             location: Location::VariableLength {
                                 char: 0,
                                 line: 0,
                                 length: 1,
                             }
-                        }),
+                        })),
                         operator: ExpressionOperator::Addition,
-                        right: Box::new(Expression::Number {
+                        right: Box::new(Expression::Number(Number {
                             content: "2".to_string(),
                             location: Location::VariableLength {
                                 char: 4,
                                 line: 0,
                                 length: 1,
                             }
-                        }),
+                        })),
                         operator_location: Location::SingleCharacter { char: 2, line: 0 }
                     }),
                     operator: ExpressionOperator::Addition,
                     right: Box::new(Expression::SignedExpression {
-                        expression: Box::new(Expression::Number {
+                        expression: Box::new(Expression::Number(Number {
                             content: "3".to_string(),
                             location: Location::VariableLength {
                                 char: 9,
                                 line: 0,
                                 length: 1,
                             }
-                        }),
+                        })),
                         sign: Sign::Minus,
                         sign_location: Location::SingleCharacter { char: 8, line: 0 },
                     }),
@@ -1979,33 +1990,33 @@ mod tests {
             parse_expression("6 + 10 / 2"),
             ExpressionAst {
                 root: Expression::BinaryOperation {
-                    left: Box::new(Expression::Number {
+                    left: Box::new(Expression::Number(Number {
                         content: "6".to_string(),
                         location: Location::VariableLength {
                             char: 0,
                             line: 0,
                             length: 1,
                         }
-                    }),
+                    })),
                     operator: ExpressionOperator::Addition,
                     right: Box::new(Expression::BinaryOperation {
-                        left: Box::new(Expression::Number {
+                        left: Box::new(Expression::Number(Number {
                             content: "10".to_string(),
                             location: Location::VariableLength {
                                 char: 4,
                                 line: 0,
                                 length: 2,
                             }
-                        }),
+                        })),
                         operator: ExpressionOperator::Division,
-                        right: Box::new(Expression::Number {
+                        right: Box::new(Expression::Number(Number {
                             content: "2".to_string(),
                             location: Location::VariableLength {
                                 char: 9,
                                 line: 0,
                                 length: 1,
                             }
-                        }),
+                        })),
                         operator_location: Location::SingleCharacter { char: 7, line: 0 }
                     }),
                     operator_location: Location::SingleCharacter { char: 2, line: 0 }
@@ -2020,69 +2031,69 @@ mod tests {
             parse_expression("1 + 2 / 3 * 4 ^ 5 % 6"),
             ExpressionAst {
                 root: Expression::BinaryOperation {
-                    left: Box::new(Expression::Number {
+                    left: Box::new(Expression::Number(Number {
                         content: "1".to_string(),
                         location: Location::VariableLength {
                             char: 0,
                             line: 0,
                             length: 1,
                         }
-                    }),
+                    })),
                     operator: ExpressionOperator::Addition,
                     right: Box::new(Expression::BinaryOperation {
                         left: Box::new(Expression::BinaryOperation {
                             left: Box::new(Expression::BinaryOperation {
-                                left: Box::new(Expression::Number {
+                                left: Box::new(Expression::Number(Number {
                                     content: "2".to_string(),
                                     location: Location::VariableLength {
                                         char: 4,
                                         line: 0,
                                         length: 1,
                                     }
-                                }),
+                                })),
                                 operator: ExpressionOperator::Division,
-                                right: Box::new(Expression::Number {
+                                right: Box::new(Expression::Number(Number {
                                     content: "3".to_string(),
                                     location: Location::VariableLength {
                                         char: 8,
                                         line: 0,
                                         length: 1,
                                     }
-                                }),
+                                })),
                                 operator_location: Location::SingleCharacter { char: 6, line: 0 }
                             }),
                             operator: ExpressionOperator::Multiplication,
                             right: Box::new(Expression::BinaryOperation {
-                                left: Box::new(Expression::Number {
+                                left: Box::new(Expression::Number(Number {
                                     content: "4".to_string(),
                                     location: Location::VariableLength {
                                         char: 12,
                                         line: 0,
                                         length: 1,
                                     }
-                                }),
+                                })),
                                 operator: ExpressionOperator::Power,
-                                right: Box::new(Expression::Number {
+                                right: Box::new(Expression::Number(Number {
                                     content: "5".to_string(),
                                     location: Location::VariableLength {
                                         char: 16,
                                         line: 0,
                                         length: 1,
                                     }
-                                }),
+                                })),
                                 operator_location: Location::SingleCharacter { char: 14, line: 0 }
                             }),
                             operator_location: Location::SingleCharacter { char: 10, line: 0 }
                         }),
                         operator: ExpressionOperator::Modulo,
-                        right: Box::new(Expression::Number {
+                        right: Box::new(Expression::Number(Number {
                             content: "6".to_string(),
                             location: Location::VariableLength {
                                 char: 20,
                                 line: 0,
                                 length: 1,
                             }
-                        }),
+                        })),
                         operator_location: Location::SingleCharacter { char: 18, line: 0 }
                     }),
                     operator_location: Location::SingleCharacter { char: 2, line: 0 }
@@ -2104,22 +2115,22 @@ mod tests {
                             length: 4,
                         }
                     }),
-                    left: Box::new(Expression::Number {
+                    left: Box::new(Expression::Number(Number {
                         content: "1".to_string(),
                         location: Location::VariableLength {
                             char: 7,
                             line: 0,
                             length: 1
                         }
-                    }),
-                    right: Box::new(Expression::Number {
+                    })),
+                    right: Box::new(Expression::Number(Number {
                         content: "2".to_string(),
                         location: Location::VariableLength {
                             char: 11,
                             line: 0,
                             length: 1
                         }
-                    }),
+                    })),
                     question_mark_location: Location::SingleCharacter { char: 5, line: 0 },
                     colon_location: Location::SingleCharacter { char: 9, line: 0 },
                 },
@@ -2264,18 +2275,16 @@ mod tests {
                     left: Box::new(Comparable::Object(Interpolation {
                         opening_bracket_location: Location::DoubleCharacter { char: 0, line: 0 },
                         closing_bracket_location: Location::SingleCharacter { char: 6, line: 0 },
-                        content: Object::Name {
-                            name: Word {
-                                fragments: vec![WordFragment::String(StringLiteral {
-                                    content: "test".to_string(),
-                                    location: Location::VariableLength {
-                                        char: 2,
-                                        line: 0,
-                                        length: 4
-                                    }
-                                })]
-                            }
-                        }
+                        content: Object::Name(Word {
+                            fragments: vec![WordFragment::String(StringLiteral {
+                                content: "test".to_string(),
+                                location: Location::VariableLength {
+                                    char: 2,
+                                    line: 0,
+                                    length: 4
+                                }
+                            })]
+                        })
                     })),
                     operator: ComparissonOperator::Equal,
                     right: Box::new(Comparable::Condition(Condition::True {
@@ -2308,34 +2317,26 @@ mod tests {
                         })]
                     },
                     arguments: vec![FunctionArgument {
-                        object: Object::Name {
-                            name: Word {
-                                fragments: vec![WordFragment::Interpolation(Interpolation {
-                                    content: Object::Name {
-                                        name: Word {
-                                            fragments: vec![WordFragment::String(
-                                                StringLiteral {
-                                                    content: "_test".to_string(),
-                                                    location: Location::VariableLength {
-                                                        char: 9,
-                                                        line: 0,
-                                                        length: 5
-                                                    }
-                                                }
-                                            )]
-                                        }
-                                    },
-                                    opening_bracket_location: Location::DoubleCharacter {
-                                        char: 7,
-                                        line: 0
-                                    },
-                                    closing_bracket_location: Location::SingleCharacter {
-                                        char: 14,
-                                        line: 0
-                                    },
+                        argument: Argument::Object(Interpolation {
+                            content: Object::Name(Word {
+                                fragments: vec![WordFragment::String(StringLiteral {
+                                    content: "_test".to_string(),
+                                    location: Location::VariableLength {
+                                        char: 9,
+                                        line: 0,
+                                        length: 5
+                                    }
                                 })]
-                            }
-                        },
+                            }),
+                            opening_bracket_location: Location::DoubleCharacter {
+                                char: 7,
+                                line: 0
+                            },
+                            closing_bracket_location: Location::SingleCharacter {
+                                char: 14,
+                                line: 0
+                            },
+                        }),
                         comma_location: None
                     }],
                     opening_bracket_location: Location::SingleCharacter { char: 6, line: 0 },
@@ -2351,23 +2352,23 @@ mod tests {
             parse_condition("3 >= 4"),
             ConditionAst {
                 root: Condition::Comparisson {
-                    left: Box::new(Comparable::Expression(Expression::Number {
+                    left: Box::new(Comparable::Expression(Expression::Number(Number {
                         content: "3".to_string(),
                         location: Location::VariableLength {
                             char: 0,
                             line: 0,
                             length: 1
                         }
-                    })),
+                    }))),
                     operator: ComparissonOperator::GreaterThanOrEqual,
-                    right: Box::new(Comparable::Expression(Expression::Number {
+                    right: Box::new(Comparable::Expression(Expression::Number(Number {
                         content: "4".to_string(),
                         location: Location::VariableLength {
                             char: 5,
                             line: 0,
                             length: 1
                         }
-                    })),
+                    }))),
                     operator_location: Location::DoubleCharacter { char: 2, line: 0 }
                 }
             }
@@ -2381,23 +2382,23 @@ mod tests {
             ConditionAst {
                 root: Condition::BinaryOperation {
                     left: Box::new(Condition::Comparisson {
-                        left: Box::new(Comparable::Expression(Expression::Number {
+                        left: Box::new(Comparable::Expression(Expression::Number(Number {
                             content: "3".to_string(),
                             location: Location::VariableLength {
                                 char: 0,
                                 line: 0,
                                 length: 1
                             }
-                        })),
+                        }))),
                         operator: ComparissonOperator::Unequal,
-                        right: Box::new(Comparable::Expression(Expression::Number {
+                        right: Box::new(Comparable::Expression(Expression::Number(Number {
                             content: "4".to_string(),
                             location: Location::VariableLength {
                                 char: 5,
                                 line: 0,
                                 length: 1
                             }
-                        })),
+                        }))),
                         operator_location: Location::DoubleCharacter { char: 2, line: 0 }
                     }),
                     operator: ConditionOperator::And,

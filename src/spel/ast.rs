@@ -25,15 +25,9 @@ impl Display for Identifier {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Object {
-    Anchor {
-        name: Word,
-        opening_bracket_location: Location,
-        closing_bracket_location: Location,
-    },
+    Anchor(Anchor),
     Function(Function),
-    Name {
-        name: Word,
-    },
+    Name(Word),
     Null(Null),
     String(StringLiteral),
     FieldAccess {
@@ -57,13 +51,15 @@ pub(crate) enum Object {
 impl Display for Object {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
         return match self {
-            Object::Anchor { name, .. } => name.fmt(formatter),
+            Object::Anchor(anchor) => anchor.fmt(formatter),
             Object::Function(function) => function.fmt(formatter),
-            Object::Name { name } => name.fmt(formatter),
+            Object::Name(name) => name.fmt(formatter),
             Object::String(inner) => inner.fmt(formatter),
             Object::Null(inner) => inner.fmt(formatter),
             Object::FieldAccess { object, field, .. } => write!(formatter, "{}.{}", object, field),
-            Object::MethodAccess { object, function, .. } => {
+            Object::MethodAccess {
+                object, function, ..
+            } => {
                 object.fmt(formatter)?;
                 formatter.write_str(".")?;
                 function.fmt(formatter)
@@ -99,14 +95,52 @@ impl Display for Function {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub(crate) struct Anchor {
+    pub(crate) name: Word,
+    pub(crate) opening_bracket_location: Location,
+    pub(crate) closing_bracket_location: Location,
+}
+
+impl Display for Anchor {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("!{")?;
+        self.name.fmt(formatter)?;
+        formatter.write_str("}")
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct FunctionArgument {
-    pub(crate) object: Object,
+    pub(crate) argument: Argument,
     pub(crate) comma_location: Option<Location>,
 }
 
 impl Display for FunctionArgument {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
-        self.object.fmt(formatter)
+        self.argument.fmt(formatter)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum Argument {
+    String(StringLiteral),
+    Anchor(Anchor),
+    Object(Interpolation),
+    Null(Null),
+    Number(Number),
+    SignedNumber(SignedNumber),
+}
+
+impl Display for Argument {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Argument::String(string) => string.fmt(formatter),
+            Argument::Anchor(anchor) => anchor.fmt(formatter),
+            Argument::Object(object) => object.fmt(formatter),
+            Argument::Null(null) => null.fmt(formatter),
+            Argument::Number(number) => number.fmt(formatter),
+            Argument::SignedNumber(number) => number.fmt(formatter),
+        }
     }
 }
 
@@ -179,10 +213,7 @@ impl Display for Null {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Expression {
-    Number {
-        content: String,
-        location: Location,
-    },
+    Number(Number),
     Object(Box<Interpolation>),
     SignedExpression {
         expression: Box<Expression>,
@@ -212,7 +243,7 @@ pub(crate) enum Expression {
 impl Display for Expression {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
         return match self {
-            Expression::Number { content, .. } => formatter.write_str(content),
+            Expression::Number(number) => number.fmt(formatter),
             Expression::Object(interpolation) => interpolation.fmt(formatter),
             Expression::SignedExpression {
                 expression, sign, ..
@@ -237,6 +268,32 @@ impl Display for Expression {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub(crate) struct Number {
+    pub(crate) content: String,
+    pub(crate) location: Location,
+}
+
+impl Display for Number {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str(&self.content)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct SignedNumber {
+    pub(crate) sign: Sign,
+    pub(crate) sign_location: Location,
+    pub(crate) number: Number,
+}
+
+impl Display for SignedNumber {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+        self.sign.fmt(formatter)?;
+        self.number.fmt(formatter)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Sign {
     Plus,
     Minus,
@@ -245,8 +302,8 @@ pub(crate) enum Sign {
 impl Display for Sign {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
         return formatter.write_str(match self {
-            Sign::Plus { .. } => "+",
-            Sign::Minus { .. } => "-",
+            Sign::Plus => "+",
+            Sign::Minus => "-",
         });
     }
 }
@@ -306,7 +363,7 @@ pub(crate) enum Condition {
     False {
         location: Location,
     },
-    Object(Box<Interpolation>),
+    Object(Interpolation),
     Function(Function),
     BinaryOperation {
         left: Box<Condition>,
@@ -617,7 +674,7 @@ impl Display for UriFileExtension {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Regex {
-    pub(crate) location: Location
+    pub(crate) location: Location,
 }
 
 #[cfg(test)]
@@ -640,18 +697,16 @@ mod tests {
                             }
                         }),
                         WordFragment::Interpolation(Interpolation {
-                            content: Object::Name {
-                                name: Word {
-                                    fragments: vec![WordFragment::String(StringLiteral {
-                                        content: "nice".to_string(),
-                                        location: Location::VariableLength {
-                                            line: 0,
-                                            char: 11,
-                                            length: 4,
-                                        }
-                                    })]
-                                }
-                            },
+                            content: Object::Name(Word {
+                                fragments: vec![WordFragment::String(StringLiteral {
+                                    content: "nice".to_string(),
+                                    location: Location::VariableLength {
+                                        line: 0,
+                                        char: 11,
+                                        length: 4,
+                                    }
+                                })]
+                            }),
                             opening_bracket_location: Location::DoubleCharacter {
                                 line: 0,
                                 char: 9
