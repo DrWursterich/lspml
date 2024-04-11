@@ -178,7 +178,7 @@ impl Parser {
                 Some(_char) => {
                     length += 1;
                     self.scanner.pop();
-                },
+                }
                 None => {
                     return Ok(ast::Regex {
                         location: Location::VariableLength {
@@ -544,6 +544,7 @@ impl Parser {
                     ast::Comparable::Object(interpolation) => {
                         ast::Condition::Object(Box::new(interpolation))
                     }
+                    ast::Comparable::Function(function) => ast::Condition::Function(function),
                     comparable => {
                         return Err(anyhow::anyhow!("unexpected {}", comparable.r#type()))
                     }
@@ -2286,6 +2287,60 @@ mod tests {
                     })),
                     operator_location: Location::DoubleCharacter { char: 8, line: 0 }
                 }
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_function_condition() {
+        assert_eq!(
+            parse_condition("isNull(${_test})"),
+            ConditionAst {
+                root: Condition::Function(Function {
+                    name: Word {
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "isNull".to_string(),
+                            location: Location::VariableLength {
+                                char: 0,
+                                line: 0,
+                                length: 6
+                            }
+                        })]
+                    },
+                    arguments: vec![FunctionArgument {
+                        object: Object::Name {
+                            name: Word {
+                                fragments: vec![WordFragment::Interpolation(Interpolation {
+                                    content: Object::Name {
+                                        name: Word {
+                                            fragments: vec![WordFragment::String(
+                                                StringLiteral {
+                                                    content: "_test".to_string(),
+                                                    location: Location::VariableLength {
+                                                        char: 9,
+                                                        line: 0,
+                                                        length: 5
+                                                    }
+                                                }
+                                            )]
+                                        }
+                                    },
+                                    opening_bracket_location: Location::DoubleCharacter {
+                                        char: 7,
+                                        line: 0
+                                    },
+                                    closing_bracket_location: Location::SingleCharacter {
+                                        char: 14,
+                                        line: 0
+                                    },
+                                })]
+                            }
+                        },
+                        comma_location: None
+                    }],
+                    opening_bracket_location: Location::SingleCharacter { char: 6, line: 0 },
+                    closing_bracket_location: Location::SingleCharacter { char: 15, line: 0 }
+                })
             }
         );
     }

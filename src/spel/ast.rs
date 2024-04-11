@@ -307,6 +307,7 @@ pub(crate) enum Condition {
         location: Location,
     },
     Object(Box<Interpolation>),
+    Function(Function),
     BinaryOperation {
         left: Box<Condition>,
         operator: ConditionOperator,
@@ -386,6 +387,7 @@ impl Display for Condition {
             Condition::True { .. } => formatter.write_str("true"),
             Condition::False { .. } => formatter.write_str("false"),
             Condition::Object(interpolation) => interpolation.fmt(formatter),
+            Condition::Function(function) => function.fmt(formatter),
             Condition::BracketedCondition { condition, .. } => write!(formatter, "({})", condition),
             Condition::BinaryOperation {
                 left,

@@ -333,7 +333,7 @@ fn index_tag(
                                         err
                                     );
                                 }
-                            }
+                            },
                             grammar::TagAttributeType::String => match parser.parse_text() {
                                 Ok(result) => {
                                     let position = value_node.start_position();
@@ -616,6 +616,7 @@ fn index_condition(condition: &ast::Condition, token_collector: &mut SpelTokenCo
                 &vec![],
             );
         }
+        ast::Condition::Function(function) => index_function(function, token_collector),
         ast::Condition::BinaryOperation {
             left,
             right,
@@ -715,15 +716,12 @@ fn index_uri(uri: &ast::Uri, token_collector: &mut SpelTokenCollector) {
     };
 }
 
-fn index_regex(
-    regex: &ast::Regex,
-    token_collector: &mut SpelTokenCollector,
-) {
+fn index_regex(regex: &ast::Regex, token_collector: &mut SpelTokenCollector) {
     token_collector.add(
         &regex.location,
         // &SemanticTokenType::ENUM_MEMBER,
         &SemanticTokenType::REGEXP,
-        &vec![]
+        &vec![],
     );
 }
 
