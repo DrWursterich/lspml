@@ -1,5 +1,5 @@
 use super::{
-    ast::{self, ConditionAst, ExpressionAst, Location},
+    ast::{self, ConditionAst, ExpressionAst, Location, StringLiteral, WordFragment},
     Scanner,
 };
 use crate::spel::ast::ObjectAst;
@@ -502,9 +502,9 @@ impl Parser {
                                     }),
                                     name => {
                                         return Err(anyhow::anyhow!(
-                                        "objects in comparissons have to be interpolated. Try \"${{{}}}\"",
-                                        name
-                                    ));
+                                            "objects in comparissons have to be interpolated. Try `${{{}}}`",
+                                            name
+                                        ));
                                     }
                                 }
                             }
@@ -525,7 +525,7 @@ impl Parser {
                     ast::Object::Function(function) => ast::Comparable::Function(function),
                     object => {
                         return Err(anyhow::anyhow!(
-                            "objects in comparissons have to be interpolated. Try \"${{{}}}\"",
+                            "objects in comparissons have to be interpolated. Try `${{{}}}`",
                             object
                         ))
                     }
@@ -988,26 +988,23 @@ impl Parser {
 
     fn parse_name_or_global_function(&mut self) -> Result<ast::Object> {
         let name = self.parse_word()?;
-        // TODO: there probably is a better way...
-        match &name.fragments[0] {
-            ast::WordFragment::String(ast::StringLiteral { content, location })
-                if name.fragments.len() == 1 && content == "null" =>
-            {
+        let mut result = None;
+        if let [ast::WordFragment::String(ast::StringLiteral { content, location })] =
+            &name.fragments[..]
+        {
+            if content == "null" {
                 return Ok(ast::Object::Null(ast::Null {
                     location: location.clone(),
                 }));
             }
-            _ => {}
-        }
-        self.scanner.skip_whitespace();
-        let next = self.scanner.peek();
-        let mut result = match next {
-            Some(&'(') => {
+            self.scanner.skip_whitespace();
+            if let Some(&'(') = self.scanner.peek() {
                 let start = self.scanner.cursor as u16;
                 let arguments = self.parse_function_arguments()?;
-                ast::Object::Function(ast::Function {
-                    name,
+                result = Some(ast::Object::Function(ast::Function {
+                    name: content.to_string(),
                     arguments,
+                    name_location: location.clone(),
                     opening_bracket_location: Location::SingleCharacter {
                         char: start,
                         line: 0,
@@ -1016,10 +1013,11 @@ impl Parser {
                         char: self.scanner.cursor as u16 - 1,
                         line: 0,
                     },
-                })
+                }));
             }
-            _ => ast::Object::Name(name),
-        };
+        }
+        let mut result = result.unwrap_or(ast::Object::Name(name));
+        self.scanner.skip_whitespace();
         loop {
             match self.scanner.peek() {
                 Some('[') => {
@@ -1055,16 +1053,20 @@ impl Parser {
                     self.scanner.skip_whitespace();
                     let name = self.parse_word()?;
                     self.scanner.skip_whitespace();
-                    result = match self.scanner.peek() {
-                        Some('(') => {
+                    result = match (&name.fragments[..], self.scanner.peek()) {
+                        (
+                            [WordFragment::String(StringLiteral { content, location })],
+                            Some('('),
+                        ) => {
                             let start = self.scanner.cursor as u16;
                             let arguments = self.parse_function_arguments()?;
                             ast::Object::MethodAccess {
                                 object: Box::new(result),
                                 dot_location,
                                 function: ast::Function {
-                                    name,
+                                    name: content.to_string(),
                                     arguments,
+                                    name_location: location.clone(),
                                     opening_bracket_location: Location::SingleCharacter {
                                         char: start,
                                         line: 0,
@@ -1462,15 +1464,11 @@ mod tests {
             parse_object("flush()"),
             ObjectAst {
                 root: Object::Function(Function {
-                    name: Word {
-                        fragments: vec![WordFragment::String(StringLiteral {
-                            content: "flush".to_string(),
-                            location: Location::VariableLength {
-                                char: 0,
-                                line: 0,
-                                length: 5,
-                            },
-                        })]
+                    name: "flush".to_string(),
+                    name_location: Location::VariableLength {
+                        char: 0,
+                        line: 0,
+                        length: 5,
                     },
                     arguments: vec![],
                     opening_bracket_location: Location::SingleCharacter { char: 5, line: 0 },
@@ -1486,15 +1484,11 @@ mod tests {
             parse_object("is_string('test')"),
             ObjectAst {
                 root: Object::Function(Function {
-                    name: Word {
-                        fragments: vec![WordFragment::String(StringLiteral {
-                            content: "is_string".to_string(),
-                            location: Location::VariableLength {
-                                char: 0,
-                                line: 0,
-                                length: 9,
-                            },
-                        })]
+                    name: "is_string".to_string(),
+                    name_location: Location::VariableLength {
+                        char: 0,
+                        line: 0,
+                        length: 9,
                     },
                     arguments: vec![FunctionArgument {
                         argument: Argument::String(StringLiteral {
@@ -1515,66 +1509,16 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_interpolated_global_function() {
-        assert_eq!(
-            parse_object("is_${_type}()"),
-            ObjectAst {
-                root: Object::Function(Function {
-                    name: Word {
-                        fragments: vec![
-                            WordFragment::String(StringLiteral {
-                                content: "is_".to_string(),
-                                location: Location::VariableLength {
-                                    char: 0,
-                                    line: 0,
-                                    length: 3,
-                                },
-                            }),
-                            WordFragment::Interpolation(Interpolation {
-                                content: Object::Name(Word {
-                                    fragments: vec![WordFragment::String(StringLiteral {
-                                        content: "_type".to_string(),
-                                        location: Location::VariableLength {
-                                            char: 5,
-                                            line: 0,
-                                            length: 5,
-                                        },
-                                    })]
-                                }),
-                                opening_bracket_location: Location::DoubleCharacter {
-                                    char: 3,
-                                    line: 0,
-                                },
-                                closing_bracket_location: Location::SingleCharacter {
-                                    char: 10,
-                                    line: 0,
-                                },
-                            })
-                        ]
-                    },
-                    arguments: vec![],
-                    opening_bracket_location: Location::SingleCharacter { char: 11, line: 0 },
-                    closing_bracket_location: Location::SingleCharacter { char: 12, line: 0 },
-                })
-            }
-        );
-    }
-
-    #[test]
     fn test_parse_global_function_with_excessive_whitespace() {
         assert_eq!(
             parse_object("\tis_string (\t'test'  , 'test2' ) "),
             ObjectAst {
                 root: Object::Function(Function {
-                    name: Word {
-                        fragments: vec![WordFragment::String(StringLiteral {
-                            content: "is_string".to_string(),
-                            location: Location::VariableLength {
-                                char: 1,
-                                line: 0,
-                                length: 9,
-                            },
-                        })]
+                    name: "is_string".to_string(),
+                    name_location: Location::VariableLength {
+                        char: 1,
+                        line: 0,
+                        length: 9,
                     },
                     arguments: vec![
                         FunctionArgument {
@@ -1744,15 +1688,11 @@ mod tests {
                         })]
                     })),
                     function: Function {
-                        name: Word {
-                            fragments: vec![WordFragment::String(StringLiteral {
-                                content: "length".to_string(),
-                                location: Location::VariableLength {
-                                    char: 8,
-                                    line: 0,
-                                    length: 6,
-                                },
-                            })]
+                        name: "length".to_string(),
+                        name_location: Location::VariableLength {
+                            char: 8,
+                            line: 0,
+                            length: 6,
                         },
                         arguments: vec![],
                         opening_bracket_location: Location::SingleCharacter { char: 14, line: 0 },
@@ -2304,15 +2244,11 @@ mod tests {
             parse_condition("isNull(${_test})"),
             ConditionAst {
                 root: Condition::Function(Function {
-                    name: Word {
-                        fragments: vec![WordFragment::String(StringLiteral {
-                            content: "isNull".to_string(),
-                            location: Location::VariableLength {
-                                char: 0,
-                                line: 0,
-                                length: 6
-                            }
-                        })]
+                    name: "isNull".to_string(),
+                    name_location: Location::VariableLength {
+                        char: 0,
+                        line: 0,
+                        length: 6
                     },
                     arguments: vec![FunctionArgument {
                         argument: Argument::Object(Interpolation {

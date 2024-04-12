@@ -678,10 +678,9 @@ fn index_condition(condition: &ast::Condition, token_collector: &mut SpelTokenCo
 }
 
 fn index_function(function: &ast::Function, token_collector: &mut SpelTokenCollector) {
-    index_word(
-        &function.name,
-        token_collector,
-        Some(SemanticTokenType::METHOD),
+    token_collector.add(
+        &function.name_location,
+        &SemanticTokenType::METHOD,
         &vec![],
     );
     token_collector.add(
@@ -700,7 +699,6 @@ fn index_function(function: &ast::Function, token_collector: &mut SpelTokenColle
             ast::Argument::Number(number) => index_number(&number, token_collector),
             ast::Argument::SignedNumber(number) => index_signed_number(&number, token_collector),
         }
-        // index_object(&arg.argument, token_collector);
         if let Some(comma_location) = &arg.comma_location {
             token_collector.add(&comma_location, &SemanticTokenType::OPERATOR, &vec![]);
         }

@@ -10,10 +10,7 @@ use crate::{
     command::ResponseErrorCode,
     document_store::{self, Document},
     spel::{
-        ast::{
-            Argument, Comparable, ComparissonOperator, Condition, ConditionAst, Function,
-            StringLiteral, Word, WordFragment,
-        },
+        ast::{Argument, Comparable, ComparissonOperator, Condition, ConditionAst, Function},
         parser::Parser,
     },
     CODE_ACTIONS,
@@ -260,11 +257,13 @@ fn parse_is_null(root: &Condition) -> Option<(String, String)> {
             right,
             ..
         } => match &**left {
-            Comparable::Condition(condition) => is_null_argument(&*condition)
-                .map(|argument| (argument, format!("{}", right).to_string())),
+            Comparable::Condition(condition) => {
+                is_null_argument(&*condition).map(|argument| (argument, right.to_string()))
+            }
             _ => match &**right {
-                Comparable::Condition(condition) => is_null_argument(&*condition)
-                    .map(|argument| (argument, format!("{}", left).to_string())),
+                Comparable::Condition(condition) => {
+                    is_null_argument(&*condition).map(|argument| (argument, left.to_string()))
+                }
                 _ => None,
             },
         },
@@ -275,19 +274,10 @@ fn parse_is_null(root: &Condition) -> Option<(String, String)> {
 fn is_null_argument(root: &Condition) -> Option<String> {
     match root {
         Condition::Function(Function {
-            name: Word { fragments },
-            arguments,
-            ..
-        }) if fragments.len() == 1 && arguments.len() == 1 => match &fragments[0] {
-            WordFragment::String(StringLiteral { content, .. }) if content == "isNull" => {
-                match &arguments[0].argument {
-                    Argument::Object(interpolation) => {
-                        Some(format!("{}", interpolation.content).to_string())
-                    }
-                    argument => Some(format!("{}", argument).to_string()),
-                }
-            }
-            _ => None,
+            name, arguments, ..
+        }) if arguments.len() == 1 && name == "isNull" => match &arguments[0].argument {
+            Argument::Object(interpolation) => Some(interpolation.content.to_string()),
+            argument => Some(argument.to_string()),
         },
         _ => None,
     }

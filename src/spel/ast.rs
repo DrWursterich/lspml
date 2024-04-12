@@ -71,15 +71,16 @@ impl Display for Object {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Function {
-    pub(crate) name: Word,
+    pub(crate) name: String,
     pub(crate) arguments: Vec<FunctionArgument>,
+    pub(crate) name_location: Location,
     pub(crate) opening_bracket_location: Location,
     pub(crate) closing_bracket_location: Location,
 }
 
 impl Display for Function {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
-        self.name.fmt(formatter)?;
+        formatter.write_str(&self.name)?;
         match self.arguments.len() {
             0 => formatter.write_str("()"),
             len => {
