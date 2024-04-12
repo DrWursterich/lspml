@@ -958,7 +958,7 @@ impl Parser {
                     line: 0,
                 },
             }),
-            Some(char) => Err(anyhow::anyhow!("unexpected char {}", char)),
+            Some(char) => Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
             None => Err(anyhow::anyhow!("unclosed interpolation")),
         };
     }
@@ -971,8 +971,8 @@ impl Parser {
         self.scanner.skip_whitespace();
         let result = self.parse_word()?;
         self.scanner.skip_whitespace();
-        return match self.scanner.take(&'}') {
-            true => Ok(ast::Anchor {
+        return match self.scanner.pop() {
+            Some('}') => Ok(ast::Anchor {
                 name: result,
                 opening_bracket_location: Location::DoubleCharacter {
                     char: start,
@@ -983,7 +983,8 @@ impl Parser {
                     line: 0,
                 },
             }),
-            false => Err(anyhow::anyhow!("unclosed interpolated anchor")),
+            Some(char) => Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
+            None => Err(anyhow::anyhow!("unclosed interpolated anchor")),
         };
     }
 
