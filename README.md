@@ -29,8 +29,8 @@ A work-in-progress language server for the sitepark markup language (spml).
     - uris
     - to be comparable (for `sp:if` and `sp:elseif` `eq`/`gt`/...)
 - code actions to:
-    - split `sp:if` `condition` into `name` and `eq`/`gt`/...
-    - join `sp:if` `name` and `eq`/`gt`/... into `condition`
+    - split `sp:if` `condition` into `name` and `eq`/`gt`/`isNull`/...
+    - join `sp:if` `name` and `eq`/`gt`/`isNull`/... into `condition`
 
 ## commandline
 

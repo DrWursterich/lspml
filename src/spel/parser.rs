@@ -542,9 +542,7 @@ impl Parser {
             None => {
                 let condition = match comparable {
                     ast::Comparable::Condition(condition) => condition,
-                    ast::Comparable::Object(interpolation) => {
-                        ast::Condition::Object(interpolation)
-                    }
+                    ast::Comparable::Object(interpolation) => ast::Condition::Object(interpolation),
                     ast::Comparable::Function(function) => ast::Condition::Function(function),
                     comparable => {
                         return Err(anyhow::anyhow!("unexpected {}", comparable.r#type()))
