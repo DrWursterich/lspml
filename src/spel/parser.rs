@@ -1174,9 +1174,15 @@ impl Parser {
                         })
                         .map(ast::Argument::SignedNumber)
                 }
-                Some('n') => self.parse_null_literal().map(ast::Argument::Null),
-                Some(char) => Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
-                None => Err(anyhow::anyhow!("unexpected end")),
+                Some(_) => match self.parse_name_or_global_function()? {
+                    ast::Object::Function(function) => Ok(ast::Argument::Function(function)),
+                    ast::Object::Null(null) => Ok(ast::Argument::Null(null)),
+                    object => Err(anyhow::anyhow!(
+                        "objects in function arguments have to be interpolated. Try `${{{}}}`",
+                        object
+                    )),
+                },
+                None => Err(anyhow::anyhow!("unclosed function arguments")),
             }?;
             self.scanner.skip_whitespace();
             match self.scanner.pop() {
@@ -1551,82 +1557,70 @@ mod tests {
         );
     }
 
-    // TODO: I don't think this is possible, it would have to be like this:
-    //
-    //       is_string(${concat('hello', 'world')})
-    //
-    // #[test]
-    // fn test_parse_nested_global_function() {
-    //     assert_eq!(
-    //         parse_object("is_string(concat('hello', 'world'))"),
-    //         ObjectAst {
-    //             root: Object::Function(Function {
-    //                 name: Word {
-    //                     fragments: vec![WordFragment::String(StringLiteral {
-    //                         content: "is_string".to_string(),
-    //                         location: Location::VariableLength {
-    //                             char: 0,
-    //                             line: 0,
-    //                             length: 9,
-    //                         },
-    //                     })]
-    //                 },
-    //                 arguments: vec![FunctionArgument {
-    //                     argument: Object::Function(Function {
-    //                         name: Word {
-    //                             fragments: vec![WordFragment::String(StringLiteral {
-    //                                 content: "concat".to_string(),
-    //                                 location: Location::VariableLength {
-    //                                     char: 10,
-    //                                     line: 0,
-    //                                     length: 6,
-    //                                 },
-    //                             })]
-    //                         },
-    //                         arguments: vec![
-    //                             FunctionArgument {
-    //                                 argument: Object::String(StringLiteral {
-    //                                     content: "hello".to_string(),
-    //                                     location: Location::VariableLength {
-    //                                         char: 17,
-    //                                         line: 0,
-    //                                         length: 7,
-    //                                     },
-    //                                 }),
-    //                                 comma_location: Some(Location::SingleCharacter {
-    //                                     char: 24,
-    //                                     line: 0
-    //                                 })
-    //                             },
-    //                             FunctionArgument {
-    //                                 argument: Object::String(StringLiteral {
-    //                                     content: "world".to_string(),
-    //                                     location: Location::VariableLength {
-    //                                         char: 26,
-    //                                         line: 0,
-    //                                         length: 7,
-    //                                     },
-    //                                 }),
-    //                                 comma_location: None,
-    //                             }
-    //                         ],
-    //                         opening_bracket_location: Location::SingleCharacter {
-    //                             char: 16,
-    //                             line: 0
-    //                         },
-    //                         closing_bracket_location: Location::SingleCharacter {
-    //                             char: 33,
-    //                             line: 0
-    //                         },
-    //                     }),
-    //                     comma_location: None
-    //                 }],
-    //                 opening_bracket_location: Location::SingleCharacter { char: 9, line: 0 },
-    //                 closing_bracket_location: Location::SingleCharacter { char: 34, line: 0 },
-    //             })
-    //         }
-    //     );
-    // }
+    #[test]
+    fn test_parse_nested_global_function() {
+        assert_eq!(
+            parse_object("is_string(concat('hello', 'world'))"),
+            ObjectAst {
+                root: Object::Function(Function {
+                    name: "is_string".to_string(),
+                    name_location: Location::VariableLength {
+                        char: 0,
+                        line: 0,
+                        length: 9,
+                    },
+                    arguments: vec![FunctionArgument {
+                        argument: Argument::Function(Function {
+                            name: "concat".to_string(),
+                            name_location: Location::VariableLength {
+                                char: 10,
+                                line: 0,
+                                length: 6,
+                            },
+                            arguments: vec![
+                                FunctionArgument {
+                                    argument: Argument::String(StringLiteral {
+                                        content: "hello".to_string(),
+                                        location: Location::VariableLength {
+                                            char: 17,
+                                            line: 0,
+                                            length: 7,
+                                        },
+                                    }),
+                                    comma_location: Some(Location::SingleCharacter {
+                                        char: 24,
+                                        line: 0
+                                    })
+                                },
+                                FunctionArgument {
+                                    argument: Argument::String(StringLiteral {
+                                        content: "world".to_string(),
+                                        location: Location::VariableLength {
+                                            char: 26,
+                                            line: 0,
+                                            length: 7,
+                                        },
+                                    }),
+                                    comma_location: None,
+                                }
+                            ],
+                            opening_bracket_location: Location::SingleCharacter {
+                                char: 16,
+                                line: 0
+                            },
+                            closing_bracket_location: Location::SingleCharacter {
+                                char: 33,
+                                line: 0
+                            },
+                        }),
+                        comma_location: None
+                    }],
+                    opening_bracket_location: Location::SingleCharacter { char: 9, line: 0 },
+                    closing_bracket_location: Location::SingleCharacter { char: 34, line: 0 },
+                })
+            }
+        );
+    }
 
     #[test]
     fn test_parse_simple_field_access() {

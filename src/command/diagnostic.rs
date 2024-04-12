@@ -226,7 +226,7 @@ fn validate_tag(
                                         ..Default::default()
                                     });
                                 }
-                            }
+                            },
                             grammar::TagAttributeType::String => match parser.parse_text() {
                                 Ok(_result) => {}
                                 Err(err) => {
@@ -243,7 +243,7 @@ fn validate_tag(
                                         ..Default::default()
                                     });
                                 }
-                            }
+                            },
                             grammar::TagAttributeType::Query => {}
                             grammar::TagAttributeType::Uri => match parser.parse_uri() {
                                 Ok(_result) => {}
@@ -261,7 +261,7 @@ fn validate_tag(
                                         ..Default::default()
                                     });
                                 }
-                            }
+                            },
                         }
                     };
                 }

@@ -124,23 +124,25 @@ impl Display for FunctionArgument {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Argument {
-    String(StringLiteral),
     Anchor(Anchor),
-    Object(Interpolation),
+    Function(Function),
     Null(Null),
     Number(Number),
+    Object(Interpolation),
     SignedNumber(SignedNumber),
+    String(StringLiteral),
 }
 
 impl Display for Argument {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
-            Argument::String(string) => string.fmt(formatter),
             Argument::Anchor(anchor) => anchor.fmt(formatter),
-            Argument::Object(object) => object.fmt(formatter),
+            Argument::Function(function) => function.fmt(formatter),
             Argument::Null(null) => null.fmt(formatter),
             Argument::Number(number) => number.fmt(formatter),
+            Argument::Object(object) => object.fmt(formatter),
             Argument::SignedNumber(number) => number.fmt(formatter),
+            Argument::String(string) => string.fmt(formatter),
         }
     }
 }

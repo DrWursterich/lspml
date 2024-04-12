@@ -678,11 +678,7 @@ fn index_condition(condition: &ast::Condition, token_collector: &mut SpelTokenCo
 }
 
 fn index_function(function: &ast::Function, token_collector: &mut SpelTokenCollector) {
-    token_collector.add(
-        &function.name_location,
-        &SemanticTokenType::METHOD,
-        &vec![],
-    );
+    token_collector.add(&function.name_location, &SemanticTokenType::METHOD, &vec![]);
     token_collector.add(
         &function.opening_bracket_location,
         &SemanticTokenType::OPERATOR,
@@ -690,14 +686,15 @@ fn index_function(function: &ast::Function, token_collector: &mut SpelTokenColle
     );
     for arg in function.arguments.iter() {
         match &arg.argument {
-            ast::Argument::String(string) => index_string(&string, token_collector),
             ast::Argument::Anchor(anchor) => index_anchor(&anchor, token_collector),
+            ast::Argument::Function(function) => index_function(&function, token_collector),
+            ast::Argument::Null(null) => index_null(&null, token_collector),
+            ast::Argument::Number(number) => index_number(&number, token_collector),
             ast::Argument::Object(interpolation) => {
                 index_interpolation(&interpolation, token_collector)
             }
-            ast::Argument::Null(null) => index_null(&null, token_collector),
-            ast::Argument::Number(number) => index_number(&number, token_collector),
             ast::Argument::SignedNumber(number) => index_signed_number(&number, token_collector),
+            ast::Argument::String(string) => index_string(&string, token_collector),
         }
         if let Some(comma_location) = &arg.comma_location {
             token_collector.add(&comma_location, &SemanticTokenType::OPERATOR, &vec![]);
