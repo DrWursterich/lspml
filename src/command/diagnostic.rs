@@ -5,6 +5,7 @@ use crate::modules;
 use crate::parser;
 use crate::spel::parser::Parser;
 use anyhow::Result;
+use lsp_types::DiagnosticTag;
 use lsp_types::{Diagnostic, DiagnosticSeverity, DocumentDiagnosticParams, Position, Range, Url};
 use std::{collections::HashMap, path::Path, str::FromStr};
 use tree_sitter::Node;
@@ -80,6 +81,7 @@ fn validate_tag(
             severity: Some(DiagnosticSeverity::INFORMATION),
             range: node_range(node),
             source: Some("lspml".to_string()),
+            tags: Some(vec![DiagnosticTag::DEPRECATED]),
             ..Default::default()
         });
     }
@@ -309,6 +311,7 @@ fn validate_tag(
                     severity: Some(DiagnosticSeverity::INFORMATION),
                     range: node_range(node),
                     source: Some("lspml".to_string()),
+                    tags: Some(vec![DiagnosticTag::DEPRECATED]),
                     ..Default::default()
                 });
             }

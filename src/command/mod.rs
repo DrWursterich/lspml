@@ -185,7 +185,7 @@ pub(crate) fn action(request: Request) -> Result<Message> {
                             message: format!("{}", err),
                             code: ResponseErrorCode::RequestFailed as i32,
                             data: None,
-                        })
+                        }),
                     },
                 },
                 Err(err) => err.to_response(request.id),

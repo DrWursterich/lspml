@@ -2,7 +2,13 @@ use anyhow::Result;
 use clap::Parser;
 use lsp_server::{Connection, Message};
 use lsp_types::{
-    CancelParams, CodeActionKind, CodeActionOptions, CodeActionProviderCapability, CompletionOptions, CompletionOptionsCompletionItem, DiagnosticOptions, DiagnosticServerCapabilities, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams, HoverOptions, HoverProviderCapability, InitializeParams, OneOf, SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions
+    CancelParams, CodeActionKind, CodeActionOptions, CodeActionProviderCapability,
+    CompletionOptions, CompletionOptionsCompletionItem, DiagnosticOptions,
+    DiagnosticServerCapabilities, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, HoverOptions, HoverProviderCapability,
+    InitializeParams, OneOf, SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
+    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions,
 };
 use std::{error::Error, fs::File, str::FromStr};
 use structured_logger::Builder;
@@ -49,7 +55,7 @@ pub(crate) const TOKEN_MODIFIERS: &'static [SemanticTokenModifier] = &[
 
 pub(crate) const CODE_ACTIONS: &'static [CodeActionKind] = &[
     CodeActionKind::new("refactor.name_to_condition"),
-    CodeActionKind::new("refactor.condition_to_name")
+    CodeActionKind::new("refactor.condition_to_name"),
 ];
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
@@ -156,7 +162,7 @@ fn main_loop(
                 })?;
             }
             Message::Response(response) => {
-                log::info!("got unknown response: {response:?}");
+                log::info!("got unknown response: {:?}", response);
             }
             Message::Notification(notification) => match notification.method.as_str() {
                 "textDocument/didChange" => {
@@ -175,7 +181,7 @@ fn main_loop(
                     let params: CancelParams = serde_json::from_value(notification.params).unwrap();
                     log::debug!("attempted to cancel request {:?}", params.id);
                 }
-                _ => log::info!("got unknown notification: {notification:?}"),
+                _ => log::info!("got unknown notification: {:?}", notification),
             },
         }
     }
