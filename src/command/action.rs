@@ -82,15 +82,18 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
 fn collect_attributes<'a>(mut node: Node<'a>) -> HashMap<&'a str, Node<'a>> {
     let mut attributes = HashMap::new();
     loop {
-        match node.next_sibling().filter(|n| n.kind() != ">") {
-            Some(sibling) => {
-                attributes.insert(sibling.child(0).unwrap().kind(), sibling);
+        if let Some(sibling) = node
+            .next_sibling()
+            .filter(|n| n.kind().ends_with("_attribute"))
+        {
+            if let Some(value) = sibling.child(0) {
+                attributes.insert(value.kind(), sibling);
                 node = sibling;
+                continue;
             }
-            None => break,
-        };
+        }
+        return attributes;
     }
-    return attributes;
 }
 
 fn construct_generate_default_header<'a>(uri: &Url) -> CodeActionOrCommand {
