@@ -29,6 +29,7 @@ A work-in-progress language server for the sitepark markup language (spml).
     - uris
     - to be comparable (for `sp:if` and `sp:elseif` `eq`/`gt`/...)
 - code actions to:
+    - generate a default file header
     - split `sp:if` `condition` into `name` and `eq`/`gt`/`isNull`/...
     - join `sp:if` `name` and `eq`/`gt`/`isNull`/... into `condition`
 

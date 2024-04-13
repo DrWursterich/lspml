@@ -13,10 +13,18 @@ use crate::{
         ast::{Argument, Comparable, ComparissonOperator, Condition, ConditionAst, Function},
         parser::Parser,
     },
-    CODE_ACTIONS,
+    CodeActionImplementation,
 };
 
 use super::LsError;
+
+const DEFAULT_HEADER: &str = concat!(
+    "<%@ page language=\"java\" pageEncoding=\"UTF-8\" contentType=\"text/html; charset=UTF-8\"\n",
+    "%><%@ taglib uri=\"http://www.sitepark.com/taglibs/core\" prefix=\"sp\"\n",
+    "%><%@ taglib tagdir=\"/WEB-INF/tags/spt\" prefix=\"spt\"\n",
+    "%><%@ taglib tagdir=\"/WEB-INF/tags/tag\" prefix=\"tag\"\n",
+    "%>\n"
+);
 
 pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand>, LsError> {
     let uri = params.text_document.uri;
@@ -32,6 +40,17 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
                 };
             }),
     }?;
+    let mut actions = Vec::new();
+    let diagnostics = params.context.diagnostics;
+    if diagnostics.len() > 0 {
+        log::debug!("code action request carried diagnostics: {:?}", diagnostics);
+        match diagnostics[0].code {
+            Some(CodeActionImplementation::GENERATE_DEFAULT_HEADER_CODE) => {
+                actions.push(construct_generate_default_header(&uri))
+            }
+            _ => {}
+        }
+    }
     let node = document.tree.root_node().descendant_for_point_range(
         Point {
             row: params.range.start.line as usize,
@@ -42,7 +61,6 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
             column: params.range.end.character as usize,
         },
     );
-    let mut actions = Vec::new();
     match node {
         Some(node) => match node.kind() {
             "if_tag_open" => {
@@ -73,6 +91,31 @@ fn collect_attributes<'a>(mut node: Node<'a>) -> HashMap<&'a str, Node<'a>> {
         };
     }
     return attributes;
+}
+
+fn construct_generate_default_header<'a>(uri: &Url) -> CodeActionOrCommand {
+    let document_start = Position {
+        line: 0,
+        character: 0,
+    };
+    return CodeActionOrCommand::CodeAction(CodeAction {
+        title: "generate default header".to_string(),
+        kind: Some(CodeActionImplementation::GenerateDefaultHeaders.to_kind()),
+        edit: Some(WorkspaceEdit {
+            changes: Some(HashMap::from([(
+                uri.clone(),
+                vec![TextEdit {
+                    range: Range {
+                        start: document_start,
+                        end: document_start,
+                    },
+                    new_text: DEFAULT_HEADER.to_string(),
+                }],
+            )])),
+            ..WorkspaceEdit::default()
+        }),
+        ..CodeAction::default()
+    });
 }
 
 fn construct_name_to_condition<'a>(
@@ -112,7 +155,7 @@ fn construct_name_to_condition<'a>(
                     };
                     return Some(CodeActionOrCommand::CodeAction(CodeAction {
                         title: format!("transform \"name\" and \"{}\" to \"condition\"", operator),
-                        kind: Some(CODE_ACTIONS[0].clone()),
+                        kind: Some(CodeActionImplementation::NameToCondition.to_kind()),
                         edit: Some(WorkspaceEdit {
                             changes: Some(HashMap::from([(
                                 uri.clone(),
@@ -202,7 +245,7 @@ fn construct_condition_to_name<'a>(
                             "transform \"condition\" to \"name\" and \"{}\"",
                             operator_name
                         ),
-                        kind: Some(CODE_ACTIONS[1].clone()),
+                        kind: Some(CodeActionImplementation::ConditionToName.to_kind()),
                         edit: Some(WorkspaceEdit {
                             changes: Some(HashMap::from([(
                                 uri.clone(),
@@ -220,7 +263,7 @@ fn construct_condition_to_name<'a>(
                     return parse_is_null(&root).map(|(name, value)| {
                         CodeActionOrCommand::CodeAction(CodeAction {
                             title: "transform \"condition\" to \"name\" and \"isNull\"".to_string(),
-                            kind: Some(CODE_ACTIONS[1].clone()),
+                            kind: Some(CodeActionImplementation::ConditionToName.to_kind()),
                             edit: Some(WorkspaceEdit {
                                 changes: Some(HashMap::from([(
                                     uri.clone(),

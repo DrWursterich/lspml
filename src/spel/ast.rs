@@ -85,6 +85,7 @@ impl Display for Function {
             0 => formatter.write_str("()"),
             len => {
                 formatter.write_str("(")?;
+                self.arguments[0].fmt(formatter)?;
                 for argument in &self.arguments[1..len] {
                     formatter.write_str(", ")?;
                     argument.fmt(formatter)?;

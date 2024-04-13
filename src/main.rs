@@ -6,11 +6,17 @@ use lsp_types::{
     CompletionOptions, CompletionOptionsCompletionItem, DiagnosticOptions,
     DiagnosticServerCapabilities, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DidSaveTextDocumentParams, HoverOptions, HoverProviderCapability,
-    InitializeParams, OneOf, SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions,
-    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
-    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions,
+    InitializeParams, NumberOrString, OneOf, SemanticTokenModifier, SemanticTokenType,
+    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability,
+    TextDocumentSyncKind, WorkDoneProgressOptions,
 };
-use std::{error::Error, fs::File, str::FromStr};
+use std::{
+    error::Error,
+    fmt::{Display, Formatter},
+    fs::File,
+    str::FromStr,
+};
 use structured_logger::Builder;
 mod command;
 mod document_store;
@@ -53,10 +59,41 @@ pub(crate) const TOKEN_MODIFIERS: &'static [SemanticTokenModifier] = &[
     SemanticTokenModifier::MODIFICATION,
 ];
 
-pub(crate) const CODE_ACTIONS: &'static [CodeActionKind] = &[
-    CodeActionKind::new("refactor.name_to_condition"),
-    CodeActionKind::new("refactor.condition_to_name"),
-];
+pub(crate) enum CodeActionImplementation {
+    GenerateDefaultHeaders,
+    NameToCondition,
+    ConditionToName,
+}
+
+impl CodeActionImplementation {
+    pub(crate) const GENERATE_DEFAULT_HEADER_CODE: NumberOrString = NumberOrString::Number(7126);
+
+    fn kinds() -> Vec<CodeActionKind> {
+        return vec![
+            CodeActionImplementation::GenerateDefaultHeaders.to_kind(),
+            CodeActionImplementation::NameToCondition.to_kind(),
+            CodeActionImplementation::ConditionToName.to_kind(),
+        ];
+    }
+
+    fn to_kind(self) -> CodeActionKind {
+        return CodeActionKind::new(match self {
+            CodeActionImplementation::GenerateDefaultHeaders => "refactor.generate_default_headers",
+            CodeActionImplementation::NameToCondition => "refactor.name_to_condition",
+            CodeActionImplementation::ConditionToName => "refactor.condition_to_name",
+        });
+    }
+}
+
+impl Display for CodeActionImplementation {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            CodeActionImplementation::GenerateDefaultHeaders => "refactor.generate_default_headers",
+            CodeActionImplementation::NameToCondition => "refactor.name_to_condition",
+            CodeActionImplementation::ConditionToName => "refactor.condition_to_name",
+        })
+    }
+}
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let opts = CommandLineOpts::parse();
@@ -109,7 +146,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
             },
         })),
         code_action_provider: Some(CodeActionProviderCapability::Options(CodeActionOptions {
-            code_action_kinds: Some(CODE_ACTIONS.to_vec()),
+            code_action_kinds: Some(CodeActionImplementation::kinds()),
             ..CodeActionOptions::default()
         })),
         ..ServerCapabilities::default()

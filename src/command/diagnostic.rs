@@ -1,14 +1,16 @@
-use super::{LsError, ResponseErrorCode};
-use crate::document_store;
-use crate::grammar;
-use crate::modules;
-use crate::parser;
-use crate::spel::parser::Parser;
-use anyhow::Result;
-use lsp_types::DiagnosticTag;
-use lsp_types::{Diagnostic, DiagnosticSeverity, DocumentDiagnosticParams, Position, Range, Url};
 use std::{collections::HashMap, path::Path, str::FromStr};
+
+use anyhow::Result;
+use lsp_types::{
+    Diagnostic, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticParams, Position, Range, Url,
+};
 use tree_sitter::Node;
+
+use crate::{
+    document_store, grammar, modules, parser, spel::parser::Parser, CodeActionImplementation,
+};
+
+use super::{LsError, ResponseErrorCode};
 
 pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnostic>, LsError> {
     let uri = params.text_document.uri;
@@ -39,6 +41,7 @@ fn validate_document(
     diagnositcs: &mut Vec<Diagnostic>,
     file: &Url,
 ) -> Result<()> {
+    validate_header(root, text, diagnositcs)?;
     for node in root.children(&mut root.walk()) {
         match node.kind() {
             "page_header" | "import_header" | "taglib_header" | "html_doctype" | "text"
@@ -64,6 +67,30 @@ fn validate_document(
                 }
             }?,
         }
+    }
+    return Ok(());
+}
+
+fn validate_header(root: Node, _text: &String, diagnositcs: &mut Vec<Diagnostic>) -> Result<()> {
+    if root.kind() != "document" {
+        let document_start = Position {
+            line: 0,
+            character: 0,
+        };
+        diagnositcs.push(Diagnostic {
+            source: Some("lspml".to_string()),
+            message: format!(
+                "missing atleast one header. Try generating one with the \"{}\" code-action",
+                CodeActionImplementation::GenerateDefaultHeaders
+            ),
+            range: Range {
+                start: document_start,
+                end: document_start,
+            },
+            code: Some(CodeActionImplementation::GENERATE_DEFAULT_HEADER_CODE),
+            severity: Some(DiagnosticSeverity::ERROR),
+            ..Default::default()
+        });
     }
     return Ok(());
 }
