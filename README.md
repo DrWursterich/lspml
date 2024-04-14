@@ -5,13 +5,20 @@ A work-in-progress language server for the sitepark markup language (spml).
 ## features
 
 - go to definition for variables and `<sp:include>` tag `uri` attributes
-- hover for documentation of most tags and attributes
+- hover for documentation of
+    - most tags
+    - most attributes
+    - attribute enum values
+    - global functions in spel attribute values
 - diagnostics on:
     - syntax errors
-    - spel syntax errors in attributes values
     - misplaced, unclosed and deprecated tags
     - duplicate, required and deprecated attributes / tag-bodies
     - nonexistent files in `<sp:include>` and similar tags
+    - sitepark markup expression language (spel):
+        - syntax errors
+        - nonexistent global functions
+        - incorrect argument counts for global functions
 - completion for:
     - tags
     - `</`, closing the last unclosed tag
