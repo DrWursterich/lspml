@@ -98,7 +98,7 @@ impl Display for Function {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Anchor {
-    pub(crate) name: Word,
+    pub(crate) name: Word, // TODO: anchors can contain dots!
     pub(crate) opening_bracket_location: Location,
     pub(crate) closing_bracket_location: Location,
 }

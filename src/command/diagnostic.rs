@@ -150,7 +150,11 @@ fn validate_tag(
                         match definition.r#type {
                             grammar::TagAttributeType::Comparable => {
                                 match parser.parse_comparable() {
-                                    Ok(_result) => {}
+                                    Ok(result) => validate_comparable(
+                                        result,
+                                        diagnostics,
+                                        &value_node.start_position(),
+                                    )?,
                                     Err(err) => {
                                         log::error!(
                                             "parse comparable \"{}\" failed: {}",
@@ -192,7 +196,11 @@ fn validate_tag(
                             }
                             grammar::TagAttributeType::Expression => {
                                 match parser.parse_expression_ast() {
-                                    Ok(_result) => {}
+                                    Ok(result) => validate_expression(
+                                        result.root,
+                                        diagnostics,
+                                        &value_node.start_position(),
+                                    )?,
                                     Err(err) => {
                                         log::error!(
                                             "parse expression \"{}\" failed: {}",
@@ -211,7 +219,11 @@ fn validate_tag(
                             }
                             grammar::TagAttributeType::Identifier => {
                                 match parser.parse_identifier() {
-                                    Ok(_result) => {}
+                                    Ok(result) => validate_identifier(
+                                        result,
+                                        diagnostics,
+                                        &value_node.start_position(),
+                                    )?,
                                     Err(err) => {
                                         log::error!(
                                             "parse identifier \"{}\" failed: {}",
@@ -229,7 +241,11 @@ fn validate_tag(
                                 }
                             }
                             grammar::TagAttributeType::Object => match parser.parse_object_ast() {
-                                Ok(_result) => {}
+                                Ok(result) => validate_object(
+                                    result.root,
+                                    diagnostics,
+                                    &value_node.start_position(),
+                                )?,
                                 Err(err) => {
                                     log::error!(
                                         "parse object \"{}\" failed: {}",
@@ -246,7 +262,11 @@ fn validate_tag(
                                 }
                             },
                             grammar::TagAttributeType::Regex => match parser.parse_regex() {
-                                Ok(_result) => {}
+                                Ok(result) => validate_regex(
+                                    result,
+                                    diagnostics,
+                                    &value_node.start_position(),
+                                )?,
                                 Err(err) => {
                                     log::error!(
                                         "parse regex \"{}\" failed: {}",
@@ -858,13 +878,104 @@ fn validate_tag(
     return Ok(());
 }
 
+fn validate_identifier(
+    identifier: ast::Identifier,
+    diagnostics: &mut Vec<Diagnostic>,
+    offset: &Point,
+) -> Result<()> {
+    match identifier {
+        ast::Identifier::Name(name) => {
+            validate_interpolations_in_word(name, diagnostics, offset)?;
+        },
+        ast::Identifier::FieldAccess { identifier, field, .. } => {
+            validate_identifier(*identifier, diagnostics, offset)?;
+            validate_interpolations_in_word(field, diagnostics, offset)?;
+        },
+    };
+    return Ok(());
+}
+
+fn validate_object(
+    object: ast::Object,
+    diagnostics: &mut Vec<Diagnostic>,
+    offset: &Point,
+) -> Result<()> {
+    match object {
+        ast::Object::Anchor(anchor) => {
+            validate_interpolations_in_word(anchor.name, diagnostics, offset)?;
+        }
+        ast::Object::Function(function) => validate_global_function(function, diagnostics, offset)?,
+        ast::Object::Name(name) => {
+            validate_interpolations_in_word(name, diagnostics, offset)?;
+        }
+        // ast::Object::Null(null) => todo!(),
+        // ast::Object::String(string) => todo!(),
+        ast::Object::FieldAccess {
+            object, /* field, */
+            ..
+        } => {
+            validate_object(*object, diagnostics, offset)?;
+        }
+        ast::Object::MethodAccess {
+            object, /* function, */
+            ..
+        } => {
+            validate_object(*object, diagnostics, offset)?;
+            // validate_method(*object, diagnostics, offset)?;
+        }
+        ast::Object::ArrayAccess { object, index, .. } => {
+            validate_object(*object, diagnostics, offset)?;
+            validate_expression(index, diagnostics, offset)?;
+        }
+        _ => {}
+    };
+    return Ok(());
+}
+
+fn validate_expression(
+    expression: ast::Expression,
+    diagnostics: &mut Vec<Diagnostic>,
+    offset: &Point,
+) -> Result<()> {
+    match expression {
+        // ast::Expression::Number(number) => todo!(),
+        ast::Expression::Object(interpolation) => {
+            validate_object(interpolation.content, diagnostics, offset)?;
+        }
+        ast::Expression::SignedExpression { expression, .. } => {
+            validate_expression(*expression, diagnostics, offset)?
+        }
+        ast::Expression::BracketedExpression { expression, .. } => {
+            validate_expression(*expression, diagnostics, offset)?
+        }
+        ast::Expression::BinaryOperation { left, right, .. } => {
+            validate_expression(*left, diagnostics, offset)?;
+            validate_expression(*right, diagnostics, offset)?;
+        }
+        ast::Expression::Ternary {
+            condition,
+            left,
+            right,
+            ..
+        } => {
+            validate_condition(*condition, diagnostics, offset)?;
+            validate_expression(*left, diagnostics, offset)?;
+            validate_expression(*right, diagnostics, offset)?;
+        }
+        _ => {}
+    };
+    return Ok(());
+}
+
 fn validate_condition(
     condition: ast::Condition,
     diagnostics: &mut Vec<Diagnostic>,
     offset: &Point,
 ) -> Result<()> {
     match condition {
-        // ast::Condition::Object(ast::Interpolation { content, .. } ) => {},
+        ast::Condition::Object(ast::Interpolation { content, .. }) => {
+            validate_object(content, diagnostics, offset)?;
+        }
         ast::Condition::Function(function) => {
             validate_global_function(function, diagnostics, offset)?
         }
@@ -894,11 +1005,15 @@ fn validate_comparable(
 ) -> Result<()> {
     match comparable {
         ast::Comparable::Condition(condition) => validate_condition(condition, diagnostics, offset),
-        // ast::Comparable::Expression(expression) => validate_global_function(function)?,
+        ast::Comparable::Expression(expression) => {
+            validate_expression(expression, diagnostics, offset)
+        }
         ast::Comparable::Function(function) => {
             validate_global_function(function, diagnostics, offset)
         }
-        // ast::Comparable::Object(object) => todo!(),
+        ast::Comparable::Object(interpolation) => {
+            validate_object(interpolation.content, diagnostics, offset)
+        }
         // ast::Comparable::String(string) => todo!(),
         // ast::Comparable::Null(null) => todo!(),
         _ => Ok(()),
@@ -975,6 +1090,46 @@ fn validate_global_function(
                 source: Some("lspml".to_string()),
                 ..Default::default()
             });
+        }
+    }
+    for argument in function.arguments {
+        match argument.argument {
+            ast::Argument::Anchor(anchor) => {
+            validate_interpolations_in_word(anchor.name, diagnostics, offset)?;
+            }
+            ast::Argument::Function(function) => {
+                validate_global_function(function, diagnostics, offset)?
+            }
+            // ast::Argument::Null(_) => todo!(),
+            // ast::Argument::Number(_) => todo!(),
+            ast::Argument::Object(interpolation) => {
+                validate_object(interpolation.content, diagnostics, offset)?
+            }
+            // ast::Argument::SignedNumber(_) => todo!(),
+            // ast::Argument::String(_) => todo!(),
+            _ => {}
+        };
+    }
+    return Ok(());
+}
+
+fn validate_regex(
+    _regex: ast::Regex,
+    _diagnostics: &mut Vec<Diagnostic>,
+    _offset: &Point,
+) -> Result<()> {
+    // TODO!
+    return Ok(());
+}
+
+fn validate_interpolations_in_word(
+    word: ast::Word,
+    diagnostics: &mut Vec<Diagnostic>,
+    offset: &Point,
+) -> Result<()> {
+    for fragment in word.fragments {
+        if let ast::WordFragment::Interpolation(interpolation) = fragment {
+            validate_object(interpolation.content, diagnostics, offset)?;
         }
     }
     return Ok(());
