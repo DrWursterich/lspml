@@ -4,10 +4,12 @@ use anyhow::Result;
 use lsp_types::{
     Diagnostic, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticParams, Position, Range, Url,
 };
-use tree_sitter::Node;
+use tree_sitter::{Node, Point};
 
 use crate::{
-    document_store, grammar, modules, parser, spel::parser::Parser, CodeActionImplementation,
+    document_store, grammar, modules, parser,
+    spel::{self, ast, parser::Parser},
+    CodeActionImplementation,
 };
 
 use super::{LsError, ResponseErrorCode};
@@ -26,27 +28,27 @@ pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnos
                 };
             }),
     }?;
-    let mut diagnositcs: Vec<Diagnostic> = Vec::new();
+    let mut diagnostics: Vec<Diagnostic> = Vec::new();
     let root = document.tree.root_node();
-    validate_document(root, &document.text, &mut diagnositcs, &uri).map_err(|err| LsError {
+    validate_document(root, &document.text, &mut diagnostics, &uri).map_err(|err| LsError {
         message: format!("failed to validate document: {}", err),
         code: ResponseErrorCode::RequestFailed,
     })?;
-    return Ok(diagnositcs);
+    return Ok(diagnostics);
 }
 
 fn validate_document(
     root: Node,
     text: &String,
-    diagnositcs: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<Diagnostic>,
     file: &Url,
 ) -> Result<()> {
-    validate_header(root, text, diagnositcs)?;
+    validate_header(root, text, diagnostics)?;
     for node in root.children(&mut root.walk()) {
         match node.kind() {
             "page_header" | "import_header" | "taglib_header" | "html_doctype" | "text"
             | "comment" | "xml_entity" => continue,
-            "ERROR" => diagnositcs.push(Diagnostic {
+            "ERROR" => diagnostics.push(Diagnostic {
                 source: Some("lspml".to_string()),
                 message: format!("unexpected \"{}\"", node.utf8_text(text.as_bytes())?),
                 range: node_range(node),
@@ -54,9 +56,9 @@ fn validate_document(
                 ..Default::default()
             }),
             "html_tag" | "html_option_tag" | "html_void_tag" | "xml_comment" | "java_tag"
-            | "script_tag" | "style_tag" => validate_children(node, &text, diagnositcs, file)?,
+            | "script_tag" | "style_tag" => validate_children(node, &text, diagnostics, file)?,
             _ => match &grammar::Tag::from_str(node.kind()) {
-                Ok(tag) => validate_tag(tag.properties(), node, &text, diagnositcs, file),
+                Ok(tag) => validate_tag(tag.properties(), node, &text, diagnostics, file),
                 Err(err) => {
                     log::info!(
                         "error while trying to interprete node \"{}\" as tag: {}",
@@ -71,13 +73,13 @@ fn validate_document(
     return Ok(());
 }
 
-fn validate_header(root: Node, _text: &String, diagnositcs: &mut Vec<Diagnostic>) -> Result<()> {
+fn validate_header(root: Node, _text: &String, diagnostics: &mut Vec<Diagnostic>) -> Result<()> {
     if root.kind() != "document" {
         let document_start = Position {
             line: 0,
             character: 0,
         };
-        diagnositcs.push(Diagnostic {
+        diagnostics.push(Diagnostic {
             source: Some("lspml".to_string()),
             message: format!(
                 "missing atleast one header. Try generating one with the \"{}\" code-action",
@@ -99,11 +101,11 @@ fn validate_tag(
     tag: grammar::TagProperties,
     node: Node,
     text: &String,
-    diagnositcs: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<Diagnostic>,
     file: &Url,
 ) -> Result<()> {
     if tag.deprecated {
-        diagnositcs.push(Diagnostic {
+        diagnostics.push(Diagnostic {
             message: format!("{} tag is deprecated", tag.name),
             severity: Some(DiagnosticSeverity::INFORMATION),
             range: node_range(node),
@@ -116,14 +118,14 @@ fn validate_tag(
     for child in node.children(&mut node.walk()) {
         match child.kind() {
             // may need to check on kind of missing child
-            _ if child.is_missing() => diagnositcs.push(Diagnostic {
+            _ if child.is_missing() => diagnostics.push(Diagnostic {
                 message: format!("{} is never closed", node.kind()),
                 severity: Some(DiagnosticSeverity::ERROR),
                 range: node_range(node),
                 source: Some("lspml".to_string()),
                 ..Default::default()
             }),
-            _ if child.is_error() => diagnositcs.push(Diagnostic {
+            _ if child.is_error() => diagnostics.push(Diagnostic {
                 message: format!("unexpected \"{}\"", child.utf8_text(text.as_bytes())?),
                 severity: Some(DiagnosticSeverity::ERROR),
                 range: node_range(child),
@@ -131,7 +133,7 @@ fn validate_tag(
                 ..Default::default()
             }),
             "html_void_tag" | "java_tag" | "script_tag" | "style_tag" => {}
-            "html_tag" | "html_option_tag" => validate_children(child, text, diagnositcs, file)?,
+            "html_tag" | "html_option_tag" => validate_children(child, text, diagnostics, file)?,
             kind if kind.ends_with("_attribute") => {
                 let attribute = parser::attribute_name_of(child, text).to_string();
                 let value = parser::attribute_value_of(child, text).to_string();
@@ -155,7 +157,7 @@ fn validate_tag(
                                             value_node.utf8_text(&text.as_bytes())?,
                                             err
                                         );
-                                        diagnositcs.push(Diagnostic {
+                                        diagnostics.push(Diagnostic {
                                             message: format!("invalid comparable: {}", err),
                                             severity: Some(DiagnosticSeverity::ERROR),
                                             range: node_range(value_node),
@@ -167,14 +169,18 @@ fn validate_tag(
                             }
                             grammar::TagAttributeType::Condition => {
                                 match parser.parse_condition_ast() {
-                                    Ok(_result) => {}
+                                    Ok(result) => validate_condition(
+                                        result.root,
+                                        diagnostics,
+                                        &value_node.start_position(),
+                                    )?,
                                     Err(err) => {
                                         log::error!(
                                             "parse condition \"{}\" failed: {}",
                                             value_node.utf8_text(&text.as_bytes())?,
                                             err
                                         );
-                                        diagnositcs.push(Diagnostic {
+                                        diagnostics.push(Diagnostic {
                                             message: format!("invalid condition: {}", err),
                                             severity: Some(DiagnosticSeverity::ERROR),
                                             range: node_range(value_node),
@@ -193,7 +199,7 @@ fn validate_tag(
                                             value_node.utf8_text(&text.as_bytes())?,
                                             err
                                         );
-                                        diagnositcs.push(Diagnostic {
+                                        diagnostics.push(Diagnostic {
                                             message: format!("invalid expression: {}", err),
                                             severity: Some(DiagnosticSeverity::ERROR),
                                             range: node_range(value_node),
@@ -212,7 +218,7 @@ fn validate_tag(
                                             value_node.utf8_text(&text.as_bytes())?,
                                             err
                                         );
-                                        diagnositcs.push(Diagnostic {
+                                        diagnostics.push(Diagnostic {
                                             message: format!("invalid identifier: {}", err),
                                             severity: Some(DiagnosticSeverity::ERROR),
                                             range: node_range(value_node),
@@ -230,7 +236,7 @@ fn validate_tag(
                                         value_node.utf8_text(&text.as_bytes())?,
                                         err
                                     );
-                                    diagnositcs.push(Diagnostic {
+                                    diagnostics.push(Diagnostic {
                                         message: format!("invalid object: {}", err),
                                         severity: Some(DiagnosticSeverity::ERROR),
                                         range: node_range(value_node),
@@ -247,7 +253,7 @@ fn validate_tag(
                                         value_node.utf8_text(&text.as_bytes())?,
                                         err
                                     );
-                                    diagnositcs.push(Diagnostic {
+                                    diagnostics.push(Diagnostic {
                                         message: format!("invalid regex: {}", err),
                                         severity: Some(DiagnosticSeverity::ERROR),
                                         range: node_range(value_node),
@@ -264,7 +270,7 @@ fn validate_tag(
                                         value_node.utf8_text(&text.as_bytes())?,
                                         err
                                     );
-                                    diagnositcs.push(Diagnostic {
+                                    diagnostics.push(Diagnostic {
                                         message: format!("invalid text: {}", err),
                                         severity: Some(DiagnosticSeverity::ERROR),
                                         range: node_range(value_node),
@@ -282,7 +288,7 @@ fn validate_tag(
                                         value_node.utf8_text(&text.as_bytes())?,
                                         err
                                     );
-                                    diagnositcs.push(Diagnostic {
+                                    diagnostics.push(Diagnostic {
                                         message: format!("invalid uri: {}", err),
                                         severity: Some(DiagnosticSeverity::ERROR),
                                         range: node_range(value_node),
@@ -295,7 +301,7 @@ fn validate_tag(
                     };
                 }
                 if attributes.contains_key(&attribute) {
-                    diagnositcs.push(Diagnostic {
+                    diagnostics.push(Diagnostic {
                         message: format!("duplicate {} attribute", attribute),
                         severity: Some(DiagnosticSeverity::WARNING),
                         range: node_range(child),
@@ -309,9 +315,9 @@ fn validate_tag(
             kind if kind.ends_with("_tag") => match &grammar::Tag::from_str(kind) {
                 Ok(child_tag) => {
                     if can_have_child(&tag, child_tag) {
-                        validate_tag(child_tag.properties(), child, text, diagnositcs, file)?;
+                        validate_tag(child_tag.properties(), child, text, diagnostics, file)?;
                     } else {
-                        diagnositcs.push(Diagnostic {
+                        diagnostics.push(Diagnostic {
                             message: format!(
                                 "unexpected {} tag",
                                 &kind[..kind.find("_tag").unwrap()]
@@ -327,13 +333,13 @@ fn validate_tag(
                     log::info!("expected sp or spt tag: {}", err);
                 }
             },
-            _ => validate_children(child, text, diagnositcs, file)?,
+            _ => validate_children(child, text, diagnostics, file)?,
         }
     }
     for rule in tag.attribute_rules {
         match rule {
             grammar::AttributeRule::Deprecated(name) if attributes.contains_key(*name) => {
-                diagnositcs.push(Diagnostic {
+                diagnostics.push(Diagnostic {
                     message: format!("attribute {} is deprecated", name),
                     severity: Some(DiagnosticSeverity::INFORMATION),
                     range: node_range(node),
@@ -345,7 +351,7 @@ fn validate_tag(
             grammar::AttributeRule::AtleastOneOf(names)
                 if !names.iter().any(|name| attributes.contains_key(*name)) =>
             {
-                diagnositcs.push(Diagnostic {
+                diagnostics.push(Diagnostic {
                     message: format!(
                         "requires atleast one of these attributes: {}",
                         names.join(", ")
@@ -364,7 +370,7 @@ fn validate_tag(
                     .collect();
                 match present.len() {
                     0 => {
-                        diagnositcs.push(Diagnostic {
+                        diagnostics.push(Diagnostic {
                             message: format!(
                                 "requires one of these attributes: {}",
                                 names.join(", ")
@@ -377,7 +383,7 @@ fn validate_tag(
                     }
                     1 => {}
                     _ => {
-                        diagnositcs.push(Diagnostic {
+                        diagnostics.push(Diagnostic {
                             message: format!(
                                 "requires only one of these attributes: {}",
                                 present.join(", ")
@@ -401,7 +407,7 @@ fn validate_tag(
                     .is_some_and(|tag| tag.kind().ends_with("_tag_close"));
                 match present.len() {
                     0 if !has_body => {
-                        diagnositcs.push(Diagnostic {
+                        diagnostics.push(Diagnostic {
                             message: format!(
                                 "requires either a tag-body or one of these attributes: {}",
                                 names.join(", ")
@@ -415,7 +421,7 @@ fn validate_tag(
                     0 if has_body => {}
                     1 if !has_body => {}
                     _ => {
-                        diagnositcs.push(Diagnostic {
+                        diagnostics.push(Diagnostic {
                             message: format!(
                                 "requires either a tag-body or only one of these attributes: {}",
                                 present.join(", ")
@@ -434,7 +440,7 @@ fn validate_tag(
                         .child(node.child_count() - 1)
                         .is_some_and(|tag| tag.kind().ends_with("_tag_close")) =>
             {
-                diagnositcs.push(Diagnostic {
+                diagnostics.push(Diagnostic {
                     message: format!("requires either a tag-body or the attribute {}", name,),
                     severity: Some(DiagnosticSeverity::ERROR),
                     range: node_range(node),
@@ -449,7 +455,7 @@ fn validate_tag(
                     .filter(|name| attributes.contains_key(*name))
                     .collect();
                 if present.len() > 1 {
-                    diagnositcs.push(Diagnostic {
+                    diagnostics.push(Diagnostic {
                         message: format!(
                             "can only have one of these attributes: {}",
                             present.join(", ")
@@ -472,7 +478,7 @@ fn validate_tag(
                     .is_some_and(|tag| tag.kind().ends_with("_tag_close"));
                 if has_body {
                     if present.len() > 0 {
-                        diagnositcs.push(Diagnostic {
+                        diagnostics.push(Diagnostic {
                             message: format!(
                                 "can only have either a tag-body or one of these attributes: {}",
                                 present.join(", ")
@@ -484,7 +490,7 @@ fn validate_tag(
                         });
                     }
                 } else if present.len() > 1 {
-                    diagnositcs.push(Diagnostic {
+                    diagnostics.push(Diagnostic {
                         message: format!(
                             "can only have one of these attributes: {}",
                             present.join(", ")
@@ -502,7 +508,7 @@ fn validate_tag(
                         .child(node.child_count() - 1)
                         .is_some_and(|tag| tag.kind().ends_with("_tag_close")) =>
             {
-                diagnositcs.push(Diagnostic {
+                diagnostics.push(Diagnostic {
                     message: format!("can only have either a tag-body or the {} attribute", name),
                     severity: Some(DiagnosticSeverity::WARNING),
                     range: node_range(node),
@@ -513,7 +519,7 @@ fn validate_tag(
             grammar::AttributeRule::OnlyWith(name1, name2)
                 if attributes.contains_key(*name1) && !attributes.contains_key(*name2) =>
             {
-                diagnositcs.push(Diagnostic {
+                diagnostics.push(Diagnostic {
                     message: format!("attribute {} is useless without attribute {}", name1, name2),
                     severity: Some(DiagnosticSeverity::WARNING),
                     range: node_range(node),
@@ -525,7 +531,7 @@ fn validate_tag(
                 if attributes.contains_key(*name)
                     && !names.iter().any(|name| attributes.contains_key(*name)) =>
             {
-                diagnositcs.push(Diagnostic {
+                diagnostics.push(Diagnostic {
                     message: format!(
                         "attribute {} is useless without one of these attributes: {}",
                         name,
@@ -544,7 +550,7 @@ fn validate_tag(
                         .child(node.child_count() - 1)
                         .is_some_and(|tag| tag.kind().ends_with("_tag_close")) =>
             {
-                diagnositcs.push(Diagnostic {
+                diagnostics.push(Diagnostic {
                     message: format!(
                         "attribute {} is useless without either a tag-body or one of these attributes: {}",
                         name,
@@ -557,7 +563,7 @@ fn validate_tag(
                 });
             }
             grammar::AttributeRule::Required(name) if !attributes.contains_key(*name) => {
-                diagnositcs.push(Diagnostic {
+                diagnostics.push(Diagnostic {
                     message: format!("missing required attribute {}", name),
                     severity: Some(DiagnosticSeverity::ERROR),
                     range: node_range(node),
@@ -582,7 +588,7 @@ fn validate_tag(
                         Some(module) => {
                             let file = format!("{}{}", module.path, uri);
                             if !Path::new(&file).exists() {
-                                diagnositcs.push(Diagnostic {
+                                diagnostics.push(Diagnostic {
                                     message: format!("included file {} does not exist", file),
                                     severity: Some(DiagnosticSeverity::ERROR),
                                     range: node_range(node),
@@ -592,7 +598,7 @@ fn validate_tag(
                             }
                         }
                         None => {
-                            diagnositcs.push(Diagnostic {
+                            diagnostics.push(Diagnostic {
                                 message: match module_value {
                                     Some("${module.id}") | None => {
                                         "current module not listed in module-file".to_string()
@@ -615,7 +621,7 @@ fn validate_tag(
                     .get(*name)
                     .is_some_and(|v| !values.contains(&v.as_str())) =>
             {
-                diagnositcs.push(Diagnostic {
+                diagnostics.push(Diagnostic {
                     message: format!(
                         "attribute {} should be one of these values: [{}]",
                         name,
@@ -632,7 +638,7 @@ fn validate_tag(
                     .get(*name)
                     .is_some_and(|v| !values.contains(&v.to_uppercase().as_str())) =>
             {
-                diagnositcs.push(Diagnostic {
+                diagnostics.push(Diagnostic {
                     message: format!(
                         "attribute {} should be one of these values: [{}]",
                         name,
@@ -648,7 +654,7 @@ fn validate_tag(
                 if attributes.contains_key(*name)
                     && !attributes.get(*attribute).is_some_and(|v| v == value) =>
             {
-                diagnositcs.push(Diagnostic {
+                diagnostics.push(Diagnostic {
                     message: format!(
                         "attribute {} is useless without attribute {} containing the value {}",
                         name, attribute, value
@@ -665,7 +671,7 @@ fn validate_tag(
                         .get(*attribute)
                         .is_some_and(|v| values.contains(&v.as_str())) =>
             {
-                diagnositcs.push(Diagnostic {
+                diagnostics.push(Diagnostic {
                     message: format!(
                         "attribute {} is useless without attribute {} containing one of these values: [{}]",
                         name, attribute, values.join(", ")
@@ -684,7 +690,7 @@ fn validate_tag(
                         .get(*attribute)
                         .is_some_and(|v| values.contains(&v.as_str())) =>
             {
-                diagnositcs.push(Diagnostic {
+                diagnostics.push(Diagnostic {
                     message: format!(
                         "tag-body is useless without attribute {} containing one of these values: [{}]",
                         attribute, values.join(", ")
@@ -699,7 +705,7 @@ fn validate_tag(
                 if attributes.get(*attribute).is_some_and(|v| v == value)
                     && !attributes.contains_key(*name) =>
             {
-                diagnositcs.push(Diagnostic {
+                diagnostics.push(Diagnostic {
                     message: format!(
                         "attribute {} is required when attribute {} is {}",
                         name, attribute, value
@@ -718,7 +724,7 @@ fn validate_tag(
                     .child(node.child_count() - 1)
                     .is_some_and(|tag| tag.kind().ends_with("_tag_close"));
                 if !has_attribute && !has_body {
-                    diagnositcs.push(Diagnostic {
+                    diagnostics.push(Diagnostic {
                         message: format!(
                             "either attribute {} or a tag-body is required when attribute {} is \"{}\"",
                             name,
@@ -731,7 +737,7 @@ fn validate_tag(
                         ..Default::default()
                     });
                 } else if has_attribute && has_body {
-                    diagnositcs.push(Diagnostic {
+                    diagnostics.push(Diagnostic {
                         message: format!(
                             "exactly one of attribute {} or a tag-body is required when attribute {} is \"{}\"",
                             name,
@@ -751,7 +757,7 @@ fn validate_tag(
                     .is_some_and(|v| values.contains(&v.as_str()))
                     && !attributes.contains_key(*name) =>
             {
-                diagnositcs.push(Diagnostic {
+                diagnostics.push(Diagnostic {
                     message: format!(
                         "attribute {} is required when attribute {} is either of [{}]",
                         name,
@@ -777,7 +783,7 @@ fn validate_tag(
                     .is_some_and(|tag| tag.kind().ends_with("_tag_close"));
                 match present.len() {
                     0 if !has_body => {
-                        diagnositcs.push(Diagnostic {
+                        diagnostics.push(Diagnostic {
                             message: format!(
                                 "when attribute {} is \"{}\" either a tag-body or exactly one of these attributes is required: [{}]",
                                 attribute, value, names.join(", ")
@@ -791,7 +797,7 @@ fn validate_tag(
                     0 if has_body => {}
                     1 if !has_body => {}
                     _ => {
-                        diagnositcs.push(Diagnostic {
+                        diagnostics.push(Diagnostic {
                             message: format!(
                                 "when attribute {} is \"{}\" only one of a tag-body and these attributes is required: [{}]",
                                 attribute, value, names.join(", ")
@@ -819,7 +825,7 @@ fn validate_tag(
                     .is_some_and(|tag| tag.kind().ends_with("_tag_close"));
                 match present.len() {
                     0 if !has_body => {
-                        diagnositcs.push(Diagnostic {
+                        diagnostics.push(Diagnostic {
                             message: format!(
                                 "when attribute {} is either of [{}] either a tag-body or exactly one of these attributes is required: [{}]",
                                 attribute, values.join(", "), names.join(", ")
@@ -833,7 +839,7 @@ fn validate_tag(
                     0 if has_body => {}
                     1 if !has_body => {}
                     _ => {
-                        diagnositcs.push(Diagnostic {
+                        diagnostics.push(Diagnostic {
                             message: format!(
                                 "when attribute {} is either of [{}] only one of a tag-body and these attributes is required: [{}]",
                                 attribute, values.join(", "), names.join(", ")
@@ -852,6 +858,128 @@ fn validate_tag(
     return Ok(());
 }
 
+fn validate_condition(
+    condition: ast::Condition,
+    diagnostics: &mut Vec<Diagnostic>,
+    offset: &Point,
+) -> Result<()> {
+    match condition {
+        // ast::Condition::Object(ast::Interpolation { content, .. } ) => {},
+        ast::Condition::Function(function) => {
+            validate_global_function(function, diagnostics, offset)?
+        }
+        ast::Condition::BracketedCondition { condition, .. } => {
+            validate_condition(*condition, diagnostics, offset)?
+        }
+        ast::Condition::NegatedCondition { condition, .. } => {
+            validate_condition(*condition, diagnostics, offset)?
+        }
+        ast::Condition::BinaryOperation { left, right, .. } => {
+            validate_condition(*left, diagnostics, offset)?;
+            validate_condition(*right, diagnostics, offset)?;
+        }
+        ast::Condition::Comparisson { left, right, .. } => {
+            validate_comparable(*left, diagnostics, offset)?;
+            validate_comparable(*right, diagnostics, offset)?;
+        }
+        _ => {}
+    };
+    return Ok(());
+}
+
+fn validate_comparable(
+    comparable: ast::Comparable,
+    diagnostics: &mut Vec<Diagnostic>,
+    offset: &Point,
+) -> Result<()> {
+    match comparable {
+        ast::Comparable::Condition(condition) => validate_condition(condition, diagnostics, offset),
+        // ast::Comparable::Expression(expression) => validate_global_function(function)?,
+        ast::Comparable::Function(function) => {
+            validate_global_function(function, diagnostics, offset)
+        }
+        // ast::Comparable::Object(object) => todo!(),
+        // ast::Comparable::String(string) => todo!(),
+        // ast::Comparable::Null(null) => todo!(),
+        _ => Ok(()),
+    }
+}
+
+fn validate_global_function(
+    function: ast::Function,
+    diagnostics: &mut Vec<Diagnostic>,
+    offset: &Point,
+) -> Result<()> {
+    let argument_count = function.arguments.len();
+    match spel::grammar::Function::from_str(function.name.as_str()) {
+        Ok(definition) => match definition.argument_number {
+            spel::grammar::ArgumentNumber::AtLeast(number) if argument_count < number => {
+                diagnostics.push(Diagnostic {
+                    message: format!(
+                        "invalid arguments number to \"{}\", expected {} or more but got {}",
+                        definition.name, number, argument_count,
+                    ),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    range: locations_range(
+                        &function.name_location,
+                        &function.closing_bracket_location,
+                        offset,
+                    ),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
+            spel::grammar::ArgumentNumber::Exactly(number) if argument_count != number => {
+                diagnostics.push(Diagnostic {
+                    message: format!(
+                        "invalid arguments number to \"{}\", expected {} but got {}",
+                        definition.name, number, argument_count,
+                    ),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    range: locations_range(
+                        &function.name_location,
+                        &function.closing_bracket_location,
+                        offset,
+                    ),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
+            spel::grammar::ArgumentNumber::None if argument_count > 0 => {
+                diagnostics.push(Diagnostic {
+                    message: format!(
+                        "invalid arguments number to \"{}\", expected 0 but got {}",
+                        definition.name, argument_count,
+                    ),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    range: locations_range(
+                        &function.name_location,
+                        &function.closing_bracket_location,
+                        offset,
+                    ),
+                    source: Some("lspml".to_string()),
+                    ..Default::default()
+                });
+            }
+            _ => {}
+        },
+        Err(err) => {
+            diagnostics.push(Diagnostic {
+                message: err.to_string(),
+                severity: Some(DiagnosticSeverity::ERROR),
+                range: locations_range(
+                    &function.name_location,
+                    &function.closing_bracket_location,
+                    offset,
+                ),
+                source: Some("lspml".to_string()),
+                ..Default::default()
+            });
+        }
+    }
+    return Ok(());
+}
+
 fn can_have_child(tag: &grammar::TagProperties, child: &grammar::Tag) -> bool {
     return match &tag.children {
         grammar::TagChildren::Any => true,
@@ -864,12 +992,12 @@ fn can_have_child(tag: &grammar::TagProperties, child: &grammar::Tag) -> bool {
 fn validate_children(
     node: Node,
     text: &String,
-    diagnositcs: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<Diagnostic>,
     file: &Url,
 ) -> Result<()> {
     for child in node.children(&mut node.walk()) {
         match child.kind() {
-            "ERROR" => diagnositcs.push(Diagnostic {
+            "ERROR" => diagnostics.push(Diagnostic {
                 message: format!("unexpected \"{}\"", child.utf8_text(text.as_bytes())?),
                 severity: Some(DiagnosticSeverity::ERROR),
                 range: node_range(child),
@@ -881,17 +1009,17 @@ fn validate_children(
             }
             "html_tag" | "html_option_tag" | "html_void_tag" | "java_tag" | "script_tag"
             | "style_tag" => {
-                validate_children(child, text, diagnositcs, file)?;
+                validate_children(child, text, diagnostics, file)?;
             }
             kind if kind.ends_with("_tag") => match &grammar::Tag::from_str(kind) {
                 Ok(child_tag) => {
-                    validate_tag(child_tag.properties(), child, text, diagnositcs, file)?
+                    validate_tag(child_tag.properties(), child, text, diagnostics, file)?
                 }
                 Err(err) => {
                     log::info!("expected sp or spt tag: {}", err);
                 }
             },
-            _ => validate_children(child, text, diagnositcs, file)?,
+            _ => validate_children(child, text, diagnostics, file)?,
         }
     }
     return Ok(());
@@ -906,6 +1034,19 @@ fn node_range(node: Node) -> Range {
         end: Position {
             line: node.end_position().row as u32,
             character: node.end_position().column as u32,
+        },
+    };
+}
+
+fn locations_range(left: &ast::Location, right: &ast::Location, offset: &Point) -> Range {
+    return Range {
+        start: Position {
+            line: left.line() as u32 + offset.row as u32,
+            character: left.char() as u32 + offset.column as u32,
+        },
+        end: Position {
+            line: right.line() as u32 + offset.row as u32,
+            character: right.char() as u32 + right.len() as u32 + offset.column as u32,
         },
     };
 }

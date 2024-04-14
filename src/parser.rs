@@ -20,7 +20,7 @@ pub(crate) fn find_current_node<'tree>(
             break;
         }
     }
-    log::debug!("node: {node:?}");
+    log::debug!("current node: {:?}", node);
     return Some(node);
 }
 
