@@ -8,7 +8,7 @@ use lsp_types::{
 use tree_sitter::{Node, Point};
 
 use crate::{
-    document_store, grammar, modules, parser,
+    document_store, grammar::{self, TagAttribute, TagAttributeType, TagAttributes, TagChildren, TagDefinition}, modules, parser,
     spel::{self, ast, grammar::ArgumentNumber, parser::Parser},
     CodeActionImplementation,
 };
@@ -43,8 +43,8 @@ impl DiagnosticCollector {
                 ),
                 "html_tag" | "html_option_tag" | "html_void_tag" | "xml_comment" | "java_tag"
                 | "script_tag" | "style_tag" => self.validate_children(&node)?,
-                _ => match &grammar::Tag::from_str(node.kind()) {
-                    Ok(tag) => self.validate_tag(tag.properties(), &node),
+                _ => match &TagDefinition::from_str(node.kind()) {
+                    Ok(tag) => self.validate_tag(tag, &node),
                     Err(err) => {
                         log::info!(
                             "error while trying to interprete node \"{}\" as tag: {}",
@@ -81,7 +81,7 @@ impl DiagnosticCollector {
         return Ok(());
     }
 
-    fn validate_tag(self: &mut Self, tag: grammar::TagProperties, node: &Node) -> Result<()> {
+    fn validate_tag(self: &mut Self, tag: &TagDefinition, node: &Node) -> Result<()> {
         if tag.deprecated {
             self.add_diagnostic_with_tag(
                 format!("{} tag is deprecated", tag.name),
@@ -110,7 +110,7 @@ impl DiagnosticCollector {
                     let text = self.text.as_str();
                     let attribute = parser::attribute_name_of(child, text).to_string();
                     let value = parser::attribute_value_of(child, text).to_string();
-                    if let grammar::TagAttributes::These(definitions) = tag.attributes {
+                    if let TagAttributes::These(definitions) = tag.attributes {
                         if let Some(definition) = definitions
                             .iter()
                             .find(|definition| definition.name == attribute)
@@ -132,9 +132,9 @@ impl DiagnosticCollector {
                         attributes.insert(attribute, value);
                     }
                 }
-                kind if kind.ends_with("_tag") => match &grammar::Tag::from_str(kind) {
+                kind if kind.ends_with("_tag") => match &TagDefinition::from_str(kind) {
                     Ok(child_tag) if self.can_have_child(&tag, child_tag) => {
-                        self.validate_tag(child_tag.properties(), &child)?;
+                        self.validate_tag(child_tag, &child)?;
                     }
                     Ok(_) => self.add_diagnostic(
                         format!("unexpected {} tag", &kind[..kind.find("_tag").unwrap()]),
@@ -588,12 +588,12 @@ impl DiagnosticCollector {
         return Ok(());
     }
 
-    fn can_have_child(self: &Self, tag: &grammar::TagProperties, child: &grammar::Tag) -> bool {
+    fn can_have_child(self: &Self, tag: &TagDefinition, child: &TagDefinition) -> bool {
         return match &tag.children {
-            grammar::TagChildren::Any => true,
-            grammar::TagChildren::None => false,
-            grammar::TagChildren::Scalar(tag) => child == tag,
-            grammar::TagChildren::Vector(tags) => tags.iter().any(|tag| child == tag),
+            TagChildren::Any => true,
+            TagChildren::None => false,
+            TagChildren::Scalar(tag) => *child == **tag,
+            TagChildren::Vector(tags) => tags.iter().any(|tag| child == tag),
         };
     }
 
@@ -612,8 +612,8 @@ impl DiagnosticCollector {
                 | "style_tag" => {
                     self.validate_children(&child)?;
                 }
-                kind if kind.ends_with("_tag") => match &grammar::Tag::from_str(kind) {
-                    Ok(child_tag) => self.validate_tag(child_tag.properties(), &child)?,
+                kind if kind.ends_with("_tag") => match &TagDefinition::from_str(kind) {
+                    Ok(child_tag) => self.validate_tag(child_tag, &child)?,
                     Err(err) => {
                         log::info!("expected sp or spt tag: {}", err);
                     }
@@ -934,41 +934,41 @@ impl SpelValidator<'_> {
     fn validate<'a>(
         collector: &'a mut DiagnosticCollector,
         node: &'a Node<'a>,
-        definition: &grammar::TagAttribute,
+        definition: &TagAttribute,
     ) -> Result<()> {
         let parser = &mut Parser::new(node.utf8_text(&collector.text.as_bytes())?);
         let mut validator = SpelValidator::new(collector, node.start_position());
         match definition.r#type {
-            grammar::TagAttributeType::Comparable => match parser.parse_comparable() {
+            TagAttributeType::Comparable => match parser.parse_comparable() {
                 Ok(result) => validator.validate_comparable(result)?,
                 Err(err) => validator.parse_failed(node, err, "comparable"),
             },
-            grammar::TagAttributeType::Condition => match parser.parse_condition_ast() {
+            TagAttributeType::Condition => match parser.parse_condition_ast() {
                 Ok(result) => validator.validate_condition(result.root)?,
                 Err(err) => validator.parse_failed(node, err, "condition"),
             },
-            grammar::TagAttributeType::Expression => match parser.parse_expression_ast() {
+            TagAttributeType::Expression => match parser.parse_expression_ast() {
                 Ok(result) => validator.validate_expression(result.root)?,
                 Err(err) => validator.parse_failed(node, err, "expression"),
             },
-            grammar::TagAttributeType::Identifier => match parser.parse_identifier() {
+            TagAttributeType::Identifier => match parser.parse_identifier() {
                 Ok(result) => validator.validate_identifier(result)?,
                 Err(err) => validator.parse_failed(node, err, "identifier"),
             },
-            grammar::TagAttributeType::Object => match parser.parse_object_ast() {
+            TagAttributeType::Object => match parser.parse_object_ast() {
                 Ok(result) => validator.validate_object(result.root)?,
                 Err(err) => validator.parse_failed(node, err, "object"),
             },
-            grammar::TagAttributeType::Regex => match parser.parse_regex() {
+            TagAttributeType::Regex => match parser.parse_regex() {
                 Ok(result) => validator.validate_regex(result)?,
                 Err(err) => validator.parse_failed(node, err, "regex"),
             },
-            grammar::TagAttributeType::String => match parser.parse_text() {
+            TagAttributeType::String => match parser.parse_text() {
                 Ok(_result) => {}
                 Err(err) => validator.parse_failed(node, err, "text"),
             },
-            grammar::TagAttributeType::Query => {}
-            grammar::TagAttributeType::Uri => match parser.parse_uri() {
+            TagAttributeType::Query => {}
+            TagAttributeType::Uri => match parser.parse_uri() {
                 Ok(_result) => {}
                 Err(err) => validator.parse_failed(node, err, "uri"),
             },

@@ -3,7 +3,7 @@ use super::{
     LsError, ResponseErrorCode,
 };
 use crate::{
-    document_store, grammar, parser,
+    document_store, grammar::{self, TagDefinition}, parser,
     spel::{ast, parser::Parser},
 };
 use anyhow::Result;
@@ -162,8 +162,8 @@ fn index_document(root: Node, text: &String, tokenizer: &mut Tokenizer) -> Resul
             | "comment" | "xml_entity" => continue,
             "html_tag" | "html_option_tag" | "html_void_tag" | "xml_comment" | "java_tag"
             | "script_tag" | "style_tag" => index_children(node, &text, tokenizer)?,
-            _ => match &grammar::Tag::from_str(node.kind()) {
-                Ok(tag) => index_tag(tag.properties(), node, &text, tokenizer)?,
+            _ => match &TagDefinition::from_str(node.kind()) {
+                Ok(tag) => index_tag(tag, node, &text, tokenizer)?,
                 Err(err) => log::info!(
                     "error while trying to interprete node \"{}\" as tag: {}",
                     node.kind(),
@@ -176,7 +176,7 @@ fn index_document(root: Node, text: &String, tokenizer: &mut Tokenizer) -> Resul
 }
 
 fn index_tag(
-    tag: grammar::TagProperties,
+    tag: &TagDefinition,
     node: Node,
     text: &String,
     tokenizer: &mut Tokenizer,
@@ -385,8 +385,8 @@ fn index_tag(
                     };
                 }
             }
-            kind if kind.ends_with("_tag") => match &grammar::Tag::from_str(kind) {
-                Ok(child_tag) => index_tag(child_tag.properties(), child, text, tokenizer)?,
+            kind if kind.ends_with("_tag") => match &TagDefinition::from_str(kind) {
+                Ok(child_tag) => index_tag(child_tag, child, text, tokenizer)?,
                 Err(err) => {
                     log::info!("expected sp or spt tag: {}", err);
                 }
@@ -404,8 +404,8 @@ fn index_children(node: Node, text: &String, tokenizer: &mut Tokenizer) -> Resul
             "ERROR" | "html_tag" | "html_option_tag" | "script_tag" | "style_tag" => {
                 index_children(child, text, tokenizer)?;
             }
-            kind if kind.ends_with("_tag") => match &grammar::Tag::from_str(kind) {
-                Ok(child_tag) => index_tag(child_tag.properties(), child, text, tokenizer)?,
+            kind if kind.ends_with("_tag") => match &TagDefinition::from_str(kind) {
+                Ok(child_tag) => index_tag(child_tag, child, text, tokenizer)?,
                 Err(err) => {
                     log::info!("expected sp or spt tag: {}", err);
                 }

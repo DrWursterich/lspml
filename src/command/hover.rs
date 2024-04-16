@@ -7,7 +7,7 @@ use super::{LsError, ResponseErrorCode};
 
 use crate::{
     document_store,
-    grammar::{self, Tag, TagAttribute, TagAttributeType, TagAttributes},
+    grammar::{self, TagAttribute, TagAttributeType, TagAttributes, TagDefinition},
     parser,
     spel::{
         self,
@@ -126,14 +126,14 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
             result
         }
         kind if kind.ends_with("_tag_open") || kind.ends_with("_tag_close") => {
-            match grammar::Tag::from_str(kind.rsplit_once("_").unwrap().0) {
-                Ok(tag) => tag.properties().documentation.map(|d| d.to_string()),
+            match TagDefinition::from_str(kind.rsplit_once("_").unwrap().0) {
+                Ok(tag) => tag.documentation.map(|d| d.to_string()),
                 Err(_) => return Ok(None),
             }
         }
         kind => match node.parent() {
             Some(parent) if parent.kind().ends_with("_attribute") => {
-                match find_containing_tag(parent).map(|tag| tag.properties().attributes) {
+                match find_containing_tag(parent).map(|tag| tag.attributes) {
                     Some(grammar::TagAttributes::These(attributes)) => {
                         let kind = &parent.kind();
                         let attribute_name = &kind[..kind.len() - "_attribute".len()];
@@ -380,15 +380,15 @@ fn hover_uri(_uri: ast::Uri, _cursor: &Position, _offset: &Point) -> Option<Stri
     return None;
 }
 
-fn find_containing_tag(node: Node<'_>) -> Option<Tag> {
+fn find_containing_tag(node: Node<'_>) -> Option<TagDefinition> {
     return node
         .parent()
-        .and_then(|parent| grammar::Tag::from_str(parent.kind()).ok());
+        .and_then(|parent| TagDefinition::from_str(parent.kind()).ok());
 }
 
-fn find_attribute_definition(tag: Tag, attribute: Node<'_>) -> Option<&TagAttribute> {
+fn find_attribute_definition(tag: TagDefinition, attribute: Node<'_>) -> Option<&TagAttribute> {
     let attribute_name = attribute.kind().strip_suffix("_attribute")?;
-    if let TagAttributes::These(definitions) = tag.properties().attributes {
+    if let TagAttributes::These(definitions) = tag.attributes {
         for definition in definitions {
             if definition.name == attribute_name {
                 return Some(definition);

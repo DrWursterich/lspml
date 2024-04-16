@@ -1,7 +1,7 @@
 use super::{LsError, ResponseErrorCode};
 use crate::{
     document_store::{self, Document},
-    grammar, modules, parser,
+    grammar::{self, TagChildren, TagDefinition}, modules, parser,
 };
 use anyhow::Result;
 use lsp_types::{
@@ -81,8 +81,8 @@ impl CompletionCollector<'_> {
                             self.cursor,
                             tag
                         );
-                        return grammar::Tag::from_str(&tag).and_then(|tag| {
-                            self.search_completions_in_tag(tag.properties(), node)
+                        return TagDefinition::from_str(&tag).and_then(|tag| {
+                            self.search_completions_in_tag(tag, node)
                         });
                     }
                     _ if node
@@ -138,8 +138,8 @@ impl CompletionCollector<'_> {
                         node.start_byte(),
                         node.end_position()
                     );
-                    return grammar::Tag::from_str(kind)
-                        .and_then(|tag| self.search_completions_in_tag(tag.properties(), node));
+                    return TagDefinition::from_str(kind)
+                        .and_then(|tag| self.search_completions_in_tag(tag, node));
                 }
             }
         }
@@ -184,7 +184,6 @@ impl CompletionCollector<'_> {
         );
         grammar::TOP_LEVEL_TAGS
             .iter()
-            .map(|tag| tag.properties())
             .map(|properties| CompletionItem {
                 label: format!("<{}", properties.name),
                 kind: Some(CompletionItemKind::SNIPPET),
@@ -208,7 +207,7 @@ impl CompletionCollector<'_> {
 
     fn search_completions_in_tag(
         self: &mut Self,
-        tag: grammar::TagProperties,
+        tag: TagDefinition,
         node: Node,
     ) -> Result<()> {
         let mut attributes: HashMap<String, String> = HashMap::new();
@@ -244,8 +243,8 @@ impl CompletionCollector<'_> {
                             self.cursor,
                             tag
                         );
-                        return grammar::Tag::from_str(&tag).and_then(|tag| {
-                            self.search_completions_in_tag(tag.properties(), child)
+                        return TagDefinition::from_str(&tag).and_then(|tag| {
+                            self.search_completions_in_tag(tag, child)
                         });
                     }
                     _ if child
@@ -277,9 +276,9 @@ impl CompletionCollector<'_> {
                                 }
                                 kind if kind.ends_with("_tag_open") => {
                                     tag =
-                                        grammar::Tag::from_str(&kind[..kind.len() - "_open".len()])
+                                        TagDefinition::from_str(&kind[..kind.len() - "_open".len()])
                                             .ok()
-                                            .map(|tag| tag.properties().name)
+                                            .map(|tag| tag.name)
                                 }
                                 _ => continue,
                             }
@@ -349,7 +348,7 @@ impl CompletionCollector<'_> {
                 }
                 kind if kind.ends_with("_tag") => {
                     return self.search_completions_in_tag(
-                        grammar::Tag::from_str(kind)?.properties(),
+                        TagDefinition::from_str(kind)?,
                         child,
                     );
                 }
@@ -401,7 +400,7 @@ impl CompletionCollector<'_> {
 
     fn complete_values_of_attribute(
         self: &mut Self,
-        tag: grammar::TagProperties,
+        tag: TagDefinition,
         attribute: String,
         attributes: HashMap<String, String>,
     ) -> Result<()> {
@@ -471,7 +470,7 @@ impl CompletionCollector<'_> {
 
     fn complete_attributes_of(
         self: &mut Self,
-        tag: grammar::TagProperties,
+        tag: TagDefinition,
         attributes: HashMap<String, String>,
     ) -> Result<()> {
         match tag.attributes {
@@ -497,26 +496,25 @@ impl CompletionCollector<'_> {
         return Ok(());
     }
 
-    fn complete_children_of(self: &mut Self, tag: grammar::TagProperties) -> Result<()> {
+    fn complete_children_of(self: &mut Self, tag: TagDefinition) -> Result<()> {
         match tag.children {
-            grammar::TagChildren::Any => self.complete_top_level_tags()?,
-            grammar::TagChildren::None => {}
-            grammar::TagChildren::Scalar(tag) => self.completions.push(CompletionItem {
-                label: "<".to_string() + tag.properties().name,
+            TagChildren::Any => self.complete_top_level_tags()?,
+            TagChildren::None => {}
+            TagChildren::Scalar(tag) => self.completions.push(CompletionItem {
+                label: "<".to_string() + tag.name,
                 kind: Some(CompletionItemKind::METHOD),
-                detail: tag.properties().detail.map(|detail| detail.to_string()),
-                documentation: tag.properties().documentation.map(|detail| {
+                detail: tag.detail.map(|detail| detail.to_string()),
+                documentation: tag.documentation.map(|detail| {
                     Documentation::MarkupContent(MarkupContent {
                         kind: MarkupKind::Markdown,
                         value: detail.to_string(),
                     })
                 }),
-                insert_text: Some("<".to_string() + tag.properties().name),
+                insert_text: Some("<".to_string() + tag.name),
                 ..Default::default()
             }),
-            grammar::TagChildren::Vector(tags) => tags
+            TagChildren::Vector(tags) => tags
                 .iter()
-                .map(|tag| tag.properties())
                 .map(|properties| CompletionItem {
                     label: "<".to_string() + properties.name,
                     kind: Some(CompletionItemKind::METHOD),
