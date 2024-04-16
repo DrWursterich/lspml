@@ -1115,8 +1115,8 @@ impl Parser {
                             },
                         }));
                         string = String::new();
-                        start = self.scanner.cursor as u16;
                     }
+                    start = self.scanner.cursor as u16;
                     fragments.push(ast::WordFragment::Interpolation(interpolation))
                 }
                 _ => break,
