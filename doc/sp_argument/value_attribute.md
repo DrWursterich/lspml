@@ -1,0 +1,1 @@
+Zu setzender Wert. Dieser wird immer als Zeichenkette ausgewertet.

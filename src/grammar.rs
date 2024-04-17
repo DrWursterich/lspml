@@ -89,119 +89,113 @@ pub(crate) enum TagChildren {
     Vector(&'static [TagDefinition]),
 }
 
+macro_rules! tag_definition {
+    (
+        type $tag_type:expr,
+        name $tag_name:expr,
+        deprecated $deprecated:expr,
+        children $children:expr,
+        rules $attribute_rules:expr
+    ) => {
+        TagDefinition {
+            name: concat!($tag_type, ":", $tag_name),
+            detail: None,
+            documentation: Some(
+                include_str!(concat!("../doc/", $tag_type, "_", $tag_name, "/tag.md"))
+            ),
+            deprecated: $deprecated,
+            children: $children,
+            attributes: TagAttributes::None,
+            attribute_rules: $attribute_rules,
+        }
+    };
+
+    (
+        type $tag_type:expr,
+        name $tag_name:expr,
+        deprecated $deprecated:expr,
+        children $children:expr,
+        attributes $(($attribute_name:expr, $attribute_type:expr)),+,
+        rules $attribute_rules:expr
+    ) => {
+        TagDefinition {
+            name: concat!($tag_type, ":", $tag_name),
+            detail: None,
+            documentation: match include_str!(concat!(
+                "../doc/",
+                $tag_type,
+                "_",
+                $tag_name,
+                "/tag.md"
+            )) {
+                doc if doc.len() == 0 => None,
+                doc => Some(doc),
+            },
+            deprecated: $deprecated,
+            children: $children,
+            attributes: TagAttributes::These(
+                &[
+                    $(TagAttribute {
+                        name: $attribute_name,
+                        r#type: $attribute_type,
+                        detail: None,
+                        documentation: Some(
+                            include_str!(
+                                concat!(
+                                    "../doc/",
+                                    $tag_type,
+                                    "_",
+                                    $tag_name,
+                                    "/",
+                                    $attribute_name,
+                                    "_attribute.md"
+                                )
+                            )
+                        ),
+                    }),+
+                ]
+            ),
+            attribute_rules: $attribute_rules,
+        }
+    };
+}
+
 impl TagDefinition {
-    const SP_ARGUMENT: TagDefinition = TagDefinition {
-        name: "sp:argument",
-        detail: None,
-        documentation: Some(r#"Setzt ein Argument für ein sp:include"#),
-        deprecated: false,
-        children: TagChildren::Any,
-        attributes: TagAttributes::These(&[
-            TagAttribute {
-                name: "condition",
-                r#type: TagAttributeType::Condition,
-                detail: None,
-                documentation: Some(
-                    r#"Die Condition wird ausgewertet und als Bedingung in das Argument geschrieben."#,
-                ),
-            },
-            TagAttribute {
-                name: "default",
-                r#type: TagAttributeType::String,
-                detail: None,
-                documentation: Some(
-                    r#"Der Text, der verwendet wird, wenn die Inhalte von `value`, `expression` und body leer sind."#,
-                ),
-            },
-            TagAttribute {
-                name: "expression",
-                r#type: TagAttributeType::Expression,
-                detail: None,
-                documentation: Some(
-                    r#"Die Expression wird ausgewertet und als Wert in das Argument geschrieben."#,
-                ),
-            },
-            TagAttribute {
-                name: "locale",
-                r#type: TagAttributeType::Object,
-                detail: None,
-                documentation: Some(
-                    r#"Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen Variablen."#,
-                ),
-            },
-            TagAttribute {
-                name: "name",
-                r#type: TagAttributeType::Identifier,
-                detail: None,
-                documentation: Some(r#"Name des Arguments."#),
-            },
-            TagAttribute {
-                name: "object",
-                r#type: TagAttributeType::Object,
-                detail: None,
-                documentation: Some(
-                    r#"Evaluiert das Attribut und setzt den evaluierten Wert. Im Gegensatz zu `value` wird hier das Object gespeichert und nicht der Text."#,
-                ),
-            },
-            TagAttribute {
-                name: "value",
-                r#type: TagAttributeType::String,
-                detail: None,
-                documentation: Some(
-                    r#"Zu setzender Wert. Dieser wird immer als Zeichenkette ausgewertet."#,
-                ),
-            },
-        ]),
-        attribute_rules: &[
+    const SP_ARGUMENT: TagDefinition = tag_definition!(
+        type "sp",
+        name "argument",
+        deprecated false,
+        children TagChildren::Any,
+        attributes
+            ("condition", TagAttributeType::Condition),
+            ("default", TagAttributeType::String),
+            ("expression", TagAttributeType::Expression),
+            ("locale", TagAttributeType::Object),
+            ("name", TagAttributeType::Identifier),
+            ("object", TagAttributeType::Object),
+            ("value", TagAttributeType::String),
+        rules &[
             AttributeRule::Required("name"),
             AttributeRule::ExactlyOneOfOrBody(&["value", "expression", "condition", "object"]),
             AttributeRule::OnlyWithEither("default", &["object", "expression"]),
-        ],
-    };
+        ]
+    );
 
-    const SP_ATTRIBUTE: TagDefinition = TagDefinition {
-        name: "sp:attribute",
-        detail: None,
-        documentation: None,
-        deprecated: false,
-        children: TagChildren::Any,
-        attributes: TagAttributes::These(&[
-            TagAttribute {
-                name: "dynamics",
-                r#type: TagAttributeType::Object,
-                detail: None,
-                documentation: Some(r#"Evaluierung aller dynamischen Attribute."#),
-            },
-            TagAttribute {
-                name: "name",
-                r#type: TagAttributeType::Identifier,
-                detail: None,
-                documentation: Some(
-                    r#"Name des Attributes, das als Objekt evaluiert werden soll."#,
-                ),
-            },
-            TagAttribute {
-                name: "object",
-                r#type: TagAttributeType::Object,
-                detail: None,
-                documentation: Some(
-                    r#"Name des Attributes, das als Objekt evaluiert werden soll."#,
-                ),
-            },
-            TagAttribute {
-                name: "text",
-                r#type: TagAttributeType::String,
-                detail: None,
-                documentation: Some(
-                    r#"Text der evaluiert werden soll. Dies ist funktional identisch mit `name`"#,
-                ),
-            },
-        ]),
-        attribute_rules: &[
+    const SP_ATTRIBUTE: TagDefinition = tag_definition!(
+        type "sp",
+        name "attribute",
+        deprecated false,
+        children TagChildren::Any,
+        attributes
+            ("dynamics", TagAttributeType::Object),
+            ("name", TagAttributeType::Identifier),
+            ("object", TagAttributeType::Object),
+            ("text", TagAttributeType::String),
+        rules &[
             AttributeRule::Deprecated("name"),
             AttributeRule::ExactlyOneOf(&["name", "text", "object", "dynamics"]),
-        ],
-    };
+        ]
+    );
 
     const SP_BARCODE: TagDefinition = TagDefinition {
         name: "sp:barcode",
