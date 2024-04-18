@@ -102,14 +102,11 @@ pub(crate) fn diagnostic(request: Request) -> Result<Message> {
             let response = Message::Response(match diagnostic::diagnostic(params) {
                 Ok(diagnostic) => Response {
                     id: request.id,
-                    result: match diagnostic.len() {
-                        0 => None,
-                        _ => serde_json::to_value(FullDocumentDiagnosticReport {
-                            result_id: None,
-                            items: diagnostic,
-                        })
-                        .ok(),
-                    },
+                    result: serde_json::to_value(FullDocumentDiagnosticReport {
+                        result_id: None,
+                        items: diagnostic,
+                    })
+                    .ok(),
                     error: None,
                 },
                 Err(err) => err.to_response(request.id),
@@ -117,7 +114,7 @@ pub(crate) fn diagnostic(request: Request) -> Result<Message> {
             log::trace!("responding to diagnostics request: {:?}", response);
             response
         })
-        .map_err(Error::from);
+        .map_err(|err| Error::from(err));
 }
 
 pub(crate) fn highlight(request: Request) -> Result<Message> {
