@@ -102,17 +102,20 @@ pub(crate) fn diagnostic(request: Request) -> Result<Message> {
             Message::Response(match diagnostic::diagnostic(params) {
                 Ok(diagnostic) => Response {
                     id: request.id,
-                    result: serde_json::to_value(FullDocumentDiagnosticReport {
-                        result_id: None,
-                        items: diagnostic,
-                    })
-                    .ok(),
+                    result: match diagnostic.len() {
+                        0 => None,
+                        _ => serde_json::to_value(FullDocumentDiagnosticReport {
+                            result_id: None,
+                            items: diagnostic,
+                        })
+                        .ok(),
+                    },
                     error: None,
                 },
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(|err| Error::from(err));
+        .map_err(Error::from);
 }
 
 pub(crate) fn highlight(request: Request) -> Result<Message> {
