@@ -1,9 +1,9 @@
 use anyhow::{Error, Result};
 use lsp_server::{Message, Request, RequestId, Response, ResponseError};
 use lsp_types::{
-    CompletionResponse, FullDocumentDiagnosticReport, GotoDefinitionResponse, SemanticTokens,
-    SemanticTokensResult, WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport,
-    WorkspaceFullDocumentDiagnosticReport, DocumentDiagnosticParams,
+    CompletionResponse, DocumentDiagnosticParams, DocumentDiagnosticReport,
+    FullDocumentDiagnosticReport, GotoDefinitionResponse, RelatedFullDocumentDiagnosticReport,
+    SemanticTokens, SemanticTokensResult,
 };
 use std::fmt;
 mod action;
@@ -100,22 +100,18 @@ pub(crate) fn diagnostic(request: Request) -> Result<Message> {
     log::trace!("got diagnose request: {request:?}");
     return serde_json::from_value(request.params)
         .map(|params: DocumentDiagnosticParams| {
-            let uri = params.text_document.uri.clone();
             let response = Message::Response(match diagnostic::diagnostic(params) {
                 Ok(diagnostic) => Response {
                     id: request.id,
-                    result: serde_json::to_value(WorkspaceDiagnosticReport {
-                        items: vec![WorkspaceDocumentDiagnosticReport::Full(
-                            WorkspaceFullDocumentDiagnosticReport {
-                                uri,
-                                version: None,
-                                full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                                    result_id: None,
-                                    items: diagnostic,
-                                }
+                    result: serde_json::to_value(DocumentDiagnosticReport::Full(
+                        RelatedFullDocumentDiagnosticReport {
+                            related_documents: None,
+                            full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                                result_id: None,
+                                items: diagnostic,
                             },
-                        )],
-                    })
+                        },
+                    ))
                     .ok(),
                     error: None,
                 },
