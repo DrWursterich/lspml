@@ -211,32 +211,26 @@ fn hover_condition(condition: ast::Condition, cursor: &Position, offset: &Point)
             right,
             operator_location,
             ..
-        } => {
-            match compare_cursor_to_location(&operator_location, cursor, offset) {
-                Ordering::Less => hover_condition(*left, cursor, offset),
-                Ordering::Equal => None,
-                Ordering::Greater => hover_condition(*right, cursor, offset),
-            }
+        } => match compare_cursor_to_location(&operator_location, cursor, offset) {
+            Ordering::Less => hover_condition(*left, cursor, offset),
+            Ordering::Equal => None,
+            Ordering::Greater => hover_condition(*right, cursor, offset),
         },
-        ast::Condition::BracketedCondition {
-            condition,
-            ..
-        } => hover_condition(*condition, cursor, offset),
-        ast::Condition::NegatedCondition {
-            condition,
-            ..
-        } => hover_condition(*condition, cursor, offset),
+        ast::Condition::BracketedCondition { condition, .. } => {
+            hover_condition(*condition, cursor, offset)
+        }
+        ast::Condition::NegatedCondition { condition, .. } => {
+            hover_condition(*condition, cursor, offset)
+        }
         ast::Condition::Comparisson {
             left,
             right,
             operator_location,
             ..
-        } => {
-            match compare_cursor_to_location(&operator_location, cursor, offset) {
-                Ordering::Less => hover_comparable(*left, cursor, offset),
-                Ordering::Equal => None,
-                Ordering::Greater => hover_comparable(*right, cursor, offset),
-            }
+        } => match compare_cursor_to_location(&operator_location, cursor, offset) {
+            Ordering::Less => hover_comparable(*left, cursor, offset),
+            Ordering::Equal => None,
+            Ordering::Greater => hover_comparable(*right, cursor, offset),
         },
         _ => None,
     };

@@ -1,7 +1,8 @@
 use super::{LsError, ResponseErrorCode};
 use crate::{
     document_store::{self, Document},
-    grammar::{self, TagChildren, TagDefinition}, modules, parser,
+    grammar::{self, TagChildren, TagDefinition},
+    modules, parser,
 };
 use anyhow::Result;
 use lsp_types::{
@@ -81,9 +82,8 @@ impl CompletionCollector<'_> {
                             self.cursor,
                             tag
                         );
-                        return TagDefinition::from_str(&tag).and_then(|tag| {
-                            self.search_completions_in_tag(tag, node)
-                        });
+                        return TagDefinition::from_str(&tag)
+                            .and_then(|tag| self.search_completions_in_tag(tag, node));
                     }
                     _ if node
                         .utf8_text(&self.document.text.as_bytes())
@@ -205,11 +205,7 @@ impl CompletionCollector<'_> {
         return Ok(());
     }
 
-    fn search_completions_in_tag(
-        self: &mut Self,
-        tag: TagDefinition,
-        node: Node,
-    ) -> Result<()> {
+    fn search_completions_in_tag(self: &mut Self, tag: TagDefinition, node: Node) -> Result<()> {
         let mut attributes: HashMap<String, String> = HashMap::new();
         let mut completion_type = CompletionType::Attributes;
         let mut position = TagParsePosition::Attributes;
@@ -243,9 +239,8 @@ impl CompletionCollector<'_> {
                             self.cursor,
                             tag
                         );
-                        return TagDefinition::from_str(&tag).and_then(|tag| {
-                            self.search_completions_in_tag(tag, child)
-                        });
+                        return TagDefinition::from_str(&tag)
+                            .and_then(|tag| self.search_completions_in_tag(tag, child));
                     }
                     _ if child
                         .utf8_text(self.document.text.as_bytes())
@@ -347,10 +342,7 @@ impl CompletionCollector<'_> {
                     );
                 }
                 kind if kind.ends_with("_tag") => {
-                    return self.search_completions_in_tag(
-                        TagDefinition::from_str(kind)?,
-                        child,
-                    );
+                    return self.search_completions_in_tag(TagDefinition::from_str(kind)?, child);
                 }
                 kind => {
                     log::info!("ignore node {}", kind);

@@ -3,7 +3,9 @@ use super::{
     LsError, ResponseErrorCode,
 };
 use crate::{
-    document_store, grammar::{self, TagDefinition}, parser,
+    document_store,
+    grammar::{self, TagDefinition},
+    parser,
     spel::{ast, parser::Parser},
 };
 use anyhow::Result;
