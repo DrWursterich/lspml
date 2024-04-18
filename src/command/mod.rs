@@ -1,9 +1,9 @@
 use anyhow::{Error, Result};
 use lsp_server::{Message, Request, RequestId, Response, ResponseError};
 use lsp_types::{
-    CompletionResponse, DocumentDiagnosticParams, DocumentDiagnosticReport,
-    FullDocumentDiagnosticReport, GotoDefinitionResponse, RelatedFullDocumentDiagnosticReport,
-    SemanticTokens, SemanticTokensResult,
+    CompletionResponse, DocumentDiagnosticReport, FullDocumentDiagnosticReport,
+    GotoDefinitionResponse, RelatedFullDocumentDiagnosticReport, SemanticTokens,
+    SemanticTokensResult,
 };
 use std::fmt;
 mod action;
@@ -76,7 +76,7 @@ pub(crate) fn complete(request: Request) -> Result<Message> {
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(|err| Error::from(err));
+        .map_err(Error::from);
 }
 
 pub(crate) fn definition(request: Request) -> Result<Message> {
@@ -99,7 +99,7 @@ pub(crate) fn definition(request: Request) -> Result<Message> {
 pub(crate) fn diagnostic(request: Request) -> Result<Message> {
     log::trace!("got diagnose request: {request:?}");
     return serde_json::from_value(request.params)
-        .map(|params: DocumentDiagnosticParams| {
+        .map(|params| {
             Message::Response(match diagnostic::diagnostic(params) {
                 Ok(diagnostic) => Response {
                     id: request.id,
@@ -118,7 +118,7 @@ pub(crate) fn diagnostic(request: Request) -> Result<Message> {
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(|err| Error::from(err));
+        .map_err(Error::from);
 }
 
 pub(crate) fn highlight(request: Request) -> Result<Message> {
@@ -134,7 +134,7 @@ pub(crate) fn highlight(request: Request) -> Result<Message> {
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(|err| Error::from(err));
+        .map_err(Error::from);
 }
 
 pub(crate) fn hover(request: Request) -> Result<Option<Message>> {
@@ -169,7 +169,7 @@ pub(crate) fn semantics(request: Request) -> Result<Message> {
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(|err| Error::from(err));
+        .map_err(Error::from);
 }
 
 pub(crate) fn action(request: Request) -> Result<Message> {
@@ -197,7 +197,7 @@ pub(crate) fn action(request: Request) -> Result<Message> {
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(|err| Error::from(err));
+        .map_err(Error::from);
 }
 
 pub(crate) fn unknown(request: Request) -> Result<Message> {
