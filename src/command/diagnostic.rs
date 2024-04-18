@@ -8,7 +8,9 @@ use lsp_types::{
 use tree_sitter::{Node, Point};
 
 use crate::{
-    document_store, grammar::{self, TagAttribute, TagAttributeType, TagAttributes, TagChildren, TagDefinition}, modules, parser,
+    document_store,
+    grammar::{self, TagAttribute, TagAttributeType, TagAttributes, TagChildren, TagDefinition},
+    modules, parser,
     spel::{self, ast, grammar::ArgumentNumber, parser::Parser},
     CodeActionImplementation,
 };
@@ -879,10 +881,7 @@ impl SpelValidator<'_> {
             Err(err) => self.collector.add_diagnostic(
                 err.to_string(),
                 DiagnosticSeverity::ERROR,
-                self.locations_range(
-                    &function.name_location,
-                    &function.closing_bracket_location,
-                ),
+                self.locations_range(&function.name_location, &function.closing_bracket_location),
             ),
         }
         for argument in function.arguments {
