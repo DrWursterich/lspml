@@ -15,7 +15,7 @@ A work-in-progress language server for the sitepark markup language (spml).
     - misplaced, unclosed and deprecated tags
     - duplicate, required and deprecated attributes / tag-bodies
     - nonexistent files in `<sp:include>` and similar tags
-    - sitepark markup expression language (spel):
+    - sitepark expression language (spel):
         - syntax errors
         - nonexistent global functions
         - incorrect argument counts for global functions
