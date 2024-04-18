@@ -1,10 +1,11 @@
-use super::{LsError, ResponseErrorCode};
+use super::LsError;
 use crate::{
     document_store::{self, Document},
     grammar::{self, TagChildren, TagDefinition},
     modules, parser,
 };
 use anyhow::Result;
+use lsp_server::ErrorCode;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionParams, CompletionTextEdit, Documentation,
     MarkupContent, MarkupKind, Position, Range, TextDocumentPositionParams, TextEdit, Url,
@@ -537,7 +538,7 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
                 log::error!("failed to read {}: {}", uri, err);
                 return LsError {
                     message: format!("cannot read file {}", uri),
-                    code: ResponseErrorCode::RequestFailed,
+                    code: ErrorCode::RequestFailed,
                 };
             }),
     }?;
@@ -547,7 +548,7 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
         .search_completions_in_document(root)
         .map_err(|err| LsError {
             message: format!("failed to validate document: {}", err),
-            code: ResponseErrorCode::RequestFailed,
+            code: ErrorCode::RequestFailed,
         })?;
     return Ok(completion_collector.completions);
 }

@@ -1,9 +1,10 @@
 use std::{cmp::Ordering, str::FromStr};
 
+use lsp_server::ErrorCode;
 use lsp_types::{Hover, HoverContents, HoverParams, MarkupContent, MarkupKind, Position};
 use tree_sitter::{Node, Point};
 
-use super::{LsError, ResponseErrorCode};
+use super::LsError;
 
 use crate::{
     document_store,
@@ -27,7 +28,7 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
                 log::error!("failed to read {}: {}", file, err);
                 return LsError {
                     message: format!("cannot read file {}", file),
-                    code: ResponseErrorCode::RequestFailed,
+                    code: ErrorCode::RequestFailed,
                 };
             }),
     }?;
@@ -37,7 +38,7 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
                 "could not determine node in {} at line {}, character {}",
                 file, text_params.position.line, text_params.position.character
             ),
-            code: ResponseErrorCode::RequestFailed,
+            code: ErrorCode::RequestFailed,
         })?;
     return Ok((match node.kind() {
         "string_content" => {

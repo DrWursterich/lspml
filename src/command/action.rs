@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use lsp_server::ErrorCode;
 use lsp_types::{
     CodeAction, CodeActionOrCommand, CodeActionParams, Position, Range, TextEdit, Url,
     WorkspaceEdit,
@@ -7,7 +8,6 @@ use lsp_types::{
 use tree_sitter::{Node, Point};
 
 use crate::{
-    command::ResponseErrorCode,
     document_store::{self, Document},
     spel::{
         ast::{Argument, Comparable, ComparissonOperator, Condition, ConditionAst, Function},
@@ -36,7 +36,7 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
                 log::error!("failed to read {}: {}", uri, err);
                 return LsError {
                     message: format!("cannot read file {}", uri),
-                    code: ResponseErrorCode::RequestFailed,
+                    code: ErrorCode::RequestFailed,
                 };
             }),
     }?;

@@ -1,17 +1,20 @@
-use super::{
-    super::{TOKEN_MODIFIERS, TOKEN_TYPES},
-    LsError, ResponseErrorCode,
-};
+use anyhow::Result;
+use lsp_server::ErrorCode;
+use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensParams};
+use std::str::FromStr;
+use tree_sitter::Node;
+
 use crate::{
     document_store,
     grammar::{self, TagDefinition},
     parser,
     spel::{ast, parser::Parser},
 };
-use anyhow::Result;
-use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensParams};
-use std::str::FromStr;
-use tree_sitter::Node;
+
+use super::{
+    super::{TOKEN_MODIFIERS, TOKEN_TYPES},
+    LsError,
+};
 
 #[derive(Debug, PartialEq)]
 struct Tokenizer {
@@ -142,7 +145,7 @@ pub(crate) fn semantics(params: SemanticTokensParams) -> Result<Vec<SemanticToke
                 log::error!("failed to read {}: {}", uri, err);
                 return LsError {
                     message: format!("cannot read file {}", uri),
-                    code: ResponseErrorCode::RequestFailed,
+                    code: ErrorCode::RequestFailed,
                 };
             }),
     }?;
@@ -151,7 +154,7 @@ pub(crate) fn semantics(params: SemanticTokensParams) -> Result<Vec<SemanticToke
         log::error!("semantic token parsing failed for {}: {}", uri, err);
         return LsError {
             message: format!("semantic token parsing failed for {}", uri),
-            code: ResponseErrorCode::RequestFailed,
+            code: ErrorCode::RequestFailed,
         };
     })?;
     return Ok(tokenizer.collect());

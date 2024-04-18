@@ -1,8 +1,11 @@
-use super::{LsError, ResponseErrorCode};
-use crate::document_store;
+use lsp_server::ErrorCode;
 use lsp_types::{
     DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, Position, Range,
 };
+
+use crate::document_store;
+
+use super::LsError;
 
 /**
  * this highlights occurences of a hovered identifier - not the entire file!
@@ -19,7 +22,7 @@ pub(crate) fn highlight(
                 log::error!("failed to read {}: {}", uri, err);
                 return LsError {
                     message: format!("cannot read file {}", uri),
-                    code: ResponseErrorCode::RequestFailed,
+                    code: ErrorCode::RequestFailed,
                 };
             }),
     }?;

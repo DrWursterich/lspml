@@ -1,6 +1,7 @@
 use std::{collections::HashMap, path::Path, str::FromStr};
 
 use anyhow::{Error, Result};
+use lsp_server::ErrorCode;
 use lsp_types::{
     Diagnostic, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticParams, NumberOrString,
     Position, Range, Url,
@@ -15,7 +16,7 @@ use crate::{
     CodeActionImplementation,
 };
 
-use super::{LsError, ResponseErrorCode};
+use super::LsError;
 
 pub(crate) struct DiagnosticCollector {
     file: Url,
@@ -996,7 +997,7 @@ pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnos
                 log::error!("failed to read {}: {}", uri, err);
                 return LsError {
                     message: format!("cannot read file {}", uri),
-                    code: ResponseErrorCode::RequestFailed,
+                    code: ErrorCode::RequestFailed,
                 };
             }),
     }?;
@@ -1005,7 +1006,7 @@ pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnos
         .validate_document(&document.tree.root_node())
         .map_err(|err| LsError {
             message: format!("failed to validate document: {}", err),
-            code: ResponseErrorCode::RequestFailed,
+            code: ErrorCode::RequestFailed,
         })?;
     return Ok(collector.diagnostics);
 }
