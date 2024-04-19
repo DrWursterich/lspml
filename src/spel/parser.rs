@@ -254,19 +254,56 @@ impl Parser {
                 .parse_number()
                 .map(ast::Expression::Number)
                 .map(ast::UndecidedExpressionContent::Expression),
-            Some('n') => self
-                .parse_null_literal()
-                .map(ast::UndecidedExpressionContent::Null),
-            Some('f') => self
-                .parse_false_literal()
-                .map(ast::UndecidedExpressionContent::Condition),
-            Some('t') => self
-                .parse_true_literal()
-                .map(ast::UndecidedExpressionContent::Condition),
             Some('!') => self
                 .parse_negated_condition()
                 .map(ast::UndecidedExpressionContent::Condition),
-            Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
+            Some(_) => {
+                match self.parse_name_or_global_function()? {
+                    ast::Object::Function(function) => {
+                        Ok(ast::UndecidedExpressionContent::Function(function))
+                    }
+                    ast::Object::Name(ast::Word { fragments }) if fragments.len() == 1 => {
+                        match &fragments[0] {
+                            WordFragment::String(ast::StringLiteral { content, location })
+                                if content == "null" =>
+                            {
+                                Ok(ast::UndecidedExpressionContent::Null(ast::Null {
+                                    location: location.clone(),
+                                }))
+                            }
+                            WordFragment::String(ast::StringLiteral { content, location })
+                                if content == "true" =>
+                            {
+                                Ok(ast::UndecidedExpressionContent::Condition(
+                                    ast::Condition::True {
+                                        location: location.clone(),
+                                    },
+                                ))
+                            }
+                            WordFragment::String(ast::StringLiteral { content, location })
+                                if content == "false" =>
+                            {
+                                Ok(ast::UndecidedExpressionContent::Condition(
+                                    ast::Condition::False {
+                                        location: location.clone(),
+                                    },
+                                ))
+                            }
+                            WordFragment::Interpolation(interpolation) => {
+                                Ok(ast::UndecidedExpressionContent::Name(interpolation.clone()))
+                            }
+                            fragment => Err(anyhow::anyhow!("unexpected char \"{}\"", fragment)),
+                        }
+                    }
+                    // ast::Object::Anchor(_) => todo!(),
+                    // ast::Object::Name(_) => todo!(),
+                    // ast::Object::String(_) => todo!(),
+                    // ast::Object::FieldAccess { object, field, dot_location } => todo!(),
+                    // ast::Object::MethodAccess { object, function, dot_location } => todo!(),
+                    // ast::Object::ArrayAccess { object, index, opening_bracket_location, closing_bracket_location } => todo!(),
+                    object => Err(anyhow::anyhow!("unexpected \"{}\"", object)),
+                }
+            }
             None => return Err(anyhow::anyhow!("unexpected end")),
         };
     }
@@ -281,6 +318,7 @@ impl Parser {
             ast::UndecidedExpressionContent::Name(name) => {
                 Ok(ast::Expression::Object(Box::new(name)))
             }
+            ast::UndecidedExpressionContent::Null(null) => Ok(ast::Expression::Null(null)),
             content => Err(anyhow::anyhow!("unexpected {}", content.r#type())),
         };
     }
@@ -303,6 +341,41 @@ impl Parser {
                         )
                     }
                     None => Ok(ast::UndecidedExpressionContent::Expression(expression)),
+                };
+            }
+            ast::UndecidedExpressionContent::Function(function) => {
+                let function_function = function.clone();
+                let expression = ast::Expression::Function(function);
+                let expression_function = expression.clone();
+                let binary_expression = self.try_parse_binary_operation(expression)?;
+                return match self.try_parse_comparisson(&ast::Comparable::Expression(
+                    binary_expression.clone(),
+                ))? {
+                    Some(comparison) => {
+                        let condition = self.resolve_comparable(comparison)?;
+                        self.resolve_undecided_expression_content(
+                            ast::UndecidedExpressionContent::Condition(condition),
+                        )
+                    }
+                    None => match self.try_parse_binary_condition(&ast::Condition::Function(
+                        function_function.clone(),
+                    ))? {
+                        Some(condition) => self.resolve_undecided_expression_content(
+                            ast::UndecidedExpressionContent::Condition(condition),
+                        ),
+                        None => match self
+                            .try_parse_ternary(&ast::Condition::Function(function_function))?
+                        {
+                            Some(expression) => self.resolve_undecided_expression_content(
+                                ast::UndecidedExpressionContent::Expression(expression),
+                            ),
+                            None => Ok(ast::UndecidedExpressionContent::Expression(
+                                expression_function,
+                            )),
+                            // TODO: if try_parse_binary_operation did not find any operator this
+                            // should be an UndecidedExpressionContent::Function !
+                        },
+                    },
                 };
             }
             ast::UndecidedExpressionContent::Condition(condition) => {
@@ -455,6 +528,7 @@ impl Parser {
             ast::UndecidedExpressionContent::Name(_name) => todo!(),
             ast::UndecidedExpressionContent::String(_string) => todo!(),
             ast::UndecidedExpressionContent::Null(_null) => todo!(),
+            ast::UndecidedExpressionContent::Function(_function) => todo!(),
         });
     }
 
@@ -521,7 +595,6 @@ impl Parser {
                             }
                         }
                     }
-                    ast::Object::Null(null) => ast::Comparable::Null(null),
                     ast::Object::Function(function) => ast::Comparable::Function(function),
                     object => {
                         return Err(anyhow::anyhow!(
@@ -680,60 +753,6 @@ impl Parser {
             Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
             None => return Err(anyhow::anyhow!("unclosed bracket")),
         };
-    }
-
-    fn parse_true_literal(&mut self) -> Result<ast::Condition> {
-        match self.scanner.take_str(&"true") {
-            true => Ok(ast::Condition::True {
-                location: Location::VariableLength {
-                    char: self.scanner.cursor as u16 - 4,
-                    line: 0,
-                    length: 4,
-                },
-            }),
-            false => {
-                return Err(match self.scanner.pop() {
-                    Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
-                    None => anyhow::anyhow!("unexpected end"),
-                })
-            }
-        }
-    }
-
-    fn parse_false_literal(&mut self) -> Result<ast::Condition> {
-        match self.scanner.take_str(&"false") {
-            true => Ok(ast::Condition::False {
-                location: Location::VariableLength {
-                    char: self.scanner.cursor as u16 - 5,
-                    line: 0,
-                    length: 5,
-                },
-            }),
-            false => {
-                return Err(match self.scanner.pop() {
-                    Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
-                    None => anyhow::anyhow!("unexpected end"),
-                })
-            }
-        }
-    }
-
-    fn parse_null_literal(&mut self) -> Result<ast::Null> {
-        match self.scanner.take_str(&"null") {
-            true => Ok(ast::Null {
-                location: Location::VariableLength {
-                    char: self.scanner.cursor as u16 - 4,
-                    line: 0,
-                    length: 4,
-                },
-            }),
-            false => {
-                return Err(match self.scanner.pop() {
-                    Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
-                    None => anyhow::anyhow!("unexpected end"),
-                })
-            }
-        }
     }
 
     fn parse_negated_condition(&mut self) -> Result<ast::Condition> {
@@ -994,11 +1013,6 @@ impl Parser {
         if let [ast::WordFragment::String(ast::StringLiteral { content, location })] =
             &name.fragments[..]
         {
-            if content == "null" {
-                return Ok(ast::Object::Null(ast::Null {
-                    location: location.clone(),
-                }));
-            }
             self.scanner.skip_whitespace();
             if let Some(&'(') = self.scanner.peek() {
                 let start = self.scanner.cursor as u16;
@@ -1177,8 +1191,20 @@ impl Parser {
                         .map(ast::Argument::SignedNumber)
                 }
                 Some(_) => match self.parse_name_or_global_function()? {
+                    ast::Object::Name(ast::Word { fragments }) if fragments.len() == 1 => {
+                        match &fragments[0] {
+                            ast::WordFragment::String(ast::StringLiteral { content, location })
+                                if content == "null" =>
+                            {
+                                Ok(ast::Argument::Null(ast::Null { location: location.clone() }))
+                            }
+                            object => Err(anyhow::anyhow!(
+                                "objects in function arguments have to be interpolated. Try `${{{}}}`",
+                                object
+                            ))
+                        }
+                    }
                     ast::Object::Function(function) => Ok(ast::Argument::Function(function)),
-                    ast::Object::Null(null) => Ok(ast::Argument::Null(null)),
                     object => Err(anyhow::anyhow!(
                         "objects in function arguments have to be interpolated. Try `${{{}}}`",
                         object
@@ -1275,9 +1301,9 @@ mod tests {
     #[test]
     fn test_parse_null() {
         assert_eq!(
-            parse_object("null"),
-            ObjectAst {
-                root: Object::Null(Null {
+            parse_expression("null"),
+            ExpressionAst {
+                root: Expression::Null(Null {
                     location: Location::VariableLength {
                         char: 0,
                         line: 0,
@@ -1328,14 +1354,23 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_null_not_a_function() {
-        let string = "null()";
-        (&mut super::Parser::new(&string))
-            .parse_object_ast()
-            .expect_err(&format!(
-                "successfully parsed invalid string \"{}\"",
-                string
-            ));
+    fn test_parse_null_function() {
+        assert_eq!(
+            parse_expression("null()"),
+            ExpressionAst {
+                root: Expression::Function(Function {
+                    name: "null".to_string(),
+                    arguments: vec![],
+                    name_location: Location::VariableLength {
+                        char: 0,
+                        line: 0,
+                        length: 4,
+                    },
+                    opening_bracket_location: Location::SingleCharacter { char: 4, line: 0 },
+                    closing_bracket_location: Location::SingleCharacter { char: 5, line: 0 }
+                })
+            }
+        );
     }
 
     #[test]

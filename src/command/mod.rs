@@ -1,7 +1,8 @@
 use anyhow::{Error, Result};
-use lsp_server::{Message, Request, RequestId, Response, ResponseError};
+use lsp_server::{ErrorCode, Message, Request, RequestId, Response, ResponseError};
 use lsp_types::{
-    CompletionResponse, FullDocumentDiagnosticReport, GotoDefinitionResponse, SemanticTokens,
+    CompletionResponse, DocumentDiagnosticReport, FullDocumentDiagnosticReport,
+    GotoDefinitionResponse, RelatedFullDocumentDiagnosticReport, SemanticTokens,
     SemanticTokensResult,
 };
 use std::fmt;
@@ -16,14 +17,14 @@ mod semantics;
 #[derive(Debug)]
 struct LsError {
     message: String,
-    code: ResponseErrorCode,
+    code: ErrorCode,
 }
 
 impl std::error::Error for LsError {}
 
 impl fmt::Display for LsError {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        return write!(formatter, "{}: {}", self.code, self.message);
+        return write!(formatter, "{:?}: {}", self.code, self.message);
     }
 }
 
@@ -41,27 +42,6 @@ impl LsError {
     }
 }
 
-#[derive(Debug)]
-enum ResponseErrorCode {
-    RequestFailed = -32803,
-    // ServerCancelled = -32802,
-    // ContentModified = -32801,
-    // RequestCancelled = -32800,
-    // ParseError = -32700,
-    // InternalError = -32603,
-    // InvalidParams = -32602,
-    MethodNotFound = -32601,
-    // InvalidRequest = -32600,
-    // ServerNotInitialized = -32002,
-    // UnknownErrorCode = -32001,
-}
-
-impl fmt::Display for ResponseErrorCode {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        return write!(formatter, "{}", self.to_string());
-    }
-}
-
 pub(crate) fn complete(request: Request) -> Result<Message> {
     log::trace!("got completion request: {request:?}");
     return serde_json::from_value(request.params)
@@ -75,7 +55,7 @@ pub(crate) fn complete(request: Request) -> Result<Message> {
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(|err| Error::from(err));
+        .map_err(Error::from);
 }
 
 pub(crate) fn definition(request: Request) -> Result<Message> {
@@ -102,17 +82,22 @@ pub(crate) fn diagnostic(request: Request) -> Result<Message> {
             Message::Response(match diagnostic::diagnostic(params) {
                 Ok(diagnostic) => Response {
                     id: request.id,
-                    result: serde_json::to_value(FullDocumentDiagnosticReport {
-                        result_id: None,
-                        items: diagnostic,
-                    })
+                    result: serde_json::to_value(DocumentDiagnosticReport::Full(
+                        RelatedFullDocumentDiagnosticReport {
+                            related_documents: None,
+                            full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                                result_id: None,
+                                items: diagnostic,
+                            },
+                        },
+                    ))
                     .ok(),
                     error: None,
                 },
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(|err| Error::from(err));
+        .map_err(Error::from);
 }
 
 pub(crate) fn highlight(request: Request) -> Result<Message> {
@@ -128,7 +113,7 @@ pub(crate) fn highlight(request: Request) -> Result<Message> {
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(|err| Error::from(err));
+        .map_err(Error::from);
 }
 
 pub(crate) fn hover(request: Request) -> Result<Option<Message>> {
@@ -163,7 +148,7 @@ pub(crate) fn semantics(request: Request) -> Result<Message> {
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(|err| Error::from(err));
+        .map_err(Error::from);
 }
 
 pub(crate) fn action(request: Request) -> Result<Message> {
@@ -183,7 +168,7 @@ pub(crate) fn action(request: Request) -> Result<Message> {
                         result: None,
                         error: Some(ResponseError {
                             message: format!("{}", err),
-                            code: ResponseErrorCode::RequestFailed as i32,
+                            code: ErrorCode::RequestFailed as i32,
                             data: None,
                         }),
                     },
@@ -191,7 +176,7 @@ pub(crate) fn action(request: Request) -> Result<Message> {
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(|err| Error::from(err));
+        .map_err(Error::from);
 }
 
 pub(crate) fn unknown(request: Request) -> Result<Message> {
@@ -201,7 +186,7 @@ pub(crate) fn unknown(request: Request) -> Result<Message> {
         result: None,
         error: Some(ResponseError {
             message: format!("method \"{}\" not found", request.method),
-            code: ResponseErrorCode::MethodNotFound as i32,
+            code: ErrorCode::MethodNotFound as i32,
             data: None,
         }),
     }));

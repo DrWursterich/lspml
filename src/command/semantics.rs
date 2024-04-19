@@ -1,17 +1,20 @@
-use super::{
-    super::{TOKEN_MODIFIERS, TOKEN_TYPES},
-    LsError, ResponseErrorCode,
-};
+use anyhow::Result;
+use lsp_server::ErrorCode;
+use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensParams};
+use std::str::FromStr;
+use tree_sitter::Node;
+
 use crate::{
     document_store,
     grammar::{self, TagDefinition},
     parser,
     spel::{ast, parser::Parser},
 };
-use anyhow::Result;
-use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensParams};
-use std::str::FromStr;
-use tree_sitter::Node;
+
+use super::{
+    super::{TOKEN_MODIFIERS, TOKEN_TYPES},
+    LsError,
+};
 
 #[derive(Debug, PartialEq)]
 struct Tokenizer {
@@ -142,7 +145,7 @@ pub(crate) fn semantics(params: SemanticTokensParams) -> Result<Vec<SemanticToke
                 log::error!("failed to read {}: {}", uri, err);
                 return LsError {
                     message: format!("cannot read file {}", uri),
-                    code: ResponseErrorCode::RequestFailed,
+                    code: ErrorCode::RequestFailed,
                 };
             }),
     }?;
@@ -151,7 +154,7 @@ pub(crate) fn semantics(params: SemanticTokensParams) -> Result<Vec<SemanticToke
         log::error!("semantic token parsing failed for {}: {}", uri, err);
         return LsError {
             message: format!("semantic token parsing failed for {}", uri),
-            code: ResponseErrorCode::RequestFailed,
+            code: ErrorCode::RequestFailed,
         };
     })?;
     return Ok(tokenizer.collect());
@@ -455,7 +458,6 @@ fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) 
                 &vec![],
             );
         }
-        ast::Object::Null(null) => index_null(&null, token_collector),
         ast::Object::String(string) => index_string(string, token_collector),
         ast::Object::FieldAccess {
             object,
@@ -526,7 +528,7 @@ fn index_string(string: &ast::StringLiteral, token_collector: &mut SpelTokenColl
 }
 
 fn index_null(null: &ast::Null, token_collector: &mut SpelTokenCollector) {
-    token_collector.add(&null.location, &SemanticTokenType::VARIABLE, &vec![])
+    token_collector.add(&null.location, &SemanticTokenType::ENUM_MEMBER, &vec![])
 }
 
 fn index_number(number: &ast::Number, token_collector: &mut SpelTokenCollector) {
@@ -540,6 +542,8 @@ fn index_signed_number(number: &ast::SignedNumber, token_collector: &mut SpelTok
 
 fn index_expression(expression: &ast::Expression, token_collector: &mut SpelTokenCollector) {
     match expression {
+        ast::Expression::Function(function) => index_function(&function, token_collector),
+        ast::Expression::Null(null) => index_null(&null, token_collector),
         ast::Expression::Number(number) => index_number(&number, token_collector),
         ast::Expression::Object(interpolation) => {
             token_collector.add(

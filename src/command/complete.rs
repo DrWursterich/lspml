@@ -1,9 +1,11 @@
-use super::{LsError, ResponseErrorCode};
+use super::LsError;
 use crate::{
     document_store::{self, Document},
-    grammar::{self, TagChildren, TagDefinition}, modules, parser,
+    grammar::{self, TagChildren, TagDefinition},
+    modules, parser,
 };
 use anyhow::Result;
+use lsp_server::ErrorCode;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionParams, CompletionTextEdit, Documentation,
     MarkupContent, MarkupKind, Position, Range, TextDocumentPositionParams, TextEdit, Url,
@@ -81,9 +83,8 @@ impl CompletionCollector<'_> {
                             self.cursor,
                             tag
                         );
-                        return TagDefinition::from_str(&tag).and_then(|tag| {
-                            self.search_completions_in_tag(tag, node)
-                        });
+                        return TagDefinition::from_str(&tag)
+                            .and_then(|tag| self.search_completions_in_tag(tag, node));
                     }
                     _ if node
                         .utf8_text(&self.document.text.as_bytes())
@@ -205,11 +206,7 @@ impl CompletionCollector<'_> {
         return Ok(());
     }
 
-    fn search_completions_in_tag(
-        self: &mut Self,
-        tag: TagDefinition,
-        node: Node,
-    ) -> Result<()> {
+    fn search_completions_in_tag(self: &mut Self, tag: TagDefinition, node: Node) -> Result<()> {
         let mut attributes: HashMap<String, String> = HashMap::new();
         let mut completion_type = CompletionType::Attributes;
         let mut position = TagParsePosition::Attributes;
@@ -243,9 +240,8 @@ impl CompletionCollector<'_> {
                             self.cursor,
                             tag
                         );
-                        return TagDefinition::from_str(&tag).and_then(|tag| {
-                            self.search_completions_in_tag(tag, child)
-                        });
+                        return TagDefinition::from_str(&tag)
+                            .and_then(|tag| self.search_completions_in_tag(tag, child));
                     }
                     _ if child
                         .utf8_text(self.document.text.as_bytes())
@@ -347,10 +343,7 @@ impl CompletionCollector<'_> {
                     );
                 }
                 kind if kind.ends_with("_tag") => {
-                    return self.search_completions_in_tag(
-                        TagDefinition::from_str(kind)?,
-                        child,
-                    );
+                    return self.search_completions_in_tag(TagDefinition::from_str(kind)?, child);
                 }
                 kind => {
                     log::info!("ignore node {}", kind);
@@ -545,7 +538,7 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
                 log::error!("failed to read {}: {}", uri, err);
                 return LsError {
                     message: format!("cannot read file {}", uri),
-                    code: ResponseErrorCode::RequestFailed,
+                    code: ErrorCode::RequestFailed,
                 };
             }),
     }?;
@@ -555,7 +548,7 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
         .search_completions_in_document(root)
         .map_err(|err| LsError {
             message: format!("failed to validate document: {}", err),
-            code: ResponseErrorCode::RequestFailed,
+            code: ErrorCode::RequestFailed,
         })?;
     return Ok(completion_collector.completions);
 }

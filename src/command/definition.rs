@@ -1,10 +1,11 @@
-use super::{LsError, ResponseErrorCode};
-use crate::document_store;
-use crate::modules;
-use crate::parser;
+use lsp_server::ErrorCode;
 use lsp_types::{GotoDefinitionParams, Location, Position, Range, Url};
 use std::path::Path;
 use tree_sitter::{Query, QueryCursor};
+
+use crate::{document_store, modules, parser};
+
+use super::LsError;
 
 /**
  * variables (check)
@@ -23,7 +24,7 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                 log::error!("failed to read {}: {}", file, err);
                 return LsError {
                     message: format!("cannot read file {}", file),
-                    code: ResponseErrorCode::RequestFailed,
+                    code: ErrorCode::RequestFailed,
                 };
             }),
     }?;
@@ -33,7 +34,7 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                 "could not determine node in {} at line {}, character {}",
                 file, text_params.position.line, text_params.position.character
             ),
-            code: ResponseErrorCode::RequestFailed,
+            code: ErrorCode::RequestFailed,
         })?;
     return match node.kind() {
         // check if string is evaluated ?
@@ -48,7 +49,7 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                 node.utf8_text(document.text.as_bytes())
                     .map_err(|err| LsError {
                         message: format!("error while reading file: {}", err),
-                        code: ResponseErrorCode::RequestFailed,
+                        code: ErrorCode::RequestFailed,
                     })
                     .map(|path| {
                         node.parent()
@@ -115,7 +116,7 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                         log::error!("error in definition query of {}: {}", variable, err);
                         return Err(LsError {
                             message: format!("error in definition query of {}: {}", variable, err),
-                            code: ResponseErrorCode::RequestFailed,
+                            code: ErrorCode::RequestFailed,
                         });
                     }
                 };

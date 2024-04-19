@@ -1,9 +1,10 @@
 use std::{cmp::Ordering, str::FromStr};
 
+use lsp_server::ErrorCode;
 use lsp_types::{Hover, HoverContents, HoverParams, MarkupContent, MarkupKind, Position};
 use tree_sitter::{Node, Point};
 
-use super::{LsError, ResponseErrorCode};
+use super::LsError;
 
 use crate::{
     document_store,
@@ -27,7 +28,7 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
                 log::error!("failed to read {}: {}", file, err);
                 return LsError {
                     message: format!("cannot read file {}", file),
-                    code: ResponseErrorCode::RequestFailed,
+                    code: ErrorCode::RequestFailed,
                 };
             }),
     }?;
@@ -37,7 +38,7 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
                 "could not determine node in {} at line {}, character {}",
                 file, text_params.position.line, text_params.position.character
             ),
-            code: ResponseErrorCode::RequestFailed,
+            code: ErrorCode::RequestFailed,
         })?;
     return Ok((match node.kind() {
         "string_content" => {
@@ -211,32 +212,26 @@ fn hover_condition(condition: ast::Condition, cursor: &Position, offset: &Point)
             right,
             operator_location,
             ..
-        } => {
-            match compare_cursor_to_location(&operator_location, cursor, offset) {
-                Ordering::Less => hover_condition(*left, cursor, offset),
-                Ordering::Equal => None,
-                Ordering::Greater => hover_condition(*right, cursor, offset),
-            }
+        } => match compare_cursor_to_location(&operator_location, cursor, offset) {
+            Ordering::Less => hover_condition(*left, cursor, offset),
+            Ordering::Equal => None,
+            Ordering::Greater => hover_condition(*right, cursor, offset),
         },
-        ast::Condition::BracketedCondition {
-            condition,
-            ..
-        } => hover_condition(*condition, cursor, offset),
-        ast::Condition::NegatedCondition {
-            condition,
-            ..
-        } => hover_condition(*condition, cursor, offset),
+        ast::Condition::BracketedCondition { condition, .. } => {
+            hover_condition(*condition, cursor, offset)
+        }
+        ast::Condition::NegatedCondition { condition, .. } => {
+            hover_condition(*condition, cursor, offset)
+        }
         ast::Condition::Comparisson {
             left,
             right,
             operator_location,
             ..
-        } => {
-            match compare_cursor_to_location(&operator_location, cursor, offset) {
-                Ordering::Less => hover_comparable(*left, cursor, offset),
-                Ordering::Equal => None,
-                Ordering::Greater => hover_comparable(*right, cursor, offset),
-            }
+        } => match compare_cursor_to_location(&operator_location, cursor, offset) {
+            Ordering::Less => hover_comparable(*left, cursor, offset),
+            Ordering::Equal => None,
+            Ordering::Greater => hover_comparable(*right, cursor, offset),
         },
         _ => None,
     };
@@ -249,6 +244,7 @@ fn hover_expression(
 ) -> Option<String> {
     return match expression {
         // ast::Expression::Number(_) => todo!(),
+        ast::Expression::Function(function) => hover_global_function(function, cursor, offset),
         ast::Expression::Object(interpolation) => {
             hover_object(interpolation.content, cursor, offset)
         }

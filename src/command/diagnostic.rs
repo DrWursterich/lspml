@@ -1,6 +1,7 @@
 use std::{collections::HashMap, path::Path, str::FromStr};
 
 use anyhow::{Error, Result};
+use lsp_server::ErrorCode;
 use lsp_types::{
     Diagnostic, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticParams, NumberOrString,
     Position, Range, Url,
@@ -8,12 +9,14 @@ use lsp_types::{
 use tree_sitter::{Node, Point};
 
 use crate::{
-    document_store, grammar::{self, TagAttribute, TagAttributeType, TagAttributes, TagChildren, TagDefinition}, modules, parser,
+    document_store,
+    grammar::{self, TagAttribute, TagAttributeType, TagAttributes, TagChildren, TagDefinition},
+    modules, parser,
     spel::{self, ast, grammar::ArgumentNumber, parser::Parser},
     CodeActionImplementation,
 };
 
-use super::{LsError, ResponseErrorCode};
+use super::LsError;
 
 pub(crate) struct DiagnosticCollector {
     file: Url,
@@ -768,6 +771,8 @@ impl SpelValidator<'_> {
     fn validate_expression(self: &mut Self, expression: ast::Expression) -> Result<()> {
         match expression {
             // ast::Expression::Number(number) => todo!(),
+            // ast::Expression::Null(null) => todo!(),
+            ast::Expression::Function(function) => self.validate_global_function(function)?,
             ast::Expression::Object(interpolation) => {
                 self.validate_object(interpolation.content)?;
             }
@@ -879,10 +884,7 @@ impl SpelValidator<'_> {
             Err(err) => self.collector.add_diagnostic(
                 err.to_string(),
                 DiagnosticSeverity::ERROR,
-                self.locations_range(
-                    &function.name_location,
-                    &function.closing_bracket_location,
-                ),
+                self.locations_range(&function.name_location, &function.closing_bracket_location),
             ),
         }
         for argument in function.arguments {
@@ -997,7 +999,7 @@ pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnos
                 log::error!("failed to read {}: {}", uri, err);
                 return LsError {
                     message: format!("cannot read file {}", uri),
-                    code: ResponseErrorCode::RequestFailed,
+                    code: ErrorCode::RequestFailed,
                 };
             }),
     }?;
@@ -1006,7 +1008,7 @@ pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnos
         .validate_document(&document.tree.root_node())
         .map_err(|err| LsError {
             message: format!("failed to validate document: {}", err),
-            code: ResponseErrorCode::RequestFailed,
+            code: ErrorCode::RequestFailed,
         })?;
     return Ok(collector.diagnostics);
 }

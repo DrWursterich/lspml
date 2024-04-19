@@ -28,7 +28,6 @@ pub(crate) enum Object {
     Anchor(Anchor),
     Function(Function),
     Name(Word),
-    Null(Null),
     String(StringLiteral),
     FieldAccess {
         object: Box<Object>,
@@ -55,7 +54,6 @@ impl Display for Object {
             Object::Function(function) => function.fmt(formatter),
             Object::Name(name) => name.fmt(formatter),
             Object::String(inner) => inner.fmt(formatter),
-            Object::Null(inner) => inner.fmt(formatter),
             Object::FieldAccess { object, field, .. } => write!(formatter, "{}.{}", object, field),
             Object::MethodAccess {
                 object, function, ..
@@ -217,6 +215,8 @@ impl Display for Null {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Expression {
+    Function(Function),
+    Null(Null),
     Number(Number),
     Object(Box<Interpolation>),
     SignedExpression {
@@ -247,6 +247,8 @@ pub(crate) enum Expression {
 impl Display for Expression {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
         return match self {
+            Expression::Function(function) => function.fmt(formatter),
+            Expression::Null(null) => null.fmt(formatter),
             Expression::Number(number) => number.fmt(formatter),
             Expression::Object(interpolation) => interpolation.fmt(formatter),
             Expression::SignedExpression {
@@ -415,20 +417,6 @@ impl Display for Comparable {
     }
 }
 
-impl Into<Comparable> for UndecidedExpressionContent {
-    fn into(self) -> Comparable {
-        return match self {
-            UndecidedExpressionContent::Expression(expression) => {
-                Comparable::Expression(expression)
-            }
-            UndecidedExpressionContent::Condition(condition) => Comparable::Condition(condition),
-            UndecidedExpressionContent::Name(interpolation) => Comparable::Object(interpolation),
-            UndecidedExpressionContent::String(string) => Comparable::String(string),
-            UndecidedExpressionContent::Null(null) => Comparable::Null(null),
-        };
-    }
-}
-
 impl Comparable {
     pub(crate) fn r#type(&self) -> &str {
         match self {
@@ -508,21 +496,23 @@ impl Display for ComparissonOperator {
 // TODO: better name!
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum UndecidedExpressionContent {
-    Expression(Expression),
     Condition(Condition),
+    Expression(Expression),
+    Function(Function),
     Name(Interpolation),
-    String(StringLiteral),
     Null(Null),
+    String(StringLiteral),
 }
 
 impl Display for UndecidedExpressionContent {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
         return match self {
-            UndecidedExpressionContent::Expression(expression) => expression.fmt(formatter),
             UndecidedExpressionContent::Condition(condition) => condition.fmt(formatter),
+            UndecidedExpressionContent::Expression(expression) => expression.fmt(formatter),
+            UndecidedExpressionContent::Function(function) => function.fmt(formatter),
             UndecidedExpressionContent::Name(interpolation) => interpolation.fmt(formatter),
-            UndecidedExpressionContent::String(string) => string.fmt(formatter),
             UndecidedExpressionContent::Null(null) => null.fmt(formatter),
+            UndecidedExpressionContent::String(string) => string.fmt(formatter),
         };
     }
 }
@@ -530,11 +520,12 @@ impl Display for UndecidedExpressionContent {
 impl UndecidedExpressionContent {
     pub(crate) fn r#type(&self) -> &str {
         return match self {
-            UndecidedExpressionContent::Expression(_) => "expression",
             UndecidedExpressionContent::Condition(_) => "condition",
+            UndecidedExpressionContent::Expression(_) => "expression",
+            UndecidedExpressionContent::Function(_) => "function",
             UndecidedExpressionContent::Name(_) => "object",
-            UndecidedExpressionContent::String(_) => "string",
             UndecidedExpressionContent::Null(_) => "null",
+            UndecidedExpressionContent::String(_) => "string",
         };
     }
 }

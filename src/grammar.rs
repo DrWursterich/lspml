@@ -314,6 +314,7 @@ impl TagDefinition {
                     "addAll",
                     "remove",
                     "clear",
+                    "insert",
                     "new",
                     "replace",
                     "removeFirst",
@@ -326,7 +327,7 @@ impl TagDefinition {
             AttributeRule::ExactlyOneOfOrBodyWithEitherValue(
                 &["value", "object", "expression", "condition"],
                 "action",
-                &["add", "addNotEmpty"],
+                &["add", "addNotEmpty", "insert"],
             ),
             AttributeRule::ExactlyOneOfOrBodyWithEitherValue(
                 &["index", "value", "object"],
@@ -336,21 +337,44 @@ impl TagDefinition {
             AttributeRule::ExactlyOneOfOrBodyWithValue(&["object", "query"], "action", "addAll"),
             AttributeRule::BodyOnlyWithEitherValue(
                 "action",
-                &["add", "addAll", "addNotEmpty", "remove", "replace"],
+                &[
+                    "add",
+                    "addAll",
+                    "addNotEmpty",
+                    "insert",
+                    "remove",
+                    "replace",
+                ],
             ),
+            AttributeRule::RequiredWithValue("index", "action", "insert"),
             AttributeRule::OnlyWithEitherValue(
                 "value",
                 "action",
-                &["add", "addNotEmpty", "remove", "replace"],
+                &["add", "addNotEmpty", "insert", "remove", "replace"],
             ),
-            AttributeRule::OnlyWithEitherValue("expression", "action", &["add", "addNotEmpty"]),
-            AttributeRule::OnlyWithEitherValue("condition", "action", &["add", "addNotEmpty"]),
+            AttributeRule::OnlyWithEitherValue(
+                "expression",
+                "action",
+                &["add", "addNotEmpty", "insert"],
+            ),
+            AttributeRule::OnlyWithEitherValue(
+                "condition",
+                "action",
+                &["add", "addNotEmpty", "insert"],
+            ),
             AttributeRule::OnlyWithEitherValue(
                 "object",
                 "action",
-                &["add", "addNotEmpty", "addAll", "remove", "replace"],
+                &[
+                    "add",
+                    "addNotEmpty",
+                    "addAll",
+                    "insert",
+                    "remove",
+                    "replace",
+                ],
             ),
-            AttributeRule::OnlyWithEitherValue("index", "action", &["remove", "replace"]),
+            AttributeRule::OnlyWithEitherValue("index", "action", &["insert", "remove", "replace"]),
             AttributeRule::OnlyWithEither("default", &["object", "expression"]),
             AttributeRule::OnlyWithEither("publisher", &["query", "object"]),
         ]
@@ -1146,7 +1170,7 @@ impl TagDefinition {
         rules &[
             AttributeRule::Required("name"),
             AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
-            AttributeRule::ValueOneOf("type", &["date", "number", "text"]),
+            AttributeRule::ValueOneOf("type", &["date", "email", "number", "text"]),
             AttributeRule::OnlyWithEitherValue("format", "type", &["date", "number"]),
         ]
     );
