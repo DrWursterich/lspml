@@ -63,16 +63,17 @@ pub(crate) fn definition(request: Request) -> Result<Message> {
     return serde_json::from_value(request.params)
         .map(|params| {
             Message::Response(match definition::definition(params) {
-                Ok(definition) => Response {
-                    id: request.id,
-                    result: serde_json::to_value(
-                        definition
-                            .map(GotoDefinitionResponse::Scalar)
-                            .unwrap_or_else(|| GotoDefinitionResponse::Array(Vec::new())),
-                    )
-                    .ok(),
-                    error: None,
-                },
+                Ok(definition) => {
+                    let result = definition
+                        .and_then(|d| serde_json::to_value(GotoDefinitionResponse::Scalar(d)).ok())
+                        .or_else(|| Some(serde_json::value::Value::Null));
+                    log::debug!("responding with definition: {:?}", &result);
+                    Response {
+                        id: request.id,
+                        result,
+                        error: None,
+                    }
+                }
                 Err(err) => err.to_response(request.id),
             })
         })
