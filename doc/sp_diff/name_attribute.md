@@ -1,0 +1,1 @@
+Vergleicht ein Attribute von zwei Versionen einer Information

@@ -1,0 +1,1 @@
+Vergleicht zwei Zeichenketten und zeigt die Unterschiede an

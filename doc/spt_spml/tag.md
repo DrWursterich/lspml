@@ -1,0 +1,1 @@
+schreibt den Header für SPML-Live Seiten

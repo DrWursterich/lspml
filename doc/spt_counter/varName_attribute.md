@@ -1,0 +1,1 @@
+Zählt Zugriffe auf publizierte Informationen

@@ -1,0 +1,1 @@
+Erzeugt eine Bearbeitungsoberfläche für Bilder

@@ -1,0 +1,1 @@
+Integriert den WYSIWYG-SmartEditor ins CMS

@@ -1,0 +1,1 @@
+Erzeugt Links auf Informationen und bindet Bildmedien ein.

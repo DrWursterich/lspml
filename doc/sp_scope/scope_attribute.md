@@ -1,0 +1,1 @@
+Setzt bereichsweise oder global den Scope für die folgenden Tags
