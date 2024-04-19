@@ -244,6 +244,7 @@ fn hover_expression(
 ) -> Option<String> {
     return match expression {
         // ast::Expression::Number(_) => todo!(),
+        ast::Expression::Function(function) => hover_global_function(function, cursor, offset),
         ast::Expression::Object(interpolation) => {
             hover_object(interpolation.content, cursor, offset)
         }

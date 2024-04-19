@@ -771,6 +771,8 @@ impl SpelValidator<'_> {
     fn validate_expression(self: &mut Self, expression: ast::Expression) -> Result<()> {
         match expression {
             // ast::Expression::Number(number) => todo!(),
+            // ast::Expression::Null(null) => todo!(),
+            ast::Expression::Function(function) => self.validate_global_function(function)?,
             ast::Expression::Object(interpolation) => {
                 self.validate_object(interpolation.content)?;
             }
