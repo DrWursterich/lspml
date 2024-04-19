@@ -3071,7 +3071,7 @@ gif:70,png:50,jpg:62
         attribute_rules: &[
             AttributeRule::Required("name"),
             AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
-            AttributeRule::ValueOneOf("type", &["date", "number", "text"]),
+            AttributeRule::ValueOneOf("type", &["date", "email", "number", "text"]),
             AttributeRule::OnlyWithEitherValue("format", "type", &["date", "number"]),
         ],
     };
