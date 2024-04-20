@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use lsp_server::ErrorCode;
 use lsp_types::{
-    CodeAction, CodeActionOrCommand, CodeActionParams, Position, Range, TextEdit, Url,
-    WorkspaceEdit,
+    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, Position, Range, TextEdit,
+    Url, WorkspaceEdit,
 };
 use tree_sitter::{Node, Point};
 
@@ -39,14 +39,55 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
             }),
     }?;
     let mut actions = Vec::new();
-    let diagnostics = params.context.diagnostics;
-    if diagnostics.len() > 0 {
-        log::debug!("code action request carried diagnostics: {:?}", diagnostics);
-        match diagnostics[0].code {
-            Some(CodeActionImplementation::GENERATE_DEFAULT_HEADER_CODE) => {
-                actions.push(construct_generate_default_header(&uri))
+    if params
+        .context
+        .only
+        .is_some_and(|kinds| kinds.contains(&CodeActionKind::SOURCE_FIX_ALL))
+    {
+        let edits = params
+            .context
+            .diagnostics
+            .iter()
+            .filter_map(|diagnostic| match diagnostic.code {
+                Some(CodeActionImplementation::FIX_SPEL_SYNTAX_CODE) => diagnostic
+                    .data
+                    .as_ref()
+                    .and_then(|data| serde_json::from_value::<Vec<TextEdit>>(data.to_owned()).ok()),
+                _ => None,
+            })
+            .flatten()
+            .collect::<Vec<TextEdit>>();
+        if edits.len() > 0 {
+            actions.push(CodeActionOrCommand::CodeAction(CodeAction {
+                title: "fix all spel syntax errors".to_string(),
+                kind: Some(CodeActionKind::SOURCE_FIX_ALL),
+                edit: Some(WorkspaceEdit {
+                    changes: Some(HashMap::from([(uri.clone(), edits)])),
+                    ..WorkspaceEdit::default()
+                }),
+                ..CodeAction::default()
+            }));
+        }
+    } else {
+        for diagnostic in params.context.diagnostics {
+            match diagnostic.code {
+                Some(CodeActionImplementation::GENERATE_DEFAULT_HEADER_CODE) => {
+                    actions.push(construct_generate_default_header(&uri))
+                }
+                Some(CodeActionImplementation::FIX_SPEL_SYNTAX_CODE) => {
+                    diagnostic
+                        .data
+                        .and_then(|data| serde_json::from_value(data).ok())
+                        .map(|edits| {
+                            actions.push(construct_fix_spel_syntax(
+                                &uri,
+                                format!("quick-fix: {}", diagnostic.message),
+                                edits,
+                            ))
+                        });
+                }
+                _ => (),
             }
-            _ => {}
         }
     }
     let node = document.tree.root_node().descendant_for_point_range(
@@ -113,6 +154,22 @@ fn construct_generate_default_header<'a>(uri: &Url) -> CodeActionOrCommand {
                     new_text: DEFAULT_HEADER.to_string(),
                 }],
             )])),
+            ..WorkspaceEdit::default()
+        }),
+        ..CodeAction::default()
+    });
+}
+
+fn construct_fix_spel_syntax<'a>(
+    uri: &Url,
+    title: String,
+    edits: Vec<TextEdit>,
+) -> CodeActionOrCommand {
+    return CodeActionOrCommand::CodeAction(CodeAction {
+        title,
+        kind: Some(CodeActionImplementation::GenerateDefaultHeaders.to_kind()),
+        edit: Some(WorkspaceEdit {
+            changes: Some(HashMap::from([(uri.clone(), edits)])),
             ..WorkspaceEdit::default()
         }),
         ..CodeAction::default()

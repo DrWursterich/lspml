@@ -2,6 +2,8 @@ use core::cmp::Ordering;
 use core::fmt::Display;
 use std::fmt::Formatter;
 
+use super::parser::SyntaxError;
+
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Identifier {
     Name(Word),
@@ -130,6 +132,12 @@ pub(crate) enum Argument {
     Object(Interpolation),
     SignedNumber(SignedNumber),
     String(StringLiteral),
+    True {
+        location: Location,
+    },
+    False {
+        location: Location,
+    },
 }
 
 impl Display for Argument {
@@ -142,6 +150,8 @@ impl Display for Argument {
             Argument::Object(object) => object.fmt(formatter),
             Argument::SignedNumber(number) => number.fmt(formatter),
             Argument::String(string) => string.fmt(formatter),
+            Argument::True { .. } => formatter.write_str("true"),
+            Argument::False { .. } => formatter.write_str("false"),
         }
     }
 }
@@ -575,13 +585,13 @@ impl Display for Location {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub(crate) enum SpelResult<AST> {
     Valid(AST),
-    Invalid(String, String),
+    Invalid(SyntaxError),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub(crate) enum SpelAst {
     Comparable(SpelResult<Comparable>),
     Condition(SpelResult<Condition>),

@@ -1,9 +1,104 @@
+use core::fmt;
+use std::fmt::Display;
+
 use super::{
-    ast::{self, ConditionAst, ExpressionAst, Location, StringLiteral, WordFragment},
+    ast::{
+        self, ConditionAst, ExpressionAst, Interpolation, Location, StringLiteral, WordFragment,
+    },
     Scanner,
 };
 use crate::spel::ast::ObjectAst;
 use anyhow::Result;
+use lsp_types::{Position, Range, TextEdit};
+use tree_sitter::Point;
+
+#[derive(Clone, Debug)]
+pub(crate) enum SyntaxFix {
+    Insert(Position, String),
+    Delete(Location),
+    Replace(Location, String),
+}
+
+impl SyntaxFix {
+    pub(crate) fn to_text_edit(self: &Self, offset: &Point) -> TextEdit {
+        return match self {
+            SyntaxFix::Insert(position, text) => {
+                let position = Position {
+                    line: offset.row as u32 + position.line,
+                    character: offset.column as u32 + position.character,
+                };
+                TextEdit {
+                    range: Range {
+                        start: position,
+                        end: position,
+                    },
+                    new_text: text.to_string(),
+                }
+            }
+            SyntaxFix::Delete(location) => {
+                let line = offset.row as u32 + location.line() as u32;
+                let start = offset.column as u32 + location.char() as u32;
+                TextEdit {
+                    range: Range {
+                        start: Position {
+                            line,
+                            character: start,
+                        },
+                        end: Position {
+                            line,
+                            character: start + location.len() as u32,
+                        },
+                    },
+                    new_text: "".to_string(),
+                }
+            }
+            SyntaxFix::Replace(location, text) => {
+                let line = offset.row as u32 + location.line() as u32;
+                let start = offset.column as u32 + location.char() as u32;
+                TextEdit {
+                    range: Range {
+                        start: Position {
+                            line,
+                            character: start,
+                        },
+                        end: Position {
+                            line,
+                            character: start + location.len() as u32,
+                        },
+                    },
+                    new_text: text.to_string(),
+                }
+            }
+        };
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct SyntaxError {
+    pub(crate) message: String,
+    pub(crate) proposed_fixes: Vec<SyntaxFix>,
+}
+
+impl Display for SyntaxError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.message.fmt(formatter)
+    }
+}
+
+macro_rules! syntax_error {
+    ($msg:literal $(,)?) => {
+        SyntaxError {
+            message: $msg.to_string(),
+            proposed_fixes: Vec::new(),
+        }
+    };
+    ($fmt:expr, $($arg:tt)*) => {
+        SyntaxError {
+            message: format!($fmt, $($arg)*),
+            proposed_fixes: Vec::new(),
+        }
+    };
+}
 
 pub(crate) struct Parser {
     scanner: Scanner,
@@ -16,55 +111,46 @@ impl Parser {
         };
     }
 
-    pub(crate) fn parse_object_ast(&mut self) -> Result<ObjectAst> {
+    pub(crate) fn parse_object_ast(&mut self) -> Result<ObjectAst, SyntaxError> {
         self.scanner.skip_whitespace();
         if self.scanner.is_done() {
-            return Err(anyhow::anyhow!("string is empty"));
+            return Err(syntax_error!("string is empty"));
         }
         let root = self.parse_object()?;
         self.scanner.skip_whitespace();
-        return match self.scanner.is_done() {
+        match self.scanner.is_done() {
             true => Ok(ObjectAst::new(root)),
-            false => Err(anyhow::anyhow!(
-                "trailing character \"{}\"",
-                self.scanner.peek().unwrap()
-            )),
-        };
+            false => Err(self.trailing_characters_error()),
+        }
     }
 
-    pub(crate) fn parse_expression_ast(&mut self) -> Result<ExpressionAst> {
+    pub(crate) fn parse_expression_ast(&mut self) -> Result<ExpressionAst, SyntaxError> {
         self.scanner.skip_whitespace();
         if self.scanner.is_done() {
-            return Err(anyhow::anyhow!("string is empty"));
+            return Err(syntax_error!("string is empty"));
         }
         let root = self.parse_expression()?;
         self.scanner.skip_whitespace();
-        return match self.scanner.is_done() {
+        match self.scanner.is_done() {
             true => Ok(ExpressionAst::new(root)),
-            false => Err(anyhow::anyhow!(
-                "trailing character \"{}\"",
-                self.scanner.peek().unwrap()
-            )),
-        };
+            false => Err(self.trailing_characters_error()),
+        }
     }
 
-    pub(crate) fn parse_condition_ast(&mut self) -> Result<ConditionAst> {
+    pub(crate) fn parse_condition_ast(&mut self) -> Result<ConditionAst, SyntaxError> {
         self.scanner.skip_whitespace();
         if self.scanner.is_done() {
-            return Err(anyhow::anyhow!("string is empty"));
+            return Err(syntax_error!("string is empty"));
         }
         let root = self.parse_condition()?;
         self.scanner.skip_whitespace();
-        return match self.scanner.is_done() {
+        match self.scanner.is_done() {
             true => Ok(ConditionAst::new(root)),
-            false => Err(anyhow::anyhow!(
-                "trailing character \"{}\"",
-                self.scanner.peek().unwrap()
-            )),
-        };
+            false => Err(self.trailing_characters_error()),
+        }
     }
 
-    pub(crate) fn parse_text(&mut self) -> Result<ast::Word> {
+    pub(crate) fn parse_text(&mut self) -> Result<ast::Word, SyntaxError> {
         let mut string = String::new();
         let mut fragments = Vec::new();
         let mut start = self.scanner.cursor as u16;
@@ -108,7 +194,7 @@ impl Parser {
         return Ok(ast::Word { fragments });
     }
 
-    pub(crate) fn parse_uri(&mut self) -> Result<ast::Uri> {
+    pub(crate) fn parse_uri(&mut self) -> Result<ast::Uri, SyntaxError> {
         let mut fragments = Vec::new();
         self.scanner.skip_whitespace();
         loop {
@@ -145,13 +231,10 @@ impl Parser {
                     self.scanner.skip_whitespace();
                     return match self.scanner.is_done() {
                         true => Ok(ast::Uri::Object(interpolation)),
-                        false => Err(anyhow::anyhow!(
-                            "trailing character \"{}\"",
-                            self.scanner.peek().unwrap()
-                        )),
+                        false => Err(self.trailing_characters_error()),
                     };
                 }
-                Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
+                Some(char) => return Err(syntax_error!("unexpected char \"{}\"", char)),
                 None => {
                     return Ok(ast::Uri::Literal(ast::UriLiteral {
                         fragments,
@@ -162,9 +245,9 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_regex(&mut self) -> Result<ast::Regex> {
+    pub(crate) fn parse_regex(&mut self) -> Result<ast::Regex, SyntaxError> {
         if self.scanner.is_done() {
-            return Err(anyhow::anyhow!("string is empty"));
+            return Err(syntax_error!("string is empty"));
         }
         let start = self.scanner.cursor as u16;
         let mut length = 0;
@@ -192,9 +275,9 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_query(&mut self) -> Result<ast::Query> {
+    pub(crate) fn parse_query(&mut self) -> Result<ast::Query, SyntaxError> {
         if self.scanner.is_done() {
-            return Err(anyhow::anyhow!("string is empty"));
+            return Err(syntax_error!("string is empty"));
         }
         let start = self.scanner.cursor as u16;
         let mut length = 0;
@@ -218,10 +301,10 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_identifier(&mut self) -> Result<ast::Identifier> {
+    pub(crate) fn parse_identifier(&mut self) -> Result<ast::Identifier, SyntaxError> {
         self.scanner.skip_whitespace();
         if self.scanner.is_done() {
-            return Err(anyhow::anyhow!("string is empty"));
+            return Err(syntax_error!("string is empty"));
         }
         let name = self.parse_word()?;
         self.scanner.skip_whitespace();
@@ -243,28 +326,30 @@ impl Parser {
                         dot_location,
                     };
                 }
-                Some(char) => return Err(anyhow::anyhow!("trailing character \"{}\"", char)),
+                Some(_) => return Err(self.trailing_characters_error()),
                 None => return Ok(result),
             }
         }
     }
 
-    fn parse_object(&mut self) -> Result<ast::Object> {
+    fn parse_object(&mut self) -> Result<ast::Object, SyntaxError> {
         return match self.scanner.peek() {
             Some('\'') => self.parse_string().map(|s| ast::Object::String(s)),
             Some('!') => self.parse_interpolated_anchor().map(ast::Object::Anchor),
             Some('$' | 'a'..='z' | 'A'..='Z' | '_') => self.parse_name_or_global_function(),
-            Some(char) => Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
-            None => Err(anyhow::anyhow!("unexpected end")),
+            Some(char) => Err(syntax_error!("unexpected char \"{}\"", char)),
+            None => Err(syntax_error!("unexpected end")),
         };
     }
 
-    fn parse_expression(&mut self) -> Result<ast::Expression> {
+    fn parse_expression(&mut self) -> Result<ast::Expression, SyntaxError> {
         let result = self.parse_undecided_expression_content()?;
         return self.resolve_expression_content(result);
     }
 
-    fn parse_undecided_expression_content(&mut self) -> Result<ast::UndecidedExpressionContent> {
+    fn parse_undecided_expression_content(
+        &mut self,
+    ) -> Result<ast::UndecidedExpressionContent, SyntaxError> {
         return match self.scanner.peek() {
             Some('\'') => self
                 .parse_string()
@@ -318,26 +403,71 @@ impl Parser {
                             WordFragment::Interpolation(interpolation) => {
                                 Ok(ast::UndecidedExpressionContent::Name(interpolation.clone()))
                             }
-                            fragment => Err(anyhow::anyhow!("unexpected char \"{}\"", fragment)),
+                            WordFragment::String(ast::StringLiteral { content, location }) => {
+                                let new_string = format!("${{{}}}", content);
+                                Err(SyntaxError {
+                                    message: format!(
+                                        "objects in expressions have to be interpolated. try `{}`",
+                                        new_string
+                                    ),
+                                    proposed_fixes: vec![SyntaxFix::Replace(
+                                        location.to_owned(),
+                                        new_string,
+                                    )],
+                                })
+                            }
                         }
                     }
+                    ast::Object::Name(word) => {
+                        let new_string = format!("${{{}}}", word);
+                        let (char, line) = match word.fragments.first().unwrap() {
+                            WordFragment::String(StringLiteral { location, .. }) => {
+                                (location.line(), location.char())
+                            }
+                            WordFragment::Interpolation(Interpolation {
+                                opening_bracket_location,
+                                ..
+                            }) => (
+                                opening_bracket_location.line(),
+                                opening_bracket_location.char(),
+                            ),
+                        };
+                        let length = match word.fragments.last().unwrap() {
+                            WordFragment::String(StringLiteral { location, .. }) => {
+                                location.char() + location.len()
+                            }
+                            WordFragment::Interpolation(Interpolation {
+                                closing_bracket_location,
+                                ..
+                            }) => closing_bracket_location.char() + closing_bracket_location.len(),
+                        } - char;
+                        Err(SyntaxError {
+                            message: format!(
+                                "objects in expressions have to be interpolated. try `{}`",
+                                new_string
+                            ),
+                            proposed_fixes: vec![SyntaxFix::Replace(
+                                Location::VariableLength { char, line, length },
+                                new_string,
+                            )],
+                        })
+                    }
                     // ast::Object::Anchor(_) => todo!(),
-                    // ast::Object::Name(_) => todo!(),
                     // ast::Object::String(_) => todo!(),
                     // ast::Object::FieldAccess { object, field, dot_location } => todo!(),
                     // ast::Object::MethodAccess { object, function, dot_location } => todo!(),
                     // ast::Object::ArrayAccess { object, index, opening_bracket_location, closing_bracket_location } => todo!(),
-                    object => Err(anyhow::anyhow!("unexpected \"{}\"", object)),
+                    object => Err(syntax_error!("unexpected \"{}\"", object)),
                 }
             }
-            None => return Err(anyhow::anyhow!("unexpected end")),
+            None => return Err(syntax_error!("unexpected end")),
         };
     }
 
     fn resolve_expression_content(
         &mut self,
         content: ast::UndecidedExpressionContent,
-    ) -> Result<ast::Expression> {
+    ) -> Result<ast::Expression, SyntaxError> {
         self.scanner.skip_whitespace();
         return match self.resolve_undecided_expression_content(content)? {
             ast::UndecidedExpressionContent::Expression(expression) => Ok(expression),
@@ -345,14 +475,17 @@ impl Parser {
                 Ok(ast::Expression::Object(Box::new(name)))
             }
             ast::UndecidedExpressionContent::Null(null) => Ok(ast::Expression::Null(null)),
-            content => Err(anyhow::anyhow!("unexpected {}", content.r#type())),
+            ast::UndecidedExpressionContent::Function(function) => {
+                Ok(ast::Expression::Function(function))
+            }
+            content => Err(syntax_error!("unexpected {}", content.r#type())),
         };
     }
 
     fn resolve_undecided_expression_content(
         &mut self,
         content: ast::UndecidedExpressionContent,
-    ) -> Result<ast::UndecidedExpressionContent> {
+    ) -> Result<ast::UndecidedExpressionContent, SyntaxError> {
         // TODO: waaaaaay to many .clone()s!
         match content {
             ast::UndecidedExpressionContent::Expression(expression) => {
@@ -488,7 +621,10 @@ impl Parser {
         };
     }
 
-    fn try_parse_ternary(&mut self, condition: &ast::Condition) -> Result<Option<ast::Expression>> {
+    fn try_parse_ternary(
+        &mut self,
+        condition: &ast::Condition,
+    ) -> Result<Option<ast::Expression>, SyntaxError> {
         if !self.scanner.take(&'?') {
             return Ok(None);
         }
@@ -499,7 +635,16 @@ impl Parser {
         self.scanner.skip_whitespace();
         let left = self.parse_expression()?;
         if !self.scanner.take(&':') {
-            return Err(anyhow::anyhow!("missing \":\" in ternary"));
+            return Err(SyntaxError {
+                message: "incomplete ternary; missing `:`. try adding it".to_string(),
+                proposed_fixes: vec![SyntaxFix::Insert(
+                    Position {
+                        line: 0,
+                        character: self.scanner.cursor as u32,
+                    },
+                    " : 0".to_string(),
+                )],
+            });
         }
         let colon_location = Location::SingleCharacter {
             char: self.scanner.cursor as u16 - 1,
@@ -516,9 +661,11 @@ impl Parser {
         }));
     }
 
-    fn parse_bracketed_expression_content(&mut self) -> Result<ast::UndecidedExpressionContent> {
+    fn parse_bracketed_expression_content(
+        &mut self,
+    ) -> Result<ast::UndecidedExpressionContent, SyntaxError> {
         if !self.scanner.take(&'(') {
-            return Err(anyhow::anyhow!("expected opening bracket"));
+            return Err(syntax_error!("expected opening bracket"));
         }
         let opening_bracket_location = Location::SingleCharacter {
             char: self.scanner.cursor as u16 - 1,
@@ -530,7 +677,16 @@ impl Parser {
         let content = self.resolve_undecided_expression_content(content)?;
         self.scanner.skip_whitespace();
         if !self.scanner.take(&')') {
-            return Err(anyhow::anyhow!("unclosed bracket"));
+            return Err(SyntaxError {
+                message: "unclosed bracket. try adding it".to_string(),
+                proposed_fixes: vec![SyntaxFix::Insert(
+                    Position {
+                        line: 0,
+                        character: self.scanner.cursor as u32,
+                    },
+                    ")".to_string(),
+                )],
+            });
         }
         let closing_bracket_location = Location::SingleCharacter {
             char: self.scanner.cursor as u16 - 1,
@@ -558,12 +714,12 @@ impl Parser {
         });
     }
 
-    fn parse_condition(&mut self) -> Result<ast::Condition> {
+    fn parse_condition(&mut self) -> Result<ast::Condition, SyntaxError> {
         let comparable = self.parse_comparable()?;
         return self.resolve_comparable(comparable);
     }
 
-    pub(crate) fn parse_comparable(&mut self) -> Result<ast::Comparable> {
+    pub(crate) fn parse_comparable(&mut self) -> Result<ast::Comparable, SyntaxError> {
         return Ok(match self.scanner.peek() {
             Some('\'') => ast::Comparable::String(self.parse_string()?),
             Some('$') => {
@@ -588,6 +744,7 @@ impl Parser {
             Some('(') => self.parse_bracketed_comparable()?,
             Some('!') => ast::Comparable::Condition(self.parse_negated_condition()?),
             Some(_) => {
+                let start = self.scanner.cursor as u16;
                 let func = self.parse_name_or_global_function()?;
                 match func {
                     ast::Object::Name(ast::Word { fragments }) if fragments.len() == 1 => {
@@ -600,11 +757,21 @@ impl Parser {
                                     "false" => ast::Comparable::Condition(ast::Condition::False {
                                         location: location.clone(),
                                     }),
+                                    "null" => ast::Comparable::Null(ast::Null {
+                                        location: location.clone(),
+                                    }),
                                     name => {
-                                        return Err(anyhow::anyhow!(
-                                            "objects in comparissons have to be interpolated. Try `${{{}}}`",
-                                            name
-                                        ));
+                                        let new_string = format!("${{{}}}", name);
+                                        return Err(SyntaxError {
+                                            message: format!(
+                                                "objects in comparissons have to be interpolated. try `{}`",
+                                                new_string
+                                            ),
+                                            proposed_fixes: vec![SyntaxFix::Replace(
+                                                location.to_owned(),
+                                                new_string,
+                                            )],
+                                        });
                                     }
                                 }
                             }
@@ -623,18 +790,33 @@ impl Parser {
                     }
                     ast::Object::Function(function) => ast::Comparable::Function(function),
                     object => {
-                        return Err(anyhow::anyhow!(
-                            "objects in comparissons have to be interpolated. Try `${{{}}}`",
-                            object
-                        ))
+                        // this should not be possible
+                        let new_string = format!("${{{}}}", object);
+                        return Err(SyntaxError {
+                            message: format!(
+                                "objects in comparissons have to be interpolated. try `{}`",
+                                new_string
+                            ),
+                            proposed_fixes: vec![SyntaxFix::Replace(
+                                Location::VariableLength {
+                                    char: start,
+                                    line: 0,
+                                    length: self.scanner.cursor as u16 - start,
+                                },
+                                new_string,
+                            )],
+                        });
                     }
                 }
             }
-            None => return Err(anyhow::anyhow!("unexpected end")),
+            None => return Err(syntax_error!("unexpected end")),
         });
     }
 
-    fn resolve_comparable(&mut self, comparable: ast::Comparable) -> Result<ast::Condition> {
+    fn resolve_comparable(
+        &mut self,
+        comparable: ast::Comparable,
+    ) -> Result<ast::Condition, SyntaxError> {
         self.scanner.skip_whitespace();
         return match self.try_parse_comparisson(&comparable)? {
             Some(comparisson) => self.resolve_comparable(comparisson),
@@ -643,9 +825,19 @@ impl Parser {
                     ast::Comparable::Condition(condition) => condition,
                     ast::Comparable::Object(interpolation) => ast::Condition::Object(interpolation),
                     ast::Comparable::Function(function) => ast::Condition::Function(function),
-                    comparable => {
-                        return Err(anyhow::anyhow!("unexpected {}", comparable.r#type()))
+                    ast::Comparable::Null(ast::Null { location }) => {
+                        let new_string = "false".to_string();
+                        return Err(SyntaxError {
+                            message: format!(
+                                "`null` is not a valid condition. did you mean `{}`?",
+                                new_string
+                            ),
+                            proposed_fixes: vec![SyntaxFix::Replace(location, new_string)],
+                        });
                     }
+                    // ast::Comparable::Expression(_) => todo!(),
+                    // ast::Comparable::String(_) => todo!(),
+                    comparable => return Err(syntax_error!("unexpected {}", comparable.r#type())),
                 };
                 match self.try_parse_binary_condition(&condition)? {
                     Some(condition) => {
@@ -657,7 +849,10 @@ impl Parser {
         };
     }
 
-    fn try_parse_comparisson(&mut self, left: &ast::Comparable) -> Result<Option<ast::Comparable>> {
+    fn try_parse_comparisson(
+        &mut self,
+        left: &ast::Comparable,
+    ) -> Result<Option<ast::Comparable>, SyntaxError> {
         return Ok(match self.scanner.peek() {
             Some(char @ ('!' | '=' | '>' | '<')) => {
                 let char = char.clone();
@@ -670,7 +865,21 @@ impl Parser {
                     ('>', true) => ast::ComparissonOperator::GreaterThanOrEqual,
                     ('<', false) => ast::ComparissonOperator::LessThan,
                     ('<', true) => ast::ComparissonOperator::LessThanOrEqual,
-                    (_, _) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
+                    (char, _) => {
+                        return Err(SyntaxError {
+                            message: format!(
+                                "`{}` is not a valid comparisson operator. did you mean `{}=`?",
+                                char, char
+                            ),
+                            proposed_fixes: vec![SyntaxFix::Insert(
+                                Position {
+                                    line: 0,
+                                    character: self.scanner.cursor as u32,
+                                },
+                                "=".to_string(),
+                            )],
+                        })
+                    }
                 };
                 let operator_location = match equals {
                     true => Location::DoubleCharacter {
@@ -697,7 +906,7 @@ impl Parser {
     fn try_parse_binary_condition(
         &mut self,
         left: &ast::Condition,
-    ) -> Result<Option<ast::Condition>> {
+    ) -> Result<Option<ast::Condition>, SyntaxError> {
         return Ok(match self.scanner.peek() {
             Some(char @ ('&' | '|')) => {
                 let first = &char.clone();
@@ -711,13 +920,19 @@ impl Parser {
                 };
                 self.scanner.pop();
                 if !self.scanner.take(first) {
-                    return Err(anyhow::anyhow!(
-                        "unexpected char \"{}\"",
-                        match self.scanner.pop() {
-                            Some(char) => char,
-                            None => first,
-                        }
-                    ));
+                    return Err(SyntaxError {
+                        message: format!(
+                            "`{}` is not a valid condition operator. did you mean `{}{}`?",
+                            first, first, first
+                        ),
+                        proposed_fixes: vec![SyntaxFix::Insert(
+                            Position {
+                                line: 0,
+                                character: self.scanner.cursor as u32,
+                            },
+                            first.to_string(),
+                        )],
+                    });
                 }
                 self.scanner.skip_whitespace();
                 Some(ast::Condition::BinaryOperation {
@@ -731,9 +946,9 @@ impl Parser {
         });
     }
 
-    fn parse_bracketed_comparable(&mut self) -> Result<ast::Comparable> {
+    fn parse_bracketed_comparable(&mut self) -> Result<ast::Comparable, SyntaxError> {
         if !self.scanner.take(&'(') {
-            return Err(anyhow::anyhow!("expected opening bracket"));
+            return Err(syntax_error!("expected opening bracket"));
         }
         let opening_bracket_location = Location::SingleCharacter {
             char: self.scanner.cursor as u16 - 1,
@@ -769,19 +984,28 @@ impl Parser {
                         },
                     )),
                     comparable => {
-                        return Err(anyhow::anyhow!(
-                            "unsupported brackets aroun {}",
+                        return Err(syntax_error!(
+                            "unsupported brackets around \"{}\"",
                             comparable.r#type()
                         ))
                     }
                 }
             }
-            Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
-            None => return Err(anyhow::anyhow!("unclosed bracket")),
+            Some(char) => Err(syntax_error!("unexpected char \"{}\"", char)),
+            None => Err(SyntaxError {
+                message: "unclosed bracket. try adding it".to_string(),
+                proposed_fixes: vec![SyntaxFix::Insert(
+                    Position {
+                        line: 0,
+                        character: self.scanner.cursor as u32,
+                    },
+                    ")".to_string(),
+                )],
+            }),
         };
     }
 
-    fn parse_negated_condition(&mut self) -> Result<ast::Condition> {
+    fn parse_negated_condition(&mut self) -> Result<ast::Condition, SyntaxError> {
         let exclamation_mark_location = Location::SingleCharacter {
             char: self.scanner.cursor as u16,
             line: 0,
@@ -789,9 +1013,18 @@ impl Parser {
         self.scanner.pop();
         self.scanner.skip_whitespace();
         match self.parse_condition()? {
-            ast::Condition::NegatedCondition { .. } => {
-                return Err(anyhow::anyhow!("duplicate condition negation"));
-            }
+            ast::Condition::NegatedCondition {
+                exclamation_mark_location: second,
+                ..
+            } => Err(SyntaxError {
+                message: "doubly negated conditions are not supported. try removing the negations"
+                    .to_string(),
+                proposed_fixes: vec![SyntaxFix::Delete(Location::VariableLength {
+                    char: exclamation_mark_location.char(),
+                    line: 0,
+                    length: second.char() + second.len() - exclamation_mark_location.char(),
+                })],
+            }),
             condition => Ok(ast::Condition::NegatedCondition {
                 condition: Box::new(condition),
                 exclamation_mark_location,
@@ -799,7 +1032,7 @@ impl Parser {
         }
     }
 
-    fn parse_number(&mut self) -> Result<ast::Number> {
+    fn parse_number(&mut self) -> Result<ast::Number, SyntaxError> {
         let start = self.scanner.cursor as u16;
         let mut result = self.parse_integer()?;
         loop {
@@ -832,12 +1065,12 @@ impl Parser {
         }
     }
 
-    fn parse_integer(&mut self) -> Result<String> {
+    fn parse_integer(&mut self) -> Result<String, SyntaxError> {
         let mut result = String::new();
         match self.scanner.pop() {
             Some(char @ '0'..='9') => result.push(*char),
-            Some(char) => return Err(anyhow::anyhow!("expected number, found \"{}\"", char)),
-            None => return Err(anyhow::anyhow!("unexpected end")),
+            Some(char) => return Err(syntax_error!("expected number, found \"{}\"", char)),
+            None => return Err(syntax_error!("unexpected end")),
         };
         loop {
             match self.scanner.peek() {
@@ -850,12 +1083,12 @@ impl Parser {
         }
     }
 
-    fn parse_signed_expression(&mut self) -> Result<ast::Expression> {
+    fn parse_signed_expression(&mut self) -> Result<ast::Expression, SyntaxError> {
         let sign = match self.scanner.pop() {
             Some('+') => ast::Sign::Plus,
             Some('-') => ast::Sign::Minus,
-            Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
-            None => return Err(anyhow::anyhow!("unexpected end")),
+            Some(char) => return Err(syntax_error!("unexpected char \"{}\"", char)),
+            None => return Err(syntax_error!("unexpected end")),
         };
         let sign_location = Location::SingleCharacter {
             char: self.scanner.cursor as u16 - 1,
@@ -864,7 +1097,7 @@ impl Parser {
         self.scanner.skip_whitespace();
         match self.parse_expression()? {
             ast::Expression::SignedExpression { .. } => {
-                return Err(anyhow::anyhow!("duplicate sign"));
+                return Err(syntax_error!("duplicate sign"));
             }
             expression => Ok(ast::Expression::SignedExpression {
                 expression: Box::new(expression),
@@ -874,7 +1107,10 @@ impl Parser {
         }
     }
 
-    fn try_parse_binary_operation(&mut self, left: ast::Expression) -> Result<ast::Expression> {
+    fn try_parse_binary_operation(
+        &mut self,
+        left: ast::Expression,
+    ) -> Result<ast::Expression, SyntaxError> {
         return Ok(
             match self.scanner.transform(|c| match c {
                 '+' => Some(ast::ExpressionOperator::Addition),
@@ -937,11 +1173,11 @@ impl Parser {
         }
     }
 
-    fn parse_string(&mut self) -> Result<ast::StringLiteral> {
+    fn parse_string(&mut self) -> Result<ast::StringLiteral, SyntaxError> {
         let mut result = String::new();
         let start = self.scanner.cursor as u16;
         if !self.scanner.take(&'\'') {
-            return Err(anyhow::anyhow!("expected string"));
+            return Err(syntax_error!("expected string"));
         }
         loop {
             match self.scanner.peek() {
@@ -953,12 +1189,37 @@ impl Parser {
                             result.push(*char);
                         }
                         Some('u') => {
-                            todo!("parse hexadecimal unicode");
+                            // TODO: parse hexadecimal unicode
+                            result.push('\\');
+                            result.push('u');
                         }
                         Some(char) => {
-                            return Err(anyhow::anyhow!("invalid escape sequence \"\\{}\"", char))
+                            return Err(SyntaxError {
+                                message: format!(
+                                    "invalid escape sequence `\\{}`. did you mean `\\\\`?",
+                                    char
+                                ),
+                                proposed_fixes: vec![SyntaxFix::Insert(
+                                    Position {
+                                        line: 0,
+                                        character: self.scanner.cursor as u32,
+                                    },
+                                    "\\".to_string(),
+                                )],
+                            });
                         }
-                        None => return Err(anyhow::anyhow!("unexpected end")),
+                        None => {
+                            return Err(SyntaxError {
+                                message: "missing qoute. try adding adding it".to_string(),
+                                proposed_fixes: vec![SyntaxFix::Insert(
+                                    Position {
+                                        line: 0,
+                                        character: self.scanner.cursor as u32,
+                                    },
+                                    "\\'".to_string(),
+                                )],
+                            })
+                        }
                     }
                 }
                 Some('\'') => {
@@ -977,16 +1238,27 @@ impl Parser {
                     result.push(*char);
                     self.scanner.pop();
                 }
-                Some(char) => return Err(anyhow::anyhow!("invalid character \"{}\"", char)),
-                None => return Err(anyhow::anyhow!("unexpected end")),
+                Some(char) => return Err(syntax_error!("invalid character \"{}\"", char)),
+                None => {
+                    return Err(SyntaxError {
+                        message: "missing qoute. try adding adding it".to_string(),
+                        proposed_fixes: vec![SyntaxFix::Insert(
+                            Position {
+                                line: 0,
+                                character: self.scanner.cursor as u32,
+                            },
+                            "'".to_string(),
+                        )],
+                    })
+                }
             }
         }
     }
 
-    fn parse_interpolation(&mut self) -> Result<ast::Interpolation> {
+    fn parse_interpolation(&mut self) -> Result<ast::Interpolation, SyntaxError> {
         let start = self.scanner.cursor as u16;
         if !self.scanner.take_str(&"${") {
-            return Err(anyhow::anyhow!("expected interpolation"));
+            return Err(syntax_error!("expected interpolation"));
         }
         self.scanner.skip_whitespace();
         let result = self.parse_object()?;
@@ -1003,15 +1275,34 @@ impl Parser {
                     line: 0,
                 },
             }),
-            Some(char) => Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
-            None => Err(anyhow::anyhow!("unclosed interpolation")),
+            Some(char) => Err(syntax_error!("unexpected char \"{}\"", char)),
+            None => Err(SyntaxError {
+                message: "unclosed interpolation. try adding the missing bracket".to_string(),
+                proposed_fixes: vec![SyntaxFix::Insert(
+                    Position {
+                        line: 0,
+                        character: self.scanner.cursor as u32,
+                    },
+                    "}".to_string(),
+                )],
+            }),
         };
     }
 
-    fn parse_interpolated_anchor(&mut self) -> Result<ast::Anchor> {
+    fn parse_interpolated_anchor(&mut self) -> Result<ast::Anchor, SyntaxError> {
         let start = self.scanner.cursor as u16;
         if !self.scanner.take_str(&"!{") {
-            return Err(anyhow::anyhow!("expected interpolated anchor"));
+            return Err(SyntaxError {
+                message: "expected `{` after `!` for an interpolated anchor. try adding it"
+                    .to_string(),
+                proposed_fixes: vec![SyntaxFix::Insert(
+                    Position {
+                        line: 0,
+                        character: self.scanner.cursor as u32 + 1,
+                    },
+                    "{".to_string(),
+                )],
+            });
         }
         self.scanner.skip_whitespace();
         let result = self.parse_word()?;
@@ -1028,12 +1319,22 @@ impl Parser {
                     line: 0,
                 },
             }),
-            Some(char) => Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
-            None => Err(anyhow::anyhow!("unclosed interpolated anchor")),
+            Some(char) => Err(syntax_error!("unexpected char \"{}\"", char)),
+            None => Err(SyntaxError {
+                message: "unclosed anchor interpolation. try adding the missing bracket"
+                    .to_string(),
+                proposed_fixes: vec![SyntaxFix::Insert(
+                    Position {
+                        line: 0,
+                        character: self.scanner.cursor as u32,
+                    },
+                    "}".to_string(),
+                )],
+            }),
         };
     }
 
-    fn parse_name_or_global_function(&mut self) -> Result<ast::Object> {
+    fn parse_name_or_global_function(&mut self) -> Result<ast::Object, SyntaxError> {
         let name = self.parse_word()?;
         let mut result = None;
         if let [ast::WordFragment::String(ast::StringLiteral { content, location })] =
@@ -1083,7 +1384,19 @@ impl Parser {
                                 },
                             }
                         }
-                        false => return Err(anyhow::anyhow!("unclosed array access")),
+                        false => {
+                            return Err(SyntaxError {
+                                message: "unclosed array access. try adding the missing bracket"
+                                    .to_string(),
+                                proposed_fixes: vec![SyntaxFix::Insert(
+                                    Position {
+                                        line: 0,
+                                        character: self.scanner.cursor as u32,
+                                    },
+                                    "]".to_string(),
+                                )],
+                            })
+                        }
                     }
                 }
                 Some('.') => {
@@ -1132,7 +1445,7 @@ impl Parser {
         }
     }
 
-    fn parse_word(&mut self) -> Result<ast::Word> {
+    fn parse_word(&mut self) -> Result<ast::Word, SyntaxError> {
         let mut string = String::new();
         let mut fragments = Vec::new();
         let mut start = self.scanner.cursor as u16;
@@ -1176,16 +1489,16 @@ impl Parser {
         return match fragments.len() > 0 {
             true => Ok(ast::Word { fragments }),
             false => Err(match self.scanner.peek() {
-                Some(char) => anyhow::anyhow!("unexpected char \"{}\"", char),
-                _ => anyhow::anyhow!("unexpected end"),
+                Some(char) => syntax_error!("unexpected char \"{}\"", char),
+                _ => syntax_error!("unexpected end"),
             }),
         };
     }
 
-    fn parse_function_arguments(&mut self) -> Result<Vec<ast::FunctionArgument>> {
+    fn parse_function_arguments(&mut self) -> Result<Vec<ast::FunctionArgument>, SyntaxError> {
         let mut arguments = Vec::new();
         if !self.scanner.take(&'(') {
-            return Err(anyhow::anyhow!("expected opening brace"));
+            return Err(syntax_error!("expected opening brace"));
         }
         self.scanner.skip_whitespace();
         if self.scanner.take(&')') {
@@ -1220,23 +1533,73 @@ impl Parser {
                     ast::Object::Name(ast::Word { fragments }) if fragments.len() == 1 => {
                         match &fragments[0] {
                             ast::WordFragment::String(ast::StringLiteral { content, location })
+                                if content == "false" =>
+                            {
+                                Ok(ast::Argument::False {
+                                    location: location.clone(),
+                                })
+                            }
+                            ast::WordFragment::String(ast::StringLiteral { content, location })
+                                if content == "true" =>
+                            {
+                                Ok(ast::Argument::True {
+                                    location: location.clone(),
+                                })
+                            }
+                            ast::WordFragment::String(ast::StringLiteral { content, location })
                                 if content == "null" =>
                             {
-                                Ok(ast::Argument::Null(ast::Null { location: location.clone() }))
+                                Ok(ast::Argument::Null(ast::Null {
+                                    location: location.clone(),
+                                }))
                             }
-                            object => Err(anyhow::anyhow!(
-                                "objects in function arguments have to be interpolated. Try `${{{}}}`",
-                                object
-                            ))
+                            ast::WordFragment::String(ast::StringLiteral { content, location }) => {
+                                let new_string = format!("${{{}}}", content);
+                                Err(SyntaxError {
+                                    message: format!(
+                                        "objects in arguments have to be interpolated. try `{}`",
+                                        new_string,
+                                    ),
+                                    proposed_fixes: vec![SyntaxFix::Replace(
+                                        location.to_owned(),
+                                        new_string,
+                                    )],
+                                })
+                            }
+                            ast::WordFragment::Interpolation(interpolation) => {
+                                Ok(ast::Argument::Object(interpolation.to_owned()))
+                            }
                         }
                     }
                     ast::Object::Function(function) => Ok(ast::Argument::Function(function)),
-                    object => Err(anyhow::anyhow!(
-                        "objects in function arguments have to be interpolated. Try `${{{}}}`",
-                        object
-                    )),
+                    object => {
+                        // this should not be possible
+                        Err(syntax_error!(
+                            "objects in function arguments have to be interpolated. try `${{{}}}`",
+                            object
+                        ))
+                    }
                 },
-                None => Err(anyhow::anyhow!("unclosed function arguments")),
+                None => Err(SyntaxError {
+                    message: "unclosed function arguments. try adding the missing bracket"
+                        .to_string(),
+                    proposed_fixes: match arguments
+                        .last()
+                        .and_then(|arg| arg.comma_location.as_ref())
+                    {
+                        Some(comma_location) => vec![SyntaxFix::Replace(
+                            comma_location.to_owned(),
+                            ")".to_string(),
+                        )],
+                        None => vec![SyntaxFix::Insert(
+                            Position {
+                                character: self.scanner.cursor as u32,
+                                line: 0,
+                            },
+                            ")".to_string(),
+                        )],
+                    },
+                }),
             }?;
             self.scanner.skip_whitespace();
             match self.scanner.pop() {
@@ -1257,10 +1620,34 @@ impl Parser {
                     });
                     self.scanner.skip_whitespace();
                 }
-                Some(char) => return Err(anyhow::anyhow!("unexpected char \"{}\"", char)),
-                None => return Err(anyhow::anyhow!("unclosed function arguments")),
+                Some(char) => return Err(syntax_error!("unexpected char \"{}\"", char)),
+                None => {
+                    return Err(SyntaxError {
+                        message: "unclosed function arguments. try adding the missing bracket"
+                            .to_string(),
+                        proposed_fixes: vec![SyntaxFix::Insert(
+                            Position {
+                                character: self.scanner.cursor as u32,
+                                line: 0,
+                            },
+                            ")".to_string(),
+                        )],
+                    })
+                }
             };
         }
+    }
+
+    fn trailing_characters_error(&self) -> SyntaxError {
+        let root_end = self.scanner.subtract_whitespace() as u16 + 1;
+        return SyntaxError {
+            message: format!("trailing \"{}\". try removing it", self.scanner.rest()),
+            proposed_fixes: vec![SyntaxFix::Delete(Location::VariableLength {
+                char: root_end,
+                line: 0,
+                length: self.scanner.characters.len() as u16 - root_end,
+            })],
+        };
     }
 }
 

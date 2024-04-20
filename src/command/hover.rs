@@ -143,16 +143,6 @@ fn hover_condition(
     offset: &Point,
 ) -> Option<String> {
     return match condition {
-        ast::Condition::True { location }
-            if compare_cursor_to_location(&location, cursor, offset) == Ordering::Equal =>
-        {
-            Some("boolisches true".to_string())
-        }
-        ast::Condition::False { location }
-            if compare_cursor_to_location(&location, cursor, offset) == Ordering::Equal =>
-        {
-            Some("boolisches false".to_string())
-        }
         ast::Condition::Object(interpolation) => {
             hover_object(&interpolation.content, cursor, offset)
         }

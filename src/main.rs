@@ -62,16 +62,20 @@ pub(crate) enum CodeActionImplementation {
     GenerateDefaultHeaders,
     NameToCondition,
     ConditionToName,
+    FixSpelSyntax,
 }
 
 impl CodeActionImplementation {
     pub(crate) const GENERATE_DEFAULT_HEADER_CODE: NumberOrString = NumberOrString::Number(7126);
+    pub(crate) const FIX_SPEL_SYNTAX_CODE: NumberOrString = NumberOrString::Number(7127);
 
     fn kinds() -> Vec<CodeActionKind> {
         return vec![
             CodeActionImplementation::GenerateDefaultHeaders.to_kind(),
             CodeActionImplementation::NameToCondition.to_kind(),
             CodeActionImplementation::ConditionToName.to_kind(),
+            CodeActionImplementation::FixSpelSyntax.to_kind(),
+            CodeActionKind::SOURCE_FIX_ALL,
         ];
     }
 
@@ -80,6 +84,7 @@ impl CodeActionImplementation {
             CodeActionImplementation::GenerateDefaultHeaders => "refactor.generate_default_headers",
             CodeActionImplementation::NameToCondition => "refactor.name_to_condition",
             CodeActionImplementation::ConditionToName => "refactor.condition_to_name",
+            CodeActionImplementation::FixSpelSyntax => "quickfix.fix_spel_syntax",
         });
     }
 }
@@ -90,6 +95,7 @@ impl Display for CodeActionImplementation {
             CodeActionImplementation::GenerateDefaultHeaders => "refactor.generate_default_headers",
             CodeActionImplementation::NameToCondition => "refactor.name_to_condition",
             CodeActionImplementation::ConditionToName => "refactor.condition_to_name",
+            CodeActionImplementation::FixSpelSyntax => "quickfix.fix_spel_syntax",
         })
     }
 }

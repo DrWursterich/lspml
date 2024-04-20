@@ -91,4 +91,29 @@ impl Scanner {
         }
         return result;
     }
+
+    /// Finds the last position, that is not whitespace.
+    /// If none is found `0` is returned.
+    pub(crate) fn subtract_whitespace(&self) -> usize {
+        let mut cursor = match self.cursor {
+            0 => 0,
+            c => c - 1,
+        };
+        loop {
+            if !self
+                .characters
+                .get(cursor)
+                .is_some_and(|c| c.is_whitespace())
+            {
+                return cursor;
+            }
+            cursor -= 1;
+        }
+    }
+
+    /// Create a String from all remaining characters.
+    /// If `is_done() == true` this returns `""`.
+    pub(crate) fn rest(&self) -> String {
+        return String::from_iter(self.characters[self.cursor..].iter());
+    }
 }

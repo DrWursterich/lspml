@@ -4,7 +4,7 @@ use anyhow::Result;
 use lsp_server::ErrorCode;
 use lsp_types::{
     Diagnostic, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticParams, NumberOrString,
-    Position, Range, Url,
+    Position, Range, TextEdit, Url,
 };
 use tree_sitter::{Node, Point};
 
@@ -16,6 +16,7 @@ use crate::{
         self,
         ast::{self, SpelAst, SpelResult},
         grammar::ArgumentNumber,
+        parser::SyntaxError,
     },
     CodeActionImplementation,
 };
@@ -87,6 +88,7 @@ impl DiagnosticCollector {
                     end: document_start,
                 },
                 CodeActionImplementation::GENERATE_DEFAULT_HEADER_CODE,
+                None,
             );
         }
         return Ok(());
@@ -673,6 +675,7 @@ impl DiagnosticCollector {
         severity: DiagnosticSeverity,
         range: Range,
         code: NumberOrString,
+        data: Option<serde_json::Value>,
     ) {
         self.diagnostics.push(Diagnostic {
             message,
@@ -680,6 +683,7 @@ impl DiagnosticCollector {
             range,
             source: Some(String::from("lspml")),
             code: Some(code),
+            data,
             ..Default::default()
         });
     }
@@ -961,53 +965,69 @@ impl SpelValidator<'_> {
         match spel.get(&offset) {
             Some(SpelAst::Comparable(result)) => match result {
                 SpelResult::Valid(comparable) => validator.validate_comparable(comparable)?,
-                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "comparable"),
+                SpelResult::Invalid(err) => validator.parse_failed(node, err, "comparable"),
             },
             Some(SpelAst::Condition(result)) => match result {
                 SpelResult::Valid(result) => validator.validate_condition(result)?,
-                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "condition"),
+                SpelResult::Invalid(err) => validator.parse_failed(node, err, "condition"),
             },
             Some(SpelAst::Expression(result)) => match result {
                 SpelResult::Valid(result) => validator.validate_expression(result)?,
-                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "expression"),
+                SpelResult::Invalid(err) => validator.parse_failed(node, err, "expression"),
             },
             Some(SpelAst::Identifier(result)) => match result {
                 SpelResult::Valid(result) => validator.validate_identifier(result)?,
-                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "identifier"),
+                SpelResult::Invalid(err) => validator.parse_failed(node, err, "identifier"),
             },
             Some(SpelAst::Object(result)) => match result {
                 SpelResult::Valid(result) => validator.validate_object(result)?,
-                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "object"),
+                SpelResult::Invalid(err) => validator.parse_failed(node, err, "object"),
             },
             Some(SpelAst::Query(result)) => match result {
                 SpelResult::Valid(query) => validator.validate_query(query)?,
-                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "query"),
+                SpelResult::Invalid(err) => validator.parse_failed(node, err, "query"),
             },
             Some(SpelAst::Regex(result)) => match result {
                 SpelResult::Valid(regex) => validator.validate_regex(regex)?,
-                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "regex"),
+                SpelResult::Invalid(err) => validator.parse_failed(node, err, "regex"),
             },
             Some(SpelAst::String(result)) => match result {
                 SpelResult::Valid(word) => validator.validate_interpolations_in_word(word)?,
-                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "text"),
+                SpelResult::Invalid(err) => validator.parse_failed(node, err, "text"),
             },
             Some(SpelAst::Uri(result)) => match result {
                 SpelResult::Valid(uri) => validator.validate_uri(uri)?,
-                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "uri"),
+                SpelResult::Invalid(err) => validator.parse_failed(node, err, "uri"),
             },
             _ => (),
         };
         return Ok(());
     }
 
-    fn parse_failed(self: &mut Self, node: &Node<'_>, err: &String, r#type: &str) -> () {
-        self.collector.diagnostics.push(Diagnostic {
-            message: format!("invalid {}: {}", r#type, err),
-            severity: Some(DiagnosticSeverity::ERROR),
-            range: self.collector.node_range(node),
-            source: Some("lspml".to_string()),
-            ..Default::default()
-        });
+    fn parse_failed(self: &mut Self, node: &Node<'_>, err: &SyntaxError, r#type: &str) -> () {
+        match err.proposed_fixes.len() {
+            0 => self.collector.add_diagnostic(
+                format!("invalid {}: {}", r#type, err.message),
+                DiagnosticSeverity::ERROR,
+                self.collector.node_range(node),
+            ),
+            _ => {
+                let offset = node.start_position();
+                self.collector.add_diagnostic_with_code(
+                    format!("invalid {}: {}", r#type, err.message),
+                    DiagnosticSeverity::ERROR,
+                    self.collector.node_range(node),
+                    CodeActionImplementation::FIX_SPEL_SYNTAX_CODE,
+                    serde_json::to_value(
+                        err.proposed_fixes
+                            .iter()
+                            .map(|fix| fix.to_text_edit(&offset))
+                            .collect::<Vec<TextEdit>>(),
+                    )
+                    .ok(),
+                );
+            }
+        }
     }
 }
 

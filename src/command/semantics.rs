@@ -566,6 +566,9 @@ fn index_function(function: &ast::Function, token_collector: &mut SpelTokenColle
             }
             ast::Argument::SignedNumber(number) => index_signed_number(&number, token_collector),
             ast::Argument::String(string) => index_string(&string, token_collector),
+            ast::Argument::True { location } | ast::Argument::False { location } => {
+                token_collector.add(location, &SemanticTokenType::ENUM_MEMBER, &vec![])
+            }
         }
         if let Some(comma_location) = &arg.comma_location {
             token_collector.add(&comma_location, &SemanticTokenType::OPERATOR, &vec![]);

@@ -160,41 +160,41 @@ fn spel_ast_of(node: Node, text: &str, r#type: &TagAttributeType) -> Result<Spel
     match r#type {
         TagAttributeType::Comparable => Ok(SpelAst::Comparable(match parser.parse_comparable() {
             Ok(result) => SpelResult::Valid(result),
-            Err(err) => SpelResult::Invalid(text.to_string(), err.to_string()),
+            Err(err) => SpelResult::Invalid(err),
         })),
         TagAttributeType::Condition => Ok(SpelAst::Condition(match parser.parse_condition_ast() {
             Ok(result) => SpelResult::Valid(result.root),
-            Err(err) => SpelResult::Invalid(text.to_string(), err.to_string()),
+            Err(err) => SpelResult::Invalid(err),
         })),
         TagAttributeType::Expression => {
             Ok(SpelAst::Expression(match parser.parse_expression_ast() {
                 Ok(result) => SpelResult::Valid(result.root),
-                Err(err) => SpelResult::Invalid(text.to_string(), err.to_string()),
+                Err(err) => SpelResult::Invalid(err),
             }))
         }
         TagAttributeType::Identifier => Ok(SpelAst::Identifier(match parser.parse_identifier() {
             Ok(result) => SpelResult::Valid(result),
-            Err(err) => SpelResult::Invalid(text.to_string(), err.to_string()),
+            Err(err) => SpelResult::Invalid(err),
         })),
         TagAttributeType::Object => Ok(SpelAst::Object(match parser.parse_object_ast() {
             Ok(result) => SpelResult::Valid(result.root),
-            Err(err) => SpelResult::Invalid(text.to_string(), err.to_string()),
+            Err(err) => SpelResult::Invalid(err),
         })),
         TagAttributeType::Regex => Ok(SpelAst::Regex(match parser.parse_regex() {
             Ok(result) => SpelResult::Valid(result),
-            Err(err) => SpelResult::Invalid(text.to_string(), err.to_string()),
+            Err(err) => SpelResult::Invalid(err),
         })),
         TagAttributeType::String => Ok(SpelAst::String(match parser.parse_text() {
             Ok(result) => SpelResult::Valid(result),
-            Err(err) => SpelResult::Invalid(text.to_string(), err.to_string()),
+            Err(err) => SpelResult::Invalid(err),
         })),
         TagAttributeType::Query => Ok(SpelAst::Query(match parser.parse_query() {
             Ok(result) => SpelResult::Valid(result),
-            Err(err) => SpelResult::Invalid(text.to_string(), err.to_string()),
+            Err(err) => SpelResult::Invalid(err),
         })),
         TagAttributeType::Uri => Ok(SpelAst::Uri(match parser.parse_uri() {
             Ok(result) => SpelResult::Valid(result),
-            Err(err) => SpelResult::Invalid(text.to_string(), err.to_string()),
+            Err(err) => SpelResult::Invalid(err),
         })),
     }
 }

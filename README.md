@@ -37,6 +37,8 @@ A work-in-progress language server for the sitepark markup language (spml).
     - to be comparable (for `sp:if` and `sp:elseif` `eq`/`gt`/...)
 - code actions to:
     - generate a default file header
+    - fix small spel syntax errors (`quickfix`)
+    - fix all `quickfix`-able errors at once (`source.fixAll`)
     - split `sp:if` `condition` into `name` and `eq`/`gt`/`isNull`/...
     - join `sp:if` `name` and `eq`/`gt`/`isNull`/... into `condition`
 
