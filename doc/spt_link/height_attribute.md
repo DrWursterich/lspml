@@ -1,1 +1,1 @@
-Erzeugt Links auf Informationen und bindet Bildmedien ein.
+Bei `type="image"` kann durch dieses Attribut der `'height'`-Wert des generierten `<img ...>`-Tags gesetzt werden.

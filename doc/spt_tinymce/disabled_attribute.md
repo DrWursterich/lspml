@@ -1,1 +1,1 @@
-Integriert einen Editor
+HTML-Attribut (`true`, `false`).

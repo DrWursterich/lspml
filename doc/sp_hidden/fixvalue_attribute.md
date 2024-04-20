@@ -1,1 +1,1 @@
-Hidden-Tag, erzeugt ein Hiddenfeld.
+Überschreibt jeden vorhandenen Inhalt der mit `name` bestimmten Variablen mit dem durch `fixvalue` angegebenen Wert.

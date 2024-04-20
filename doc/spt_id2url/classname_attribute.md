@@ -1,1 +1,1 @@
-Durchsucht einen Text nach ID-Signaturen von Artikeln und ersetzt die IDs durch die URL des aktuellen Publikationsbereichs.
+Setzt oder ergänzt das class-Attribut des `<a>`-Tags für die Links, bei denen die ID durch die URL ersetzt wird.

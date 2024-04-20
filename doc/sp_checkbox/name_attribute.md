@@ -1,1 +1,1 @@
-Check-Box-Tag, erzeugt eine checkBox.
+Bestimmt den Namen des Feldes.

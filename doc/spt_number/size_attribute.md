@@ -1,1 +1,1 @@
-Zahleneingabe mit Prüfung auf Gültigkeit
+`'size'`-Wert des generierten input-Tags.

@@ -1,1 +1,1 @@
-Datums- und Uhrzeiteingabe mit Prüfung auf Gültigkeit
+Überschreibt jeden vorhandenen Inhalt der mit `name` bestimmten Variablen mit dem durch `fixvalue` angegebenen Wert.

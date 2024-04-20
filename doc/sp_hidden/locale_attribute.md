@@ -1,1 +1,1 @@
-Hidden-Tag, erzeugt ein Hiddenfeld.
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen.

@@ -1,1 +1,1 @@
-Erzeugt Links auf Informationen und bindet Bildmedien ein.
+Diese Attribut bestimmt die Mehrsprachigkeit der Variable.

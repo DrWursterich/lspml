@@ -1,1 +1,1 @@
-Zahlenfeld, das per Klick auf- und abwärts gezählt werden kann
+Bestimmt den Namen des Feldes.

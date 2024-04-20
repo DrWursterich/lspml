@@ -1,1 +1,1 @@
-Text-Tag, erzeugt ein Eingabefeld.
+HTML-Attribut (`true`, `false`).

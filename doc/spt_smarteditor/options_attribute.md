@@ -1,1 +1,1 @@
-Integriert den WYSIWYG-SmartEditor ins CMS
+Optionen, die beim Aufruf des Smarteditors an diesen übergeben werden.

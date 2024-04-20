@@ -1,1 +1,1 @@
-Verlässt die SPML-Seite und setzt ggf. einen Rückgabewert für sp:include
+Die Expression wird ausgewertet und als Rückgabe-Wert geschrieben.

@@ -1,1 +1,1 @@
-Sortiert eine Liste
+Name der sortierten Liste.

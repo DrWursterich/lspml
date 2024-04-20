@@ -1,1 +1,1 @@
-Erzeugt einen Link auf das CMS
+Optionale Angabe eines Artikels, auf den der Link zeigen soll (z.B. für Listen).

@@ -1,1 +1,1 @@
-Zahleneingabe mit Prüfung auf Gültigkeit
+HTML-Attribut (`true`, `false`).

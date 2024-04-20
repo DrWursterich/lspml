@@ -1,1 +1,1 @@
-Erzeugt Links auf Informationen und bindet Bildmedien ein.
+Überschreibt jeden vorhandenen Inhalt der mit name bestimmten Variablen mit dem durch `fixvalue` angegebenen Wert.

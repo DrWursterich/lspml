@@ -1,1 +1,1 @@
-Option-Tag, für das Select Tag.
+Gibt den Wert der Option an.

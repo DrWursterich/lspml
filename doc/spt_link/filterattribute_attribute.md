@@ -1,1 +1,1 @@
-Erzeugt Links auf Informationen und bindet Bildmedien ein.
+Attribut, auf das der Filter angewendet werden soll.

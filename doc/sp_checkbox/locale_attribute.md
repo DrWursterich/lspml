@@ -1,1 +1,1 @@
-Check-Box-Tag, erzeugt eine checkBox.
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen.

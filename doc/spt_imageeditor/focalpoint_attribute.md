@@ -1,1 +1,1 @@
-Erzeugt eine Bearbeitungsoberfläche für Bilder
+Aktiviert die Bearbeitung des Fokus-Punktes

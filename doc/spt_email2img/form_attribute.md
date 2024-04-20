@@ -1,1 +1,1 @@
-Ersetzt E-Mail-Adressen durch Bilder
+Artikel, der das Kontaktformular bereitstellt.

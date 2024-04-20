@@ -1,1 +1,1 @@
-ElseIf-Tag, schreibt Body wenn Bedingung ok ist und vorheriges if fehl schlug.
+Variablenname eines Objektes das verglichen werden soll.

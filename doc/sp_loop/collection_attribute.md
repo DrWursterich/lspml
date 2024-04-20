@@ -1,1 +1,1 @@
-Dient zur Ausgabe eines oder mehrerer Elemente.
+Die zu iterierende Liste.

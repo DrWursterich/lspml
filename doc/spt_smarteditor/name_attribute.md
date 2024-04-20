@@ -1,1 +1,1 @@
-Integriert den WYSIWYG-SmartEditor ins CMS
+Bestimmt den Namen des Eingabefeldes.

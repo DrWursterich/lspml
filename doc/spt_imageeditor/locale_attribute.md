@@ -1,1 +1,1 @@
-Erzeugt eine Bearbeitungsoberfläche für Bilder
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen.

@@ -1,1 +1,1 @@
-Integriert den WYSIWYG-SmartEditor ins CMS
+Höhe des Eingabefeldes in Zeilen.

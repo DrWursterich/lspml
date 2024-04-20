@@ -1,1 +1,1 @@
-Toggle-Tag erzeugt einen toggle der einen einzigen boolischen Wert speichert
+Setzt einen Default-Wert für die mit `name` angegebenen Variable, wenn sie leer ist.

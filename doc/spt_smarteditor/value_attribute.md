@@ -1,1 +1,1 @@
-Integriert den WYSIWYG-SmartEditor ins CMS
+Vorgegebener Inhalt des Feldes.

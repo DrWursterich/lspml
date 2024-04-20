@@ -1,1 +1,1 @@
-If-Tag, schreibt Body wenn Bedingung ok ist.
+Regulärer Ausdruck, der in der Variablen enthalten sein soll.

@@ -1,1 +1,1 @@
-Verlässt die SPML-Seite und setzt ggf. einen Rückgabewert für sp:include
+Evaluiert das Attribut und setzt den evaluierten Wert. Im Gegensatz zu `value` wird hier das Object zurück gegeben und nicht der Text.

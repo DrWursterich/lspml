@@ -1,1 +1,1 @@
-Das Tag, erzeugt ein Eingabefeld zum Herunderladen von Dateien.
+Bestimmt den Namen des Feldes.

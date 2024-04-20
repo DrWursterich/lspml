@@ -1,1 +1,1 @@
-Textarea-Tag, erzeugt einen Einabebereich.
+HTML-Attribut (`true`, `false`).

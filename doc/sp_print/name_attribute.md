@@ -1,1 +1,1 @@
-Dient zur Ausgabe eines Attributes
+Attribut das ausgegeben werden soll (Siehe „Attribute“).

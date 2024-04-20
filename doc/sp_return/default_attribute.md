@@ -1,1 +1,1 @@
-Verlässt die SPML-Seite und setzt ggf. einen Rückgabewert für sp:include
+Der Text, der verwendet wird, wenn die Inhalte von value, expression und body leer sind.

@@ -1,1 +1,1 @@
-If-Tag, schreibt Body wenn Bedingung ok ist.
+Variablenname eines Objektes das verglichen werden soll.

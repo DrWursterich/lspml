@@ -1,1 +1,1 @@
-Vergleicht zwei Zeichenketten und zeigt die Unterschiede an
+CSS Styleangaben, die noch in den umschließenden div-Tag eingetragen werden.

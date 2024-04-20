@@ -1,1 +1,1 @@
-Zahlenfeld, das per Klick auf- und abwärts gezählt werden kann
+Default-Wert (Vorgabewert).

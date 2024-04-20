@@ -1,1 +1,1 @@
-Zahleneingabe mit Prüfung auf Gültigkeit
+Ausrichtung des Inhalts für das erzeugte Eingabefeld.

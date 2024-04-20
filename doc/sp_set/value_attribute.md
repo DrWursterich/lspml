@@ -1,1 +1,1 @@
-Setzt ein Attribute
+Zu setzender Wert. Dieser wird immer als Zeichenkette ausgewertet.

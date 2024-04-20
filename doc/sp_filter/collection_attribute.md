@@ -1,1 +1,1 @@
-Filtert eine Liste
+Name der zu filternden Liste.

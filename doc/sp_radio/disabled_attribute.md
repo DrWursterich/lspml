@@ -1,1 +1,1 @@
-Radio Button-Tag, erzeugt einen RadioButton.
+HTML-Attribut (`true`, `false`).

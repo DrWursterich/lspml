@@ -1,1 +1,1 @@
-ElseIf-Tag, schreibt Body wenn Bedingung ok ist und vorheriges if fehl schlug.
+Regulärer Ausdruck, der in der Variablen enthalten sein soll.

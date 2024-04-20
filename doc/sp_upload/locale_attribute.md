@@ -1,1 +1,1 @@
-Das Tag, erzeugt ein Eingabefeld zum Herunderladen von Dateien.
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen.

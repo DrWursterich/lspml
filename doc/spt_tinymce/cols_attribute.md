@@ -1,1 +1,1 @@
-Integriert einen Editor
+Breite des Eingabefeldes in Spalten.

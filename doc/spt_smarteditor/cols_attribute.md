@@ -1,1 +1,1 @@
-Integriert den WYSIWYG-SmartEditor ins CMS
+Breite des Eingabefeldes in Spalten.

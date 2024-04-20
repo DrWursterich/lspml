@@ -1,1 +1,1 @@
-Hidden-Tag, erzeugt ein Hiddenfeld.
+Der Typ des Eingabefeldes.

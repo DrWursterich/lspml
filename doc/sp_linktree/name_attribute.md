@@ -1,0 +1,1 @@
+Name der Variable für das LinkTree-Objekt.

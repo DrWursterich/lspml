@@ -1,1 +1,1 @@
-Datums- und Uhrzeiteingabe mit Prüfung auf Gültigkeit
+`'size'`-Wert des generierten input-Tags.

@@ -1,1 +1,1 @@
-Option-Tag, für das Select Tag.
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen.

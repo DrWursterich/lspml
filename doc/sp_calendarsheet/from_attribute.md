@@ -1,1 +1,1 @@
-CalendarSheet manage dates and objects
+Über diesen Parameter wird der zeitliche Rahmen des CalendarSheets festgelegt.

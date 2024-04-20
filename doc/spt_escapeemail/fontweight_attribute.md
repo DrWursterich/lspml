@@ -1,1 +1,2 @@
-Ersetzt Email-Adressen durch Bilder
+Schriftstyle, die für den E-Mail-Text in dem generierten Bild verwendet werden soll.
+Mögliche Werte sind: `plain` `bold` `italic`

@@ -1,1 +1,1 @@
-Textarea-Tag, erzeugt einen Einabebereich.
+Der Typ des Eingabefeldes.

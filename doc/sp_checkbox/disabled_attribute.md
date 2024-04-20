@@ -1,1 +1,1 @@
-Check-Box-Tag, erzeugt eine checkBox.
+HTML-Attribut (`true`, `false`).

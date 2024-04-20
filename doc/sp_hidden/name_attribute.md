@@ -1,1 +1,1 @@
-Hidden-Tag, erzeugt ein Hiddenfeld.
+Bestimmt den Namen des Feldes.

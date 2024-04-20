@@ -1,1 +1,2 @@
-Durchsucht einen Text nach ID-Signaturen von Artikeln und ersetzt die IDs durch die URL des aktuellen Publikationsbereichs.
+Dieses Attribut kann benutzt werden um relative oder absolute URL zu generieren.
+Erlaubte Werte: `relative` | `absolute`

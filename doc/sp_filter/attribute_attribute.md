@@ -1,1 +1,1 @@
-Filtert eine Liste
+Attribut, auf das der Filter angewendet werden soll.

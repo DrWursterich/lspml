@@ -1,1 +1,1 @@
-Setzt ein Attribute
+Die Expression wird ausgewertet und als Wert in die Variable geschrieben.

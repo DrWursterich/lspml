@@ -1,1 +1,1 @@
-Text-Tag, erzeugt ein Eingabefeld.
+Bestimmt den Namen des Feldes.

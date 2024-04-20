@@ -1,1 +1,1 @@
-includiert ein anderes bereits im System gespeichertes Template.
+Anchor-Name des zu includenden Templates.

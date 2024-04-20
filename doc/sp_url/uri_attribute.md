@@ -1,1 +1,1 @@
-Fügt den ContextPath vor die angegebene URL und hängt, falls nötig die Session ID an die URL.
+Dies kann ein beliebiger Pfad zu einer Seite sein. sp:url sorgt dafür, dass alle Session-Informationen an die URL gehängt werden, so dass die Session nicht verloren geht.

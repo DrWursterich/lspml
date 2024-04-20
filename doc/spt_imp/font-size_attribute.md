@@ -1,1 +1,2 @@
-Erzeugt einen <img src="...">-Tag für kleingerechnete, sowie aus Texten generierte Bilder
+__Deprecated__. *Dieses Attribut ist veraltet und es sollte das Attribut fontsize verwendet werden.*
+Punkt-Größe des zu verwendenden Fonts (z.b.: `12`) 

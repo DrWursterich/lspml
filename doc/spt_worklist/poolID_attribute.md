@@ -1,1 +1,1 @@
-Workflow Management einbinden
+Pool des Artikels, zu dem der Worklisteintrag gehören soll.

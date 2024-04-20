@@ -1,1 +1,1 @@
-For-Tag, wiederholt solange wie angegeben.
+Startwert des Zählers

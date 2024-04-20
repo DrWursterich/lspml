@@ -1,1 +1,1 @@
-Option-Tag, für das Select Tag.
+Gibt an, ob die Option deaktiviert werden soll.

@@ -1,1 +1,1 @@
-Zahlenfeld, das per Klick auf- und abwärts gezählt werden kann
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen.

@@ -1,1 +1,1 @@
-Radio Button-Tag, erzeugt einen RadioButton.
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen.

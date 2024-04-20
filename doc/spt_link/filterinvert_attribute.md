@@ -1,1 +1,1 @@
-Erzeugt Links auf Informationen und bindet Bildmedien ein.
+Invertiert die Logik des Filters. Alle Elemente die normalerweise herausgefiltert würden, bilden die Filterergebnisse.

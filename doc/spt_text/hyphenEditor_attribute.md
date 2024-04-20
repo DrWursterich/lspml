@@ -1,1 +1,1 @@
-Einzeiliges Textfeld, das Versionierung unterstützt
+Deaktiviert bei `false` den Hyphen-Editor

@@ -1,1 +1,1 @@
-Erzeugt Links auf Informationen und bindet Bildmedien ein.
+HTML-size Wert des von `spt:link` erzeugten Eingabefeldes.

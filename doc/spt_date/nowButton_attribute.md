@@ -1,1 +1,1 @@
-Datums- und Uhrzeiteingabe mit Prüfung auf Gültigkeit
+Zeigt bei true eine Schaltfläche zum setzen des aktuellen Zeitpunkts an

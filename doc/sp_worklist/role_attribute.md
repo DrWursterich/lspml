@@ -1,1 +1,1 @@
-Findet die gewünschte Workliste
+Rolle, für die die Worklist-Items geladen werden sollen.

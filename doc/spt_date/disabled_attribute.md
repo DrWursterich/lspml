@@ -1,1 +1,1 @@
-Datums- und Uhrzeiteingabe mit Prüfung auf Gültigkeit
+HTML-Attribut (`true`, `false`).

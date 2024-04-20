@@ -1,1 +1,1 @@
-Verschlüsselt Email-Adressen so, dass sie auch für Responsive-Design-Anforderungen verwendet werden können
+Objekt das den zu ersetzenden Text enhält.

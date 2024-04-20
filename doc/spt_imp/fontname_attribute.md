@@ -1,1 +1,1 @@
-Erzeugt einen <img src="...">-Tag für kleingerechnete, sowie aus Texten generierte Bilder
+Der Font (z.B. `Arial`)

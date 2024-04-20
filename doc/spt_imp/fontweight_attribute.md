@@ -1,1 +1,1 @@
-Erzeugt einen <img src="...">-Tag für kleingerechnete, sowie aus Texten generierte Bilder
+Die Dicke (Wichtung) des angegebenen Fonts (z.b.: `bold`, `200` oder `900`).

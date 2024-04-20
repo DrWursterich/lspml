@@ -1,1 +1,1 @@
-Textarea-Tag, erzeugt einen Einabebereich.
+Überschreibt jeden vorhandenen Inhalt der mit `name` bestimmten Variablen mit dem durch `fixvalue` angegebenen Wert.

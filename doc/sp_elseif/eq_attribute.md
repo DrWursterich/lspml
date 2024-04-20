@@ -1,1 +1,1 @@
-ElseIf-Tag, schreibt Body wenn Bedingung ok ist und vorheriges if fehl schlug.
+Die Bedingung ist erfüllt, wenn die Variable in `name` gleich der Variable in `eq` ist.

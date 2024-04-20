@@ -1,1 +1,1 @@
-Findet die gewünschte Workliste
+Der Name, über den auf die Collection zugegriffen werden kann.

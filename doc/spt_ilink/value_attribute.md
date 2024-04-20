@@ -1,1 +1,1 @@
-Erzeugt einen Link auf das CMS
+Code für den generierten i-Link.

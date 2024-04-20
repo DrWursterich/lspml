@@ -1,1 +1,1 @@
-For-Tag, wiederholt solange wie angegeben.
+Name der Variable, die den aktuellen Zählerstand enthält

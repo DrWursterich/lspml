@@ -1,1 +1,1 @@
-Dient zur Ausgabe eines oder mehrerer Elemente.
+Das Trennzeichen der übergebenen Liste.

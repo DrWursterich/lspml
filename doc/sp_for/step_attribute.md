@@ -1,1 +1,1 @@
-For-Tag, wiederholt solange wie angegeben.
+Schrittweite, in der gezählt werden soll. `step` kann für einen Rückwärtszähler negativ sein

@@ -1,1 +1,1 @@
-Check-Box-Tag, erzeugt eine checkBox.
+Der Typ des Eingabefeldes.

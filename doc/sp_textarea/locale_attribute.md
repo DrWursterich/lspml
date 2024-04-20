@@ -1,1 +1,1 @@
-Textarea-Tag, erzeugt einen Einabebereich.
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen.

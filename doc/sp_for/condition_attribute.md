@@ -1,1 +1,1 @@
-For-Tag, wiederholt solange wie angegeben.
+Die For-Schleife wird solange durchlaufen, bis die Bedingung `false` ergibt

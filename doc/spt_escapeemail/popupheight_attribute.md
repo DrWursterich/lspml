@@ -1,1 +1,1 @@
-Ersetzt Email-Adressen durch Bilder
+Höhe des Popup-Fensters für das Kontaktformular.

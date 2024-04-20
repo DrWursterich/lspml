@@ -1,1 +1,1 @@
-Integriert einen Editor
+Höhe des Eingabefeldes in Zeilen.

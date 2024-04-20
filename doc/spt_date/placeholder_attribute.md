@@ -1,1 +1,1 @@
-Datums- und Uhrzeiteingabe mit Prüfung auf Gültigkeit
+Muss ein Datum sind und wird als Placeholder eingesetzt

@@ -1,0 +1,1 @@
+Name der Variable für den Zugriff auf das erzeugte CSS.

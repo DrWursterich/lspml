@@ -1,1 +1,1 @@
-If-Tag, schreibt Body wenn Bedingung ok ist.
+Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen Variablen.

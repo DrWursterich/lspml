@@ -1,1 +1,1 @@
-Einzeiliges Textfeld, das Versionierung unterstützt
+HTML-Attribut (`true`, `false`).

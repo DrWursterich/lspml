@@ -1,1 +1,1 @@
-Integriert einen Editor
+Bestimmt den Namen des Feldes.

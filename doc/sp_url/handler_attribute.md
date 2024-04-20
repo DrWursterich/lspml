@@ -1,1 +1,1 @@
-Fügt den ContextPath vor die angegebene URL und hängt, falls nötig die Session ID an die URL.
+Handler der vor dem Aufruf, der mit `uri` oder `template` angegebenen Seite, ausgeführt werden soll.

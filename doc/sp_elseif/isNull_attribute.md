@@ -1,1 +1,1 @@
-ElseIf-Tag, schreibt Body wenn Bedingung ok ist und vorheriges if fehl schlug.
+Die Bedingung ist erfüllt, wenn die Variable in `name` leer oder nicht vorhanden ist und `isNull` den Wert `true` hat. Wenn `isNull` den Wert `false` hat, ist die Bedingungen erfüllt, wenn die Variable in `name` nicht leer ist.

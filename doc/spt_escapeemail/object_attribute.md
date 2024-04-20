@@ -1,1 +1,1 @@
-Ersetzt Email-Adressen durch Bilder
+Objekt das den zu ersetzenden Text enhält.

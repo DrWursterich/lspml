@@ -1,1 +1,1 @@
-Erzeugt einen <img src="...">-Tag für kleingerechnete, sowie aus Texten generierte Bilder
+Punkt-Größe des zu verwendenden Fonts (z.b.: `12`) 

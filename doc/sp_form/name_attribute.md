@@ -1,1 +1,1 @@
-Erzeugt ein HTML-Form-Tag mit einem angepassten Kommando
+Optionaler Name für das erzeugte Formular.

@@ -1,1 +1,1 @@
-includiert ein anderes bereits im System gespeichertes Template.
+Zu includendes Template (Variable mit einer Template-ID).

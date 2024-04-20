@@ -1,1 +1,1 @@
-Ersetzt Email-Adressen durch Bilder
+Schriftfarbe, die für den E-Mail-Text in dem generierten Bild verwendet werden soll.

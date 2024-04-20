@@ -1,1 +1,1 @@
-Verlässt die SPML-Seite und setzt ggf. einen Rückgabewert für sp:include
+Zu setzender Wert. Dieser wird immer als Zeichenkette ausgewertet.

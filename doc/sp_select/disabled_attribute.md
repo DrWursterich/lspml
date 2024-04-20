@@ -1,1 +1,1 @@
-Select-Tag, erzeugt den Rahmen einen Auswahlliste.
+HTML-Attribut (`true`, `false`).

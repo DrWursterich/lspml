@@ -1,1 +1,1 @@
-Text-Tag, erzeugt ein Eingabefeld.
+Überschreibt jeden vorhandenen Inhalt der mit `name` bestimmten Variablen mit dem durch `fixvalue` angegebenen Wert.

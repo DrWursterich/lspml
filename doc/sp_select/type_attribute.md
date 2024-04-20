@@ -1,1 +1,1 @@
-Select-Tag, erzeugt den Rahmen einen Auswahlliste.
+Der Typ des Eingabefeldes.

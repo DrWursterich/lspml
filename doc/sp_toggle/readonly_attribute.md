@@ -1,1 +1,1 @@
-Toggle-Tag erzeugt einen toggle der einen einzigen boolischen Wert speichert
+HTML-Attribut (`true`, `false`).

@@ -1,1 +1,1 @@
-Datums- und Uhrzeiteingabe mit Prüfung auf Gültigkeit
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen.

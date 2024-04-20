@@ -1,1 +1,1 @@
-Erzeugt Links auf Informationen und bindet Bildmedien ein.
+Name der Variable, unter der der Systemlink in die Datenbank geschrieben wird.

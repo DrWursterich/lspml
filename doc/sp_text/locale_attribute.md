@@ -1,1 +1,1 @@
-Text-Tag, erzeugt ein Eingabefeld.
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen.

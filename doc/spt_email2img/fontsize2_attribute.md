@@ -1,1 +1,1 @@
-Ersetzt E-Mail-Adressen durch Bilder
+Schriftgröße, die für den E-Mail-Text in dem generierten Bild für das Mailformular verwendet werden soll.

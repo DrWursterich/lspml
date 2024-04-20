@@ -1,1 +1,1 @@
-Erzeugt ein mehrzeiliges Textfeld, das Versionierung unterstützt
+Dieses Attribut bestimmt die Mehrsprachigkeit der Variablen.

@@ -1,1 +1,1 @@
-If-Tag, schreibt Body wenn Bedingung ok ist.
+Es wird eine Condition erwartet, die den Wert `true` oder `false` zurückliefert.

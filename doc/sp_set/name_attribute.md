@@ -1,1 +1,1 @@
-Setzt ein Attribute
+Name der neuen Variable.

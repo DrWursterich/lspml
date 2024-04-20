@@ -1,1 +1,1 @@
-Durchsucht einen Text nach ID-Signaturen von Artikeln und ersetzt die IDs durch die URL des aktuellen Publikationsbereichs.
+Mit diesem Attribut kann für die eingesetzten URL noch ein Querystring (Parameter nach einem `?`) angehängt werden.

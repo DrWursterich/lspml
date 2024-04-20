@@ -1,1 +1,1 @@
-CalendarSheet manage dates and objects
+Name über den das `CalendarSheet` angesprochen werden kann.

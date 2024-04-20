@@ -1,1 +1,1 @@
-Erzeugt einen <img src="...">-Tag für kleingerechnete, sowie aus Texten generierte Bilder
+Die Farbe der Schrift. Beispielsweise `AA00DD` oder `ff77ff`

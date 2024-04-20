@@ -1,1 +1,1 @@
-Verlässt die SPML-Seite und setzt ggf. einen Rückgabewert für sp:include
+Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen Variablen.

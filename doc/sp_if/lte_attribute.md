@@ -1,1 +1,1 @@
-If-Tag, schreibt Body wenn Bedingung ok ist.
+Die Bedingung ist erfüllt, wenn die Variable in `name` kleiner oder gleich der Variable in `lte` ist.

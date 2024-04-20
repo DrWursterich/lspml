@@ -1,1 +1,1 @@
-Zählt Zugriffe auf publizierte Informationen
+Name der Variable in der der Zugriffswert gespeichert wird.

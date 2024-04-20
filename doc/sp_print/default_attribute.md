@@ -1,1 +1,1 @@
-Dient zur Ausgabe eines Attributes
+Auszugebender Default-Wert, wenn das Ergebnis von name bzw. `text` bzw. `expression` leer ist.

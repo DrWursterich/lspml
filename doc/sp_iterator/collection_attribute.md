@@ -1,1 +1,1 @@
-Wird für den Aufbau von Wiederholfeldern verwendet.
+Die zu iterierende Liste. Dieses Attribut entspricht dem `name`-Attribut des `spt:iterator-Tags`.

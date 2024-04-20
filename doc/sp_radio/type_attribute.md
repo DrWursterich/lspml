@@ -1,1 +1,1 @@
-Radio Button-Tag, erzeugt einen RadioButton.
+Der Typ des Eingabefeldes.

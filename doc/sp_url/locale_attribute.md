@@ -1,1 +1,1 @@
-Fügt den ContextPath vor die angegebene URL und hängt, falls nötig die Session ID an die URL.
+Dieses Attribut dient zur Auswahl der zu verwendende Sprache bei mehrsprachiger Variablen.

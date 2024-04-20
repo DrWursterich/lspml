@@ -1,1 +1,1 @@
-Erzeugt ein mehrzeiliges Textfeld, das Versionierung unterstützt
+HTML-Attribut (`true`, `false`).

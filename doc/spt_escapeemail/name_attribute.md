@@ -1,1 +1,1 @@
-Ersetzt Email-Adressen durch Bilder
+Variable, in der der ersetzte Text abgelegt wird.

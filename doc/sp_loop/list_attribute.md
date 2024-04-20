@@ -1,1 +1,1 @@
-Dient zur Ausgabe eines oder mehrerer Elemente.
+Eine Zeichenkette mit dem in `separator` angegebenen Trennzeichen.

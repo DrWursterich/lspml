@@ -1,1 +1,1 @@
-Verlässt die SPML-Seite und setzt ggf. einen Rückgabewert für sp:include
+Die Condition wird ausgewertet und als Bedingung in den Rückgabe-Wert geschrieben.

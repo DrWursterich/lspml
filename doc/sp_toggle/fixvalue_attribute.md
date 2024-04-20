@@ -1,1 +1,1 @@
-Toggle-Tag erzeugt einen toggle der einen einzigen boolischen Wert speichert
+Überschreibt jeden vorhandenen Inhalt der mit `name` bestimmten Variablen mit dem durch `fixvalue` angegebenen Wert.

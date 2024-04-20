@@ -1,1 +1,1 @@
-Erzeugt ein mehrzeiliges Textfeld, das Versionierung unterstützt
+Bestimmt den Namen des Feldes.

@@ -1,1 +1,1 @@
-ElseIf-Tag, schreibt Body wenn Bedingung ok ist und vorheriges if fehl schlug.
+Dieses Attribut dient zur Auswahl der zu verwendenden Sprache bei mehrsprachigen Variablen.

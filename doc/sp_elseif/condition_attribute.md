@@ -1,1 +1,1 @@
-ElseIf-Tag, schreibt Body wenn Bedingung ok ist und vorheriges if fehl schlug.
+Es wird eine Condition erwartet, die den Wert `true` oder `false` zurückliefert.

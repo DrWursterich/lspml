@@ -1,1 +1,1 @@
-Collection tag offers certain operation that deal with a common collection. For further description see the javadoc of the class com.sitepark.ies.taglib.core.CollectionTag.
+Fügt in die Collection die Ergebnisse der übergebenen Suchabfrage ein. Ist dieses Attibut gesetzt, ist kein `action` nötig. Die Aktion entspricht einem `addAll`. Es kann jedoch eine andere Aktion angegeben werden.

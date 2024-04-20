@@ -1,1 +1,1 @@
-Check-Box-Tag, erzeugt eine checkBox.
+Setzt einen zu übertragenen Wert dieser Checkbox

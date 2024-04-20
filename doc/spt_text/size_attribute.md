@@ -1,1 +1,1 @@
-Einzeiliges Textfeld, das Versionierung unterstützt
+`'size'`-Wert des generierten `input`-Tags.

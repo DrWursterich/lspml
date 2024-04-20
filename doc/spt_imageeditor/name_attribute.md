@@ -1,1 +1,1 @@
-Erzeugt eine Bearbeitungsoberfläche für Bilder
+Bestimmt den Namen des Feldes.

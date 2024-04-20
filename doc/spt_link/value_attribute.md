@@ -1,1 +1,1 @@
-Erzeugt Links auf Informationen und bindet Bildmedien ein.
+Vorgabefeld für das erzeugte Eingabefeld.

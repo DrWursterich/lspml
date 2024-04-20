@@ -1,1 +1,1 @@
-HTML-Code nachbearbeiten.
+Name der Variablen, unter der die ersetzte Zeichenkette gespeichert werden soll.

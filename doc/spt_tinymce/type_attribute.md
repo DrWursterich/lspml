@@ -1,1 +1,1 @@
-Integriert einen Editor
+Der Typ des Eingabefeldes.

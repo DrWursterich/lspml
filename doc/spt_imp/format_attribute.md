@@ -1,1 +1,1 @@
-Erzeugt einen <img src="...">-Tag für kleingerechnete, sowie aus Texten generierte Bilder
+Die Formate `png` und `jpeg` können für Thumbnails verwendet werden

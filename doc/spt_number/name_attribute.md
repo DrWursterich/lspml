@@ -1,1 +1,1 @@
-Zahleneingabe mit Prüfung auf Gültigkeit
+Bestimmt den Namen des Feldes.

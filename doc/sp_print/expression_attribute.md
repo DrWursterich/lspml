@@ -1,1 +1,1 @@
-Dient zur Ausgabe eines Attributes
+Alternative zu name (Siehe „Expression“).

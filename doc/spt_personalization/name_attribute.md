@@ -1,1 +1,1 @@
-Definiert personalisierte Bereiche
+Variablenname, unter dem die Rechte gespeichert werden.

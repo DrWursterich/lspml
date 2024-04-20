@@ -1,1 +1,1 @@
-Select-Tag, erzeugt den Rahmen einen Auswahlliste.
+Bestimmt den Namen des Feldes.

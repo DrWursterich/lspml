@@ -1,1 +1,1 @@
-Ersetzt Email-Adressen durch Bilder
+Alternativtext der in die `alt`-Attribute der `<img>`-Tags eingetragen wird.

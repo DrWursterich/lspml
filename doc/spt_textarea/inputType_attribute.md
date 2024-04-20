@@ -1,1 +1,1 @@
-Erzeugt ein mehrzeiliges Textfeld, das Versionierung unterstützt
+Setzt den [Typ](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input#Form_%3Cinput%3E_types) des Eingeabefelds
