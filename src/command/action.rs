@@ -124,70 +124,72 @@ fn construct_name_to_condition<'a>(
     uri: &Url,
     attributes: &HashMap<&'a str, Node<'a>>,
 ) -> Option<CodeActionOrCommand> {
-    if let Some(name_node) = attributes.get("name") {
-        if let Some((operator, value_node)) = attributes.iter().find_map(|(k, v)| match *k {
-            k @ ("gt" | "gte" | "lt" | "lte" | "eq" | "neq" | "isNull") => Some((k, v)),
-            _ => None,
-        }) {
-            if let Some(name) = name_node
-                .named_child(0)
-                .and_then(|n| n.named_child(0))
-                .and_then(|n| n.utf8_text(document.text.as_bytes()).ok())
-            {
-                if let Some(value) = value_node
-                    .named_child(0)
-                    .and_then(|n| n.named_child(0))
-                    .and_then(|n| n.utf8_text(document.text.as_bytes()).ok())
-                {
-                    let new_text = match operator {
-                        "isNull" if value == "true" => {
-                            format!("condition=\"isNull(${{{}}})\"", name)
-                        }
-                        "isNull" if value == "false" => {
-                            format!("condition=\"!isNull(${{{}}})\"", name)
-                        }
-                        "isNull" => format!("condition=\"isNull(${{{}}}) == {}\"", name, value),
-                        "gt" => format!("condition=\"${{{}}} > {}\"", name, value),
-                        "gte" => format!("condition=\"${{{}}} >= {}\"", name, value),
-                        "lt" => format!("condition=\"${{{}}} < {}\"", name, value),
-                        "lte" => format!("condition=\"${{{}}} <= {}\"", name, value),
-                        "neq" => format!("condition=\"${{{}}} != {}\"", name, value),
-                        _ => format!("condition=\"${{{}}} == {}\"", name, value),
-                    };
-                    return Some(CodeActionOrCommand::CodeAction(CodeAction {
-                        title: format!("transform \"name\" and \"{}\" to \"condition\"", operator),
-                        kind: Some(CodeActionImplementation::NameToCondition.to_kind()),
-                        edit: Some(WorkspaceEdit {
-                            changes: Some(HashMap::from([(
-                                uri.clone(),
-                                vec![
-                                    TextEdit {
-                                        range: Range {
-                                            start: Position {
-                                                line: value_node.start_position().row as u32,
-                                                character: value_node.start_position().column
-                                                    as u32
-                                                    - 1,
-                                            },
-                                            end: point_to_position(&value_node.end_position()),
-                                        },
-                                        new_text: "".to_string(),
-                                    },
-                                    TextEdit {
-                                        range: node_range(&name_node),
-                                        new_text,
-                                    },
-                                ],
-                            )])),
-                            ..WorkspaceEdit::default()
-                        }),
-                        ..CodeAction::default()
-                    }));
-                }
-            }
-        };
-    }
-    return None;
+    let name_node = match attributes.get("name") {
+        Some(v) => v,
+        None => return None,
+    };
+    let (operator, value_node) = match attributes.iter().find_map(|(k, v)| match *k {
+        k @ ("gt" | "gte" | "lt" | "lte" | "eq" | "neq" | "isNull") => Some((k, v)),
+        _ => None,
+    }) {
+        Some(v) => v,
+        None => return None,
+    };
+    let name = match name_node
+        .named_child(0)
+        .and_then(|n| n.named_child(0))
+        .and_then(|n| n.utf8_text(document.text.as_bytes()).ok())
+    {
+        Some(v) => v,
+        None => return None,
+    };
+    let value = match value_node
+        .named_child(0)
+        .and_then(|n| n.named_child(0))
+        .and_then(|n| n.utf8_text(document.text.as_bytes()).ok())
+    {
+        Some(v) => v,
+        None => return None,
+    };
+    let new_condition = match operator {
+        "isNull" if value == "true" => format!("isNull(${{{}}})", name),
+        "isNull" if value == "false" => format!("!isNull(${{{}}})", name),
+        "isNull" => format!("isNull(${{{}}}) == {}", name, value),
+        "gt" => format!("${{{}}} > {}", name, value),
+        "gte" => format!("${{{}}} >= {}", name, value),
+        "lt" => format!("${{{}}} < {}", name, value),
+        "lte" => format!("${{{}}} <= {}", name, value),
+        "neq" => format!("${{{}}} != {}", name, value),
+        _ => format!("${{{}}} == {}", name, value),
+    };
+    let value_start = value_node.start_position();
+    return Some(CodeActionOrCommand::CodeAction(CodeAction {
+        title: format!("transform \"name\" and \"{}\" to \"condition\"", operator),
+        kind: Some(CodeActionImplementation::NameToCondition.to_kind()),
+        edit: Some(WorkspaceEdit {
+            changes: Some(HashMap::from([(
+                uri.clone(),
+                vec![
+                    TextEdit {
+                        range: Range {
+                            start: Position {
+                                line: value_start.row as u32,
+                                character: value_start.column as u32 - 1,
+                            },
+                            end: point_to_position(&value_node.end_position()),
+                        },
+                        new_text: "".to_string(),
+                    },
+                    TextEdit {
+                        range: node_range(&name_node),
+                        new_text: format!("condition=\"{}\"", new_condition),
+                    },
+                ],
+            )])),
+            ..WorkspaceEdit::default()
+        }),
+        ..CodeAction::default()
+    }));
 }
 
 fn construct_condition_to_name<'a>(
@@ -195,92 +197,93 @@ fn construct_condition_to_name<'a>(
     uri: &Url,
     attributes: &HashMap<&'a str, Node<'a>>,
 ) -> Option<CodeActionOrCommand> {
-    if let Some(condition_node) = attributes.get("condition") {
-        if let Some(value_node) = condition_node.named_child(0).and_then(|n| n.named_child(0)) {
-            let offset = value_node.start_position();
-            match document.spel.get(&offset) {
-                Some(SpelAst::Condition(SpelResult::Valid(Condition::Comparisson {
-                    left,
-                    operator,
-                    right,
-                    ..
-                }))) => {
-                    let operator_name;
-                    let new_text;
-                    match (&**left, &**right) {
-                        (Comparable::Object(inner), _) => {
-                            operator_name = match operator {
-                                ComparissonOperator::Equal => "eq",
-                                ComparissonOperator::Unequal => "neq",
-                                ComparissonOperator::GreaterThan => "gt",
-                                ComparissonOperator::GreaterThanOrEqual => "gte",
-                                ComparissonOperator::LessThan => "lt",
-                                ComparissonOperator::LessThanOrEqual => "lte",
-                            };
-                            new_text = format!(
-                                "name=\"{}\" {}=\"{}\"",
-                                inner.content, operator_name, *right
-                            );
-                        }
-                        (_, Comparable::Object(inner)) => {
-                            operator_name = match operator {
-                                ComparissonOperator::Equal => "eq",
-                                ComparissonOperator::Unequal => "neq",
-                                ComparissonOperator::GreaterThan => "lt",
-                                ComparissonOperator::GreaterThanOrEqual => "lte",
-                                ComparissonOperator::LessThan => "gt",
-                                ComparissonOperator::LessThanOrEqual => "gte",
-                            };
-                            new_text = format!(
-                                "name=\"{}\" {}=\"{}\"",
-                                inner.content, operator_name, *left
-                            );
-                        }
-                        _ => return None,
+    let condition_node = match attributes.get("condition") {
+        Some(v) => v,
+        None => return None,
+    };
+    let value_node = match condition_node.named_child(0).and_then(|n| n.named_child(0)) {
+        Some(v) => v,
+        None => return None,
+    };
+    let offset = value_node.start_position();
+    match document.spel.get(&offset) {
+        Some(SpelAst::Condition(SpelResult::Valid(Condition::Comparisson {
+            left,
+            operator,
+            right,
+            ..
+        }))) => {
+            let operator_name;
+            let new_text;
+            match (&**left, &**right) {
+                (Comparable::Object(inner), _) => {
+                    operator_name = match operator {
+                        ComparissonOperator::Equal => "eq",
+                        ComparissonOperator::Unequal => "neq",
+                        ComparissonOperator::GreaterThan => "gt",
+                        ComparissonOperator::GreaterThanOrEqual => "gte",
+                        ComparissonOperator::LessThan => "lt",
+                        ComparissonOperator::LessThanOrEqual => "lte",
                     };
-                    return Some(CodeActionOrCommand::CodeAction(CodeAction {
-                        title: format!(
-                            "transform \"condition\" to \"name\" and \"{}\"",
-                            operator_name
-                        ),
-                        kind: Some(CodeActionImplementation::ConditionToName.to_kind()),
-                        edit: Some(WorkspaceEdit {
-                            changes: Some(HashMap::from([(
-                                uri.clone(),
-                                vec![TextEdit {
-                                    range: node_range(&condition_node),
-                                    new_text,
-                                }],
-                            )])),
-                            ..WorkspaceEdit::default()
-                        }),
-                        ..CodeAction::default()
-                    }));
+                    new_text = format!(
+                        "name=\"{}\" {}=\"{}\"",
+                        inner.content, operator_name, *right
+                    );
                 }
-                Some(SpelAst::Condition(SpelResult::Valid(condition))) => {
-                    return parse_is_null(&condition).map(|(name, value)| {
-                        CodeActionOrCommand::CodeAction(CodeAction {
-                            title: "transform \"condition\" to \"name\" and \"isNull\"".to_string(),
-                            kind: Some(CodeActionImplementation::ConditionToName.to_kind()),
-                            edit: Some(WorkspaceEdit {
-                                changes: Some(HashMap::from([(
-                                    uri.clone(),
-                                    vec![TextEdit {
-                                        range: node_range(&condition_node),
-                                        new_text: format!("name=\"{}\" isNull=\"{}\"", name, value),
-                                    }],
-                                )])),
-                                ..WorkspaceEdit::default()
-                            }),
-                            ..CodeAction::default()
-                        })
-                    })
+                (_, Comparable::Object(inner)) => {
+                    operator_name = match operator {
+                        ComparissonOperator::Equal => "eq",
+                        ComparissonOperator::Unequal => "neq",
+                        ComparissonOperator::GreaterThan => "lt",
+                        ComparissonOperator::GreaterThanOrEqual => "lte",
+                        ComparissonOperator::LessThan => "gt",
+                        ComparissonOperator::LessThanOrEqual => "gte",
+                    };
+                    new_text =
+                        format!("name=\"{}\" {}=\"{}\"", inner.content, operator_name, *left);
                 }
                 _ => return None,
             };
+            return Some(CodeActionOrCommand::CodeAction(CodeAction {
+                title: format!(
+                    "transform \"condition\" to \"name\" and \"{}\"",
+                    operator_name
+                ),
+                kind: Some(CodeActionImplementation::ConditionToName.to_kind()),
+                edit: Some(WorkspaceEdit {
+                    changes: Some(HashMap::from([(
+                        uri.clone(),
+                        vec![TextEdit {
+                            range: node_range(&condition_node),
+                            new_text,
+                        }],
+                    )])),
+                    ..WorkspaceEdit::default()
+                }),
+                ..CodeAction::default()
+            }));
         }
+        Some(SpelAst::Condition(SpelResult::Valid(condition))) => {
+            return parse_is_null(&condition).map(|(name, value)| {
+                CodeActionOrCommand::CodeAction(CodeAction {
+                    title: "transform \"condition\" to \"name\" and \"isNull\"".to_string(),
+                    kind: Some(CodeActionImplementation::ConditionToName.to_kind()),
+                    edit: Some(WorkspaceEdit {
+                        changes: Some(HashMap::from([(
+                            uri.clone(),
+                            vec![TextEdit {
+                                range: node_range(&condition_node),
+                                new_text: format!("name=\"{}\" isNull=\"{}\"", name, value),
+                            }],
+                        )])),
+                        ..WorkspaceEdit::default()
+                    }),
+                    ..CodeAction::default()
+                })
+            })
+        }
+        _ => None,
     }
-    return None;
 }
 
 fn parse_is_null(root: &Condition) -> Option<(String, String)> {
