@@ -1,0 +1,1 @@
+Kennzeichnet das Objekt, das eingefügt, ersetzt oder gelöscht werden soll.

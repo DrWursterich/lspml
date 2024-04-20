@@ -1,0 +1,1 @@
+`ID` des Publishers, in dem die Artikel des Baumes publiziert sein müssen.

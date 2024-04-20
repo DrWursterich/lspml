@@ -1,0 +1,1 @@
+Der Typ des Eingabefeldes.

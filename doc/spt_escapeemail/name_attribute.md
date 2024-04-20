@@ -1,0 +1,1 @@
+Variable, in der der ersetzte Text abgelegt wird.

@@ -1,0 +1,1 @@
+Setzt einen zu übertragenen Wert dieser Checkbox

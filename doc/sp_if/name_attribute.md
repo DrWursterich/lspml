@@ -1,0 +1,1 @@
+Variablenname eines Objektes das verglichen werden soll.

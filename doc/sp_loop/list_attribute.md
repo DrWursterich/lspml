@@ -1,0 +1,1 @@
+Eine Zeichenkette mit dem in `separator` angegebenen Trennzeichen.

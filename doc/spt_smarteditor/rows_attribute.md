@@ -1,0 +1,1 @@
+Höhe des Eingabefeldes in Zeilen.

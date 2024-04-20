@@ -1,0 +1,1 @@
+Gibt den Wert der Option an.

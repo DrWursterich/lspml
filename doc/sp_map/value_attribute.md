@@ -1,0 +1,1 @@
+Kennzeichnet den Wert, der eingefügt, ersetzt oder gelöscht werden soll.

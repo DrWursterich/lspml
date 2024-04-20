@@ -1,0 +1,1 @@
+Die Expression wird ausgewertet und als Rückgabe-Wert geschrieben.

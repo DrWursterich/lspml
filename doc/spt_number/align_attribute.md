@@ -1,0 +1,1 @@
+Ausrichtung des Inhalts für das erzeugte Eingabefeld.

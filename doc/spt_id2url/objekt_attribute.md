@@ -1,0 +1,1 @@
+Variablenname des Objektes, das die Zeichenkette enthält.

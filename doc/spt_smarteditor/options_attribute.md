@@ -1,0 +1,1 @@
+Optionen, die beim Aufruf des Smarteditors an diesen übergeben werden.

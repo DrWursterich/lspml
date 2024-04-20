@@ -1,0 +1,1 @@
+Text aus dem der Barcode generiert werden soll.

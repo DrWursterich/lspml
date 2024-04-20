@@ -1,0 +1,1 @@
+Name der Variable, unter der die Verknüpfung in die Datenbank geschrieben wird.

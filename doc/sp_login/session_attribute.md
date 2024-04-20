@@ -1,0 +1,1 @@
+Verwendet eine aktive Session für die Authentifizierung.

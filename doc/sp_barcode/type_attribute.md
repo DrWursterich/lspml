@@ -1,0 +1,1 @@
+Zu erzeugender Barcode-Typ. Unterstütz wird z.Z. nur `qrcode`

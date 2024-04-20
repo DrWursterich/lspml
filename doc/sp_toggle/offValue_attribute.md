@@ -1,0 +1,1 @@
+Wert der gesetzt wird, wenn die Checkbox nicht gechecked ist

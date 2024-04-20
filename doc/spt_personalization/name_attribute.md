@@ -1,0 +1,1 @@
+Variablenname, unter dem die Rechte gespeichert werden.

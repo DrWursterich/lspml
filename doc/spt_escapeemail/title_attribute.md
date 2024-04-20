@@ -1,0 +1,1 @@
+Alternativtext der in die `title`-Attribute der `<img>`-Tags eingetragen wird.

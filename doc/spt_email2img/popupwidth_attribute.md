@@ -1,0 +1,1 @@
+Breite des Popup-Fensters für das Kontaktformular.

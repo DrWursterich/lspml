@@ -1,0 +1,1 @@
+Artikel, zu dem der Worklisteintrag gehören soll.

@@ -1,0 +1,1 @@
+Beschriftung des Smarteditorfeldes, oberhalb.

@@ -1,0 +1,1 @@
+Wert der gesetzt wird, wenn die Checkbox gechecked ist

@@ -1,0 +1,1 @@
+Endwert des Zählers

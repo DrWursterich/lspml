@@ -1,0 +1,1 @@
+Text der in ein Bild umgewandelt werden soll.

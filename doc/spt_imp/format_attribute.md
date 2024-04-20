@@ -1,0 +1,1 @@
+Die Formate `png` und `jpeg` können für Thumbnails verwendet werden

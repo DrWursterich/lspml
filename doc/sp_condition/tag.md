@@ -1,0 +1,1 @@
+Umklammert einen if-else Konstrukt.

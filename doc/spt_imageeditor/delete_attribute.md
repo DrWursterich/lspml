@@ -1,0 +1,1 @@
+Aktiviert die Möglichkeit das Bild im Editor löschen zu können

@@ -1,0 +1,1 @@
+Die Farbe der Schrift. Beispielsweise `AA00DD` oder `ff77ff`

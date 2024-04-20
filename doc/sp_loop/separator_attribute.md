@@ -1,0 +1,1 @@
+Das Trennzeichen der übergebenen Liste.

@@ -1,0 +1,1 @@
+Die For-Schleife wird solange durchlaufen, bis die Bedingung `false` ergibt

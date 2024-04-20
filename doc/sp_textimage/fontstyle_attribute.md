@@ -1,0 +1,1 @@
+Schriftstil. Mögliche Werte sind `plain`, `bold` und `italic`.

@@ -1,0 +1,1 @@
+Pool des Artikels, zu dem der Worklisteintrag gehören soll.

@@ -1,0 +1,1 @@
+Startwert des Bereichs (Minimalwert).

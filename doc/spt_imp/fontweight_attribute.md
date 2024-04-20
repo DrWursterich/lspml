@@ -1,0 +1,1 @@
+Die Dicke (Wichtung) des angegebenen Fonts (z.b.: `bold`, `200` oder `900`).

@@ -1,0 +1,1 @@
+Breite des Eingabefeldes in Spalten.

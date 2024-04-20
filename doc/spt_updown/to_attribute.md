@@ -1,0 +1,1 @@
+Endwert des Bereichs (Maximalwert, es folgt `'unendlich'`).

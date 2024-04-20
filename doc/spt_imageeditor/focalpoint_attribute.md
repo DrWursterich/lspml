@@ -1,0 +1,1 @@
+Aktiviert die Bearbeitung des Fokus-Punktes

@@ -1,0 +1,1 @@
+HTML-size Wert des von `spt:link` erzeugten Eingabefeldes.

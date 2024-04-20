@@ -1,0 +1,1 @@
+Regulärer Ausdruck, der in der Variablen enthalten sein soll.

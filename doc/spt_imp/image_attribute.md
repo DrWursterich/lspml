@@ -1,0 +1,1 @@
+Bild-Object, das mit dem `spt:imp`-Tag verarbeitet werden soll.

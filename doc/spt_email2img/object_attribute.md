@@ -1,0 +1,1 @@
+Objekt das den zu ersetzenden Text enhält.

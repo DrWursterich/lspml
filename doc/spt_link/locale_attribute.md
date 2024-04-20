@@ -1,0 +1,1 @@
+Diese Attribut bestimmt die Mehrsprachigkeit der Variable.

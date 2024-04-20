@@ -1,0 +1,1 @@
+Die `Condition` wird ausgewertet und als Bedingung in die Variable geschrieben.
