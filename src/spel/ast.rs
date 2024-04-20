@@ -576,6 +576,25 @@ impl Display for Location {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub(crate) enum SpelResult<AST> {
+    Valid(AST),
+    Invalid(String, String),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum SpelAst {
+    Comparable(SpelResult<Comparable>),
+    Condition(SpelResult<Condition>),
+    Expression(SpelResult<Expression>),
+    Identifier(SpelResult<Identifier>),
+    Object(SpelResult<Object>),
+    Query(SpelResult<Query>),
+    Regex(SpelResult<Regex>),
+    String(SpelResult<Word>),
+    Uri(SpelResult<Uri>),
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct ObjectAst {
     pub(crate) root: Object,
 }
@@ -665,6 +684,11 @@ impl Display for UriFileExtension {
         formatter.write_str(".")?;
         return self.content.fmt(formatter);
     }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct Query {
+    pub(crate) location: Location,
 }
 
 #[derive(Debug, PartialEq, Clone)]

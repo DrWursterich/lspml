@@ -15,7 +15,6 @@ use std::{
     error::Error,
     fmt::{Display, Formatter},
     fs::File,
-    str::FromStr,
 };
 use structured_logger::Builder;
 mod command;
@@ -227,31 +226,36 @@ fn main_loop(
 }
 
 fn changed(params: DidChangeTextDocumentParams) -> Result<()> {
+    let uri = params.text_document.uri;
     if let Some(change) = &params.content_changes.last() {
-        return document_store::Document::from_str(&change.text).map(|document| {
-            log::debug!("updated {}", params.text_document.uri);
-            document_store::put(&params.text_document.uri, document);
-            return ();
-        });
+        match document_store::Document::new(change.text.to_owned()) {
+            Ok(document) => {
+                document_store::put(&uri, document);
+                log::debug!("updated {}", uri);
+            }
+            Err(err) => return Err(err),
+        }
     }
     return Ok(());
 }
 
 fn opened(params: DidOpenTextDocumentParams) -> Result<()> {
-    return match document_store::get(&params.text_document.uri) {
-        Some(_) => Result::Ok(()),
-        None => document_store::Document::from_str(&params.text_document.text).map(|document| {
-            document_store::put(&params.text_document.uri, document);
-            log::debug!("opened {}", params.text_document.uri);
+    let uri = params.text_document.uri;
+    return match document_store::get(&uri) {
+        Some(_) => Ok(()),
+        None => document_store::Document::new(params.text_document.text).map(|document| {
+            document_store::put(&uri, document);
+            log::debug!("opened {}", uri);
             return ();
         }),
     };
 }
 
 fn saved(params: DidSaveTextDocumentParams) -> Result<()> {
-    return document_store::Document::new(&params.text_document.uri).map(|document| {
-        document_store::put(&params.text_document.uri, document);
-        log::debug!("saved {}", params.text_document.uri);
+    let uri = params.text_document.uri;
+    return document_store::Document::from_uri(&uri).map(|document| {
+        document_store::put(&uri, document);
+        log::debug!("saved {}", uri);
         return ();
     });
 }

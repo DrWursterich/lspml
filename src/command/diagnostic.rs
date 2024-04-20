@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::Path, str::FromStr};
 
-use anyhow::{Error, Result};
+use anyhow::Result;
 use lsp_server::ErrorCode;
 use lsp_types::{
     Diagnostic, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticParams, NumberOrString,
@@ -10,22 +10,26 @@ use tree_sitter::{Node, Point};
 
 use crate::{
     document_store,
-    grammar::{self, TagAttribute, TagAttributeType, TagAttributes, TagChildren, TagDefinition},
+    grammar::{self, TagChildren, TagDefinition},
     modules, parser,
-    spel::{self, ast, grammar::ArgumentNumber, parser::Parser},
+    spel::{
+        self,
+        ast::{self, SpelAst, SpelResult},
+        grammar::ArgumentNumber,
+    },
     CodeActionImplementation,
 };
 
 use super::LsError;
 
 pub(crate) struct DiagnosticCollector {
-    file: Url,
-    text: String,
-    diagnostics: Vec<Diagnostic>,
+    pub(crate) file: Url,
+    pub(crate) text: String,
+    pub(crate) diagnostics: Vec<Diagnostic>,
 }
 
 impl DiagnosticCollector {
-    fn new(file: Url, text: String) -> DiagnosticCollector {
+    pub(crate) fn new(file: Url, text: String) -> DiagnosticCollector {
         return DiagnosticCollector {
             file,
             text,
@@ -33,7 +37,11 @@ impl DiagnosticCollector {
         };
     }
 
-    fn validate_document(self: &mut Self, root: &Node) -> Result<()> {
+    pub(crate) fn validate_document(
+        self: &mut Self,
+        root: &Node,
+        spel: &HashMap<Point, SpelAst>,
+    ) -> Result<()> {
         self.validate_header(root)?;
         for node in root.children(&mut root.walk()) {
             match node.kind() {
@@ -45,9 +53,9 @@ impl DiagnosticCollector {
                     self.node_range(&node),
                 ),
                 "html_tag" | "html_option_tag" | "html_void_tag" | "xml_comment" | "java_tag"
-                | "script_tag" | "style_tag" => self.validate_children(&node)?,
+                | "script_tag" | "style_tag" => self.validate_children(&node, spel)?,
                 _ => match &TagDefinition::from_str(node.kind()) {
-                    Ok(tag) => self.validate_tag(tag, &node),
+                    Ok(tag) => self.validate_tag(tag, &node, spel),
                     Err(err) => {
                         log::info!(
                             "error while trying to interprete node \"{}\" as tag: {}",
@@ -84,7 +92,12 @@ impl DiagnosticCollector {
         return Ok(());
     }
 
-    fn validate_tag(self: &mut Self, tag: &TagDefinition, node: &Node) -> Result<()> {
+    fn validate_tag(
+        self: &mut Self,
+        tag: &TagDefinition,
+        node: &Node,
+        spel: &HashMap<Point, SpelAst>,
+    ) -> Result<()> {
         if tag.deprecated {
             self.add_diagnostic_with_tag(
                 format!("{} tag is deprecated", tag.name),
@@ -108,23 +121,14 @@ impl DiagnosticCollector {
                     self.node_range(&child),
                 ),
                 "html_void_tag" | "java_tag" | "script_tag" | "style_tag" => {}
-                "html_tag" | "html_option_tag" => self.validate_children(&child)?,
+                "html_tag" | "html_option_tag" => self.validate_children(&child, spel)?,
                 kind if kind.ends_with("_attribute") => {
                     let text = self.text.as_str();
                     let attribute = parser::attribute_name_of(child, text).to_string();
                     let value = parser::attribute_value_of(child, text).to_string();
-                    if let TagAttributes::These(definitions) = tag.attributes {
-                        if let Some(definition) = definitions
-                            .iter()
-                            .find(|definition| definition.name == attribute)
-                        {
-                            if let Some(value_node) =
-                                child.child(2).and_then(|child| child.child(1))
-                            {
-                                SpelValidator::validate(self, &value_node, definition)?;
-                            }
-                        };
-                    }
+                    if let Some(value_node) = child.child(2).and_then(|child| child.child(1)) {
+                        SpelValidator::validate(self, &value_node, spel)?;
+                    };
                     if attributes.contains_key(&attribute) {
                         self.add_diagnostic(
                             format!("duplicate {} attribute", attribute),
@@ -137,7 +141,7 @@ impl DiagnosticCollector {
                 }
                 kind if kind.ends_with("_tag") => match &TagDefinition::from_str(kind) {
                     Ok(child_tag) if self.can_have_child(&tag, child_tag) => {
-                        self.validate_tag(child_tag, &child)?;
+                        self.validate_tag(child_tag, &child, spel)?;
                     }
                     Ok(_) => self.add_diagnostic(
                         format!("unexpected {} tag", &kind[..kind.find("_tag").unwrap()]),
@@ -146,7 +150,7 @@ impl DiagnosticCollector {
                     ),
                     Err(err) => log::info!("expected sp or spt tag: {}", err),
                 },
-                _ => self.validate_children(&child)?,
+                _ => self.validate_children(&child, spel)?,
             }
         }
         for rule in tag.attribute_rules {
@@ -600,7 +604,11 @@ impl DiagnosticCollector {
         };
     }
 
-    fn validate_children(self: &mut Self, node: &Node) -> Result<()> {
+    fn validate_children(
+        self: &mut Self,
+        node: &Node,
+        spel: &HashMap<Point, SpelAst>,
+    ) -> Result<()> {
         for child in node.children(&mut node.walk()) {
             match child.kind() {
                 "ERROR" => self.add_diagnostic(
@@ -613,15 +621,15 @@ impl DiagnosticCollector {
                 }
                 "html_tag" | "html_option_tag" | "html_void_tag" | "java_tag" | "script_tag"
                 | "style_tag" => {
-                    self.validate_children(&child)?;
+                    self.validate_children(&child, spel)?;
                 }
                 kind if kind.ends_with("_tag") => match &TagDefinition::from_str(kind) {
-                    Ok(child_tag) => self.validate_tag(child_tag, &child)?,
+                    Ok(child_tag) => self.validate_tag(child_tag, &child, spel)?,
                     Err(err) => {
                         log::info!("expected sp or spt tag: {}", err);
                     }
                 },
-                _ => self.validate_children(&child)?,
+                _ => self.validate_children(&child, spel)?,
             }
         }
         return Ok(());
@@ -720,25 +728,25 @@ impl SpelValidator<'_> {
         return SpelValidator { collector, offset };
     }
 
-    fn validate_identifier(self: &mut Self, identifier: ast::Identifier) -> Result<()> {
+    fn validate_identifier(self: &mut Self, identifier: &ast::Identifier) -> Result<()> {
         match identifier {
             ast::Identifier::Name(name) => {
-                self.validate_interpolations_in_word(name)?;
+                self.validate_interpolations_in_word(&name)?;
             }
             ast::Identifier::FieldAccess {
                 identifier, field, ..
             } => {
-                self.validate_identifier(*identifier)?;
-                self.validate_interpolations_in_word(field)?;
+                self.validate_identifier(identifier)?;
+                self.validate_interpolations_in_word(&field)?;
             }
         };
         return Ok(());
     }
 
-    fn validate_object(self: &mut Self, object: ast::Object) -> Result<()> {
+    fn validate_object(self: &mut Self, object: &ast::Object) -> Result<()> {
         match object {
             ast::Object::Anchor(anchor) => {
-                self.validate_interpolations_in_word(anchor.name)?;
+                self.validate_interpolations_in_word(&anchor.name)?;
             }
             ast::Object::Function(function) => self.validate_global_function(function)?,
             ast::Object::Name(name) => {
@@ -750,17 +758,17 @@ impl SpelValidator<'_> {
                 object, /* field, */
                 ..
             } => {
-                self.validate_object(*object)?;
+                self.validate_object(object)?;
             }
             ast::Object::MethodAccess {
                 object, /* function, */
                 ..
             } => {
-                self.validate_object(*object)?;
+                self.validate_object(object)?;
                 // validate_method(*object, diagnostics, offset)?;
             }
             ast::Object::ArrayAccess { object, index, .. } => {
-                self.validate_object(*object)?;
+                self.validate_object(object)?;
                 self.validate_expression(index)?;
             }
             _ => {}
@@ -768,23 +776,23 @@ impl SpelValidator<'_> {
         return Ok(());
     }
 
-    fn validate_expression(self: &mut Self, expression: ast::Expression) -> Result<()> {
+    fn validate_expression(self: &mut Self, expression: &ast::Expression) -> Result<()> {
         match expression {
             // ast::Expression::Number(number) => todo!(),
             // ast::Expression::Null(null) => todo!(),
             ast::Expression::Function(function) => self.validate_global_function(function)?,
             ast::Expression::Object(interpolation) => {
-                self.validate_object(interpolation.content)?;
+                self.validate_object(&interpolation.content)?;
             }
             ast::Expression::SignedExpression { expression, .. } => {
-                self.validate_expression(*expression)?
+                self.validate_expression(expression)?
             }
             ast::Expression::BracketedExpression { expression, .. } => {
-                self.validate_expression(*expression)?
+                self.validate_expression(expression)?
             }
             ast::Expression::BinaryOperation { left, right, .. } => {
-                self.validate_expression(*left)?;
-                self.validate_expression(*right)?;
+                self.validate_expression(left)?;
+                self.validate_expression(right)?;
             }
             ast::Expression::Ternary {
                 condition,
@@ -792,53 +800,53 @@ impl SpelValidator<'_> {
                 right,
                 ..
             } => {
-                self.validate_condition(*condition)?;
-                self.validate_expression(*left)?;
-                self.validate_expression(*right)?;
+                self.validate_condition(condition)?;
+                self.validate_expression(left)?;
+                self.validate_expression(right)?;
             }
             _ => {}
         };
         return Ok(());
     }
 
-    fn validate_condition(self: &mut Self, condition: ast::Condition) -> Result<()> {
+    fn validate_condition(self: &mut Self, condition: &ast::Condition) -> Result<()> {
         match condition {
             ast::Condition::Object(ast::Interpolation { content, .. }) => {
                 self.validate_object(content)?;
             }
             ast::Condition::Function(function) => self.validate_global_function(function)?,
             ast::Condition::BracketedCondition { condition, .. } => {
-                self.validate_condition(*condition)?
+                self.validate_condition(condition)?
             }
             ast::Condition::NegatedCondition { condition, .. } => {
-                self.validate_condition(*condition)?
+                self.validate_condition(condition)?
             }
             ast::Condition::BinaryOperation { left, right, .. } => {
-                self.validate_condition(*left)?;
-                self.validate_condition(*right)?;
+                self.validate_condition(left)?;
+                self.validate_condition(right)?;
             }
             ast::Condition::Comparisson { left, right, .. } => {
-                self.validate_comparable(*left)?;
-                self.validate_comparable(*right)?;
+                self.validate_comparable(left)?;
+                self.validate_comparable(right)?;
             }
             _ => {}
         };
         return Ok(());
     }
 
-    fn validate_comparable(self: &mut Self, comparable: ast::Comparable) -> Result<()> {
+    fn validate_comparable(self: &mut Self, comparable: &ast::Comparable) -> Result<()> {
         match comparable {
             ast::Comparable::Condition(condition) => self.validate_condition(condition),
             ast::Comparable::Expression(expression) => self.validate_expression(expression),
             ast::Comparable::Function(function) => self.validate_global_function(function),
-            ast::Comparable::Object(interpolation) => self.validate_object(interpolation.content),
+            ast::Comparable::Object(interpolation) => self.validate_object(&interpolation.content),
             // ast::Comparable::String(string) => todo!(),
             // ast::Comparable::Null(null) => todo!(),
             _ => Ok(()),
         }
     }
 
-    fn validate_global_function(self: &mut Self, function: ast::Function) -> Result<()> {
+    fn validate_global_function(self: &mut Self, function: &ast::Function) -> Result<()> {
         let argument_count = function.arguments.len();
         match spel::grammar::Function::from_str(function.name.as_str()) {
             Ok(definition) => match definition.argument_number {
@@ -887,16 +895,16 @@ impl SpelValidator<'_> {
                 self.locations_range(&function.name_location, &function.closing_bracket_location),
             ),
         }
-        for argument in function.arguments {
-            match argument.argument {
+        for argument in &function.arguments {
+            match &argument.argument {
                 ast::Argument::Anchor(anchor) => {
-                    self.validate_interpolations_in_word(anchor.name)?;
+                    self.validate_interpolations_in_word(&anchor.name)?;
                 }
-                ast::Argument::Function(function) => self.validate_global_function(function)?,
+                ast::Argument::Function(function) => self.validate_global_function(&function)?,
                 // ast::Argument::Null(_) => todo!(),
                 // ast::Argument::Number(_) => todo!(),
                 ast::Argument::Object(interpolation) => {
-                    self.validate_object(interpolation.content)?
+                    self.validate_object(&interpolation.content)?
                 }
                 // ast::Argument::SignedNumber(_) => todo!(),
                 // ast::Argument::String(_) => todo!(),
@@ -906,15 +914,25 @@ impl SpelValidator<'_> {
         return Ok(());
     }
 
-    fn validate_regex(self: &mut Self, _regex: ast::Regex) -> Result<()> {
+    fn validate_query(self: &mut Self, _query: &ast::Query) -> Result<()> {
         // TODO!
         return Ok(());
     }
 
-    fn validate_interpolations_in_word(self: &mut Self, word: ast::Word) -> Result<()> {
-        for fragment in word.fragments {
+    fn validate_regex(self: &mut Self, _regex: &ast::Regex) -> Result<()> {
+        // TODO!
+        return Ok(());
+    }
+
+    fn validate_uri(self: &mut Self, _uri: &ast::Uri) -> Result<()> {
+        // TODO!
+        return Ok(());
+    }
+
+    fn validate_interpolations_in_word(self: &mut Self, word: &ast::Word) -> Result<()> {
+        for fragment in &word.fragments {
             if let ast::WordFragment::Interpolation(interpolation) = fragment {
-                self.validate_object(interpolation.content)?;
+                self.validate_object(&interpolation.content)?;
             }
         }
         return Ok(());
@@ -936,49 +954,53 @@ impl SpelValidator<'_> {
     fn validate<'a>(
         collector: &'a mut DiagnosticCollector,
         node: &'a Node<'a>,
-        definition: &TagAttribute,
+        spel: &HashMap<Point, SpelAst>,
     ) -> Result<()> {
-        let parser = &mut Parser::new(node.utf8_text(&collector.text.as_bytes())?);
-        let mut validator = SpelValidator::new(collector, node.start_position());
-        match definition.r#type {
-            TagAttributeType::Comparable => match parser.parse_comparable() {
-                Ok(result) => validator.validate_comparable(result)?,
-                Err(err) => validator.parse_failed(node, err, "comparable"),
+        let offset = node.start_position();
+        let mut validator = SpelValidator::new(collector, offset);
+        match spel.get(&offset) {
+            Some(SpelAst::Comparable(result)) => match result {
+                SpelResult::Valid(comparable) => validator.validate_comparable(comparable)?,
+                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "comparable"),
             },
-            TagAttributeType::Condition => match parser.parse_condition_ast() {
-                Ok(result) => validator.validate_condition(result.root)?,
-                Err(err) => validator.parse_failed(node, err, "condition"),
+            Some(SpelAst::Condition(result)) => match result {
+                SpelResult::Valid(result) => validator.validate_condition(result)?,
+                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "condition"),
             },
-            TagAttributeType::Expression => match parser.parse_expression_ast() {
-                Ok(result) => validator.validate_expression(result.root)?,
-                Err(err) => validator.parse_failed(node, err, "expression"),
+            Some(SpelAst::Expression(result)) => match result {
+                SpelResult::Valid(result) => validator.validate_expression(result)?,
+                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "expression"),
             },
-            TagAttributeType::Identifier => match parser.parse_identifier() {
-                Ok(result) => validator.validate_identifier(result)?,
-                Err(err) => validator.parse_failed(node, err, "identifier"),
+            Some(SpelAst::Identifier(result)) => match result {
+                SpelResult::Valid(result) => validator.validate_identifier(result)?,
+                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "identifier"),
             },
-            TagAttributeType::Object => match parser.parse_object_ast() {
-                Ok(result) => validator.validate_object(result.root)?,
-                Err(err) => validator.parse_failed(node, err, "object"),
+            Some(SpelAst::Object(result)) => match result {
+                SpelResult::Valid(result) => validator.validate_object(result)?,
+                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "object"),
             },
-            TagAttributeType::Regex => match parser.parse_regex() {
-                Ok(result) => validator.validate_regex(result)?,
-                Err(err) => validator.parse_failed(node, err, "regex"),
+            Some(SpelAst::Query(result)) => match result {
+                SpelResult::Valid(query) => validator.validate_query(query)?,
+                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "query"),
             },
-            TagAttributeType::String => match parser.parse_text() {
-                Ok(_result) => {}
-                Err(err) => validator.parse_failed(node, err, "text"),
+            Some(SpelAst::Regex(result)) => match result {
+                SpelResult::Valid(regex) => validator.validate_regex(regex)?,
+                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "regex"),
             },
-            TagAttributeType::Query => {}
-            TagAttributeType::Uri => match parser.parse_uri() {
-                Ok(_result) => {}
-                Err(err) => validator.parse_failed(node, err, "uri"),
+            Some(SpelAst::String(result)) => match result {
+                SpelResult::Valid(word) => validator.validate_interpolations_in_word(word)?,
+                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "text"),
             },
-        }
+            Some(SpelAst::Uri(result)) => match result {
+                SpelResult::Valid(uri) => validator.validate_uri(uri)?,
+                SpelResult::Invalid(_, err) => validator.parse_failed(node, err, "uri"),
+            },
+            _ => (),
+        };
         return Ok(());
     }
 
-    fn parse_failed(self: &mut Self, node: &Node<'_>, err: Error, r#type: &str) -> () {
+    fn parse_failed(self: &mut Self, node: &Node<'_>, err: &String, r#type: &str) -> () {
         self.collector.diagnostics.push(Diagnostic {
             message: format!("invalid {}: {}", r#type, err),
             severity: Some(DiagnosticSeverity::ERROR),
@@ -993,7 +1015,7 @@ pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnos
     let uri = params.text_document.uri;
     let document = match document_store::get(&uri) {
         Some(document) => Ok(document),
-        None => document_store::Document::new(&uri)
+        None => document_store::Document::from_uri(&uri)
             .map(|document| document_store::put(&uri, document))
             .map_err(|err| {
                 log::error!("failed to read {}: {}", uri, err);
@@ -1005,7 +1027,7 @@ pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnos
     }?;
     let mut collector = DiagnosticCollector::new(uri, document.text);
     collector
-        .validate_document(&document.tree.root_node())
+        .validate_document(&document.tree.root_node(), &document.spel)
         .map_err(|err| LsError {
             message: format!("failed to validate document: {}", err),
             code: ErrorCode::RequestFailed,

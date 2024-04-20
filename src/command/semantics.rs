@@ -1,14 +1,13 @@
 use anyhow::Result;
 use lsp_server::ErrorCode;
 use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensParams};
-use std::str::FromStr;
-use tree_sitter::Node;
+use std::{collections::HashMap, str::FromStr};
+use tree_sitter::{Node, Point};
 
 use crate::{
     document_store,
-    grammar::{self, TagDefinition},
-    parser,
-    spel::{ast, parser::Parser},
+    grammar::TagDefinition,
+    spel::ast::{self, SpelAst, SpelResult},
 };
 
 use super::{
@@ -139,7 +138,7 @@ pub(crate) fn semantics(params: SemanticTokensParams) -> Result<Vec<SemanticToke
     let uri = params.text_document.uri;
     let document = match document_store::get(&uri) {
         Some(document) => Ok(document),
-        None => document_store::Document::new(&uri)
+        None => document_store::Document::from_uri(&uri)
             .map(|document| document_store::put(&uri, document))
             .map_err(|err| {
                 log::error!("failed to read {}: {}", uri, err);
@@ -150,7 +149,13 @@ pub(crate) fn semantics(params: SemanticTokensParams) -> Result<Vec<SemanticToke
             }),
     }?;
     let tokenizer = &mut Tokenizer::new();
-    index_document(document.tree.root_node(), &document.text, tokenizer).map_err(|err| {
+    index_document(
+        document.tree.root_node(),
+        &document.text,
+        &document.spel,
+        tokenizer,
+    )
+    .map_err(|err| {
         log::error!("semantic token parsing failed for {}: {}", uri, err);
         return LsError {
             message: format!("semantic token parsing failed for {}", uri),
@@ -160,15 +165,20 @@ pub(crate) fn semantics(params: SemanticTokensParams) -> Result<Vec<SemanticToke
     return Ok(tokenizer.collect());
 }
 
-fn index_document(root: Node, text: &String, tokenizer: &mut Tokenizer) -> Result<()> {
+fn index_document(
+    root: Node,
+    text: &String,
+    spel: &HashMap<Point, SpelAst>,
+    tokenizer: &mut Tokenizer,
+) -> Result<()> {
     for node in root.children(&mut root.walk()) {
         match node.kind() {
             "page_header" | "import_header" | "taglib_header" | "html_doctype" | "text"
             | "comment" | "xml_entity" => continue,
             "html_tag" | "html_option_tag" | "html_void_tag" | "xml_comment" | "java_tag"
-            | "script_tag" | "style_tag" => index_children(node, &text, tokenizer)?,
+            | "script_tag" | "style_tag" => index_children(node, &text, spel, tokenizer)?,
             _ => match &TagDefinition::from_str(node.kind()) {
-                Ok(tag) => index_tag(tag, node, &text, tokenizer)?,
+                Ok(tag) => index_tag(tag, node, &text, spel, tokenizer)?,
                 Err(err) => log::info!(
                     "error while trying to interprete node \"{}\" as tag: {}",
                     node.kind(),
@@ -184,6 +194,7 @@ fn index_tag(
     tag: &TagDefinition,
     node: Node,
     text: &String,
+    spel: &HashMap<Point, SpelAst>,
     tokenizer: &mut Tokenizer,
 ) -> Result<()> {
     if tag.deprecated {
@@ -197,225 +208,79 @@ fn index_tag(
         match child.kind() {
             // may need to check on kind of missing child
             "html_void_tag" | "java_tag" | "script_tag" | "style_tag" => {}
-            "ERROR" | "html_tag" | "html_option_tag" => index_children(child, text, tokenizer)?,
+            "ERROR" | "html_tag" | "html_option_tag" => {
+                index_children(child, text, spel, tokenizer)?
+            }
             kind if kind.ends_with("_attribute") => {
-                let attribute = parser::attribute_name_of(child, text).to_string();
-                if let grammar::TagAttributes::These(definitions) = tag.attributes {
-                    if let Some(definition) = definitions
-                        .iter()
-                        .find(|definition| definition.name == attribute)
-                    {
-                        let value_node = match child.child(2).and_then(|child| child.child(1)) {
-                            Some(node) => node,
-                            _ => continue,
-                        };
-                        let parser = &mut Parser::new(value_node.utf8_text(&text.as_bytes())?);
-                        match definition.r#type {
-                            grammar::TagAttributeType::Comparable => {
-                                match parser.parse_comparable() {
-                                    Ok(result) => {
-                                        let position = value_node.start_position();
-                                        index_comparable(
-                                            &result,
-                                            &mut SpelTokenCollector::new(
-                                                tokenizer,
-                                                position.row as u32,
-                                                position.column as u32,
-                                            ),
-                                        );
-                                    }
-                                    Err(err) => {
-                                        log::error!(
-                                            "unparsable comparable \"{}\": {}",
-                                            value_node.utf8_text(&text.as_bytes())?,
-                                            err
-                                        );
-                                    }
-                                }
-                            }
-                            grammar::TagAttributeType::Condition => {
-                                match parser.parse_condition_ast() {
-                                    Ok(result) => {
-                                        let position = value_node.start_position();
-                                        index_condition(
-                                            &result.root,
-                                            &mut SpelTokenCollector::new(
-                                                tokenizer,
-                                                position.row as u32,
-                                                position.column as u32,
-                                            ),
-                                        );
-                                    }
-                                    Err(err) => {
-                                        log::error!(
-                                            "unparsable condition \"{}\": {}",
-                                            value_node.utf8_text(&text.as_bytes())?,
-                                            err
-                                        );
-                                    }
-                                }
-                            }
-                            grammar::TagAttributeType::Expression => {
-                                match parser.parse_expression_ast() {
-                                    Ok(result) => {
-                                        let position = value_node.start_position();
-                                        index_expression(
-                                            &result.root,
-                                            &mut SpelTokenCollector::new(
-                                                tokenizer,
-                                                position.row as u32,
-                                                position.column as u32,
-                                            ),
-                                        );
-                                    }
-                                    Err(err) => {
-                                        log::error!(
-                                            "unparsable expression \"{}\": {}",
-                                            value_node.utf8_text(&text.as_bytes())?,
-                                            err
-                                        );
-                                    }
-                                }
-                            }
-                            grammar::TagAttributeType::Identifier => {
-                                match parser.parse_identifier() {
-                                    Ok(result) => {
-                                        let position = value_node.start_position();
-                                        index_identifier(
-                                            &result,
-                                            &mut SpelTokenCollector::new(
-                                                tokenizer,
-                                                position.row as u32,
-                                                position.column as u32,
-                                            ),
-                                        );
-                                    }
-                                    Err(err) => {
-                                        log::error!(
-                                            "unparsable identifier \"{}\": {}",
-                                            value_node.utf8_text(&text.as_bytes())?,
-                                            err
-                                        );
-                                    }
-                                }
-                            }
-                            grammar::TagAttributeType::Object => match parser.parse_object_ast() {
-                                Ok(result) => {
-                                    let position = value_node.start_position();
-                                    index_object(
-                                        &result.root,
-                                        &mut SpelTokenCollector::new(
-                                            tokenizer,
-                                            position.row as u32,
-                                            position.column as u32,
-                                        ),
-                                    );
-                                }
-                                Err(err) => {
-                                    log::error!(
-                                        "unparsable object \"{}\": {}",
-                                        value_node.utf8_text(&text.as_bytes())?,
-                                        err
-                                    );
-                                }
-                            },
-                            grammar::TagAttributeType::Regex => match parser.parse_regex() {
-                                Ok(result) => {
-                                    let position = value_node.start_position();
-                                    index_regex(
-                                        &result,
-                                        &mut SpelTokenCollector::new(
-                                            tokenizer,
-                                            position.row as u32,
-                                            position.column as u32,
-                                        ),
-                                    );
-                                }
-                                Err(err) => {
-                                    log::error!(
-                                        "unparsable text \"{}\": {}",
-                                        value_node.utf8_text(&text.as_bytes())?,
-                                        err
-                                    );
-                                }
-                            },
-                            grammar::TagAttributeType::String => match parser.parse_text() {
-                                Ok(result) => {
-                                    let position = value_node.start_position();
-                                    for fragment in result.fragments {
-                                        if let ast::WordFragment::Interpolation(interpolation) =
-                                            fragment
-                                        {
-                                            index_interpolation(
-                                                &interpolation,
-                                                &mut SpelTokenCollector::new(
-                                                    tokenizer,
-                                                    position.row as u32,
-                                                    position.column as u32,
-                                                ),
-                                            );
-                                        }
-                                    }
-                                }
-                                Err(err) => {
-                                    log::error!(
-                                        "unparsable text \"{}\": {}",
-                                        value_node.utf8_text(&text.as_bytes())?,
-                                        err
-                                    );
-                                }
-                            },
-                            grammar::TagAttributeType::Query => {}
-                            grammar::TagAttributeType::Uri => match parser.parse_uri() {
-                                Ok(result) => {
-                                    let position = value_node.start_position();
-                                    index_uri(
-                                        &result,
-                                        &mut SpelTokenCollector::new(
-                                            tokenizer,
-                                            position.row as u32,
-                                            position.column as u32,
-                                        ),
-                                    );
-                                }
-                                Err(err) => {
-                                    log::error!(
-                                        "unparsable text \"{}\": {}",
-                                        value_node.utf8_text(&text.as_bytes())?,
-                                        err
-                                    );
-                                }
-                            },
-                        }
-                    };
-                }
+                let value_node = match child.child(2).and_then(|child| child.child(1)) {
+                    Some(node) => node,
+                    _ => continue,
+                };
+                let offset = value_node.start_position();
+                let mut token_collector =
+                    SpelTokenCollector::new(tokenizer, offset.row as u32, offset.column as u32);
+                match spel.get(&offset) {
+                    Some(SpelAst::Comparable(SpelResult::Valid(comparable))) => {
+                        index_comparable(&comparable, &mut token_collector)
+                    }
+                    Some(SpelAst::Condition(SpelResult::Valid(condition))) => {
+                        index_condition(&condition, &mut token_collector)
+                    }
+                    Some(SpelAst::Expression(SpelResult::Valid(expression))) => {
+                        index_expression(&expression, &mut token_collector)
+                    }
+                    Some(SpelAst::Identifier(SpelResult::Valid(identifier))) => {
+                        index_identifier(&identifier, &mut token_collector)
+                    }
+                    Some(SpelAst::Object(SpelResult::Valid(object))) => {
+                        index_object(&object, &mut token_collector)
+                    }
+                    Some(SpelAst::Query(SpelResult::Valid(query))) => {
+                        index_query(&query, &mut token_collector)
+                    }
+                    Some(SpelAst::Regex(SpelResult::Valid(regex))) => {
+                        index_regex(&regex, &mut token_collector)
+                    }
+                    Some(SpelAst::String(SpelResult::Valid(string))) => {
+                        index_word(&string, &mut token_collector, None, &vec![])
+                    }
+                    Some(SpelAst::Uri(SpelResult::Valid(uri))) => {
+                        index_uri(&uri, &mut token_collector)
+                    }
+                    _ => (),
+                };
             }
             kind if kind.ends_with("_tag") => match &TagDefinition::from_str(kind) {
-                Ok(child_tag) => index_tag(child_tag, child, text, tokenizer)?,
+                Ok(child_tag) => index_tag(child_tag, child, text, spel, tokenizer)?,
                 Err(err) => {
                     log::info!("expected sp or spt tag: {}", err);
                 }
             },
-            _ => index_children(child, text, tokenizer)?,
+            _ => index_children(child, text, spel, tokenizer)?,
         }
     }
     return Ok(());
 }
 
-fn index_children(node: Node, text: &String, tokenizer: &mut Tokenizer) -> Result<()> {
+fn index_children(
+    node: Node,
+    text: &String,
+    spel: &HashMap<Point, SpelAst>,
+    tokenizer: &mut Tokenizer,
+) -> Result<()> {
     for child in node.children(&mut node.walk()) {
         match child.kind() {
             "text" | "java_tag" | "html_void_tag" => {}
             "ERROR" | "html_tag" | "html_option_tag" | "script_tag" | "style_tag" => {
-                index_children(child, text, tokenizer)?;
+                index_children(child, text, spel, tokenizer)?;
             }
             kind if kind.ends_with("_tag") => match &TagDefinition::from_str(kind) {
-                Ok(child_tag) => index_tag(child_tag, child, text, tokenizer)?,
+                Ok(child_tag) => index_tag(child_tag, child, text, spel, tokenizer)?,
                 Err(err) => {
                     log::info!("expected sp or spt tag: {}", err);
                 }
             },
-            _ => index_children(child, text, tokenizer)?,
+            _ => index_children(child, text, spel, tokenizer)?,
         }
     }
     return Ok(());
@@ -743,6 +608,10 @@ fn index_regex(regex: &ast::Regex, token_collector: &mut SpelTokenCollector) {
         &SemanticTokenType::REGEXP,
         &vec![],
     );
+}
+
+fn index_query(_query: &ast::Query, _token_collector: &mut SpelTokenCollector) {
+    // TODO:!
 }
 
 fn index_word(

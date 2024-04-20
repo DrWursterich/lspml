@@ -18,7 +18,7 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
     let file = &text_params.text_document.uri;
     let document = match document_store::get(file) {
         Some(document) => Ok(document),
-        None => document_store::Document::new(file)
+        None => document_store::Document::from_uri(file)
             .map(|document| document_store::put(file, document))
             .map_err(|err| {
                 log::error!("failed to read {}: {}", file, err);

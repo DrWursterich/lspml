@@ -15,9 +15,9 @@ mod hover;
 mod semantics;
 
 #[derive(Debug)]
-struct LsError {
-    message: String,
-    code: ErrorCode,
+pub(crate) struct LsError {
+    pub(crate) message: String,
+    pub(crate) code: ErrorCode,
 }
 
 impl std::error::Error for LsError {}

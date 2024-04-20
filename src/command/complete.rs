@@ -532,7 +532,7 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
     let uri = &text_params.text_document.uri;
     let document = match document_store::get(uri) {
         Some(document) => Ok(document),
-        None => document_store::Document::new(uri)
+        None => document_store::Document::from_uri(uri)
             .map(|document| document_store::put(uri, document))
             .map_err(|err| {
                 log::error!("failed to read {}: {}", uri, err);

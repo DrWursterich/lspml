@@ -9,9 +9,8 @@ use tree_sitter::{Node, Point};
 
 use crate::{
     document_store::{self, Document},
-    spel::{
-        ast::{Argument, Comparable, ComparissonOperator, Condition, ConditionAst, Function},
-        parser::Parser,
+    spel::ast::{
+        Argument, Comparable, ComparissonOperator, Condition, Function, SpelAst, SpelResult,
     },
     CodeActionImplementation,
 };
@@ -30,7 +29,7 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
     let uri = params.text_document.uri;
     let document = match document_store::get(&uri) {
         Some(document) => Ok(document),
-        None => document_store::Document::new(&uri)
+        None => document_store::Document::from_uri(&uri)
             .map(|document| document_store::put(&uri, document))
             .map_err(|err| {
                 log::error!("failed to read {}: {}", uri, err);
@@ -198,51 +197,48 @@ fn construct_condition_to_name<'a>(
     attributes: &HashMap<&'a str, Node<'a>>,
 ) -> Option<CodeActionOrCommand> {
     if let Some(condition_node) = attributes.get("condition") {
-        if let Some(condition) = condition_node
-            .named_child(0)
-            .and_then(|n| n.named_child(0))
-            .and_then(|n| n.utf8_text(document.text.as_bytes()).ok())
-        {
-            let parser = &mut Parser::new(condition);
-            match parser.parse_condition_ast() {
-                Ok(ConditionAst {
-                    root:
-                        Condition::Comparisson {
-                            left,
-                            operator,
-                            right,
-                            ..
-                        },
-                }) => {
+        if let Some(value_node) = condition_node.named_child(0).and_then(|n| n.named_child(0)) {
+            let offset = value_node.start_position();
+            match document.spel.get(&offset) {
+                Some(SpelAst::Condition(SpelResult::Valid(Condition::Comparisson {
+                    left,
+                    operator,
+                    right,
+                    ..
+                }))) => {
                     let operator_name;
                     let new_text;
-                    if let Comparable::Object(inner) = *left {
-                        operator_name = match operator {
-                            ComparissonOperator::Equal => "eq",
-                            ComparissonOperator::Unequal => "neq",
-                            ComparissonOperator::GreaterThan => "gt",
-                            ComparissonOperator::GreaterThanOrEqual => "gte",
-                            ComparissonOperator::LessThan => "lt",
-                            ComparissonOperator::LessThanOrEqual => "lte",
-                        };
-                        new_text = format!(
-                            "name=\"{}\" {}=\"{}\"",
-                            inner.content, operator_name, *right
-                        );
-                    } else if let Comparable::Object(inner) = *right {
-                        operator_name = match operator {
-                            ComparissonOperator::Equal => "eq",
-                            ComparissonOperator::Unequal => "neq",
-                            ComparissonOperator::GreaterThan => "lt",
-                            ComparissonOperator::GreaterThanOrEqual => "lte",
-                            ComparissonOperator::LessThan => "gt",
-                            ComparissonOperator::LessThanOrEqual => "gte",
-                        };
-                        new_text =
-                            format!("name=\"{}\" {}=\"{}\"", inner.content, operator_name, *left);
-                    } else {
-                        return None;
-                    }
+                    match (&**left, &**right) {
+                        (Comparable::Object(inner), _) => {
+                            operator_name = match operator {
+                                ComparissonOperator::Equal => "eq",
+                                ComparissonOperator::Unequal => "neq",
+                                ComparissonOperator::GreaterThan => "gt",
+                                ComparissonOperator::GreaterThanOrEqual => "gte",
+                                ComparissonOperator::LessThan => "lt",
+                                ComparissonOperator::LessThanOrEqual => "lte",
+                            };
+                            new_text = format!(
+                                "name=\"{}\" {}=\"{}\"",
+                                inner.content, operator_name, *right
+                            );
+                        }
+                        (_, Comparable::Object(inner)) => {
+                            operator_name = match operator {
+                                ComparissonOperator::Equal => "eq",
+                                ComparissonOperator::Unequal => "neq",
+                                ComparissonOperator::GreaterThan => "lt",
+                                ComparissonOperator::GreaterThanOrEqual => "lte",
+                                ComparissonOperator::LessThan => "gt",
+                                ComparissonOperator::LessThanOrEqual => "gte",
+                            };
+                            new_text = format!(
+                                "name=\"{}\" {}=\"{}\"",
+                                inner.content, operator_name, *left
+                            );
+                        }
+                        _ => return None,
+                    };
                     return Some(CodeActionOrCommand::CodeAction(CodeAction {
                         title: format!(
                             "transform \"condition\" to \"name\" and \"{}\"",
@@ -262,8 +258,8 @@ fn construct_condition_to_name<'a>(
                         ..CodeAction::default()
                     }));
                 }
-                Ok(ConditionAst { root }) => {
-                    return parse_is_null(&root).map(|(name, value)| {
+                Some(SpelAst::Condition(SpelResult::Valid(condition))) => {
+                    return parse_is_null(&condition).map(|(name, value)| {
                         CodeActionOrCommand::CodeAction(CodeAction {
                             title: "transform \"condition\" to \"name\" and \"isNull\"".to_string(),
                             kind: Some(CodeActionImplementation::ConditionToName.to_kind()),
