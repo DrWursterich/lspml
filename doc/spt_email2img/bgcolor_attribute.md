@@ -1,1 +1,2 @@
-Hintergrundfarbe, die für den E-Mail-Text in dem generierten Bild verwendet werden soll.
+Hintergrundfarbe, die für den E-Mail-Text in dem generierten Bild verwendet
+werden soll.

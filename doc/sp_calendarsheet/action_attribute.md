@@ -1,1 +1,2 @@
-Aktion, die ausgeführt werden soll. Es existieren die Aktionen `add`, `clear` und `new`.
+Aktion, die ausgeführt werden soll. Es existieren die Aktionen `add`, `clear`
+und `new`.

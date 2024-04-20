@@ -1,1 +1,1 @@
-Punkt-Größe des zu verwendenden Fonts (z.b.: `12`) 
+Punkt-Größe des zu verwendenden Fonts (z.b.: `12`)
