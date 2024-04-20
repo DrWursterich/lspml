@@ -21,7 +21,6 @@ const DEFAULT_HEADER: &str = concat!(
     "<%@ page language=\"java\" pageEncoding=\"UTF-8\" contentType=\"text/html; charset=UTF-8\"\n",
     "%><%@ taglib uri=\"http://www.sitepark.com/taglibs/core\" prefix=\"sp\"\n",
     "%><%@ taglib tagdir=\"/WEB-INF/tags/spt\" prefix=\"spt\"\n",
-    "%><%@ taglib tagdir=\"/WEB-INF/tags/tag\" prefix=\"tag\"\n",
     "%>\n"
 );
 
