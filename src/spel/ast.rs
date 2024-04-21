@@ -132,12 +132,8 @@ pub(crate) enum Argument {
     Object(Interpolation),
     SignedNumber(SignedNumber),
     String(StringLiteral),
-    True {
-        location: Location,
-    },
-    False {
-        location: Location,
-    },
+    True { location: Location },
+    False { location: Location },
 }
 
 impl Display for Argument {

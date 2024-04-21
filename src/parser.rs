@@ -24,46 +24,32 @@ pub(crate) fn find_current_node<'tree>(
     return Some(node);
 }
 
-pub(crate) fn attribute_name_of<'a>(attribute: Node<'_>, source: &'a str) -> &'a str {
+pub(crate) fn attribute_name_of<'a>(attribute: Node<'_>, source: &'a str) -> Option<&'a str> {
     return attribute
         .child(0)
-        .expect(
-            format!(
-                "attribute {:?} did not have a attribute-name child",
-                attribute
-            )
-            .as_str(),
-        )
-        .utf8_text(source.as_bytes())
-        .expect(
-            format!(
-                "attribute-name in {:?} did not have a contain text",
-                attribute
-            )
-            .as_str(),
-        );
+        .and_then(|node| node.utf8_text(source.as_bytes()).ok());
 }
 
-pub(crate) fn attribute_value_of<'a>(attribute: Node<'_>, source: &'a str) -> &'a str {
-    let value = attribute
+pub(crate) fn attribute_value_of<'a>(attribute: Node<'_>, source: &'a str) -> Option<&'a str> {
+    return attribute
         .child(2)
-        .expect(
-            format!(
-                "attribute {:?} did not have a attribute-value child",
-                attribute
-            )
-            .as_str(),
-        )
-        .utf8_text(source.as_bytes())
-        .expect(format!("attribute-value in {:?} did not contain text", attribute).as_str());
-    // value should be wrapped inside quotes
-    if value.len() > 1 && value.starts_with("\"") && value.ends_with("\"") {
-        return &value[1..value.len() - 1];
+        .and_then(|node| node.child(1))
+        .and_then(|node| node.utf8_text(source.as_bytes()).ok());
+}
+
+pub(crate) fn attribute_name_and_value_of<'a>(
+    attribute: Node<'_>,
+    source: &'a str,
+) -> Option<(&'a str, &'a str)> {
+    if let Some(name) = attribute
+        .child(0)
+        .and_then(|node| node.utf8_text(source.as_bytes()).ok())
+    {
+        return attribute
+            .child(2)
+            .and_then(|node| node.child(1))
+            .and_then(|node| node.utf8_text(source.as_bytes()).ok())
+            .map(|value| (name, value));
     }
-    log::info!(
-        "unquoted attribute-value found for {:?}: {}",
-        attribute,
-        value
-    );
-    return &value;
+    return None;
 }

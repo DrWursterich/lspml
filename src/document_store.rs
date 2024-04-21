@@ -10,6 +10,7 @@ use tree_sitter::{Node, Parser, Point, Tree};
 
 use crate::{
     grammar::{TagAttributeType, TagAttributes, TagDefinition},
+    parser,
     spel::{
         self,
         ast::{SpelAst, SpelResult},
@@ -116,33 +117,35 @@ fn collect_from_tag(
     for child in node.children(&mut node.walk()) {
         match child.kind() {
             // may need to check on kind of missing child
-            "html_void_tag" | "java_tag" | "script_tag" | "style_tag" => {}
+            "html_void_tag" | "java_tag" | "script_tag" | "style_tag" => (),
             "ERROR" | "html_tag" | "html_option_tag" => collect_from_children(child, text, spel),
             kind if kind.ends_with("_attribute") => {
-                let attribute = crate::parser::attribute_name_of(child, text).to_string();
-                if let TagAttributes::These(definitions) = tag.attributes {
-                    if let Some(definition) = definitions
-                        .iter()
-                        .find(|definition| definition.name == attribute)
-                    {
-                        let value_node = match child.child(2).and_then(|child| child.child(1)) {
-                            Some(node) => node,
-                            _ => continue,
+                match (parser::attribute_name_of(child, text), &tag.attributes) {
+                    (Some(attribute), TagAttributes::These(definitions)) => {
+                        if let Some(definition) = definitions
+                            .iter()
+                            .find(|definition| definition.name == attribute)
+                        {
+                            let value_node = match child.child(2).and_then(|child| child.child(1)) {
+                                Some(node) => node,
+                                _ => continue,
+                            };
+                            let position = value_node.start_position();
+                            match spel_ast_of(value_node, text, &definition.r#type) {
+                                Ok(ast) => {
+                                    spel.insert(position, ast);
+                                }
+                                Err(err) => log::error!(
+                                    "could not parse spel at ({}, {}) as {:?}: {}",
+                                    position.row,
+                                    position.column,
+                                    definition.r#type,
+                                    err
+                                ),
+                            };
                         };
-                        let position = value_node.start_position();
-                        match spel_ast_of(value_node, text, &definition.r#type) {
-                            Ok(ast) => {
-                                spel.insert(position, ast);
-                            }
-                            Err(err) => log::error!(
-                                "could not parse spel at ({}, {}) as {:?}: {}",
-                                position.row,
-                                position.column,
-                                definition.r#type,
-                                err
-                            ),
-                        };
-                    };
+                    }
+                    _ => (),
                 }
             }
             kind if kind.ends_with("_tag") => match &TagDefinition::from_str(kind) {

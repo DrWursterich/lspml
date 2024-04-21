@@ -125,9 +125,11 @@ impl DiagnosticCollector {
                 "html_void_tag" | "java_tag" | "script_tag" | "style_tag" => {}
                 "html_tag" | "html_option_tag" => self.validate_children(&child, spel)?,
                 kind if kind.ends_with("_attribute") => {
-                    let text = self.text.as_str();
-                    let attribute = parser::attribute_name_of(child, text).to_string();
-                    let value = parser::attribute_value_of(child, text).to_string();
+                    let (attribute, value) =
+                        match parser::attribute_name_and_value_of(child, self.text.as_str()) {
+                            Some((attribute, value)) => (attribute.to_string(), value.to_string()),
+                            _ => continue,
+                        };
                     if let Some(value_node) = child.child(2).and_then(|child| child.child(1)) {
                         SpelValidator::validate(self, &value_node, spel)?;
                     };

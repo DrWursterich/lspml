@@ -59,7 +59,9 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                                 p.children(&mut document.tree.walk())
                                     .find(|node| node.kind() == "module_attribute")
                             })
-                            .map(|attribute| parser::attribute_value_of(attribute, &document.text))
+                            .and_then(|attribute| {
+                                parser::attribute_value_of(attribute, &document.text)
+                            })
                             .filter(|module| *module != "${module.id}")
                             .and_then(modules::find_module_by_name)
                             .or_else(|| {

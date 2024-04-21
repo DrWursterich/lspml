@@ -59,7 +59,7 @@ impl CompletionCollector<'_> {
             };
             match node.kind() {
                 "page_header" | "import_header" | "taglib_header" | "text" | "comment" => {
-                    return Ok(()) // ignore for now
+                    return Ok(()); // ignore for now
                 }
                 _ if node.is_error() => match node.child(0) {
                     Some(child) if child.kind().ends_with("_tag_open") => {
@@ -241,7 +241,7 @@ impl CompletionCollector<'_> {
                     {
                         return Ok(self.complete_closing_tag(child));
                     }
-                    _ => {}
+                    _ => (),
                 },
                 ">" => {
                     if child.is_missing() {
@@ -277,6 +277,16 @@ impl CompletionCollector<'_> {
                     log::info!("search {} children in {}", tag.name, node.kind());
                     return self.search_completions_in_tag(tag, child);
                 }
+                // TODO: this is very hacky. there needs to be a better way
+                kind if kind.ends_with("_tag_open")
+                    && tag.name.find(":").is_some_and(|i| {
+                        !kind.ends_with(&(tag.name.split_at(i + 1).1.to_string() + "_tag_open"))
+                    }) =>
+                {
+                    if let Ok(tag) = TagDefinition::from_str(&kind[0..kind.len() - "_open".len()]) {
+                        return Ok(self.complete_attributes_of(tag, HashMap::from([])));
+                    }
+                }
                 kind if kind.ends_with("_tag_close") => {
                     break;
                 }
@@ -285,17 +295,16 @@ impl CompletionCollector<'_> {
                     if child.start_position() < self.cursor && child.end_position() > self.cursor {
                         completion_type = CompletionType::Attribute(attribute.clone());
                     }
-                    attributes.insert(
-                        attribute,
-                        parser::attribute_value_of(child, &self.document.text).to_string(),
-                    );
+                    if let Some(attribute_value) =
+                        parser::attribute_value_of(child, &self.document.text)
+                    {
+                        attributes.insert(attribute, attribute_value.to_string());
+                    }
                 }
                 kind if kind.ends_with("_tag") => {
                     return self.search_completions_in_tag(TagDefinition::from_str(kind)?, child);
                 }
-                kind => {
-                    log::info!("ignore node {}", kind);
-                }
+                kind => log::info!("ignore node {}", kind),
             }
         }
         return Ok(match completion_type {
@@ -317,8 +326,12 @@ impl CompletionCollector<'_> {
 
     fn compare_node_to_cursor(&self, node: Node) -> Ordering {
         // tree sitter puts a 'missing' node at the end of unclosed tags, so we cannot blindly skip
-        // all nodes that end before the cursor
+        // all nodes that end before the cursor.
+        // also, since on unclosed tags the ERROR node is sometimes the opening one and
+        // sometimes the one after we have to stop at opening_tags specifically, as encountering
+        // one indicates, that the tag is not closed and the next one is the error
         if node.end_position() < self.cursor
+            && !node.kind().ends_with("_tag_open")
             && (node.child_count() == 0
                 || !node
                     .child(node.child_count() - 1)
@@ -489,4 +502,68 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
             code: ErrorCode::RequestFailed,
         })?;
     return Ok(completion_collector.completions);
+}
+
+#[cfg(test)]
+mod tests {
+    use lsp_types::{
+        CompletionParams, PartialResultParams, Position, TextDocumentIdentifier,
+        TextDocumentPositionParams, Url, WorkDoneProgressParams,
+    };
+
+    use crate::document_store::Document;
+
+    use super::CompletionCollector;
+
+    #[test]
+    fn test_completion_for_attributes_in_nested_tag() {
+        let document_content = concat!(
+            "<%@ page language=\"java\" pageEncoding=\"UTF-8\" contentType=\"text/html; charset=UTF-8\"%>\n",
+            "<sp:include module=\"test-module\" uri=\"/functions/doSomething.spml\">\n",
+            "\t<sp:argument \n",
+            "</sp:include>\n");
+        let params: CompletionParams = CompletionParams {
+            text_document_position: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: Url::parse("file:///some/test/file.spml").unwrap(),
+                },
+                position: Position {
+                    line: 2,
+                    character: 14,
+                },
+            },
+            work_done_progress_params: WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: PartialResultParams {
+                partial_result_token: None,
+            },
+            context: None,
+        };
+
+        let document = Document::new(document_content.to_string()).unwrap();
+        let root = document.tree.root_node();
+        let mut completion_collector =
+            CompletionCollector::new(&params.text_document_position, &document);
+        completion_collector
+            .search_completions_in_document(root)
+            .unwrap();
+        let result = completion_collector.completions;
+
+        assert_eq!(
+            result
+                .iter()
+                .map(|c| c.label.clone())
+                .collect::<Vec<String>>(),
+            vec![
+                "condition=\"",
+                "default=\"",
+                "expression=\"",
+                "locale=\"",
+                "name=\"",
+                "object=\"",
+                "value=\"",
+            ]
+        );
+    }
 }
