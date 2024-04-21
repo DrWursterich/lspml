@@ -556,13 +556,13 @@ mod tests {
                 .map(|c| c.label.clone())
                 .collect::<Vec<String>>(),
             vec![
-                "condition=\"",
-                "default=\"",
-                "expression=\"",
-                "locale=\"",
-                "name=\"",
-                "object=\"",
-                "value=\"",
+                "condition",
+                "default",
+                "expression",
+                "locale",
+                "name",
+                "object",
+                "value",
             ]
         );
     }
