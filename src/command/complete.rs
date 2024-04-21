@@ -10,7 +10,7 @@ use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionParams, CompletionTextEdit, Documentation,
     MarkupContent, MarkupKind, Position, Range, TextDocumentPositionParams, TextEdit, Url,
 };
-use std::{collections::HashMap, str::FromStr};
+use std::{cmp::Ordering, collections::HashMap, iter::Iterator, str::FromStr};
 use tree_sitter::{Node, Point};
 
 #[derive(Debug, PartialEq)]
@@ -52,24 +52,14 @@ impl CompletionCollector<'_> {
 
     fn search_completions_in_document(self: &mut Self, root: Node) -> Result<()> {
         for node in root.children(&mut root.walk()) {
-            // tree sitter puts an 'missing' node at the end of unclosed tags, so we cannot blindly
-            // skip all nodes that end before the cursor
-            if node.end_position() < self.cursor
-                && (node.child_count() == 0
-                    || !node
-                        .child(node.child_count() - 1)
-                        .is_some_and(|close_bracket| close_bracket.is_missing()))
-            {
-                continue;
-            }
-            if node.start_position() > self.cursor {
-                break;
-            }
-            // we are in a nested node:
+            match self.compare_node_to_cursor(node) {
+                Ordering::Less => continue,
+                Ordering::Equal => (),
+                Ordering::Greater => break,
+            };
             match node.kind() {
-                // ignore for now
                 "page_header" | "import_header" | "taglib_header" | "text" | "comment" => {
-                    return Ok(())
+                    return Ok(()) // ignore for now
                 }
                 _ if node.is_error() => match node.child(0) {
                     Some(child) if child.kind().ends_with("_tag_open") => {
@@ -91,33 +81,7 @@ impl CompletionCollector<'_> {
                         .map(|text| self.cut_text_up_to_cursor(node, text))
                         .is_ok_and(|text| text == "/" || text.ends_with("</")) =>
                     {
-                        let mut current = node;
-                        loop {
-                            match current.prev_sibling().or_else(|| current.parent()) {
-                                Some(next) => current = next,
-                                None => return Ok(()),
-                            };
-                            let tag;
-                            match current.kind() {
-                                "html_tag_open" => tag = Some(current),
-                                "html_option_tag" => tag = current.child(0),
-                                _ => continue,
-                            }
-                            match tag
-                                .and_then(|tag| tag.utf8_text(self.document.text.as_bytes()).ok())
-                                .map(|tag| tag[1..].to_string() + ">")
-                            {
-                                Some(tag) => self.completions.push(CompletionItem {
-                                    label: "</".to_string() + &tag,
-                                    kind: Some(CompletionItemKind::SNIPPET),
-                                    insert_text: Some(tag),
-                                    ..Default::default()
-                                }),
-                                None => {}
-                            };
-                            break;
-                        }
-                        return Ok(());
+                        return Ok(self.complete_closing_tag(node));
                     }
                     _ => {}
                 },
@@ -144,10 +108,59 @@ impl CompletionCollector<'_> {
                 }
             }
         }
-        return self.complete_top_level_tags();
+        return Ok(self.complete_top_level_tags());
     }
 
-    fn complete_top_level_tags(self: &mut Self) -> Result<()> {
+    fn complete_top_level_tags(self: &mut Self) {
+        self.complete_tags(grammar::TOP_LEVEL_TAGS.iter());
+    }
+
+    fn complete_tags<'a>(&mut self, tags: impl Iterator<Item = &'a TagDefinition>) {
+        let range = self.determine_tag_range();
+        tags.map(|tag| Self::tag_to_completion(tag, range))
+            .for_each(|completion| self.completions.push(completion));
+    }
+
+    fn complete_tag<'a>(&mut self, tag: &TagDefinition) {
+        self.completions
+            .push(Self::tag_to_completion(tag, self.determine_tag_range()));
+    }
+
+    fn complete_closing_tag(&mut self, mut current: Node) {
+        loop {
+            match current.prev_sibling().or_else(|| current.parent()) {
+                Some(next) => current = next,
+                None => return,
+            };
+            let tag = match current.kind() {
+                "html_tag_open" => current
+                    .utf8_text(self.document.text.as_bytes())
+                    .ok()
+                    .map(|tag| &tag[1..]),
+                "html_option_tag" => current
+                    .child(0)
+                    .and_then(|tag| tag.utf8_text(self.document.text.as_bytes()).ok())
+                    .map(|tag| &tag[1..]),
+                kind if kind.ends_with("_tag_open") => {
+                    TagDefinition::from_str(&kind[..kind.len() - "_open".len()])
+                        .ok()
+                        .map(|tag| tag.name)
+                }
+                _ => continue,
+            };
+            if let Some(tag) = tag.map(|tag| tag.to_string() + ">") {
+                self.completions.push(CompletionItem {
+                    label: "</".to_string() + &tag,
+                    kind: Some(CompletionItemKind::SNIPPET),
+                    insert_text: Some(tag),
+                    ..Default::default()
+                });
+            };
+            return;
+        }
+    }
+
+    fn determine_tag_range(&self) -> Range {
         let line = self
             .document
             .text
@@ -155,55 +168,42 @@ impl CompletionCollector<'_> {
             .nth(self.cursor.row)
             .map(|l| l.split_at(self.cursor.column).0)
             .unwrap_or("");
-        let mut start = self.cursor.column as u32;
+        let mut start = self.cursor.column;
         for (i, c) in line.chars().rev().enumerate() {
             match c {
                 'a'..='z' | 'A'..='Z' | '0'..='9' | ':' | '_' | '-' => continue,
-                '<' => {
-                    start -= i as u32 + 1;
-                    break;
-                }
-                _ => break,
+                '<' => start -= i + 1,
+                _ => (),
             }
+            break;
         }
-        let start = Position {
-            line: self.cursor.row as u32,
-            character: start,
+        return Range {
+            start: Position {
+                line: self.cursor.row as u32,
+                character: start as u32,
+            },
+            end: Position {
+                line: self.cursor.row as u32,
+                character: self.cursor.column as u32,
+            },
         };
-        let end = Position {
-            line: self.cursor.row as u32,
-            character: self.cursor.column as u32,
+    }
+
+    fn tag_to_completion(tag: &TagDefinition, range: Range) -> CompletionItem {
+        let new_text = format!("<{}", tag.name);
+        return CompletionItem {
+            label: new_text.clone(),
+            kind: Some(CompletionItemKind::KEYWORD),
+            detail: tag.detail.map(|detail| detail.to_string()),
+            documentation: tag.documentation.map(|detail| {
+                Documentation::MarkupContent(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: detail.to_string(),
+                })
+            }),
+            text_edit: Some(CompletionTextEdit::Edit(TextEdit { new_text, range })),
+            ..Default::default()
         };
-        log::info!(
-            "{:?} - {:?} (\"{}\")",
-            start,
-            end,
-            line.split_at(end.character as usize)
-                .0
-                .split_at(start.character as usize)
-                .1
-        );
-        grammar::TOP_LEVEL_TAGS
-            .iter()
-            .map(|properties| CompletionItem {
-                label: format!("<{}", properties.name),
-                kind: Some(CompletionItemKind::SNIPPET),
-                detail: properties.detail.map(|detail| detail.to_string()),
-                documentation: properties.documentation.map(|detail| {
-                    Documentation::MarkupContent(MarkupContent {
-                        kind: MarkupKind::Markdown,
-                        value: detail.to_string(),
-                    })
-                }),
-                text_edit: Some(CompletionTextEdit::Edit(TextEdit {
-                    new_text: format!("<{}", properties.name),
-                    range: Range { start, end },
-                })),
-                // insert_text: Some(format!("<{}", properties.name)),
-                ..Default::default()
-            })
-            .for_each(|completion| self.completions.push(completion));
-        return Ok(());
     }
 
     fn search_completions_in_tag(self: &mut Self, tag: TagDefinition, node: Node) -> Result<()> {
@@ -212,20 +212,11 @@ impl CompletionCollector<'_> {
         let mut position = TagParsePosition::Attributes;
         for child in node.children(&mut node.walk()) {
             if position == TagParsePosition::Children {
-                // tree sitter puts an 'missing' node at the end of unclosed tags, so we cannot blindly
-                // skip all nodes that end before the cursor
-                if child.end_position() < self.cursor
-                    && (child.child_count() == 0
-                        || !child
-                            .child(child.child_count() - 1)
-                            .is_some_and(|close_bracket| close_bracket.is_missing()))
-                {
-                    continue;
-                }
-                if child.start_position() > self.cursor {
-                    break;
-                }
-                completion_type = CompletionType::Tags;
+                match self.compare_node_to_cursor(child) {
+                    Ordering::Less => continue,
+                    Ordering::Equal => completion_type = CompletionType::Tags,
+                    Ordering::Greater => break,
+                };
             }
             match child.kind() {
                 _ if child.is_error() => match child.child(0) {
@@ -248,48 +239,7 @@ impl CompletionCollector<'_> {
                         .map(|text| self.cut_text_up_to_cursor(child, text))
                         .is_ok_and(|text| text == "/" || text.ends_with("</")) =>
                     {
-                        let mut current = child;
-                        loop {
-                            match current.prev_sibling().or_else(|| current.parent()) {
-                                Some(next) => current = next,
-                                None => return Ok(()),
-                            };
-                            let tag;
-                            match current.kind() {
-                                "html_tag_open" => {
-                                    tag = current
-                                        .utf8_text(self.document.text.as_bytes())
-                                        .ok()
-                                        .map(|tag| &tag[1..])
-                                }
-                                "html_option_tag" => {
-                                    tag = current
-                                        .child(0)
-                                        .and_then(|tag| {
-                                            tag.utf8_text(self.document.text.as_bytes()).ok()
-                                        })
-                                        .map(|tag| &tag[1..])
-                                }
-                                kind if kind.ends_with("_tag_open") => {
-                                    tag =
-                                        TagDefinition::from_str(&kind[..kind.len() - "_open".len()])
-                                            .ok()
-                                            .map(|tag| tag.name)
-                                }
-                                _ => continue,
-                            }
-                            match tag.map(|tag| tag.to_string() + ">") {
-                                Some(tag) => self.completions.push(CompletionItem {
-                                    label: "</".to_string() + &tag,
-                                    kind: Some(CompletionItemKind::SNIPPET),
-                                    insert_text: Some(tag),
-                                    ..Default::default()
-                                }),
-                                None => {}
-                            };
-                            break;
-                        }
-                        return Ok(());
+                        return Ok(self.complete_closing_tag(child));
                     }
                     _ => {}
                 },
@@ -310,10 +260,6 @@ impl CompletionCollector<'_> {
                     }
                     break;
                 }
-                kind if kind.ends_with("_tag_close") => {
-                    break;
-                }
-                // is there a way to "include" other lsps?
                 "java_tag" | "script_tag" | "style_tag" | "html_void_tag" => {
                     log::info!(
                         "cursor seems to be inside {}, for which completion is not supported",
@@ -328,9 +274,11 @@ impl CompletionCollector<'_> {
                         );
                         continue;
                     }
-                    // search in the child tag and complete the children possible in the current tag
                     log::info!("search {} children in {}", tag.name, node.kind());
                     return self.search_completions_in_tag(tag, child);
+                }
+                kind if kind.ends_with("_tag_close") => {
+                    break;
                 }
                 kind if kind.ends_with("_attribute") => {
                     let attribute = kind[..kind.len() - "_attribute".len()].to_string();
@@ -350,21 +298,40 @@ impl CompletionCollector<'_> {
                 }
             }
         }
-        match completion_type {
+        return Ok(match completion_type {
             CompletionType::Attributes => {
                 log::info!("complete attributes for {}", tag.name);
-                return self.complete_attributes_of(tag, attributes);
+                self.complete_attributes_of(tag, attributes)
             }
             CompletionType::Attribute(name) => {
                 log::info!("complete values for attribute {} of {}", name, tag.name);
-                return self.complete_values_of_attribute(tag, name, attributes);
+                self.complete_values_of_attribute(tag, name, attributes)?
             }
             CompletionType::Tags => {
                 log::info!("complete child tags for {}", tag.name);
                 // TODO: maybe also propose closing tag if not already present.
-                return self.complete_children_of(tag);
+                self.complete_children_of(tag)
             }
-        };
+        });
+    }
+
+    fn compare_node_to_cursor(&self, node: Node) -> Ordering {
+        // tree sitter puts a 'missing' node at the end of unclosed tags, so we cannot blindly skip
+        // all nodes that end before the cursor
+        if node.end_position() < self.cursor
+            && (node.child_count() == 0
+                || !node
+                    .child(node.child_count() - 1)
+                    .is_some_and(|close_bracket| close_bracket.is_missing()))
+        {
+            // continue;
+            return Ordering::Less;
+        }
+        if node.start_position() > self.cursor {
+            // break;
+            return Ordering::Greater;
+        }
+        return Ordering::Equal;
     }
 
     fn cut_text_up_to_cursor<'a>(self: &Self, node: Node, text: &'a str) -> &'a str {
@@ -465,7 +432,7 @@ impl CompletionCollector<'_> {
         self: &mut Self,
         tag: TagDefinition,
         attributes: HashMap<String, String>,
-    ) -> Result<()> {
+    ) {
         match tag.attributes {
             grammar::TagAttributes::These(possible) => possible
                 .iter()
@@ -486,44 +453,15 @@ impl CompletionCollector<'_> {
                 .for_each(|completion| self.completions.push(completion)),
             grammar::TagAttributes::None => {}
         };
-        return Ok(());
     }
 
-    fn complete_children_of(self: &mut Self, tag: TagDefinition) -> Result<()> {
+    fn complete_children_of(self: &mut Self, tag: TagDefinition) {
         match tag.children {
-            TagChildren::Any => self.complete_top_level_tags()?,
-            TagChildren::None => {}
-            TagChildren::Scalar(tag) => self.completions.push(CompletionItem {
-                label: "<".to_string() + tag.name,
-                kind: Some(CompletionItemKind::METHOD),
-                detail: tag.detail.map(|detail| detail.to_string()),
-                documentation: tag.documentation.map(|detail| {
-                    Documentation::MarkupContent(MarkupContent {
-                        kind: MarkupKind::Markdown,
-                        value: detail.to_string(),
-                    })
-                }),
-                insert_text: Some("<".to_string() + tag.name),
-                ..Default::default()
-            }),
-            TagChildren::Vector(tags) => tags
-                .iter()
-                .map(|properties| CompletionItem {
-                    label: "<".to_string() + properties.name,
-                    kind: Some(CompletionItemKind::METHOD),
-                    detail: properties.detail.map(|detail| detail.to_string()),
-                    documentation: properties.documentation.map(|detail| {
-                        Documentation::MarkupContent(MarkupContent {
-                            kind: MarkupKind::Markdown,
-                            value: detail.to_string(),
-                        })
-                    }),
-                    insert_text: Some("<".to_string() + properties.name),
-                    ..Default::default()
-                })
-                .for_each(|completion| self.completions.push(completion)),
+            TagChildren::Any => self.complete_top_level_tags(),
+            TagChildren::None => (),
+            TagChildren::Scalar(tag) => self.complete_tag(tag),
+            TagChildren::Vector(tags) => self.complete_tags(tags.iter()),
         };
-        return Ok(());
     }
 }
 
