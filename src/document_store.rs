@@ -169,10 +169,15 @@ fn collect_from_tag(
 fn spel_ast_of(text: &str, r#type: &TagAttributeType) -> Result<SpelAst> {
     let parser = &mut spel::parser::Parser::new(text);
     match r#type {
-        TagAttributeType::Comparable => Ok(SpelAst::Comparable(match parser.parse_comparable() {
-            Ok(result) => SpelResult::Valid(result),
-            Err(err) => SpelResult::Invalid(err),
-        })),
+        TagAttributeType::Comparable => Ok(match parser.parse_comparable() {
+            Ok(result) => SpelAst::Comparable(SpelResult::Valid(result)),
+            // workaround as comparables as attribute values do accept strings (without quotes)
+            // but comparables in actuall comparissons do not.
+            Err(err) => match spel::parser::Parser::new(text).parse_text() {
+                Ok(result) => SpelAst::String(SpelResult::Valid(result)),
+                Err(_) => SpelAst::Comparable(SpelResult::Invalid(err)),
+            },
+        }),
         TagAttributeType::Condition => Ok(SpelAst::Condition(match parser.parse_condition_ast() {
             Ok(result) => SpelResult::Valid(result.root),
             Err(err) => SpelResult::Invalid(err),
