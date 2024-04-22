@@ -23,6 +23,8 @@ pub(crate) enum SyntaxFix {
     Replace(Location, String),
 }
 
+const ADDITIONAL_CHARS_IN_ANCHOR: [char; 1] = ['.'];
+
 impl SyntaxFix {
     pub(crate) fn to_text_edit(&self, offset: &Point) -> TextEdit {
         return match self {
@@ -1286,7 +1288,7 @@ impl Parser {
             });
         }
         self.scanner.skip_whitespace();
-        let result = self.parse_word()?;
+        let result = self.parse_word_with_additional_chars(&ADDITIONAL_CHARS_IN_ANCHOR)?;
         self.scanner.skip_whitespace();
         return match self.scanner.pop() {
             Some('}') => Ok(Anchor {
@@ -1423,12 +1425,21 @@ impl Parser {
     }
 
     fn parse_word(&mut self) -> Result<Word, SyntaxError> {
+        return self.parse_word_with_additional_chars(&[]);
+    }
+
+    fn parse_word_with_additional_chars(&mut self, chars: &[char]) -> Result<Word, SyntaxError> {
         let mut string = String::new();
         let mut fragments = Vec::new();
         let mut start = self.scanner.cursor as u16;
         loop {
             match self.scanner.peek() {
-                Some(char @ ('a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-')) => {
+                // TODO: evaluate what characters are __actually__ allowed
+                Some(char @ ('a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' | '*')) => {
+                    string.push(*char);
+                    self.scanner.pop();
+                }
+                Some(char) if chars.contains(char) => {
                     string.push(*char);
                     self.scanner.pop();
                 }
