@@ -1,16 +1,20 @@
-use core::fmt;
 use std::fmt::Display;
+
+use anyhow::Result;
+use core::fmt;
+use lsp_types::{Position, Range, TextEdit};
+use tree_sitter::Point;
 
 use super::{
     ast::{
-        self, ConditionAst, ExpressionAst, Interpolation, Location, StringLiteral, WordFragment,
+        Anchor, Argument, Comparable, ComparissonOperator, Condition, ConditionAst,
+        ConditionOperator, Expression, ExpressionAst, ExpressionOperator, Function,
+        FunctionArgument, Identifier, Interpolation, Location, Null, Number, Object, ObjectAst,
+        Query, Regex, Sign, SignedNumber, StringLiteral, UndecidedExpressionContent, Uri,
+        UriFileExtension, UriFragment, UriLiteral, Word, WordFragment,
     },
     Scanner,
 };
-use crate::spel::ast::ObjectAst;
-use anyhow::Result;
-use lsp_types::{Position, Range, TextEdit};
-use tree_sitter::Point;
 
 #[derive(Clone, Debug)]
 pub(crate) enum SyntaxFix {
@@ -150,7 +154,7 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_text(&mut self) -> Result<ast::Word, SyntaxError> {
+    pub(crate) fn parse_text(&mut self) -> Result<Word, SyntaxError> {
         let mut string = String::new();
         let mut fragments = Vec::new();
         let mut start = self.scanner.cursor as u16;
@@ -160,7 +164,7 @@ impl Parser {
                     let interpolation = self.parse_interpolation()?;
                     let length = string.len() as u16;
                     if length > 0 {
-                        fragments.push(ast::WordFragment::String(ast::StringLiteral {
+                        fragments.push(WordFragment::String(StringLiteral {
                             content: string,
                             location: Location::VariableLength {
                                 char: start,
@@ -171,7 +175,7 @@ impl Parser {
                         string = String::new();
                         start = self.scanner.cursor as u16;
                     }
-                    fragments.push(ast::WordFragment::Interpolation(interpolation))
+                    fragments.push(WordFragment::Interpolation(interpolation))
                 }
                 Some(char) => {
                     string.push(*char);
@@ -182,7 +186,7 @@ impl Parser {
         }
         let length = string.len() as u16;
         if length > 0 || fragments.len() == 0 {
-            fragments.push(ast::WordFragment::String(ast::StringLiteral {
+            fragments.push(WordFragment::String(StringLiteral {
                 content: string,
                 location: Location::VariableLength {
                     char: start,
@@ -191,10 +195,10 @@ impl Parser {
                 },
             }));
         }
-        return Ok(ast::Word { fragments });
+        return Ok(Word { fragments });
     }
 
-    pub(crate) fn parse_uri(&mut self) -> Result<ast::Uri, SyntaxError> {
+    pub(crate) fn parse_uri(&mut self) -> Result<Uri, SyntaxError> {
         let mut fragments = Vec::new();
         self.scanner.skip_whitespace();
         loop {
@@ -206,7 +210,7 @@ impl Parser {
                     };
                     self.scanner.pop();
                     let content = self.parse_word()?;
-                    fragments.push(ast::UriFragment {
+                    fragments.push(UriFragment {
                         content,
                         slash_location,
                     });
@@ -218,9 +222,9 @@ impl Parser {
                     };
                     self.scanner.pop();
                     let content = self.parse_word()?;
-                    return Ok(ast::Uri::Literal(ast::UriLiteral {
+                    return Ok(Uri::Literal(UriLiteral {
                         fragments,
-                        file_extension: Some(ast::UriFileExtension {
+                        file_extension: Some(UriFileExtension {
                             content,
                             dot_location,
                         }),
@@ -230,13 +234,13 @@ impl Parser {
                     let interpolation = self.parse_interpolation()?;
                     self.scanner.skip_whitespace();
                     return match self.scanner.is_done() {
-                        true => Ok(ast::Uri::Object(interpolation)),
+                        true => Ok(Uri::Object(interpolation)),
                         false => Err(self.trailing_characters_error()),
                     };
                 }
                 Some(char) => return Err(syntax_error!("unexpected char \"{}\"", char)),
                 None => {
-                    return Ok(ast::Uri::Literal(ast::UriLiteral {
+                    return Ok(Uri::Literal(UriLiteral {
                         fragments,
                         file_extension: None,
                     }))
@@ -245,7 +249,7 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_regex(&mut self) -> Result<ast::Regex, SyntaxError> {
+    pub(crate) fn parse_regex(&mut self) -> Result<Regex, SyntaxError> {
         if self.scanner.is_done() {
             return Err(syntax_error!("string is empty"));
         }
@@ -263,7 +267,7 @@ impl Parser {
                     self.scanner.pop();
                 }
                 None => {
-                    return Ok(ast::Regex {
+                    return Ok(Regex {
                         location: Location::VariableLength {
                             char: start,
                             line: 0,
@@ -275,7 +279,7 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_query(&mut self) -> Result<ast::Query, SyntaxError> {
+    pub(crate) fn parse_query(&mut self) -> Result<Query, SyntaxError> {
         if self.scanner.is_done() {
             return Err(syntax_error!("string is empty"));
         }
@@ -289,7 +293,7 @@ impl Parser {
                     self.scanner.pop();
                 }
                 None => {
-                    return Ok(ast::Query {
+                    return Ok(Query {
                         location: Location::VariableLength {
                             char: start,
                             line: 0,
@@ -301,14 +305,14 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_identifier(&mut self) -> Result<ast::Identifier, SyntaxError> {
+    pub(crate) fn parse_identifier(&mut self) -> Result<Identifier, SyntaxError> {
         self.scanner.skip_whitespace();
         if self.scanner.is_done() {
             return Err(syntax_error!("string is empty"));
         }
         let name = self.parse_word()?;
         self.scanner.skip_whitespace();
-        let mut result = ast::Identifier::Name(name);
+        let mut result = Identifier::Name(name);
         loop {
             match self.scanner.peek() {
                 Some('.') => {
@@ -320,7 +324,7 @@ impl Parser {
                     self.scanner.skip_whitespace();
                     let name = self.parse_word()?;
                     self.scanner.skip_whitespace();
-                    result = ast::Identifier::FieldAccess {
+                    result = Identifier::FieldAccess {
                         identifier: Box::new(result),
                         field: name,
                         dot_location,
@@ -332,78 +336,73 @@ impl Parser {
         }
     }
 
-    fn parse_object(&mut self) -> Result<ast::Object, SyntaxError> {
-        return match self.scanner.peek() {
-            Some('\'') => self.parse_string().map(|s| ast::Object::String(s)),
-            Some('!') => self.parse_interpolated_anchor().map(ast::Object::Anchor),
-            Some('$' | 'a'..='z' | 'A'..='Z' | '_') => self.parse_name_or_global_function(),
-            Some(char) => Err(syntax_error!("unexpected char \"{}\"", char)),
-            None => Err(syntax_error!("unexpected end")),
+    fn parse_object(&mut self) -> Result<Object, SyntaxError> {
+        let object = match self.scanner.peek() {
+            Some('\'') => self.parse_string().map(Object::String)?,
+            Some('!') => self.parse_interpolated_anchor().map(Object::Anchor)?,
+            Some('$' | 'a'..='z' | 'A'..='Z' | '_') => self.parse_name_or_global_function()?,
+            Some(char) => return Err(syntax_error!("unexpected char \"{}\"", char)),
+            None => return Err(syntax_error!("unexpected end")),
         };
+        return self.parse_object_access(object);
     }
 
-    fn parse_expression(&mut self) -> Result<ast::Expression, SyntaxError> {
+    fn parse_expression(&mut self) -> Result<Expression, SyntaxError> {
         let result = self.parse_undecided_expression_content()?;
         return self.resolve_expression_content(result);
     }
 
     fn parse_undecided_expression_content(
         &mut self,
-    ) -> Result<ast::UndecidedExpressionContent, SyntaxError> {
+    ) -> Result<UndecidedExpressionContent, SyntaxError> {
         return match self.scanner.peek() {
-            Some('\'') => self
-                .parse_string()
-                .map(ast::UndecidedExpressionContent::String),
+            Some('\'') => self.parse_string().map(UndecidedExpressionContent::String),
             Some('$') => self
                 .parse_interpolation()
-                .map(ast::UndecidedExpressionContent::Name),
+                .map(UndecidedExpressionContent::Name),
             Some('(') => self.parse_bracketed_expression_content(),
             Some('+' | '-') => self
                 .parse_signed_expression()
-                .map(ast::UndecidedExpressionContent::Expression),
+                .map(UndecidedExpressionContent::Expression),
             Some('0'..='9') => self
                 .parse_number()
-                .map(ast::Expression::Number)
-                .map(ast::UndecidedExpressionContent::Expression),
+                .map(Expression::Number)
+                .map(UndecidedExpressionContent::Expression),
             Some('!') => self
                 .parse_negated_condition()
-                .map(ast::UndecidedExpressionContent::Condition),
+                .map(UndecidedExpressionContent::Condition),
             Some(_) => {
                 match self.parse_name_or_global_function()? {
-                    ast::Object::Function(function) => {
-                        Ok(ast::UndecidedExpressionContent::Function(function))
+                    Object::Function(function) => {
+                        Ok(UndecidedExpressionContent::Function(function))
                     }
-                    ast::Object::Name(ast::Word { fragments }) if fragments.len() == 1 => {
+                    Object::Name(Word { fragments }) if fragments.len() == 1 => {
                         match &fragments[0] {
-                            WordFragment::String(ast::StringLiteral { content, location })
+                            WordFragment::String(StringLiteral { content, location })
                                 if content == "null" =>
                             {
-                                Ok(ast::UndecidedExpressionContent::Null(ast::Null {
+                                Ok(UndecidedExpressionContent::Null(Null {
                                     location: location.clone(),
                                 }))
                             }
-                            WordFragment::String(ast::StringLiteral { content, location })
+                            WordFragment::String(StringLiteral { content, location })
                                 if content == "true" =>
                             {
-                                Ok(ast::UndecidedExpressionContent::Condition(
-                                    ast::Condition::True {
-                                        location: location.clone(),
-                                    },
-                                ))
+                                Ok(UndecidedExpressionContent::Condition(Condition::True {
+                                    location: location.clone(),
+                                }))
                             }
-                            WordFragment::String(ast::StringLiteral { content, location })
+                            WordFragment::String(StringLiteral { content, location })
                                 if content == "false" =>
                             {
-                                Ok(ast::UndecidedExpressionContent::Condition(
-                                    ast::Condition::False {
-                                        location: location.clone(),
-                                    },
-                                ))
+                                Ok(UndecidedExpressionContent::Condition(Condition::False {
+                                    location: location.clone(),
+                                }))
                             }
                             WordFragment::Interpolation(interpolation) => {
-                                Ok(ast::UndecidedExpressionContent::Name(interpolation.clone()))
+                                Ok(UndecidedExpressionContent::Name(interpolation.clone()))
                             }
-                            WordFragment::String(ast::StringLiteral { content, location }) => {
+                            WordFragment::String(StringLiteral { content, location }) => {
                                 let new_string = format!("${{{}}}", content);
                                 Err(SyntaxError {
                                     message: format!(
@@ -418,7 +417,7 @@ impl Parser {
                             }
                         }
                     }
-                    ast::Object::Name(word) => {
+                    Object::Name(word) => {
                         let new_string = format!("${{{}}}", word);
                         let (char, line) = match word.fragments.first().unwrap() {
                             WordFragment::String(StringLiteral { location, .. }) => {
@@ -452,11 +451,11 @@ impl Parser {
                             )],
                         })
                     }
-                    // ast::Object::Anchor(_) => todo!(),
-                    // ast::Object::String(_) => todo!(),
-                    // ast::Object::FieldAccess { object, field, dot_location } => todo!(),
-                    // ast::Object::MethodAccess { object, function, dot_location } => todo!(),
-                    // ast::Object::ArrayAccess { object, index, opening_bracket_location, closing_bracket_location } => todo!(),
+                    // Object::Anchor(_) => todo!(),
+                    // Object::String(_) => todo!(),
+                    // Object::FieldAccess { object, field, dot_location } => todo!(),
+                    // Object::MethodAccess { object, function, dot_location } => todo!(),
+                    // Object::ArrayAccess { object, index, opening_bracket_location, closing_bracket_location } => todo!(),
                     object => Err(syntax_error!("unexpected \"{}\"", object)),
                 }
             }
@@ -466,124 +465,116 @@ impl Parser {
 
     fn resolve_expression_content(
         &mut self,
-        content: ast::UndecidedExpressionContent,
-    ) -> Result<ast::Expression, SyntaxError> {
+        content: UndecidedExpressionContent,
+    ) -> Result<Expression, SyntaxError> {
         self.scanner.skip_whitespace();
         return match self.resolve_undecided_expression_content(content)? {
-            ast::UndecidedExpressionContent::Expression(expression) => Ok(expression),
-            ast::UndecidedExpressionContent::Name(name) => {
-                Ok(ast::Expression::Object(Box::new(name)))
-            }
-            ast::UndecidedExpressionContent::Null(null) => Ok(ast::Expression::Null(null)),
-            ast::UndecidedExpressionContent::Function(function) => {
-                Ok(ast::Expression::Function(function))
-            }
+            UndecidedExpressionContent::Expression(expression) => Ok(expression),
+            UndecidedExpressionContent::Name(name) => Ok(Expression::Object(Box::new(name))),
+            UndecidedExpressionContent::Null(null) => Ok(Expression::Null(null)),
+            UndecidedExpressionContent::Function(function) => Ok(Expression::Function(function)),
             content => Err(syntax_error!("unexpected {}", content.r#type())),
         };
     }
 
     fn resolve_undecided_expression_content(
         &mut self,
-        content: ast::UndecidedExpressionContent,
-    ) -> Result<ast::UndecidedExpressionContent, SyntaxError> {
+        content: UndecidedExpressionContent,
+    ) -> Result<UndecidedExpressionContent, SyntaxError> {
         // TODO: waaaaaay to many .clone()s!
         match content {
-            ast::UndecidedExpressionContent::Expression(expression) => {
+            UndecidedExpressionContent::Expression(expression) => {
                 let expression = self.try_parse_binary_operation(expression)?;
                 return match self
-                    .try_parse_comparisson(&ast::Comparable::Expression(expression.clone()))?
+                    .try_parse_comparisson(&Comparable::Expression(expression.clone()))?
                 {
                     Some(comparison) => {
                         let condition = self.resolve_comparable(comparison)?;
                         self.resolve_undecided_expression_content(
-                            ast::UndecidedExpressionContent::Condition(condition),
+                            UndecidedExpressionContent::Condition(condition),
                         )
                     }
-                    None => Ok(ast::UndecidedExpressionContent::Expression(expression)),
+                    None => Ok(UndecidedExpressionContent::Expression(expression)),
                 };
             }
-            ast::UndecidedExpressionContent::Function(function) => {
+            UndecidedExpressionContent::Function(function) => {
                 let function_function = function.clone();
-                let expression = ast::Expression::Function(function);
+                let expression = Expression::Function(function);
                 let expression_function = expression.clone();
                 let binary_expression = self.try_parse_binary_operation(expression)?;
-                return match self.try_parse_comparisson(&ast::Comparable::Expression(
-                    binary_expression.clone(),
-                ))? {
+                return match self
+                    .try_parse_comparisson(&Comparable::Expression(binary_expression.clone()))?
+                {
                     Some(comparison) => {
                         let condition = self.resolve_comparable(comparison)?;
                         self.resolve_undecided_expression_content(
-                            ast::UndecidedExpressionContent::Condition(condition),
+                            UndecidedExpressionContent::Condition(condition),
                         )
                     }
-                    None => match self.try_parse_binary_condition(&ast::Condition::Function(
+                    None => match self.try_parse_binary_condition(&Condition::Function(
                         function_function.clone(),
                     ))? {
                         Some(condition) => self.resolve_undecided_expression_content(
-                            ast::UndecidedExpressionContent::Condition(condition),
+                            UndecidedExpressionContent::Condition(condition),
                         ),
                         None => match self
-                            .try_parse_ternary(&ast::Condition::Function(function_function))?
+                            .try_parse_ternary(&Condition::Function(function_function))?
                         {
                             Some(expression) => self.resolve_undecided_expression_content(
-                                ast::UndecidedExpressionContent::Expression(expression),
+                                UndecidedExpressionContent::Expression(expression),
                             ),
-                            None => Ok(ast::UndecidedExpressionContent::Expression(
-                                expression_function,
-                            )),
+                            None => Ok(UndecidedExpressionContent::Expression(expression_function)),
                             // TODO: if try_parse_binary_operation did not find any operator this
                             // should be an UndecidedExpressionContent::Function !
                         },
                     },
                 };
             }
-            ast::UndecidedExpressionContent::Condition(condition) => {
+            UndecidedExpressionContent::Condition(condition) => {
                 return match self
-                    .try_parse_comparisson(&ast::Comparable::Condition(condition.clone()))?
+                    .try_parse_comparisson(&Comparable::Condition(condition.clone()))?
                 {
                     Some(comparison) => {
                         let condition = self.resolve_comparable(comparison)?;
                         self.resolve_undecided_expression_content(
-                            ast::UndecidedExpressionContent::Condition(condition),
+                            UndecidedExpressionContent::Condition(condition),
                         )
                     }
                     None => match self.try_parse_binary_condition(&condition)? {
                         Some(condition) => self.resolve_undecided_expression_content(
-                            ast::UndecidedExpressionContent::Condition(condition),
+                            UndecidedExpressionContent::Condition(condition),
                         ),
                         None => match self.try_parse_ternary(&condition)? {
                             Some(expression) => self.resolve_undecided_expression_content(
-                                ast::UndecidedExpressionContent::Expression(expression),
+                                UndecidedExpressionContent::Expression(expression),
                             ),
-                            None => Ok(ast::UndecidedExpressionContent::Condition(condition)),
+                            None => Ok(UndecidedExpressionContent::Condition(condition)),
                         },
                     },
                 };
             }
-            ast::UndecidedExpressionContent::Name(ref name) => {
+            UndecidedExpressionContent::Name(ref name) => {
                 return match self
-                    .try_parse_binary_operation(ast::Expression::Object(Box::new(name.clone())))?
+                    .try_parse_binary_operation(Expression::Object(Box::new(name.clone())))?
                 {
-                    ast::Expression::Object(name) => {
-                        match self.try_parse_comparisson(&ast::Comparable::Object(*name.clone()))? {
+                    Expression::Object(name) => {
+                        match self.try_parse_comparisson(&Comparable::Object(*name.clone()))? {
                             Some(comparison) => {
                                 let condition = self.resolve_comparable(comparison)?;
                                 self.resolve_undecided_expression_content(
-                                    ast::UndecidedExpressionContent::Condition(condition),
+                                    UndecidedExpressionContent::Condition(condition),
                                 )
                             }
                             None => {
-                                let condition = ast::Condition::Object(*name);
+                                let condition = Condition::Object(*name);
                                 match self.try_parse_binary_condition(&condition)? {
                                     Some(condition) => self.resolve_undecided_expression_content(
-                                        ast::UndecidedExpressionContent::Condition(condition),
+                                        UndecidedExpressionContent::Condition(condition),
                                     ),
                                     None => match self.try_parse_ternary(&condition)? {
                                         Some(expression) => self
                                             .resolve_undecided_expression_content(
-                                                ast::UndecidedExpressionContent::Expression(
-                                                    expression,
-                                                ),
+                                                UndecidedExpressionContent::Expression(expression),
                                             ),
                                         None => Ok(content),
                                     },
@@ -592,27 +583,27 @@ impl Parser {
                         }
                     }
                     expression => self.resolve_undecided_expression_content(
-                        ast::UndecidedExpressionContent::Expression(expression),
+                        UndecidedExpressionContent::Expression(expression),
                     ),
                 };
             }
-            ast::UndecidedExpressionContent::String(ref string) => {
-                return match self.try_parse_comparisson(&ast::Comparable::String(string.clone()))? {
+            UndecidedExpressionContent::String(ref string) => {
+                return match self.try_parse_comparisson(&Comparable::String(string.clone()))? {
                     Some(comparison) => {
                         let condition = self.resolve_comparable(comparison)?;
                         self.resolve_undecided_expression_content(
-                            ast::UndecidedExpressionContent::Condition(condition),
+                            UndecidedExpressionContent::Condition(condition),
                         )
                     }
                     None => Ok(content),
                 };
             }
-            ast::UndecidedExpressionContent::Null(ref null) => {
-                return match self.try_parse_comparisson(&ast::Comparable::Null(null.clone()))? {
+            UndecidedExpressionContent::Null(ref null) => {
+                return match self.try_parse_comparisson(&Comparable::Null(null.clone()))? {
                     Some(comparison) => {
                         let condition = self.resolve_comparable(comparison)?;
                         self.resolve_undecided_expression_content(
-                            ast::UndecidedExpressionContent::Condition(condition),
+                            UndecidedExpressionContent::Condition(condition),
                         )
                     }
                     None => Ok(content),
@@ -623,8 +614,8 @@ impl Parser {
 
     fn try_parse_ternary(
         &mut self,
-        condition: &ast::Condition,
-    ) -> Result<Option<ast::Expression>, SyntaxError> {
+        condition: &Condition,
+    ) -> Result<Option<Expression>, SyntaxError> {
         if !self.scanner.take(&'?') {
             return Ok(None);
         }
@@ -652,7 +643,7 @@ impl Parser {
         };
         self.scanner.skip_whitespace();
         let right = self.parse_expression()?;
-        return Ok(Some(ast::Expression::Ternary {
+        return Ok(Some(Expression::Ternary {
             condition: Box::new(condition.clone()),
             left: Box::new(left),
             right: Box::new(right),
@@ -663,7 +654,7 @@ impl Parser {
 
     fn parse_bracketed_expression_content(
         &mut self,
-    ) -> Result<ast::UndecidedExpressionContent, SyntaxError> {
+    ) -> Result<UndecidedExpressionContent, SyntaxError> {
         if !self.scanner.take(&'(') {
             return Err(syntax_error!("expected opening bracket"));
         }
@@ -693,71 +684,69 @@ impl Parser {
             line: 0,
         };
         return Ok(match content {
-            ast::UndecidedExpressionContent::Expression(expression) => {
-                ast::UndecidedExpressionContent::Expression(ast::Expression::BracketedExpression {
+            UndecidedExpressionContent::Expression(expression) => {
+                UndecidedExpressionContent::Expression(Expression::BracketedExpression {
                     expression: Box::new(expression),
                     opening_bracket_location,
                     closing_bracket_location,
                 })
             }
-            ast::UndecidedExpressionContent::Condition(condition) => {
-                ast::UndecidedExpressionContent::Condition(ast::Condition::BracketedCondition {
+            UndecidedExpressionContent::Condition(condition) => {
+                UndecidedExpressionContent::Condition(Condition::BracketedCondition {
                     condition: Box::new(condition),
                     opening_bracket_location,
                     closing_bracket_location,
                 })
             }
-            ast::UndecidedExpressionContent::Name(_name) => todo!(),
-            ast::UndecidedExpressionContent::String(_string) => todo!(),
-            ast::UndecidedExpressionContent::Null(_null) => todo!(),
-            ast::UndecidedExpressionContent::Function(_function) => todo!(),
+            UndecidedExpressionContent::Name(_name) => todo!(),
+            UndecidedExpressionContent::String(_string) => todo!(),
+            UndecidedExpressionContent::Null(_null) => todo!(),
+            UndecidedExpressionContent::Function(_function) => todo!(),
         });
     }
 
-    fn parse_condition(&mut self) -> Result<ast::Condition, SyntaxError> {
+    fn parse_condition(&mut self) -> Result<Condition, SyntaxError> {
         let comparable = self.parse_comparable()?;
         return self.resolve_comparable(comparable);
     }
 
-    pub(crate) fn parse_comparable(&mut self) -> Result<ast::Comparable, SyntaxError> {
+    pub(crate) fn parse_comparable(&mut self) -> Result<Comparable, SyntaxError> {
         return Ok(match self.scanner.peek() {
-            Some('\'') => ast::Comparable::String(self.parse_string()?),
+            Some('\'') => Comparable::String(self.parse_string()?),
             Some('$') => {
                 let object = self.parse_interpolation()?;
                 self.scanner.skip_whitespace();
-                match self.try_parse_binary_operation(ast::Expression::Object(Box::new(object)))? {
-                    ast::Expression::Object(interpolation) => {
-                        ast::Comparable::Object(*interpolation)
-                    }
-                    expression => ast::Comparable::Expression(expression),
+                match self.try_parse_binary_operation(Expression::Object(Box::new(object)))? {
+                    Expression::Object(interpolation) => Comparable::Object(*interpolation),
+                    expression => Comparable::Expression(expression),
                 }
             }
             Some('+' | '-') => {
                 let expression = self.parse_signed_expression()?;
-                ast::Comparable::Expression(self.try_parse_binary_operation(expression)?)
+                Comparable::Expression(self.try_parse_binary_operation(expression)?)
             }
             Some('0'..='9') => {
-                let expression = self.parse_number().map(ast::Expression::Number)?;
+                let expression = self.parse_number().map(Expression::Number)?;
                 self.scanner.skip_whitespace();
-                ast::Comparable::Expression(self.try_parse_binary_operation(expression)?)
+                Comparable::Expression(self.try_parse_binary_operation(expression)?)
             }
             Some('(') => self.parse_bracketed_comparable()?,
-            Some('!') => ast::Comparable::Condition(self.parse_negated_condition()?),
+            Some('!') => Comparable::Condition(self.parse_negated_condition()?),
             Some(_) => {
                 let start = self.scanner.cursor as u16;
                 let func = self.parse_name_or_global_function()?;
                 match func {
-                    ast::Object::Name(ast::Word { fragments }) if fragments.len() == 1 => {
+                    Object::Name(Word { fragments }) if fragments.len() == 1 => {
                         match &fragments[0] {
-                            ast::WordFragment::String(ast::StringLiteral { content, location }) => {
+                            WordFragment::String(StringLiteral { content, location }) => {
                                 match content.as_str() {
-                                    "true" => ast::Comparable::Condition(ast::Condition::True {
+                                    "true" => Comparable::Condition(Condition::True {
                                         location: location.clone(),
                                     }),
-                                    "false" => ast::Comparable::Condition(ast::Condition::False {
+                                    "false" => Comparable::Condition(Condition::False {
                                         location: location.clone(),
                                     }),
-                                    "null" => ast::Comparable::Null(ast::Null {
+                                    "null" => Comparable::Null(Null {
                                         location: location.clone(),
                                     }),
                                     name => {
@@ -775,20 +764,20 @@ impl Parser {
                                     }
                                 }
                             }
-                            ast::WordFragment::Interpolation(interpolation) => {
+                            WordFragment::Interpolation(interpolation) => {
                                 self.scanner.skip_whitespace();
-                                match self.try_parse_binary_operation(ast::Expression::Object(
+                                match self.try_parse_binary_operation(Expression::Object(
                                     Box::new(interpolation.clone()),
                                 ))? {
-                                    ast::Expression::Object(interpolation) => {
-                                        ast::Comparable::Object(*interpolation)
+                                    Expression::Object(interpolation) => {
+                                        Comparable::Object(*interpolation)
                                     }
-                                    expression => ast::Comparable::Expression(expression),
+                                    expression => Comparable::Expression(expression),
                                 }
                             }
                         }
                     }
-                    ast::Object::Function(function) => ast::Comparable::Function(function),
+                    Object::Function(function) => Comparable::Function(function),
                     object => {
                         // this should not be possible
                         let new_string = format!("${{{}}}", object);
@@ -813,19 +802,16 @@ impl Parser {
         });
     }
 
-    fn resolve_comparable(
-        &mut self,
-        comparable: ast::Comparable,
-    ) -> Result<ast::Condition, SyntaxError> {
+    fn resolve_comparable(&mut self, comparable: Comparable) -> Result<Condition, SyntaxError> {
         self.scanner.skip_whitespace();
         return match self.try_parse_comparisson(&comparable)? {
             Some(comparisson) => self.resolve_comparable(comparisson),
             None => {
                 let condition = match comparable {
-                    ast::Comparable::Condition(condition) => condition,
-                    ast::Comparable::Object(interpolation) => ast::Condition::Object(interpolation),
-                    ast::Comparable::Function(function) => ast::Condition::Function(function),
-                    ast::Comparable::Null(ast::Null { location }) => {
+                    Comparable::Condition(condition) => condition,
+                    Comparable::Object(interpolation) => Condition::Object(interpolation),
+                    Comparable::Function(function) => Condition::Function(function),
+                    Comparable::Null(Null { location }) => {
                         let new_string = "false".to_string();
                         return Err(SyntaxError {
                             message: format!(
@@ -835,14 +821,12 @@ impl Parser {
                             proposed_fixes: vec![SyntaxFix::Replace(location, new_string)],
                         });
                     }
-                    // ast::Comparable::Expression(_) => todo!(),
-                    // ast::Comparable::String(_) => todo!(),
+                    // Comparable::Expression(_) => todo!(),
+                    // Comparable::String(_) => todo!(),
                     comparable => return Err(syntax_error!("unexpected {}", comparable.r#type())),
                 };
                 match self.try_parse_binary_condition(&condition)? {
-                    Some(condition) => {
-                        self.resolve_comparable(ast::Comparable::Condition(condition))
-                    }
+                    Some(condition) => self.resolve_comparable(Comparable::Condition(condition)),
                     None => Ok(condition),
                 }
             }
@@ -851,20 +835,20 @@ impl Parser {
 
     fn try_parse_comparisson(
         &mut self,
-        left: &ast::Comparable,
-    ) -> Result<Option<ast::Comparable>, SyntaxError> {
+        left: &Comparable,
+    ) -> Result<Option<Comparable>, SyntaxError> {
         return Ok(match self.scanner.peek() {
             Some(char @ ('!' | '=' | '>' | '<')) => {
                 let char = char.clone();
                 self.scanner.pop();
                 let equals = self.scanner.take(&'=');
                 let operator = match (char, equals) {
-                    ('=', true) => ast::ComparissonOperator::Equal,
-                    ('!', true) => ast::ComparissonOperator::Unequal,
-                    ('>', false) => ast::ComparissonOperator::GreaterThan,
-                    ('>', true) => ast::ComparissonOperator::GreaterThanOrEqual,
-                    ('<', false) => ast::ComparissonOperator::LessThan,
-                    ('<', true) => ast::ComparissonOperator::LessThanOrEqual,
+                    ('=', true) => ComparissonOperator::Equal,
+                    ('!', true) => ComparissonOperator::Unequal,
+                    ('>', false) => ComparissonOperator::GreaterThan,
+                    ('>', true) => ComparissonOperator::GreaterThanOrEqual,
+                    ('<', false) => ComparissonOperator::LessThan,
+                    ('<', true) => ComparissonOperator::LessThanOrEqual,
                     (char, _) => {
                         return Err(SyntaxError {
                             message: format!(
@@ -892,7 +876,7 @@ impl Parser {
                     },
                 };
                 self.scanner.skip_whitespace();
-                Some(ast::Comparable::Condition(ast::Condition::Comparisson {
+                Some(Comparable::Condition(Condition::Comparisson {
                     left: Box::new(left.clone()),
                     operator,
                     right: Box::new(self.parse_comparable()?),
@@ -905,14 +889,14 @@ impl Parser {
 
     fn try_parse_binary_condition(
         &mut self,
-        left: &ast::Condition,
-    ) -> Result<Option<ast::Condition>, SyntaxError> {
+        left: &Condition,
+    ) -> Result<Option<Condition>, SyntaxError> {
         return Ok(match self.scanner.peek() {
             Some(char @ ('&' | '|')) => {
                 let first = &char.clone();
                 let operator = match first == &'&' {
-                    true => ast::ConditionOperator::And,
-                    false => ast::ConditionOperator::Or,
+                    true => ConditionOperator::And,
+                    false => ConditionOperator::Or,
                 };
                 let operator_location = Location::DoubleCharacter {
                     char: self.scanner.cursor as u16,
@@ -935,7 +919,7 @@ impl Parser {
                     });
                 }
                 self.scanner.skip_whitespace();
-                Some(ast::Condition::BinaryOperation {
+                Some(Condition::BinaryOperation {
                     left: Box::new(left.clone()),
                     operator,
                     right: Box::new(self.parse_condition()?),
@@ -946,7 +930,7 @@ impl Parser {
         });
     }
 
-    fn parse_bracketed_comparable(&mut self) -> Result<ast::Comparable, SyntaxError> {
+    fn parse_bracketed_comparable(&mut self) -> Result<Comparable, SyntaxError> {
         if !self.scanner.take(&'(') {
             return Err(syntax_error!("expected opening bracket"));
         }
@@ -959,7 +943,7 @@ impl Parser {
         self.scanner.skip_whitespace();
         if let Some('&' | '|' | '=' | '!' | '<' | '>') = self.scanner.peek() {
             let condition = self.resolve_comparable(comparable)?;
-            comparable = ast::Comparable::Condition(condition);
+            comparable = Comparable::Condition(condition);
             self.scanner.skip_whitespace();
         }
         return match self.scanner.pop() {
@@ -969,20 +953,20 @@ impl Parser {
                     line: 0,
                 };
                 match comparable {
-                    ast::Comparable::Expression(expression) => Ok(ast::Comparable::Expression(
-                        ast::Expression::BracketedExpression {
+                    Comparable::Expression(expression) => {
+                        Ok(Comparable::Expression(Expression::BracketedExpression {
                             expression: Box::new(expression),
                             opening_bracket_location,
                             closing_bracket_location,
-                        },
-                    )),
-                    ast::Comparable::Condition(condition) => Ok(ast::Comparable::Condition(
-                        ast::Condition::BracketedCondition {
+                        }))
+                    }
+                    Comparable::Condition(condition) => {
+                        Ok(Comparable::Condition(Condition::BracketedCondition {
                             condition: Box::new(condition),
                             opening_bracket_location,
                             closing_bracket_location,
-                        },
-                    )),
+                        }))
+                    }
                     comparable => {
                         return Err(syntax_error!(
                             "unsupported brackets around \"{}\"",
@@ -1005,7 +989,7 @@ impl Parser {
         };
     }
 
-    fn parse_negated_condition(&mut self) -> Result<ast::Condition, SyntaxError> {
+    fn parse_negated_condition(&mut self) -> Result<Condition, SyntaxError> {
         let exclamation_mark_location = Location::SingleCharacter {
             char: self.scanner.cursor as u16,
             line: 0,
@@ -1013,7 +997,7 @@ impl Parser {
         self.scanner.pop();
         self.scanner.skip_whitespace();
         match self.parse_condition()? {
-            ast::Condition::NegatedCondition {
+            Condition::NegatedCondition {
                 exclamation_mark_location: second,
                 ..
             } => Err(SyntaxError {
@@ -1025,14 +1009,14 @@ impl Parser {
                     length: second.char() + second.len() - exclamation_mark_location.char(),
                 })],
             }),
-            condition => Ok(ast::Condition::NegatedCondition {
+            condition => Ok(Condition::NegatedCondition {
                 condition: Box::new(condition),
                 exclamation_mark_location,
             }),
         }
     }
 
-    fn parse_number(&mut self) -> Result<ast::Number, SyntaxError> {
+    fn parse_number(&mut self) -> Result<Number, SyntaxError> {
         let start = self.scanner.cursor as u16;
         let mut result = self.parse_integer()?;
         loop {
@@ -1052,7 +1036,7 @@ impl Parser {
                     result.push_str(&self.parse_integer()?);
                 }
                 _ => {
-                    return Ok(ast::Number {
+                    return Ok(Number {
                         content: result,
                         location: Location::VariableLength {
                             char: start,
@@ -1083,10 +1067,10 @@ impl Parser {
         }
     }
 
-    fn parse_signed_expression(&mut self) -> Result<ast::Expression, SyntaxError> {
+    fn parse_signed_expression(&mut self) -> Result<Expression, SyntaxError> {
         let sign = match self.scanner.pop() {
-            Some('+') => ast::Sign::Plus,
-            Some('-') => ast::Sign::Minus,
+            Some('+') => Sign::Plus,
+            Some('-') => Sign::Minus,
             Some(char) => return Err(syntax_error!("unexpected char \"{}\"", char)),
             None => return Err(syntax_error!("unexpected end")),
         };
@@ -1096,10 +1080,10 @@ impl Parser {
         };
         self.scanner.skip_whitespace();
         match self.parse_expression()? {
-            ast::Expression::SignedExpression { .. } => {
+            Expression::SignedExpression { .. } => {
                 return Err(syntax_error!("duplicate sign"));
             }
-            expression => Ok(ast::Expression::SignedExpression {
+            expression => Ok(Expression::SignedExpression {
                 expression: Box::new(expression),
                 sign,
                 sign_location,
@@ -1107,18 +1091,15 @@ impl Parser {
         }
     }
 
-    fn try_parse_binary_operation(
-        &mut self,
-        left: ast::Expression,
-    ) -> Result<ast::Expression, SyntaxError> {
+    fn try_parse_binary_operation(&mut self, left: Expression) -> Result<Expression, SyntaxError> {
         return Ok(
             match self.scanner.transform(|c| match c {
-                '+' => Some(ast::ExpressionOperator::Addition),
-                '-' => Some(ast::ExpressionOperator::Subtraction),
-                '/' => Some(ast::ExpressionOperator::Division),
-                '*' => Some(ast::ExpressionOperator::Multiplication),
-                '^' => Some(ast::ExpressionOperator::Power),
-                '%' => Some(ast::ExpressionOperator::Modulo),
+                '+' => Some(ExpressionOperator::Addition),
+                '-' => Some(ExpressionOperator::Subtraction),
+                '/' => Some(ExpressionOperator::Division),
+                '*' => Some(ExpressionOperator::Multiplication),
+                '^' => Some(ExpressionOperator::Power),
+                '%' => Some(ExpressionOperator::Modulo),
                 _ => None,
             }) {
                 Some(operation) => {
@@ -1142,18 +1123,18 @@ impl Parser {
 
     fn resolve_binary_operation_precidence(
         &mut self,
-        left_expression: ast::Expression,
-        left_operation: ast::ExpressionOperator,
-        right_expression: ast::Expression,
+        left_expression: Expression,
+        left_operation: ExpressionOperator,
+        right_expression: Expression,
         left_operation_location: Location,
-    ) -> ast::Expression {
+    ) -> Expression {
         match right_expression {
-            ast::Expression::BinaryOperation {
+            Expression::BinaryOperation {
                 left,
                 operator: right_operation,
                 right,
                 operator_location: right_operation_location,
-            } if left_operation <= right_operation => ast::Expression::BinaryOperation {
+            } if left_operation <= right_operation => Expression::BinaryOperation {
                 left: Box::new(self.resolve_binary_operation_precidence(
                     left_expression,
                     left_operation,
@@ -1164,7 +1145,7 @@ impl Parser {
                 right,
                 operator_location: right_operation_location,
             },
-            _ => ast::Expression::BinaryOperation {
+            _ => Expression::BinaryOperation {
                 left: Box::new(left_expression),
                 operator: left_operation,
                 right: Box::new(right_expression),
@@ -1173,7 +1154,7 @@ impl Parser {
         }
     }
 
-    fn parse_string(&mut self) -> Result<ast::StringLiteral, SyntaxError> {
+    fn parse_string(&mut self) -> Result<StringLiteral, SyntaxError> {
         let mut result = String::new();
         let start = self.scanner.cursor as u16;
         if !self.scanner.take(&'\'') {
@@ -1224,7 +1205,7 @@ impl Parser {
                 }
                 Some('\'') => {
                     self.scanner.pop();
-                    return Ok(ast::StringLiteral {
+                    return Ok(StringLiteral {
                         content: result.clone(),
                         location: Location::VariableLength {
                             char: start,
@@ -1255,7 +1236,7 @@ impl Parser {
         }
     }
 
-    fn parse_interpolation(&mut self) -> Result<ast::Interpolation, SyntaxError> {
+    fn parse_interpolation(&mut self) -> Result<Interpolation, SyntaxError> {
         let start = self.scanner.cursor as u16;
         if !self.scanner.take_str(&"${") {
             return Err(syntax_error!("expected interpolation"));
@@ -1264,7 +1245,7 @@ impl Parser {
         let result = self.parse_object()?;
         self.scanner.skip_whitespace();
         return match self.scanner.pop() {
-            Some('}') => Ok(ast::Interpolation {
+            Some('}') => Ok(Interpolation {
                 content: result,
                 opening_bracket_location: Location::DoubleCharacter {
                     char: start,
@@ -1289,7 +1270,7 @@ impl Parser {
         };
     }
 
-    fn parse_interpolated_anchor(&mut self) -> Result<ast::Anchor, SyntaxError> {
+    fn parse_interpolated_anchor(&mut self) -> Result<Anchor, SyntaxError> {
         let start = self.scanner.cursor as u16;
         if !self.scanner.take_str(&"!{") {
             return Err(SyntaxError {
@@ -1308,7 +1289,7 @@ impl Parser {
         let result = self.parse_word()?;
         self.scanner.skip_whitespace();
         return match self.scanner.pop() {
-            Some('}') => Ok(ast::Anchor {
+            Some('}') => Ok(Anchor {
                 name: result,
                 opening_bracket_location: Location::DoubleCharacter {
                     char: start,
@@ -1334,17 +1315,14 @@ impl Parser {
         };
     }
 
-    fn parse_name_or_global_function(&mut self) -> Result<ast::Object, SyntaxError> {
+    fn parse_name_or_global_function(&mut self) -> Result<Object, SyntaxError> {
         let name = self.parse_word()?;
-        let mut result = None;
-        if let [ast::WordFragment::String(ast::StringLiteral { content, location })] =
-            &name.fragments[..]
-        {
+        if let [WordFragment::String(StringLiteral { content, location })] = &name.fragments[..] {
             self.scanner.skip_whitespace();
             if let Some(&'(') = self.scanner.peek() {
                 let start = self.scanner.cursor as u16;
                 let arguments = self.parse_function_arguments()?;
-                result = Some(ast::Object::Function(ast::Function {
+                return Ok(Object::Function(Function {
                     name: content.to_string(),
                     arguments,
                     name_location: location.clone(),
@@ -1359,9 +1337,12 @@ impl Parser {
                 }));
             }
         }
-        let mut result = result.unwrap_or(ast::Object::Name(name));
-        self.scanner.skip_whitespace();
+        return Ok(Object::Name(name));
+    }
+
+    fn parse_object_access(&mut self, mut object: Object) -> Result<Object, SyntaxError> {
         loop {
+            self.scanner.skip_whitespace();
             match self.scanner.peek() {
                 Some('[') => {
                     let start = self.scanner.cursor as u16;
@@ -1369,34 +1350,30 @@ impl Parser {
                     self.scanner.skip_whitespace();
                     let expression = self.parse_expression()?;
                     self.scanner.skip_whitespace();
-                    match self.scanner.take(&']') {
-                        true => {
-                            result = ast::Object::ArrayAccess {
-                                object: Box::new(result),
-                                index: expression,
-                                opening_bracket_location: Location::SingleCharacter {
-                                    char: start,
+                    if !self.scanner.take(&']') {
+                        return Err(SyntaxError {
+                            message: "unclosed array access. try adding the missing bracket"
+                                .to_string(),
+                            proposed_fixes: vec![SyntaxFix::Insert(
+                                Position {
                                     line: 0,
+                                    character: self.scanner.cursor as u32,
                                 },
-                                closing_bracket_location: Location::SingleCharacter {
-                                    char: self.scanner.cursor as u16 - 1,
-                                    line: 0,
-                                },
-                            }
-                        }
-                        false => {
-                            return Err(SyntaxError {
-                                message: "unclosed array access. try adding the missing bracket"
-                                    .to_string(),
-                                proposed_fixes: vec![SyntaxFix::Insert(
-                                    Position {
-                                        line: 0,
-                                        character: self.scanner.cursor as u32,
-                                    },
-                                    "]".to_string(),
-                                )],
-                            })
-                        }
+                                "]".to_string(),
+                            )],
+                        });
+                    }
+                    object = Object::ArrayAccess {
+                        object: Box::new(object),
+                        index: expression,
+                        opening_bracket_location: Location::SingleCharacter {
+                            char: start,
+                            line: 0,
+                        },
+                        closing_bracket_location: Location::SingleCharacter {
+                            char: self.scanner.cursor as u16 - 1,
+                            line: 0,
+                        },
                     }
                 }
                 Some('.') => {
@@ -1408,17 +1385,17 @@ impl Parser {
                     self.scanner.skip_whitespace();
                     let name = self.parse_word()?;
                     self.scanner.skip_whitespace();
-                    result = match (&name.fragments[..], self.scanner.peek()) {
+                    object = match (&name.fragments[..], self.scanner.peek()) {
                         (
                             [WordFragment::String(StringLiteral { content, location })],
                             Some('('),
                         ) => {
                             let start = self.scanner.cursor as u16;
                             let arguments = self.parse_function_arguments()?;
-                            ast::Object::MethodAccess {
-                                object: Box::new(result),
+                            Object::MethodAccess {
+                                object: Box::new(object),
                                 dot_location,
-                                function: ast::Function {
+                                function: Function {
                                     name: content.to_string(),
                                     arguments,
                                     name_location: location.clone(),
@@ -1433,19 +1410,19 @@ impl Parser {
                                 },
                             }
                         }
-                        _ => ast::Object::FieldAccess {
-                            object: Box::new(result),
+                        _ => Object::FieldAccess {
+                            object: Box::new(object),
                             field: name,
                             dot_location,
                         },
                     }
                 }
-                _ => return Ok(result),
+                _ => return Ok(object),
             }
         }
     }
 
-    fn parse_word(&mut self) -> Result<ast::Word, SyntaxError> {
+    fn parse_word(&mut self) -> Result<Word, SyntaxError> {
         let mut string = String::new();
         let mut fragments = Vec::new();
         let mut start = self.scanner.cursor as u16;
@@ -1459,7 +1436,7 @@ impl Parser {
                     let interpolation = self.parse_interpolation()?;
                     let length = string.len() as u16;
                     if length > 0 {
-                        fragments.push(ast::WordFragment::String(ast::StringLiteral {
+                        fragments.push(WordFragment::String(StringLiteral {
                             content: string,
                             location: Location::VariableLength {
                                 char: start,
@@ -1470,14 +1447,14 @@ impl Parser {
                         string = String::new();
                     }
                     start = self.scanner.cursor as u16;
-                    fragments.push(ast::WordFragment::Interpolation(interpolation))
+                    fragments.push(WordFragment::Interpolation(interpolation))
                 }
                 _ => break,
             }
         }
         let length = string.len() as u16;
         if length > 0 {
-            fragments.push(ast::WordFragment::String(ast::StringLiteral {
+            fragments.push(WordFragment::String(StringLiteral {
                 content: string,
                 location: Location::VariableLength {
                     char: start,
@@ -1487,7 +1464,7 @@ impl Parser {
             }));
         }
         return match fragments.len() > 0 {
-            true => Ok(ast::Word { fragments }),
+            true => Ok(Word { fragments }),
             false => Err(match self.scanner.peek() {
                 Some(char) => syntax_error!("unexpected char \"{}\"", char),
                 _ => syntax_error!("unexpected end"),
@@ -1495,7 +1472,7 @@ impl Parser {
         };
     }
 
-    fn parse_function_arguments(&mut self) -> Result<Vec<ast::FunctionArgument>, SyntaxError> {
+    fn parse_function_arguments(&mut self) -> Result<Vec<FunctionArgument>, SyntaxError> {
         let mut arguments = Vec::new();
         if !self.scanner.take(&'(') {
             return Err(syntax_error!("expected opening brace"));
@@ -1506,14 +1483,14 @@ impl Parser {
         }
         loop {
             let argument = match self.scanner.peek() {
-                Some('\'') => self.parse_string().map(ast::Argument::String),
-                Some('!') => self.parse_interpolated_anchor().map(ast::Argument::Anchor),
-                Some('$') => self.parse_interpolation().map(ast::Argument::Object),
-                Some('0'..='9') => self.parse_number().map(ast::Argument::Number),
+                Some('\'') => self.parse_string().map(Argument::String),
+                Some('!') => self.parse_interpolated_anchor().map(Argument::Anchor),
+                Some('$') => self.parse_interpolation().map(Argument::Object),
+                Some('0'..='9') => self.parse_number().map(Argument::Number),
                 Some(char @ ('-' | '+')) => {
                     let sign = match char {
-                        '+' => ast::Sign::Plus,
-                        _ => ast::Sign::Minus,
+                        '+' => Sign::Plus,
+                        _ => Sign::Minus,
                     };
                     let sign_location = Location::SingleCharacter {
                         char: self.scanner.cursor as u16,
@@ -1522,38 +1499,38 @@ impl Parser {
                     self.scanner.pop();
                     self.scanner.skip_whitespace();
                     self.parse_number()
-                        .map(|number| ast::SignedNumber {
+                        .map(|number| SignedNumber {
                             sign,
                             number,
                             sign_location,
                         })
-                        .map(ast::Argument::SignedNumber)
+                        .map(Argument::SignedNumber)
                 }
                 Some(_) => match self.parse_name_or_global_function()? {
-                    ast::Object::Name(ast::Word { fragments }) if fragments.len() == 1 => {
+                    Object::Name(Word { fragments }) if fragments.len() == 1 => {
                         match &fragments[0] {
-                            ast::WordFragment::String(ast::StringLiteral { content, location })
+                            WordFragment::String(StringLiteral { content, location })
                                 if content == "false" =>
                             {
-                                Ok(ast::Argument::False {
+                                Ok(Argument::False {
                                     location: location.clone(),
                                 })
                             }
-                            ast::WordFragment::String(ast::StringLiteral { content, location })
+                            WordFragment::String(StringLiteral { content, location })
                                 if content == "true" =>
                             {
-                                Ok(ast::Argument::True {
+                                Ok(Argument::True {
                                     location: location.clone(),
                                 })
                             }
-                            ast::WordFragment::String(ast::StringLiteral { content, location })
+                            WordFragment::String(StringLiteral { content, location })
                                 if content == "null" =>
                             {
-                                Ok(ast::Argument::Null(ast::Null {
+                                Ok(Argument::Null(Null {
                                     location: location.clone(),
                                 }))
                             }
-                            ast::WordFragment::String(ast::StringLiteral { content, location }) => {
+                            WordFragment::String(StringLiteral { content, location }) => {
                                 let new_string = format!("${{{}}}", content);
                                 Err(SyntaxError {
                                     message: format!(
@@ -1566,12 +1543,12 @@ impl Parser {
                                     )],
                                 })
                             }
-                            ast::WordFragment::Interpolation(interpolation) => {
-                                Ok(ast::Argument::Object(interpolation.to_owned()))
+                            WordFragment::Interpolation(interpolation) => {
+                                Ok(Argument::Object(interpolation.to_owned()))
                             }
                         }
                     }
-                    ast::Object::Function(function) => Ok(ast::Argument::Function(function)),
+                    Object::Function(function) => Ok(Argument::Function(function)),
                     object => {
                         // this should not be possible
                         Err(syntax_error!(
@@ -1604,16 +1581,16 @@ impl Parser {
             self.scanner.skip_whitespace();
             match self.scanner.pop() {
                 Some(')') => {
-                    arguments.push(ast::FunctionArgument {
+                    arguments.push(FunctionArgument {
                         argument,
                         comma_location: None,
                     });
                     return Ok(arguments);
                 }
                 Some(',') => {
-                    arguments.push(ast::FunctionArgument {
+                    arguments.push(FunctionArgument {
                         argument,
-                        comma_location: Some(ast::Location::SingleCharacter {
+                        comma_location: Some(Location::SingleCharacter {
                             char: self.scanner.cursor as u16 - 1,
                             line: 0,
                         }),

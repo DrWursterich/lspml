@@ -1,7 +1,8 @@
+use std::{collections::HashMap, str::FromStr};
+
 use anyhow::Result;
 use lsp_server::ErrorCode;
 use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensParams};
-use std::{collections::HashMap, str::FromStr};
 use tree_sitter::{Node, Point};
 
 use crate::{
