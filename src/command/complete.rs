@@ -50,7 +50,7 @@ impl CompletionCollector<'_> {
         };
     }
 
-    fn search_completions_in_document(self: &mut Self, root: Node) -> Result<()> {
+    fn search_completions_in_document(&mut self, root: Node) -> Result<()> {
         for node in root.children(&mut root.walk()) {
             match self.compare_node_to_cursor(node) {
                 Ordering::Less => continue,
@@ -111,7 +111,7 @@ impl CompletionCollector<'_> {
         return Ok(self.complete_top_level_tags());
     }
 
-    fn complete_top_level_tags(self: &mut Self) {
+    fn complete_top_level_tags(&mut self) {
         self.complete_tags(grammar::TOP_LEVEL_TAGS.iter());
     }
 
@@ -206,7 +206,7 @@ impl CompletionCollector<'_> {
         };
     }
 
-    fn search_completions_in_tag(self: &mut Self, tag: TagDefinition, node: Node) -> Result<()> {
+    fn search_completions_in_tag(&mut self, tag: TagDefinition, node: Node) -> Result<()> {
         let mut attributes: HashMap<String, String> = HashMap::new();
         let mut completion_type = CompletionType::Attributes;
         let mut position = TagParsePosition::Attributes;
@@ -347,7 +347,7 @@ impl CompletionCollector<'_> {
         return Ordering::Equal;
     }
 
-    fn cut_text_up_to_cursor<'a>(self: &Self, node: Node, text: &'a str) -> &'a str {
+    fn cut_text_up_to_cursor<'a>(&self, node: Node, text: &'a str) -> &'a str {
         let start = node.start_position();
         return match self.cursor.row.cmp(&start.row) {
             std::cmp::Ordering::Equal if self.cursor.column >= start.column => {
@@ -372,7 +372,7 @@ impl CompletionCollector<'_> {
     }
 
     fn complete_values_of_attribute(
-        self: &mut Self,
+        &mut self,
         tag: TagDefinition,
         attribute: String,
         attributes: HashMap<String, String>,
@@ -442,7 +442,7 @@ impl CompletionCollector<'_> {
     }
 
     fn complete_attributes_of(
-        self: &mut Self,
+        &mut self,
         tag: TagDefinition,
         attributes: HashMap<String, String>,
     ) {
@@ -468,7 +468,7 @@ impl CompletionCollector<'_> {
         };
     }
 
-    fn complete_children_of(self: &mut Self, tag: TagDefinition) {
+    fn complete_children_of(&mut self, tag: TagDefinition) {
         match tag.children {
             TagChildren::Any => self.complete_top_level_tags(),
             TagChildren::None => (),

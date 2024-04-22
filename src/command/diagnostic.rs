@@ -39,7 +39,7 @@ impl DiagnosticCollector {
     }
 
     pub(crate) fn validate_document(
-        self: &mut Self,
+        &mut self,
         root: &Node,
         spel: &HashMap<Point, SpelAst>,
     ) -> Result<()> {
@@ -71,7 +71,7 @@ impl DiagnosticCollector {
         return Ok(());
     }
 
-    fn validate_header(self: &mut Self, root: &Node) -> Result<()> {
+    fn validate_header(&mut self, root: &Node) -> Result<()> {
         if root.kind() != "document" {
             let document_start = Position {
                 line: 0,
@@ -95,7 +95,7 @@ impl DiagnosticCollector {
     }
 
     fn validate_tag(
-        self: &mut Self,
+        &mut self,
         tag: &TagDefinition,
         node: &Node,
         spel: &HashMap<Point, SpelAst>,
@@ -599,7 +599,7 @@ impl DiagnosticCollector {
         return Ok(());
     }
 
-    fn can_have_child(self: &Self, tag: &TagDefinition, child: &TagDefinition) -> bool {
+    fn can_have_child(&self, tag: &TagDefinition, child: &TagDefinition) -> bool {
         return match &tag.children {
             TagChildren::Any => true,
             TagChildren::None => false,
@@ -609,7 +609,7 @@ impl DiagnosticCollector {
     }
 
     fn validate_children(
-        self: &mut Self,
+        &mut self,
         node: &Node,
         spel: &HashMap<Point, SpelAst>,
     ) -> Result<()> {
@@ -640,7 +640,7 @@ impl DiagnosticCollector {
     }
 
     fn add_diagnostic(
-        self: &mut Self,
+        &mut self,
         message: String,
         severity: DiagnosticSeverity,
         range: Range,
@@ -655,7 +655,7 @@ impl DiagnosticCollector {
     }
 
     fn add_diagnostic_with_tag(
-        self: &mut Self,
+        &mut self,
         message: String,
         severity: DiagnosticSeverity,
         range: Range,
@@ -672,7 +672,7 @@ impl DiagnosticCollector {
     }
 
     fn add_diagnostic_with_code(
-        self: &mut Self,
+        &mut self,
         message: String,
         severity: DiagnosticSeverity,
         range: Range,
@@ -690,7 +690,7 @@ impl DiagnosticCollector {
         });
     }
 
-    fn node_range(self: &Self, node: &Node) -> Range {
+    fn node_range(&self, node: &Node) -> Range {
         return Range {
             start: Position {
                 line: node.start_position().row as u32,
@@ -703,7 +703,7 @@ impl DiagnosticCollector {
         };
     }
 
-    fn node_tag_range(self: &Self, node: &Node) -> Range {
+    fn node_tag_range(&self, node: &Node) -> Range {
         let mut closing = None;
         for child in node.children(&mut node.walk()) {
             if child.kind() == ">" {
@@ -734,7 +734,7 @@ impl SpelValidator<'_> {
         return SpelValidator { collector, offset };
     }
 
-    fn validate_identifier(self: &mut Self, identifier: &ast::Identifier) -> Result<()> {
+    fn validate_identifier(&mut self, identifier: &ast::Identifier) -> Result<()> {
         match identifier {
             ast::Identifier::Name(name) => {
                 self.validate_interpolations_in_word(&name)?;
@@ -749,7 +749,7 @@ impl SpelValidator<'_> {
         return Ok(());
     }
 
-    fn validate_object(self: &mut Self, object: &ast::Object) -> Result<()> {
+    fn validate_object(&mut self, object: &ast::Object) -> Result<()> {
         match object {
             ast::Object::Anchor(anchor) => {
                 self.validate_interpolations_in_word(&anchor.name)?;
@@ -782,7 +782,7 @@ impl SpelValidator<'_> {
         return Ok(());
     }
 
-    fn validate_expression(self: &mut Self, expression: &ast::Expression) -> Result<()> {
+    fn validate_expression(&mut self, expression: &ast::Expression) -> Result<()> {
         match expression {
             // ast::Expression::Number(number) => todo!(),
             // ast::Expression::Null(null) => todo!(),
@@ -815,7 +815,7 @@ impl SpelValidator<'_> {
         return Ok(());
     }
 
-    fn validate_condition(self: &mut Self, condition: &ast::Condition) -> Result<()> {
+    fn validate_condition(&mut self, condition: &ast::Condition) -> Result<()> {
         match condition {
             ast::Condition::Object(ast::Interpolation { content, .. }) => {
                 self.validate_object(content)?;
@@ -840,7 +840,7 @@ impl SpelValidator<'_> {
         return Ok(());
     }
 
-    fn validate_comparable(self: &mut Self, comparable: &ast::Comparable) -> Result<()> {
+    fn validate_comparable(&mut self, comparable: &ast::Comparable) -> Result<()> {
         match comparable {
             ast::Comparable::Condition(condition) => self.validate_condition(condition),
             ast::Comparable::Expression(expression) => self.validate_expression(expression),
@@ -852,7 +852,7 @@ impl SpelValidator<'_> {
         }
     }
 
-    fn validate_global_function(self: &mut Self, function: &ast::Function) -> Result<()> {
+    fn validate_global_function(&mut self, function: &ast::Function) -> Result<()> {
         let argument_count = function.arguments.len();
         match spel::grammar::Function::from_str(function.name.as_str()) {
             Ok(definition) => match definition.argument_number {
@@ -920,22 +920,22 @@ impl SpelValidator<'_> {
         return Ok(());
     }
 
-    fn validate_query(self: &mut Self, _query: &ast::Query) -> Result<()> {
+    fn validate_query(&mut self, _query: &ast::Query) -> Result<()> {
         // TODO!
         return Ok(());
     }
 
-    fn validate_regex(self: &mut Self, _regex: &ast::Regex) -> Result<()> {
+    fn validate_regex(&mut self, _regex: &ast::Regex) -> Result<()> {
         // TODO!
         return Ok(());
     }
 
-    fn validate_uri(self: &mut Self, _uri: &ast::Uri) -> Result<()> {
+    fn validate_uri(&mut self, _uri: &ast::Uri) -> Result<()> {
         // TODO!
         return Ok(());
     }
 
-    fn validate_interpolations_in_word(self: &mut Self, word: &ast::Word) -> Result<()> {
+    fn validate_interpolations_in_word(&mut self, word: &ast::Word) -> Result<()> {
         for fragment in &word.fragments {
             if let ast::WordFragment::Interpolation(interpolation) = fragment {
                 self.validate_object(&interpolation.content)?;
@@ -944,7 +944,7 @@ impl SpelValidator<'_> {
         return Ok(());
     }
 
-    fn locations_range(self: &Self, left: &ast::Location, right: &ast::Location) -> Range {
+    fn locations_range(&self, left: &ast::Location, right: &ast::Location) -> Range {
         return Range {
             start: Position {
                 line: left.line() as u32 + self.offset.row as u32,
@@ -1006,7 +1006,7 @@ impl SpelValidator<'_> {
         return Ok(());
     }
 
-    fn parse_failed(self: &mut Self, node: &Node<'_>, err: &SyntaxError, r#type: &str) -> () {
+    fn parse_failed(&mut self, node: &Node<'_>, err: &SyntaxError, r#type: &str) -> () {
         match err.proposed_fixes.len() {
             0 => self.collector.add_diagnostic(
                 format!("invalid {}: {}", r#type, err.message),

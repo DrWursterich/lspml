@@ -126,12 +126,20 @@ fn collect_from_tag(
                             .iter()
                             .find(|definition| definition.name == attribute)
                         {
-                            let value_node = match child.child(2).and_then(|child| child.child(1)) {
-                                Some(node) => node,
-                                _ => continue,
-                            };
-                            let position = value_node.start_position();
-                            match spel_ast_of(value_node, text, &definition.r#type) {
+                            let (position, text) =
+                                match child.child(2).and_then(|child| child.child(1)) {
+                                    Some(node) if node.kind() == "\"" => {
+                                        (node.start_position(), Ok(""))
+                                    }
+                                    Some(node) if node.kind() == "string_content" => {
+                                        (node.start_position(), node.utf8_text(&text.as_bytes()))
+                                    }
+                                    _ => continue,
+                                };
+                            match text
+                                .map_err(Error::from)
+                                .and_then(|text| spel_ast_of(text, &definition.r#type))
+                            {
                                 Ok(ast) => {
                                     spel.insert(position, ast);
                                 }
@@ -158,8 +166,8 @@ fn collect_from_tag(
         }
     }
 }
-fn spel_ast_of(node: Node, text: &str, r#type: &TagAttributeType) -> Result<SpelAst> {
-    let parser = &mut spel::parser::Parser::new(node.utf8_text(&text.as_bytes())?);
+fn spel_ast_of(text: &str, r#type: &TagAttributeType) -> Result<SpelAst> {
+    let parser = &mut spel::parser::Parser::new(text);
     match r#type {
         TagAttributeType::Comparable => Ok(SpelAst::Comparable(match parser.parse_comparable() {
             Ok(result) => SpelResult::Valid(result),

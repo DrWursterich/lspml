@@ -20,7 +20,7 @@ pub(crate) enum SyntaxFix {
 }
 
 impl SyntaxFix {
-    pub(crate) fn to_text_edit(self: &Self, offset: &Point) -> TextEdit {
+    pub(crate) fn to_text_edit(&self, offset: &Point) -> TextEdit {
         return match self {
             SyntaxFix::Insert(position, text) => {
                 let position = Position {
