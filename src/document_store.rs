@@ -212,7 +212,7 @@ fn spel_ast_of(text: &str, r#type: &TagAttributeType) -> Result<SpelAst> {
             Ok(result) => SpelResult::Valid(result),
             Err(err) => SpelResult::Invalid(err),
         })),
-        TagAttributeType::Uri => Ok(SpelAst::Uri(match parser.parse_uri() {
+        TagAttributeType::Uri { .. } => Ok(SpelAst::Uri(match parser.parse_uri() {
             Ok(result) => SpelResult::Valid(result),
             Err(err) => SpelResult::Invalid(err),
         })),

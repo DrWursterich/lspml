@@ -383,8 +383,8 @@ impl CompletionCollector<'_> {
                 .find(|a| a.name == attribute)
                 .map(|a| &a.r#type)
             {
-                Some(TagAttributeType::Uri) => {
-                    let module = match attributes.get("module").map(|str| str.as_str()) {
+                Some(TagAttributeType::Uri { module_attribute }) => {
+                    let module = match attributes.get(*module_attribute).map(|str| str.as_str()) {
                         Some("${module.id}") | None => self
                             .file
                             .to_file_path()

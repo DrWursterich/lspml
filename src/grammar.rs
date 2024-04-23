@@ -43,7 +43,7 @@ pub(crate) enum TagAttributeType {
     Query,
     Regex,
     String,
-    Uri,
+    Uri { module_attribute: &'static str },
     Module,
 }
 
@@ -546,7 +546,7 @@ impl TagDefinition {
             ("name", TagAttributeType::Identifier),
             ("nameencoding", TagAttributeType::String),
             ("template", TagAttributeType::String),
-            ("uri", TagAttributeType::Uri),
+            ("uri", TagAttributeType::Uri { module_attribute: "module" }),
         rules &[
             AttributeRule::Deprecated("command"),
             AttributeRule::OnlyOneOf(&["uri", "template"]),
@@ -627,7 +627,7 @@ impl TagDefinition {
             ("module", TagAttributeType::Module),
             ("return", TagAttributeType::Identifier),
             ("template", TagAttributeType::String),
-            ("uri", TagAttributeType::Uri),
+            ("uri", TagAttributeType::Uri { module_attribute: "module" }),
         rules &[
             AttributeRule::ExactlyOneOf(&["template", "anchor", "uri"]),
             AttributeRule::OnlyOneOf(&["context", "module"]),
@@ -1302,7 +1302,7 @@ impl TagDefinition {
             ("module", TagAttributeType::Module),
             ("publisher", TagAttributeType::Object),
             ("template", TagAttributeType::String),
-            ("uri", TagAttributeType::Uri),
+            ("uri", TagAttributeType::Uri { module_attribute: "module" }),
             ("window", TagAttributeType::Condition),
         rules &[
             AttributeRule::Deprecated("command"),
