@@ -9,7 +9,7 @@ use std::{
 use tree_sitter::{Node, Parser, Point, Tree};
 
 use crate::{
-    grammar::{TagAttributeType, TagAttributes, TagDefinition},
+    grammar::{TagAttributeType, TagDefinition},
     parser,
     spel::{
         self,
@@ -120,37 +120,32 @@ fn collect_from_tag(
             "html_void_tag" | "java_tag" | "script_tag" | "style_tag" => (),
             "ERROR" | "html_tag" | "html_option_tag" => collect_from_children(child, text, spel),
             kind if kind.ends_with("_attribute") => {
-                match (parser::attribute_name_of(child, text), &tag.attributes) {
-                    (Some(attribute), TagAttributes::These(definitions)) => {
-                        if let Some(definition) = definitions
-                            .iter()
-                            .find(|definition| definition.name == attribute)
+                match parser::attribute_name_of(child, text)
+                    .and_then(|attribute| tag.attributes.get_by_name(&attribute))
+                {
+                    Some(definition) => {
+                        let (position, text) = match child.child(2).and_then(|child| child.child(1))
                         {
-                            let (position, text) =
-                                match child.child(2).and_then(|child| child.child(1)) {
-                                    Some(node) if node.kind() == "\"" => {
-                                        (node.start_position(), Ok(""))
-                                    }
-                                    Some(node) if node.kind() == "string_content" => {
-                                        (node.start_position(), node.utf8_text(&text.as_bytes()))
-                                    }
-                                    _ => continue,
-                                };
-                            match text
-                                .map_err(Error::from)
-                                .and_then(|text| spel_ast_of(text, &definition.r#type))
-                            {
-                                Ok(ast) => {
-                                    spel.insert(position, ast);
-                                }
-                                Err(err) => log::error!(
-                                    "could not parse spel at ({}, {}) as {:?}: {}",
-                                    position.row,
-                                    position.column,
-                                    definition.r#type,
-                                    err
-                                ),
-                            };
+                            Some(node) if node.kind() == "\"" => (node.start_position(), Ok("")),
+                            Some(node) if node.kind() == "string_content" => {
+                                (node.start_position(), node.utf8_text(&text.as_bytes()))
+                            }
+                            _ => continue,
+                        };
+                        match text
+                            .map_err(Error::from)
+                            .and_then(|text| spel_ast_of(text, &definition.r#type))
+                        {
+                            Ok(ast) => {
+                                spel.insert(position, ast);
+                            }
+                            Err(err) => log::error!(
+                                "could not parse spel at ({}, {}) as {:?}: {}",
+                                position.row,
+                                position.column,
+                                definition.r#type,
+                                err
+                            ),
                         };
                     }
                     _ => (),
@@ -192,6 +187,10 @@ fn spel_ast_of(text: &str, r#type: &TagAttributeType) -> Result<SpelAst> {
             Ok(result) => SpelResult::Valid(result),
             Err(err) => SpelResult::Invalid(err),
         })),
+        TagAttributeType::Module => Ok(SpelAst::String(match parser.parse_text() {
+            Ok(result) => SpelResult::Valid(result),
+            Err(err) => SpelResult::Invalid(err),
+        })),
         TagAttributeType::Object => Ok(SpelAst::Object(match parser.parse_object_ast() {
             Ok(result) => SpelResult::Valid(result.root),
             Err(err) => SpelResult::Invalid(err),
@@ -208,7 +207,7 @@ fn spel_ast_of(text: &str, r#type: &TagAttributeType) -> Result<SpelAst> {
             Ok(result) => SpelResult::Valid(result),
             Err(err) => SpelResult::Invalid(err),
         })),
-        TagAttributeType::Uri => Ok(SpelAst::Uri(match parser.parse_uri() {
+        TagAttributeType::Uri { .. } => Ok(SpelAst::Uri(match parser.parse_uri() {
             Ok(result) => SpelResult::Valid(result),
             Err(err) => SpelResult::Invalid(err),
         })),

@@ -56,6 +56,17 @@ pub(crate) fn init_empty_module_mappings() -> Result<()> {
     return Ok(());
 }
 
+pub(crate) fn all_modules<'a>() -> Vec<(String, Module)> {
+    return MODULE_MAPPINGS
+        .get()
+        .expect("module mappings not initialized")
+        .lock()
+        .expect("module mappings mutex poisoned")
+        .iter()
+        .map(|(k, v)| (k.to_owned(), v.to_owned()))
+        .collect();
+}
+
 pub(crate) fn find_module_by_name(module: &str) -> Option<Module> {
     return MODULE_MAPPINGS
         .get()

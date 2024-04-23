@@ -24,6 +24,15 @@ pub(crate) enum TagAttributes {
     These(&'static [TagAttribute]),
 }
 
+impl TagAttributes {
+    pub(crate) fn get_by_name(&self, name: &str) -> Option<&TagAttribute> {
+        return match self {
+            TagAttributes::None => None,
+            TagAttributes::These(definitions) => definitions.iter().find(|a| a.name == name),
+        };
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct TagAttribute {
     pub(crate) name: &'static str,
@@ -43,7 +52,8 @@ pub(crate) enum TagAttributeType {
     Query,
     Regex,
     String,
-    Uri,
+    Uri { module_attribute: &'static str },
+    Module,
 }
 
 #[derive(Debug)]
@@ -541,11 +551,11 @@ impl TagDefinition {
             ("id", TagAttributeType::String),
             ("locale", TagAttributeType::Object),
             ("method", TagAttributeType::String),
-            ("module", TagAttributeType::String),
+            ("module", TagAttributeType::Module),
             ("name", TagAttributeType::Identifier),
             ("nameencoding", TagAttributeType::String),
             ("template", TagAttributeType::String),
-            ("uri", TagAttributeType::Uri),
+            ("uri", TagAttributeType::Uri { module_attribute: "module" }),
         rules &[
             AttributeRule::Deprecated("command"),
             AttributeRule::OnlyOneOf(&["uri", "template"]),
@@ -623,10 +633,10 @@ impl TagDefinition {
             ("arguments", TagAttributeType::Object),
             ("context", TagAttributeType::String),
             ("mode", TagAttributeType::String),
-            ("module", TagAttributeType::String),
+            ("module", TagAttributeType::Module),
             ("return", TagAttributeType::Identifier),
             ("template", TagAttributeType::String),
-            ("uri", TagAttributeType::Uri),
+            ("uri", TagAttributeType::Uri { module_attribute: "module" }),
         rules &[
             AttributeRule::ExactlyOneOf(&["template", "anchor", "uri"]),
             AttributeRule::OnlyOneOf(&["context", "module"]),
@@ -1298,10 +1308,10 @@ impl TagDefinition {
             ("handler", TagAttributeType::String),
             ("information", TagAttributeType::Object),
             ("locale", TagAttributeType::Object),
-            ("module", TagAttributeType::String),
+            ("module", TagAttributeType::Module),
             ("publisher", TagAttributeType::Object),
             ("template", TagAttributeType::String),
-            ("uri", TagAttributeType::Uri),
+            ("uri", TagAttributeType::Uri { module_attribute: "module" }),
             ("window", TagAttributeType::Condition),
         rules &[
             AttributeRule::Deprecated("command"),

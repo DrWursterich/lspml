@@ -608,11 +608,7 @@ impl DiagnosticCollector {
         };
     }
 
-    fn validate_children(
-        &mut self,
-        node: &Node,
-        spel: &HashMap<Point, SpelAst>,
-    ) -> Result<()> {
+    fn validate_children(&mut self, node: &Node, spel: &HashMap<Point, SpelAst>) -> Result<()> {
         for child in node.children(&mut node.walk()) {
             match child.kind() {
                 "ERROR" => self.add_diagnostic(
@@ -639,12 +635,7 @@ impl DiagnosticCollector {
         return Ok(());
     }
 
-    fn add_diagnostic(
-        &mut self,
-        message: String,
-        severity: DiagnosticSeverity,
-        range: Range,
-    ) {
+    fn add_diagnostic(&mut self, message: String, severity: DiagnosticSeverity, range: Range) {
         self.diagnostics.push(Diagnostic {
             message,
             severity: Some(severity),
