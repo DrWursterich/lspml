@@ -10,7 +10,7 @@ use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionParams, CompletionTextEdit, Documentation,
     MarkupContent, MarkupKind, Position, Range, TextDocumentPositionParams, TextEdit, Url,
 };
-use std::{cmp::Ordering, collections::HashMap, iter::Iterator, str::FromStr};
+use std::{cmp::Ordering, collections::HashMap, fs, iter::Iterator, str::FromStr};
 use tree_sitter::{Node, Point};
 
 #[derive(Debug, PartialEq)]
@@ -377,93 +377,87 @@ impl CompletionCollector<'_> {
         attribute: String,
         attributes: HashMap<String, String>,
     ) -> Result<()> {
-        if let TagAttributes::These(definitions) = tag.attributes {
-            match definitions
-                .iter()
-                .find(|a| a.name == attribute)
-                .map(|a| &a.r#type)
-            {
-                Some(TagAttributeType::Uri { module_attribute }) => {
-                    let module = match attributes.get(*module_attribute).map(|str| str.as_str()) {
-                        Some("${module.id}") | None => self
-                            .file
-                            .to_file_path()
-                            .ok()
-                            .and_then(|file| modules::find_module_for_file(file.as_path())),
-                        Some(module) => modules::find_module_by_name(module),
-                    };
-                    if let Some(module) = module {
-                        let path = attributes
-                            .get(&attribute)
-                            .and_then(|path| path.rfind("/").map(|index| &path[..index]))
-                            .unwrap_or("");
-                        for entry in std::fs::read_dir(module.path + path)? {
-                            let entry = entry?;
-                            let name;
-                            if path.len() == 0 {
-                                name = "/".to_string() + entry.file_name().to_str().unwrap();
-                            } else {
-                                name = entry.file_name().to_str().unwrap().to_string();
-                            }
-                            if entry.path().is_dir() {
-                                self.completions.push(CompletionItem {
-                                    label: name.clone() + "/",
-                                    kind: Some(CompletionItemKind::FOLDER),
-                                    insert_text: Some(name + "/"),
-                                    ..Default::default()
-                                })
-                            } else if name.ends_with(".spml") {
-                                self.completions.push(CompletionItem {
-                                    label: name.clone(),
-                                    kind: Some(CompletionItemKind::FILE),
-                                    insert_text: Some(name),
-                                    ..Default::default()
-                                })
-                            }
+        match tag.attributes.get_by_name(&attribute).map(|a| &a.r#type) {
+            Some(TagAttributeType::Uri { module_attribute }) => {
+                let module = match attributes.get(*module_attribute).map(|str| str.as_str()) {
+                    Some("${module.id}") | None => self
+                        .file
+                        .to_file_path()
+                        .ok()
+                        .and_then(|file| modules::find_module_for_file(file.as_path())),
+                    Some(module) => modules::find_module_by_name(module),
+                };
+                if let Some(module) = module {
+                    let path = attributes
+                        .get(&attribute)
+                        .and_then(|path| path.rfind("/").map(|index| &path[..index]))
+                        .unwrap_or("");
+                    for entry in fs::read_dir(module.path + path)? {
+                        let entry = entry?;
+                        let name;
+                        if path.len() == 0 {
+                            name = "/".to_string() + entry.file_name().to_str().unwrap();
+                        } else {
+                            name = entry.file_name().to_str().unwrap().to_string();
+                        }
+                        if entry.path().is_dir() {
+                            self.completions.push(CompletionItem {
+                                label: name.clone() + "/",
+                                kind: Some(CompletionItemKind::FOLDER),
+                                insert_text: Some(name + "/"),
+                                ..Default::default()
+                            })
+                        } else if name.ends_with(".spml") {
+                            self.completions.push(CompletionItem {
+                                label: name.clone(),
+                                kind: Some(CompletionItemKind::FILE),
+                                insert_text: Some(name),
+                                ..Default::default()
+                            })
                         }
                     }
                 }
-                Some(TagAttributeType::Module) => {
-                    modules::all_modules().iter().for_each(|(name, _)| {
-                        self.completions.push(CompletionItem {
-                            label: name.to_owned(),
-                            kind: Some(CompletionItemKind::MODULE),
-                            insert_text: Some(name.to_owned()),
-                            ..Default::default()
-                        })
-                    });
-                }
-                _ => (),
             }
-        }
-
-        // should also be done via TagAttributeType::Enum
-        for rule in tag.attribute_rules {
-            match rule {
-                grammar::AttributeRule::ValueOneOf(name, values)
-                | grammar::AttributeRule::ValueOneOfCaseInsensitive(name, values)
-                    if *name == attribute =>
-                {
-                    values.iter().for_each(|value| {
-                        self.completions.push(CompletionItem {
-                            label: value.to_string(),
-                            kind: Some(CompletionItemKind::ENUM_MEMBER),
-                            detail: None,
-                            documentation: None,
-                            ..Default::default()
-                        })
-                    });
-                    break;
+            Some(TagAttributeType::Module) => {
+                modules::all_modules().iter().for_each(|(name, _)| {
+                    self.completions.push(CompletionItem {
+                        label: name.to_owned(),
+                        kind: Some(CompletionItemKind::MODULE),
+                        insert_text: Some(name.to_owned()),
+                        ..Default::default()
+                    })
+                });
+            }
+            _ => {
+                // should also be done via TagAttributeType::Enum
+                for rule in tag.attribute_rules {
+                    match rule {
+                        grammar::AttributeRule::ValueOneOf(name, values)
+                        | grammar::AttributeRule::ValueOneOfCaseInsensitive(name, values)
+                            if *name == attribute =>
+                        {
+                            values.iter().for_each(|value| {
+                                self.completions.push(CompletionItem {
+                                    label: value.to_string(),
+                                    kind: Some(CompletionItemKind::ENUM_MEMBER),
+                                    detail: None,
+                                    documentation: None,
+                                    ..Default::default()
+                                })
+                            });
+                            break;
+                        }
+                        _ => (),
+                    };
                 }
-                _ => {}
-            };
+            }
         }
         return Ok(());
     }
 
     fn complete_attributes_of(&mut self, tag: TagDefinition, attributes: HashMap<String, String>) {
-        match tag.attributes {
-            grammar::TagAttributes::These(possible) => possible
+        if let TagAttributes::These(possible) = tag.attributes {
+            possible
                 .iter()
                 .filter(|attribute| !attributes.contains_key(attribute.name))
                 .map(|attribute| CompletionItem {
@@ -479,8 +473,7 @@ impl CompletionCollector<'_> {
                     insert_text: Some(attribute.name.to_string() + "=\""),
                     ..Default::default()
                 })
-                .for_each(|completion| self.completions.push(completion)),
-            grammar::TagAttributes::None => {}
+                .for_each(|completion| self.completions.push(completion));
         };
     }
 

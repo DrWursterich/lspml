@@ -24,6 +24,15 @@ pub(crate) enum TagAttributes {
     These(&'static [TagAttribute]),
 }
 
+impl TagAttributes {
+    pub(crate) fn get_by_name(&self, name: &str) -> Option<&TagAttribute> {
+        return match self {
+            TagAttributes::None => None,
+            TagAttributes::These(definitions) => definitions.iter().find(|a| a.name == name),
+        };
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct TagAttribute {
     pub(crate) name: &'static str,
