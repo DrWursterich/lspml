@@ -66,13 +66,14 @@ pub(crate) fn definition(request: Request) -> Result<Message> {
                 Ok(definition) => Response {
                     id: request.id,
                     result: definition
-                        .and_then(|d| serde_json::to_value(GotoDefinitionResponse::Scalar(d)).ok()),
+                        .and_then(|d| serde_json::to_value(GotoDefinitionResponse::Scalar(d)).ok())
+                        .or_else(|| Some(serde_json::value::Value::Null)),
                     error: None,
                 },
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(|err| Error::from(err));
+        .map_err(Error::from);
 }
 
 pub(crate) fn diagnostic(request: Request) -> Result<Message> {
