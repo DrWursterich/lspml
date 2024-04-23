@@ -8,11 +8,15 @@ use tree_sitter::{Node, Point};
 use crate::{
     document_store,
     grammar::TagDefinition,
-    spel::ast::{self, SpelAst, SpelResult},
+    spel::ast::{
+        Anchor, Argument, Comparable, Condition, Expression, Function, Identifier, Interpolation,
+        Location, Null, Number, Object, Query, Regex, SignedNumber, SpelAst, SpelResult,
+        StringLiteral, Uri, Word, WordFragment,
+    },
 };
 
 use super::{
-    super::{TOKEN_MODIFIERS, TOKEN_TYPES},
+    super::capabilities::{TOKEN_MODIFIERS, TOKEN_TYPES},
     LsError,
 };
 
@@ -113,7 +117,7 @@ impl SpelTokenCollector<'_> {
 
     fn add(
         &mut self,
-        location: &ast::Location,
+        location: &Location,
         r#type: &SemanticTokenType,
         modifiers: &Vec<SemanticTokenModifier>,
     ) {
@@ -287,15 +291,15 @@ fn index_children(
     return Ok(());
 }
 
-fn index_identifier(identifier: &ast::Identifier, token_collector: &mut SpelTokenCollector) {
+fn index_identifier(identifier: &Identifier, token_collector: &mut SpelTokenCollector) {
     match identifier {
-        ast::Identifier::Name(name) => index_word(
+        Identifier::Name(name) => index_word(
             name,
             token_collector,
             Some(SemanticTokenType::VARIABLE),
             &vec![],
         ),
-        ast::Identifier::FieldAccess {
+        Identifier::FieldAccess {
             identifier,
             field,
             dot_location,
@@ -312,11 +316,11 @@ fn index_identifier(identifier: &ast::Identifier, token_collector: &mut SpelToke
     };
 }
 
-fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) {
+fn index_object(object: &Object, token_collector: &mut SpelTokenCollector) {
     match object {
-        ast::Object::Anchor(anchor) => index_anchor(&anchor, token_collector),
-        ast::Object::Function(function) => index_function(function, token_collector),
-        ast::Object::Name(name) => {
+        Object::Anchor(anchor) => index_anchor(&anchor, token_collector),
+        Object::Function(function) => index_function(function, token_collector),
+        Object::Name(name) => {
             index_word(
                 name,
                 token_collector,
@@ -324,8 +328,8 @@ fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) 
                 &vec![],
             );
         }
-        ast::Object::String(string) => index_string(string, token_collector),
-        ast::Object::FieldAccess {
+        Object::String(string) => index_string(string, token_collector),
+        Object::FieldAccess {
             object,
             field,
             dot_location,
@@ -339,7 +343,7 @@ fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) 
                 &vec![],
             );
         }
-        ast::Object::MethodAccess {
+        Object::MethodAccess {
             object,
             dot_location,
             function,
@@ -348,7 +352,7 @@ fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) 
             token_collector.add(dot_location, &SemanticTokenType::OPERATOR, &vec![]);
             index_function(function, token_collector);
         }
-        ast::Object::ArrayAccess {
+        Object::ArrayAccess {
             object,
             index,
             opening_bracket_location,
@@ -370,7 +374,7 @@ fn index_object(object: &ast::Object, token_collector: &mut SpelTokenCollector) 
     };
 }
 
-fn index_anchor(anchor: &ast::Anchor, token_collector: &mut SpelTokenCollector) {
+fn index_anchor(anchor: &Anchor, token_collector: &mut SpelTokenCollector) {
     token_collector.add(
         &anchor.opening_bracket_location,
         &SemanticTokenType::OPERATOR,
@@ -389,29 +393,29 @@ fn index_anchor(anchor: &ast::Anchor, token_collector: &mut SpelTokenCollector) 
     );
 }
 
-fn index_string(string: &ast::StringLiteral, token_collector: &mut SpelTokenCollector) {
+fn index_string(string: &StringLiteral, token_collector: &mut SpelTokenCollector) {
     token_collector.add(&string.location, &SemanticTokenType::STRING, &vec![]);
 }
 
-fn index_null(null: &ast::Null, token_collector: &mut SpelTokenCollector) {
+fn index_null(null: &Null, token_collector: &mut SpelTokenCollector) {
     token_collector.add(&null.location, &SemanticTokenType::ENUM_MEMBER, &vec![])
 }
 
-fn index_number(number: &ast::Number, token_collector: &mut SpelTokenCollector) {
+fn index_number(number: &Number, token_collector: &mut SpelTokenCollector) {
     token_collector.add(&number.location, &SemanticTokenType::NUMBER, &vec![]);
 }
 
-fn index_signed_number(number: &ast::SignedNumber, token_collector: &mut SpelTokenCollector) {
+fn index_signed_number(number: &SignedNumber, token_collector: &mut SpelTokenCollector) {
     token_collector.add(&number.sign_location, &SemanticTokenType::OPERATOR, &vec![]);
     index_number(&number.number, token_collector);
 }
 
-fn index_expression(expression: &ast::Expression, token_collector: &mut SpelTokenCollector) {
+fn index_expression(expression: &Expression, token_collector: &mut SpelTokenCollector) {
     match expression {
-        ast::Expression::Function(function) => index_function(&function, token_collector),
-        ast::Expression::Null(null) => index_null(&null, token_collector),
-        ast::Expression::Number(number) => index_number(&number, token_collector),
-        ast::Expression::Object(interpolation) => {
+        Expression::Function(function) => index_function(&function, token_collector),
+        Expression::Null(null) => index_null(&null, token_collector),
+        Expression::Number(number) => index_number(&number, token_collector),
+        Expression::Object(interpolation) => {
             token_collector.add(
                 &interpolation.opening_bracket_location,
                 &SemanticTokenType::OPERATOR,
@@ -424,7 +428,7 @@ fn index_expression(expression: &ast::Expression, token_collector: &mut SpelToke
                 &vec![],
             );
         }
-        ast::Expression::SignedExpression {
+        Expression::SignedExpression {
             expression,
             sign_location,
             ..
@@ -432,7 +436,7 @@ fn index_expression(expression: &ast::Expression, token_collector: &mut SpelToke
             token_collector.add(&sign_location, &SemanticTokenType::OPERATOR, &vec![]);
             index_expression(expression, token_collector);
         }
-        ast::Expression::BinaryOperation {
+        Expression::BinaryOperation {
             left,
             right,
             operator_location: operation_location,
@@ -442,7 +446,7 @@ fn index_expression(expression: &ast::Expression, token_collector: &mut SpelToke
             token_collector.add(operation_location, &SemanticTokenType::OPERATOR, &vec![]);
             index_expression(right, token_collector);
         }
-        ast::Expression::BracketedExpression {
+        Expression::BracketedExpression {
             expression,
             opening_bracket_location,
             closing_bracket_location,
@@ -459,7 +463,7 @@ fn index_expression(expression: &ast::Expression, token_collector: &mut SpelToke
                 &vec![],
             );
         }
-        ast::Expression::Ternary {
+        Expression::Ternary {
             condition,
             left,
             right,
@@ -479,12 +483,12 @@ fn index_expression(expression: &ast::Expression, token_collector: &mut SpelToke
     };
 }
 
-fn index_condition(condition: &ast::Condition, token_collector: &mut SpelTokenCollector) {
+fn index_condition(condition: &Condition, token_collector: &mut SpelTokenCollector) {
     match condition {
-        ast::Condition::True { location } | ast::Condition::False { location } => {
+        Condition::True { location } | Condition::False { location } => {
             token_collector.add(location, &SemanticTokenType::ENUM_MEMBER, &vec![])
         }
-        ast::Condition::Object(location) => {
+        Condition::Object(location) => {
             token_collector.add(
                 &location.opening_bracket_location,
                 &SemanticTokenType::OPERATOR,
@@ -497,8 +501,8 @@ fn index_condition(condition: &ast::Condition, token_collector: &mut SpelTokenCo
                 &vec![],
             );
         }
-        ast::Condition::Function(function) => index_function(function, token_collector),
-        ast::Condition::BinaryOperation {
+        Condition::Function(function) => index_function(function, token_collector),
+        Condition::BinaryOperation {
             left,
             right,
             operator_location,
@@ -508,7 +512,7 @@ fn index_condition(condition: &ast::Condition, token_collector: &mut SpelTokenCo
             token_collector.add(operator_location, &SemanticTokenType::OPERATOR, &vec![]);
             index_condition(right, token_collector);
         }
-        ast::Condition::BracketedCondition {
+        Condition::BracketedCondition {
             condition,
             opening_bracket_location,
             closing_bracket_location,
@@ -525,7 +529,7 @@ fn index_condition(condition: &ast::Condition, token_collector: &mut SpelTokenCo
                 &vec![],
             );
         }
-        ast::Condition::NegatedCondition {
+        Condition::NegatedCondition {
             condition,
             exclamation_mark_location,
         } => {
@@ -536,7 +540,7 @@ fn index_condition(condition: &ast::Condition, token_collector: &mut SpelTokenCo
             );
             index_condition(condition, token_collector);
         }
-        ast::Condition::Comparisson {
+        Condition::Comparisson {
             left,
             right,
             operator_location,
@@ -549,7 +553,7 @@ fn index_condition(condition: &ast::Condition, token_collector: &mut SpelTokenCo
     };
 }
 
-fn index_function(function: &ast::Function, token_collector: &mut SpelTokenCollector) {
+fn index_function(function: &Function, token_collector: &mut SpelTokenCollector) {
     token_collector.add(&function.name_location, &SemanticTokenType::METHOD, &vec![]);
     token_collector.add(
         &function.opening_bracket_location,
@@ -558,16 +562,14 @@ fn index_function(function: &ast::Function, token_collector: &mut SpelTokenColle
     );
     for arg in function.arguments.iter() {
         match &arg.argument {
-            ast::Argument::Anchor(anchor) => index_anchor(&anchor, token_collector),
-            ast::Argument::Function(function) => index_function(&function, token_collector),
-            ast::Argument::Null(null) => index_null(&null, token_collector),
-            ast::Argument::Number(number) => index_number(&number, token_collector),
-            ast::Argument::Object(interpolation) => {
-                index_interpolation(&interpolation, token_collector)
-            }
-            ast::Argument::SignedNumber(number) => index_signed_number(&number, token_collector),
-            ast::Argument::String(string) => index_string(&string, token_collector),
-            ast::Argument::True { location } | ast::Argument::False { location } => {
+            Argument::Anchor(anchor) => index_anchor(&anchor, token_collector),
+            Argument::Function(function) => index_function(&function, token_collector),
+            Argument::Null(null) => index_null(&null, token_collector),
+            Argument::Number(number) => index_number(&number, token_collector),
+            Argument::Object(interpolation) => index_interpolation(&interpolation, token_collector),
+            Argument::SignedNumber(number) => index_signed_number(&number, token_collector),
+            Argument::String(string) => index_string(&string, token_collector),
+            Argument::True { location } | Argument::False { location } => {
                 token_collector.add(location, &SemanticTokenType::ENUM_MEMBER, &vec![])
             }
         }
@@ -582,9 +584,9 @@ fn index_function(function: &ast::Function, token_collector: &mut SpelTokenColle
     );
 }
 
-fn index_uri(uri: &ast::Uri, token_collector: &mut SpelTokenCollector) {
+fn index_uri(uri: &Uri, token_collector: &mut SpelTokenCollector) {
     match uri {
-        ast::Uri::Literal(literal) => {
+        Uri::Literal(literal) => {
             for fragment in &literal.fragments {
                 token_collector.add(
                     &fragment.slash_location,
@@ -601,11 +603,11 @@ fn index_uri(uri: &ast::Uri, token_collector: &mut SpelTokenCollector) {
                 );
             }
         }
-        ast::Uri::Object(object) => index_interpolation(object, token_collector),
+        Uri::Object(object) => index_interpolation(object, token_collector),
     };
 }
 
-fn index_regex(regex: &ast::Regex, token_collector: &mut SpelTokenCollector) {
+fn index_regex(regex: &Regex, token_collector: &mut SpelTokenCollector) {
     token_collector.add(
         &regex.location,
         // &SemanticTokenType::ENUM_MEMBER,
@@ -614,47 +616,44 @@ fn index_regex(regex: &ast::Regex, token_collector: &mut SpelTokenCollector) {
     );
 }
 
-fn index_query(_query: &ast::Query, _token_collector: &mut SpelTokenCollector) {
+fn index_query(_query: &Query, _token_collector: &mut SpelTokenCollector) {
     // TODO:!
 }
 
 fn index_word(
-    word: &ast::Word,
+    word: &Word,
     token_collector: &mut SpelTokenCollector,
     token_type: Option<SemanticTokenType>,
     token_modifiers: &Vec<SemanticTokenModifier>,
 ) {
     for fragment in &word.fragments {
         match fragment {
-            ast::WordFragment::String(ast::StringLiteral { location, .. }) => {
+            WordFragment::String(StringLiteral { location, .. }) => {
                 if let Some(token_type) = &token_type {
                     token_collector.add(&location, token_type, token_modifiers);
                 }
             }
-            ast::WordFragment::Interpolation(interpolation) => {
+            WordFragment::Interpolation(interpolation) => {
                 index_interpolation(&interpolation, token_collector)
             }
         }
     }
 }
 
-fn index_comparable(comparable: &ast::Comparable, token_collector: &mut SpelTokenCollector) {
+fn index_comparable(comparable: &Comparable, token_collector: &mut SpelTokenCollector) {
     match comparable {
-        ast::Comparable::Condition(condition) => index_condition(&condition, token_collector),
-        ast::Comparable::Expression(expression) => index_expression(&expression, token_collector),
-        ast::Comparable::Function(function) => index_function(&function, token_collector),
-        ast::Comparable::Object(interpolation) => {
+        Comparable::Condition(condition) => index_condition(&condition, token_collector),
+        Comparable::Expression(expression) => index_expression(&expression, token_collector),
+        Comparable::Function(function) => index_function(&function, token_collector),
+        Comparable::Object(interpolation) => {
             index_interpolation(interpolation, token_collector);
         }
-        ast::Comparable::String(string) => index_string(&string, token_collector),
-        ast::Comparable::Null(null) => index_null(&null, token_collector),
+        Comparable::String(string) => index_string(&string, token_collector),
+        Comparable::Null(null) => index_null(&null, token_collector),
     }
 }
 
-fn index_interpolation(
-    interpolation: &ast::Interpolation,
-    token_collector: &mut SpelTokenCollector,
-) {
+fn index_interpolation(interpolation: &Interpolation, token_collector: &mut SpelTokenCollector) {
     token_collector.add(
         &interpolation.opening_bracket_location,
         &SemanticTokenType::OPERATOR,
@@ -673,18 +672,18 @@ mod tests {
     use lsp_types::{SemanticToken, SemanticTokenType};
 
     use crate::{
+        capabilities::TOKEN_TYPES,
         command::semantics::{SpelTokenCollector, Tokenizer},
-        spel::ast,
-        TOKEN_TYPES,
+        spel::ast::{Location, Object, StringLiteral, Word, WordFragment},
     };
 
     #[test]
     fn test_index_single_object() {
         let tokenizer = &mut Tokenizer::new();
-        let root_object = ast::Object::Name(ast::Word {
-            fragments: vec![ast::WordFragment::String(ast::StringLiteral {
+        let root_object = Object::Name(Word {
+            fragments: vec![WordFragment::String(StringLiteral {
                 content: "_someVariable".to_string(),
-                location: ast::Location::VariableLength {
+                location: Location::VariableLength {
                     char: 0,
                     line: 0,
                     length: 13,
@@ -723,10 +722,10 @@ mod tests {
     #[test]
     fn test_index_multiple_objects() {
         let tokenizer = &mut Tokenizer::new();
-        let root_object = ast::Object::Name(ast::Word {
-            fragments: vec![ast::WordFragment::String(ast::StringLiteral {
+        let root_object = Object::Name(Word {
+            fragments: vec![WordFragment::String(StringLiteral {
                 content: "_someVariable".to_string(),
-                location: ast::Location::VariableLength {
+                location: Location::VariableLength {
                     char: 0,
                     line: 0,
                     length: 13,

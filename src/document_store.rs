@@ -1,11 +1,12 @@
-use anyhow::{Error, Result};
-use lsp_types::Url;
 use std::{
     collections::HashMap,
     fs,
     str::FromStr,
     sync::{Arc, Mutex, OnceLock},
 };
+
+use anyhow::{Error, Result};
+use lsp_types::Url;
 use tree_sitter::{Node, Parser, Point, Tree};
 
 use crate::{

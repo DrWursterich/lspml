@@ -1,5 +1,3 @@
-use anyhow::Result;
-use serde::Deserialize;
 use std::{
     collections::HashMap,
     fs,
@@ -7,6 +5,9 @@ use std::{
     path::Path,
     sync::{Arc, Mutex, OnceLock},
 };
+
+use anyhow::Result;
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ModuleMappings(HashMap<String, Module>);
@@ -84,11 +85,5 @@ pub(crate) fn find_module_for_file(file: &Path) -> Option<Module> {
         .lock()
         .expect("module mappings mutex poisoned")
         .iter()
-        .find_map(|(_, module)| {
-            if file.strip_prefix(&module.path).is_ok() {
-                return Some(module.clone());
-            } else {
-                return None;
-            }
-        });
+        .find_map(|(_, module)| file.strip_prefix(&module.path).ok().map(|_| module.clone()));
 }

@@ -1,22 +1,15 @@
+use std::{error::Error, fs::File};
+
 use anyhow::Result;
 use clap::Parser;
 use lsp_server::{Connection, Message};
 use lsp_types::{
-    CancelParams, CodeActionKind, CodeActionOptions, CodeActionProviderCapability,
-    CompletionOptions, CompletionOptionsCompletionItem, DiagnosticOptions,
-    DiagnosticServerCapabilities, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams, DidSaveTextDocumentParams, HoverOptions, HoverProviderCapability,
-    InitializeParams, NumberOrString, OneOf, SemanticTokenModifier, SemanticTokenType,
-    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
-    SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability,
-    TextDocumentSyncKind, WorkDoneProgressOptions,
-};
-use std::{
-    error::Error,
-    fmt::{Display, Formatter},
-    fs::File,
+    CancelParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, InitializeParams,
 };
 use structured_logger::Builder;
+
+mod capabilities;
 mod command;
 mod document_store;
 mod grammar;
@@ -35,71 +28,6 @@ struct CommandLineOpts {
     modules_file: Option<String>,
 }
 
-pub(crate) const TOKEN_TYPES: &'static [SemanticTokenType] = &[
-    SemanticTokenType::ENUM,
-    SemanticTokenType::ENUM_MEMBER,
-    SemanticTokenType::FUNCTION,
-    SemanticTokenType::KEYWORD,
-    SemanticTokenType::MACRO,
-    SemanticTokenType::METHOD,
-    SemanticTokenType::NUMBER,
-    SemanticTokenType::OPERATOR,
-    SemanticTokenType::PROPERTY,
-    SemanticTokenType::REGEXP,
-    SemanticTokenType::STRING,
-    SemanticTokenType::VARIABLE,
-];
-
-pub(crate) const TOKEN_MODIFIERS: &'static [SemanticTokenModifier] = &[
-    SemanticTokenModifier::DECLARATION,
-    SemanticTokenModifier::DEFINITION,
-    SemanticTokenModifier::DEPRECATED,
-    SemanticTokenModifier::DOCUMENTATION,
-    SemanticTokenModifier::MODIFICATION,
-];
-
-pub(crate) enum CodeActionImplementation {
-    GenerateDefaultHeaders,
-    NameToCondition,
-    ConditionToName,
-    FixSpelSyntax,
-}
-
-impl CodeActionImplementation {
-    pub(crate) const GENERATE_DEFAULT_HEADER_CODE: NumberOrString = NumberOrString::Number(7126);
-    pub(crate) const FIX_SPEL_SYNTAX_CODE: NumberOrString = NumberOrString::Number(7127);
-
-    fn kinds() -> Vec<CodeActionKind> {
-        return vec![
-            CodeActionImplementation::GenerateDefaultHeaders.to_kind(),
-            CodeActionImplementation::NameToCondition.to_kind(),
-            CodeActionImplementation::ConditionToName.to_kind(),
-            CodeActionImplementation::FixSpelSyntax.to_kind(),
-            CodeActionKind::SOURCE_FIX_ALL,
-        ];
-    }
-
-    fn to_kind(self) -> CodeActionKind {
-        return CodeActionKind::new(match self {
-            CodeActionImplementation::GenerateDefaultHeaders => "refactor.generate_default_headers",
-            CodeActionImplementation::NameToCondition => "refactor.name_to_condition",
-            CodeActionImplementation::ConditionToName => "refactor.condition_to_name",
-            CodeActionImplementation::FixSpelSyntax => "quickfix.fix_spel_syntax",
-        });
-    }
-}
-
-impl Display for CodeActionImplementation {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(match self {
-            CodeActionImplementation::GenerateDefaultHeaders => "refactor.generate_default_headers",
-            CodeActionImplementation::NameToCondition => "refactor.name_to_condition",
-            CodeActionImplementation::ConditionToName => "refactor.condition_to_name",
-            CodeActionImplementation::FixSpelSyntax => "quickfix.fix_spel_syntax",
-        })
-    }
-}
-
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let opts = CommandLineOpts::parse();
 
@@ -114,48 +42,14 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         )
         .init();
     log::info!("lspml starting...");
-    log::trace!("commandline opts: {:?}", opts);
+    log::debug!("commandline opts: {:?}", opts);
     match opts.modules_file {
         Some(file) => modules::init_module_mappings_from_file(&file),
         None => modules::init_empty_module_mappings(),
     }?;
 
     let (connection, io_threads) = Connection::stdio();
-    let server_capabilities = serde_json::to_value(&ServerCapabilities {
-        definition_provider: Some(OneOf::Left(true)),
-        text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
-        document_highlight_provider: Some(OneOf::Left(true)),
-        semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
-            SemanticTokensOptions {
-                full: Some(SemanticTokensFullOptions::Bool(true)),
-                legend: SemanticTokensLegend {
-                    token_types: TOKEN_TYPES.to_vec(),
-                    token_modifiers: TOKEN_MODIFIERS.to_vec(),
-                },
-                ..Default::default()
-            },
-        )),
-        diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
-            inter_file_dependencies: true,
-            ..DiagnosticOptions::default()
-        })),
-        completion_provider: Some(CompletionOptions {
-            completion_item: Some(CompletionOptionsCompletionItem {
-                label_details_support: Some(true),
-            }),
-            ..CompletionOptions::default()
-        }),
-        hover_provider: Some(HoverProviderCapability::Options(HoverOptions {
-            work_done_progress_options: WorkDoneProgressOptions {
-                work_done_progress: Some(true),
-            },
-        })),
-        code_action_provider: Some(CodeActionProviderCapability::Options(CodeActionOptions {
-            code_action_kinds: Some(CodeActionImplementation::kinds()),
-            ..CodeActionOptions::default()
-        })),
-        ..ServerCapabilities::default()
-    })?;
+    let server_capabilities = serde_json::to_value(capabilities::create())?;
     let initialization_params = match connection.initialize(server_capabilities) {
         Ok(params) => serde_json::from_value(params)?,
         Err(err) => {
@@ -183,7 +77,7 @@ fn main_loop(
         match message {
             Message::Request(request) => {
                 if connection.handle_shutdown(&request)? {
-                    return Ok(());
+                    break;
                 }
                 match request.method.as_str() {
                     "textDocument/completion" => command::complete(request).map(Some),
@@ -233,16 +127,13 @@ fn main_loop(
 
 fn changed(params: DidChangeTextDocumentParams) -> Result<()> {
     let uri = params.text_document.uri;
-    if let Some(change) = &params.content_changes.last() {
-        match document_store::Document::new(change.text.to_owned()) {
-            Ok(document) => {
-                document_store::put(&uri, document);
-                log::debug!("updated {}", uri);
-            }
-            Err(err) => return Err(err),
-        }
-    }
-    return Ok(());
+    return match &params.content_changes.last() {
+        Some(change) => document_store::Document::new(change.text.to_owned()).map(|document| {
+            document_store::put(&uri, document);
+            log::debug!("updated {}", uri);
+        }),
+        None => Ok(()),
+    };
 }
 
 fn opened(params: DidOpenTextDocumentParams) -> Result<()> {
@@ -262,7 +153,6 @@ fn saved(params: DidSaveTextDocumentParams) -> Result<()> {
     return document_store::Document::from_uri(&uri).map(|document| {
         document_store::put(&uri, document);
         log::debug!("saved {}", uri);
-        return ();
     });
 }
 

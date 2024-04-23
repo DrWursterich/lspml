@@ -5,23 +5,18 @@ pub(crate) fn find_current_node<'tree>(
     tree: &'tree Tree,
     position: Position,
 ) -> Option<Node<'tree>> {
-    let root_node = tree.root_node();
     let trigger_point = Point::new(position.line as usize, position.character as usize);
-    let mut cursor = root_node.walk();
-    let mut node;
+    let mut cursor = tree.root_node().walk();
     loop {
-        node = cursor.node();
-        if node.end_position() <= trigger_point {
-            if !cursor.goto_next_sibling() || cursor.node().start_position() > trigger_point {
-                node = node.parent().unwrap();
-                break;
-            }
-        } else if !cursor.goto_first_child() {
-            break;
+        let node = cursor.node();
+        if match node.end_position() <= trigger_point {
+            true => !cursor.goto_next_sibling() || cursor.node().start_position() > trigger_point,
+            false => !cursor.goto_first_child(),
+        } {
+            log::debug!("current node: {:?}", node);
+            return Some(node);
         }
     }
-    log::debug!("current node: {:?}", node);
-    return Some(node);
 }
 
 pub(crate) fn attribute_name_of<'a>(attribute: Node<'_>, source: &'a str) -> Option<&'a str> {

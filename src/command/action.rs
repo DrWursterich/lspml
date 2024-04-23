@@ -8,11 +8,11 @@ use lsp_types::{
 use tree_sitter::{Node, Point};
 
 use crate::{
+    capabilities::CodeActionImplementation,
     document_store::{self, Document},
     spel::ast::{
         Argument, Comparable, ComparissonOperator, Condition, Function, SpelAst, SpelResult,
     },
-    CodeActionImplementation,
 };
 
 use super::LsError;

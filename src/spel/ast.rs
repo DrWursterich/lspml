@@ -1,6 +1,9 @@
-use core::cmp::Ordering;
-use core::fmt::Display;
 use std::fmt::Formatter;
+
+use core::{
+    cmp::Ordering,
+    fmt::{self, Display},
+};
 
 use super::parser::SyntaxError;
 
@@ -15,7 +18,7 @@ pub(crate) enum Identifier {
 }
 
 impl Display for Identifier {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         return match self {
             Identifier::Name(name) => name.fmt(formatter),
             Identifier::FieldAccess {
@@ -50,7 +53,7 @@ pub(crate) enum Object {
 }
 
 impl Display for Object {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         return match self {
             Object::Anchor(anchor) => anchor.fmt(formatter),
             Object::Function(function) => function.fmt(formatter),
@@ -59,11 +62,7 @@ impl Display for Object {
             Object::FieldAccess { object, field, .. } => write!(formatter, "{}.{}", object, field),
             Object::MethodAccess {
                 object, function, ..
-            } => {
-                object.fmt(formatter)?;
-                formatter.write_str(".")?;
-                function.fmt(formatter)
-            }
+            } => write!(formatter, "{}.{}", object, function),
             Object::ArrayAccess { object, index, .. } => write!(formatter, "{}[{}]", object, index),
         };
     }
@@ -79,7 +78,7 @@ pub(crate) struct Function {
 }
 
 impl Display for Function {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.name)?;
         match self.arguments.len() {
             0 => formatter.write_str("()"),
@@ -98,16 +97,14 @@ impl Display for Function {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Anchor {
-    pub(crate) name: Word, // TODO: anchors can contain dots!
+    pub(crate) name: Word,
     pub(crate) opening_bracket_location: Location,
     pub(crate) closing_bracket_location: Location,
 }
 
 impl Display for Anchor {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
-        formatter.write_str("!{")?;
-        self.name.fmt(formatter)?;
-        formatter.write_str("}")
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        write!(formatter, "!{{{}}}", self.name)
     }
 }
 
@@ -118,7 +115,7 @@ pub(crate) struct FunctionArgument {
 }
 
 impl Display for FunctionArgument {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         self.argument.fmt(formatter)
     }
 }
@@ -137,7 +134,7 @@ pub(crate) enum Argument {
 }
 
 impl Display for Argument {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Argument::Anchor(anchor) => anchor.fmt(formatter),
             Argument::Function(function) => function.fmt(formatter),
@@ -158,7 +155,7 @@ pub(crate) struct Word {
 }
 
 impl Display for Word {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         for fragment in &self.fragments {
             fragment.fmt(formatter)?;
         }
@@ -173,7 +170,7 @@ pub(crate) enum WordFragment {
 }
 
 impl Display for WordFragment {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
             WordFragment::String(string) => string.fmt(formatter),
             WordFragment::Interpolation(interpolation) => interpolation.fmt(formatter),
@@ -189,10 +186,8 @@ pub(crate) struct Interpolation {
 }
 
 impl Display for Interpolation {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
-        formatter.write_str("${")?;
-        self.content.fmt(formatter)?;
-        formatter.write_str("}")
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        write!(formatter, "${{{}}}", self.content)
     }
 }
 
@@ -203,7 +198,7 @@ pub(crate) struct StringLiteral {
 }
 
 impl Display for StringLiteral {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         return formatter.write_str(&self.content);
     }
 }
@@ -214,7 +209,7 @@ pub(crate) struct Null {
 }
 
 impl Display for Null {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         return formatter.write_str("null");
     }
 }
@@ -251,7 +246,7 @@ pub(crate) enum Expression {
 }
 
 impl Display for Expression {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         return match self {
             Expression::Function(function) => function.fmt(formatter),
             Expression::Null(null) => null.fmt(formatter),
@@ -286,7 +281,7 @@ pub(crate) struct Number {
 }
 
 impl Display for Number {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.content)
     }
 }
@@ -299,7 +294,7 @@ pub(crate) struct SignedNumber {
 }
 
 impl Display for SignedNumber {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         self.sign.fmt(formatter)?;
         self.number.fmt(formatter)
     }
@@ -312,7 +307,7 @@ pub(crate) enum Sign {
 }
 
 impl Display for Sign {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         return formatter.write_str(match self {
             Sign::Plus => "+",
             Sign::Minus => "-",
@@ -331,7 +326,7 @@ pub(crate) enum ExpressionOperator {
 }
 
 impl Display for ExpressionOperator {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         return formatter.write_str(match self {
             ExpressionOperator::Addition => "+",
             ExpressionOperator::Subtraction => "-",
@@ -411,7 +406,7 @@ pub(crate) enum Comparable {
 }
 
 impl Display for Comparable {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Comparable::Condition(inner) => inner.fmt(formatter),
             Comparable::Expression(inner) => inner.fmt(formatter),
@@ -437,7 +432,7 @@ impl Comparable {
 }
 
 impl Display for Condition {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         return match self {
             Condition::True { .. } => formatter.write_str("true"),
             Condition::False { .. } => formatter.write_str("false"),
@@ -468,7 +463,7 @@ pub(crate) enum ConditionOperator {
 }
 
 impl Display for ConditionOperator {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         return formatter.write_str(match self {
             ConditionOperator::And => "&&",
             ConditionOperator::Or => "||",
@@ -487,7 +482,7 @@ pub(crate) enum ComparissonOperator {
 }
 
 impl Display for ComparissonOperator {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         return formatter.write_str(match self {
             ComparissonOperator::Equal => "==",
             ComparissonOperator::Unequal => "!=",
@@ -511,7 +506,7 @@ pub(crate) enum UndecidedExpressionContent {
 }
 
 impl Display for UndecidedExpressionContent {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         return match self {
             UndecidedExpressionContent::Condition(condition) => condition.fmt(formatter),
             UndecidedExpressionContent::Expression(expression) => expression.fmt(formatter),
@@ -546,17 +541,17 @@ pub(crate) enum Location {
 impl Location {
     pub(crate) fn char(&self) -> u16 {
         return match self {
-            Location::SingleCharacter { char, .. } => *char,
-            Location::DoubleCharacter { char, .. } => *char,
-            Location::VariableLength { char, .. } => *char,
+            Location::SingleCharacter { char, .. }
+            | Location::DoubleCharacter { char, .. }
+            | Location::VariableLength { char, .. } => *char,
         };
     }
 
     pub(crate) fn line(&self) -> u16 {
         return match self {
-            Location::SingleCharacter { line, .. } => *line,
-            Location::DoubleCharacter { line, .. } => *line,
-            Location::VariableLength { line, .. } => *line,
+            Location::SingleCharacter { line, .. }
+            | Location::DoubleCharacter { line, .. }
+            | Location::VariableLength { line, .. } => *line,
         };
     }
 
@@ -570,7 +565,7 @@ impl Location {
 }
 
 impl Display for Location {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
             "({}, {}, {})",
@@ -606,8 +601,8 @@ pub(crate) struct ObjectAst {
 }
 
 impl ObjectAst {
-    pub(crate) fn new(object: Object) -> Self {
-        return Self { root: object };
+    pub(crate) fn new(root: Object) -> Self {
+        return Self { root };
     }
 }
 
@@ -617,8 +612,8 @@ pub(crate) struct ExpressionAst {
 }
 
 impl ExpressionAst {
-    pub(crate) fn new(expression: Expression) -> Self {
-        return Self { root: expression };
+    pub(crate) fn new(root: Expression) -> Self {
+        return Self { root };
     }
 }
 
@@ -628,8 +623,8 @@ pub(crate) struct ConditionAst {
 }
 
 impl ConditionAst {
-    pub(crate) fn new(condition: Condition) -> Self {
-        return Self { root: condition };
+    pub(crate) fn new(root: Condition) -> Self {
+        return Self { root };
     }
 }
 
@@ -640,7 +635,7 @@ pub(crate) enum Uri {
 }
 
 impl Display for Uri {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         return match self {
             Uri::Literal(literal) => literal.fmt(formatter),
             Uri::Object(object) => object.fmt(formatter),
@@ -655,14 +650,14 @@ pub(crate) struct UriLiteral {
 }
 
 impl Display for UriLiteral {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         for fragment in &self.fragments {
             fragment.fmt(formatter)?;
         }
-        if let Some(extension) = &self.file_extension {
-            extension.fmt(formatter)?;
+        match &self.file_extension {
+            Some(extension) => extension.fmt(formatter),
+            None => Ok(()),
         }
-        Ok(())
     }
 }
 
@@ -673,9 +668,8 @@ pub(crate) struct UriFragment {
 }
 
 impl Display for UriFragment {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str("/")?;
-        return self.content.fmt(formatter);
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        write!(formatter, "/{}", self.content)
     }
 }
 
@@ -686,9 +680,8 @@ pub(crate) struct UriFileExtension {
 }
 
 impl Display for UriFileExtension {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(".")?;
-        return self.content.fmt(formatter);
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        write!(formatter, ".{}", self.content)
     }
 }
 

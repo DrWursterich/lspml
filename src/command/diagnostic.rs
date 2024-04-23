@@ -9,6 +9,7 @@ use lsp_types::{
 use tree_sitter::{Node, Point};
 
 use crate::{
+    capabilities::CodeActionImplementation,
     document_store,
     grammar::{self, TagChildren, TagDefinition},
     modules, parser,
@@ -18,7 +19,6 @@ use crate::{
         grammar::ArgumentNumber,
         parser::SyntaxError,
     },
-    CodeActionImplementation,
 };
 
 use super::LsError;

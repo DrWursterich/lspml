@@ -1,17 +1,20 @@
-use super::LsError;
-use crate::{
-    document_store::{self, Document},
-    grammar::{self, TagAttributeType, TagAttributes, TagChildren, TagDefinition},
-    modules, parser,
-};
+use std::{cmp::Ordering, collections::HashMap, fs, iter::Iterator, str::FromStr};
+
 use anyhow::Result;
 use lsp_server::ErrorCode;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionParams, CompletionTextEdit, Documentation,
     MarkupContent, MarkupKind, Position, Range, TextDocumentPositionParams, TextEdit, Url,
 };
-use std::{cmp::Ordering, collections::HashMap, fs, iter::Iterator, str::FromStr};
 use tree_sitter::{Node, Point};
+
+use crate::{
+    document_store::{self, Document},
+    grammar::{self, TagAttributeType, TagAttributes, TagChildren, TagDefinition},
+    modules, parser,
+};
+
+use super::LsError;
 
 #[derive(Debug, PartialEq)]
 enum TagParsePosition {

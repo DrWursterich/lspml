@@ -56,6 +56,7 @@ pub(crate) enum TagAttributeType {
     Module,
 }
 
+// TODO: this should probably be a trait
 #[derive(Debug)]
 pub(crate) enum AttributeRule {
     Deprecated(&'static str),
