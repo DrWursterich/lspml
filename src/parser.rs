@@ -41,15 +41,18 @@ pub(crate) fn attribute_name_and_value_of<'a>(
     attribute: Node<'_>,
     source: &'a str,
 ) -> Option<(&'a str, &'a str)> {
-    if let Some(name) = attribute
+    return attribute
         .child(0)
         .and_then(|node| node.utf8_text(source.as_bytes()).ok())
-    {
-        return attribute
-            .child(2)
-            .and_then(|node| node.child(1))
-            .and_then(|node| node.utf8_text(source.as_bytes()).ok())
-            .map(|value| (name, value));
-    }
-    return None;
+        .map(|name| {
+            (
+                name,
+                attribute
+                    .child(2)
+                    .and_then(|node| node.child(1))
+                    .filter(|node| node.kind() == "string_content")
+                    .and_then(|node| node.utf8_text(source.as_bytes()).ok())
+                    .unwrap_or(""),
+            )
+        });
 }

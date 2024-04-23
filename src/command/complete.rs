@@ -1,7 +1,7 @@
 use super::LsError;
 use crate::{
     document_store::{self, Document},
-    grammar::{self, TagChildren, TagDefinition},
+    grammar::{self, TagAttributeType, TagAttributes, TagChildren, TagDefinition},
     modules, parser,
 };
 use anyhow::Result;
@@ -377,10 +377,14 @@ impl CompletionCollector<'_> {
         attribute: String,
         attributes: HashMap<String, String>,
     ) -> Result<()> {
-        for rule in tag.attribute_rules {
-            match rule {
-                grammar::AttributeRule::UriExists(uri, module) if *uri == attribute => {
-                    let module = match attributes.get(*module).map(|str| str.as_str()) {
+        if let TagAttributes::These(definitions) = tag.attributes {
+            match definitions
+                .iter()
+                .find(|a| a.name == attribute)
+                .map(|a| &a.r#type)
+            {
+                Some(TagAttributeType::Uri) => {
+                    let module = match attributes.get("module").map(|str| str.as_str()) {
                         Some("${module.id}") | None => self
                             .file
                             .to_file_path()
@@ -418,8 +422,24 @@ impl CompletionCollector<'_> {
                             }
                         }
                     }
-                    break;
                 }
+                Some(TagAttributeType::Module) => {
+                    modules::all_modules().iter().for_each(|(name, _)| {
+                        self.completions.push(CompletionItem {
+                            label: name.to_owned(),
+                            kind: Some(CompletionItemKind::MODULE),
+                            insert_text: Some(name.to_owned()),
+                            ..Default::default()
+                        })
+                    });
+                }
+                _ => (),
+            }
+        }
+
+        // should also be done via TagAttributeType::Enum
+        for rule in tag.attribute_rules {
+            match rule {
                 grammar::AttributeRule::ValueOneOf(name, values)
                 | grammar::AttributeRule::ValueOneOfCaseInsensitive(name, values)
                     if *name == attribute =>
@@ -441,11 +461,7 @@ impl CompletionCollector<'_> {
         return Ok(());
     }
 
-    fn complete_attributes_of(
-        &mut self,
-        tag: TagDefinition,
-        attributes: HashMap<String, String>,
-    ) {
+    fn complete_attributes_of(&mut self, tag: TagDefinition, attributes: HashMap<String, String>) {
         match tag.attributes {
             grammar::TagAttributes::These(possible) => possible
                 .iter()

@@ -192,6 +192,10 @@ fn spel_ast_of(text: &str, r#type: &TagAttributeType) -> Result<SpelAst> {
             Ok(result) => SpelResult::Valid(result),
             Err(err) => SpelResult::Invalid(err),
         })),
+        TagAttributeType::Module => Ok(SpelAst::String(match parser.parse_text() {
+            Ok(result) => SpelResult::Valid(result),
+            Err(err) => SpelResult::Invalid(err),
+        })),
         TagAttributeType::Object => Ok(SpelAst::Object(match parser.parse_object_ast() {
             Ok(result) => SpelResult::Valid(result.root),
             Err(err) => SpelResult::Invalid(err),

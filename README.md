@@ -26,6 +26,7 @@ A work-in-progress language server for the sitepark markup language (spml).
     - attribute values that either:
         - have a fixed set of possible values
         - point to another spml file
+        - refer to an spml module
 - semantic highlighting for attribute values that expect:
     - conditions
     - expressions

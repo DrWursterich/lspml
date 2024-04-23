@@ -44,6 +44,7 @@ pub(crate) enum TagAttributeType {
     Regex,
     String,
     Uri,
+    Module,
 }
 
 #[derive(Debug)]
@@ -541,7 +542,7 @@ impl TagDefinition {
             ("id", TagAttributeType::String),
             ("locale", TagAttributeType::Object),
             ("method", TagAttributeType::String),
-            ("module", TagAttributeType::String),
+            ("module", TagAttributeType::Module),
             ("name", TagAttributeType::Identifier),
             ("nameencoding", TagAttributeType::String),
             ("template", TagAttributeType::String),
@@ -623,7 +624,7 @@ impl TagDefinition {
             ("arguments", TagAttributeType::Object),
             ("context", TagAttributeType::String),
             ("mode", TagAttributeType::String),
-            ("module", TagAttributeType::String),
+            ("module", TagAttributeType::Module),
             ("return", TagAttributeType::Identifier),
             ("template", TagAttributeType::String),
             ("uri", TagAttributeType::Uri),
@@ -1298,7 +1299,7 @@ impl TagDefinition {
             ("handler", TagAttributeType::String),
             ("information", TagAttributeType::Object),
             ("locale", TagAttributeType::Object),
-            ("module", TagAttributeType::String),
+            ("module", TagAttributeType::Module),
             ("publisher", TagAttributeType::Object),
             ("template", TagAttributeType::String),
             ("uri", TagAttributeType::Uri),
