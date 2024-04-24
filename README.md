@@ -73,9 +73,14 @@ The `modules-file` is a `json` file, in which module names can be mapped to loca
 cargo +nightly build --release
 ```
 
+You can find the `lspml` executable afterwards like so:
+```bash
+find . -name lspml -executable
+```
+
 ## install
 
-### nvim
+### neovim
 
 As of now there is no `lsp-config` configuration for lspml, so attatching it has to be done manually:
 ```lua
@@ -102,9 +107,27 @@ vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter" }, {
 })
 ```
 
-The `lspml` executable is best found (after building) with
+### sublime text
 
-```bash
-find . -name lspml -executable
+Install [the lsp package](https://lsp.sublimetext.io/) and follow their setup instructions. A configuration for `lspml` should look similar to this:
+```json
+{
+    "clients": {
+        "lspml": {
+            "enabled": true,
+            "command": [
+                "/path/to/lspml",
+                "--modules-file", "/path/to/module_mappings.json",
+                "--log-file", "/path/to/lspml/lspml.log.json",
+                "--log-level", "INFO"
+            ],
+            "selector": "text.html.jsp"
+        }
+    }
+}
 ```
+
+### visual studio code
+
+An extension wrapping `lspml` is currently beeing worked on. As soon as it is ready it will be published and linked here.
 
