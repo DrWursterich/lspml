@@ -4,22 +4,23 @@ use lsp_types::Position;
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Tree {
     header: Header,
+    tags: Vec<Tag>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Header {
-    java_header: JavaHeader,
+    java_header: PageHeader,
     taglib_imports: Vec<TagLibImport>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct JavaHeader {
+pub(crate) struct PageHeader {
     open_bracket: Location,
     page: Location,
-    language: Attribute,
-    page_encoding: Attribute,
-    content_type: Attribute,
-    // TODO: java_class_imports?
+    language: Option<Attribute>,
+    page_encoding: Option<Attribute>,
+    content_type: Option<Attribute>,
+    imports: Vec<Attribute>,
     close_bracket: Location,
 }
 
@@ -36,6 +37,648 @@ pub(crate) struct TagLibImport {
 pub(crate) enum TagLibOrigin {
     Uri(Attribute),
     TagDir(Attribute),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct TagBody {
+    open_location: Location,
+    tags: Vec<Tag>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum Tag {
+    // TODO: This is missing text and comments (shouldn't be called Tags then)
+    SpAttribute(SpAttribute),
+    SpBarcode(SpBarcode),
+    SpBreak(SpBreak),
+    SpCalendarsheet(SpCalendarsheet),
+    SpCheckbox(SpCheckbox),
+    SpCode(SpCode),
+    SpCollection(SpCollection),
+    SpCondition(SpCondition),
+    SpDiff(SpDiff),
+    SpError(SpError),
+    SpExpire(SpExpire),
+    SpFilter(SpFilter),
+    SpFor(SpFor),
+    SpForm(SpForm),
+    SpHidden(SpHidden),
+    SpIf(SpIf),
+    SpInclude(SpInclude),
+    SpIo(SpIo),
+    SpIterator(SpIterator),
+    SpJson(SpJson),
+    SpLinkedinformation(SpLinkedinformation),
+    SpLinktree(SpLinktree),
+    SpLivetree(SpLivetree),
+    SpLog(SpLog),
+    SpLogin(SpLogin),
+    SpLoop(SpLoop),
+    SpMap(SpMap),
+    SpOption(SpOption),
+    SpPassword(SpPassword),
+    SpPrint(SpPrint),
+    SpQuerytree(SpQuerytree),
+    SpRadio(SpRadio),
+    SpRange(SpRange),
+    SpReturn(SpReturn),
+    SpSass(SpSass),
+    SpScaleimage(SpScaleimage),
+    SpScope(SpScope),
+    SpSearch(SpSearch),
+    SpSelect(SpSelect),
+    SpSet(SpSet),
+    SpSort(SpSort),
+    SpSubinformation(SpSubinformation),
+    SpTagbody(SpTagbody),
+    SpText(SpText),
+    SpTextarea(SpTextarea),
+    SpTextimage(SpTextimage),
+    SpThrow(SpThrow),
+    SpToggle(SpToggle),
+    SpUpload(SpUpload),
+    SpUrl(SpUrl),
+    SpWarning(SpWarning),
+    SpWorklist(SpWorklist),
+    SpZip(SpZip),
+    SptCounter(SptCounter),
+    SptDate(SptDate),
+    SptDiff(SptDiff),
+    SptEmail2IMG(SptEmail2IMG),
+    SptEncryptemail(SptEncryptemail),
+    SptEscapeemail(SptEscapeemail),
+    SptFormsolutions(SptFormsolutions),
+    SptId2URL(SptId2URL),
+    SptIlink(SptIlink),
+    SptImageeditor(SptImageeditor),
+    SptImp(SptImp),
+    SptIterator(SptIterator),
+    SptLink(SptLink),
+    SptNumber(SptNumber),
+    SptPersonalization(SptPersonalization),
+    SptPrehtml(SptPrehtml),
+    SptSmarteditor(SptSmarteditor),
+    SptSpml(SptSpml),
+    SptText(SptText),
+    SptTextarea(SptTextarea),
+    SptTimestamp(SptTimestamp),
+    SptTinymce(SptTinymce),
+    SptUpdown(SptUpdown),
+    SptUpload(SptUpload),
+    SptWorklist(SptWorklist),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpAttribute {
+    open_location: Location,
+    condition_attribute: Option<Attribute>,
+    default_attribute: Option<Attribute>,
+    expression_attribute: Option<Attribute>,
+    locale_attribute: Option<Attribute>,
+    name_attribute: Option<Attribute>,
+    object_attribute: Option<Attribute>,
+    value_attribute: Option<Attribute>,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpBarcode {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpBreak {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpCalendarsheet {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpCheckbox {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpCode {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpCollection {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpCondition {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpDiff {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpError {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpExpire {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpFilter {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpFor {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpForm {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpHidden {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpIf {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpInclude {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpIo {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpIterator {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpJson {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpLinkedinformation {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpLinktree {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpLivetree {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpLog {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpLogin {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpLoop {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpMap {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpOption {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpPassword {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpPrint {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpQuerytree {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpRadio {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpRange {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpReturn {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpSass {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpScaleimage {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpScope {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpSearch {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpSelect {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpSet {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpSort {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpSubinformation {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpTagbody {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpText {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpTextarea {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpTextimage {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpThrow {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpToggle {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpUpload {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpUrl {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpWarning {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpWorklist {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpZip {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptCounter {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptDate {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptDiff {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptEmail2IMG {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptEncryptemail {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptEscapeemail {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptFormsolutions {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptId2URL {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptIlink {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptImageeditor {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptImp {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptIterator {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptLink {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptNumber {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptPersonalization {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptPrehtml {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptSmarteditor {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptSpml {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptText {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptTextarea {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptTimestamp {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptTinymce {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptUpdown {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptUpload {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SptWorklist {
+    open_location: Location,
+    body: Option<TagBody>,
+    close_location: Location,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -77,7 +720,6 @@ impl TreeParser<'_, '_> {
     }
 
     pub(crate) fn parse_header(&mut self) -> Result<Header> {
-        println!("parsing header");
         let root = self.cursor.node();
         if root.kind() != "document" {
             return Err(anyhow::anyhow!(
@@ -91,13 +733,14 @@ impl TreeParser<'_, '_> {
         let mut taglib_imports = Vec::new();
         loop {
             let header_node = self.cursor.node();
-            println!("header: {}", header_node.kind());
             match header_node.kind() {
                 "page_header" => match java_header {
+                    // technically jsp files CAN have multiple "page" headers...
                     Some(_) => return Err(anyhow::anyhow!("found multiple java headers")),
-                    None => java_header = Some(self.parse_java_header()?),
+                    None => java_header = Some(self.parse_page_header()?),
                 },
                 "taglib_header" => taglib_imports.push(self.parse_taglib_header()?),
+                "comment" | "xml_comment" => (),
                 _ => break,
             }
             if !self.cursor.goto_next_sibling() {
@@ -105,7 +748,6 @@ impl TreeParser<'_, '_> {
                 break;
             }
         }
-        println!("{:#?}", taglib_imports);
         return match java_header {
             Some(java_header) => Ok(Header {
                 java_header,
@@ -115,56 +757,51 @@ impl TreeParser<'_, '_> {
         };
     }
 
-    fn parse_java_header(&mut self) -> Result<JavaHeader> {
-        println!("parse java header");
+    fn parse_page_header(&mut self) -> Result<PageHeader> {
         if !self.cursor.goto_first_child() {
             return Err(anyhow::anyhow!("java header is empty"));
         }
         let open_bracket = node_location(self.cursor.node());
+
         if !self.cursor.goto_next_sibling() {
             return Err(anyhow::anyhow!(
                 "java header is missing the \"page\" keyword"
             ));
         }
         let page = node_location(self.cursor.node());
-        if !self.cursor.goto_next_sibling() {
-            return Err(anyhow::anyhow!(
-                "java header is missing the \"language\" attribute"
-            ));
-        }
-        // TODO: attribute order should not matter
-        let (_, language) = self.parse_attribute()?;
-        if !self.cursor.goto_next_sibling() {
-            return Err(anyhow::anyhow!(
-                "java header is missing the \"pageEncoding\" attribute"
-            ));
-        }
-        let (_, page_encoding) = self.parse_attribute()?;
-        if !self.cursor.goto_next_sibling() {
-            return Err(anyhow::anyhow!(
-                "java header is missing the \"contentType\" attribute"
-            ));
-        }
-        let (_, content_type) = self.parse_attribute()?;
-        if !self.cursor.goto_next_sibling() {
-            return Err(anyhow::anyhow!(
-                "java header is missing the \"page\" keyword"
-            ));
+
+        let mut content_type = None;
+        let mut language = None;
+        let mut page_encoding = None;
+        let mut imports = Vec::new();
+        loop {
+            if !self.cursor.goto_next_sibling() {
+                return Err(anyhow::anyhow!("java header is unclosed"));
+            }
+            let node = self.cursor.node();
+            match node.kind() {
+                "import_attribute" => imports.push(self.parse_attribute()?.1),
+                "contentType_attribute" => content_type = Some(self.parse_attribute()?.1),
+                "language_attribute" => language = Some(self.parse_attribute()?.1),
+                "pageEncoding_attribute" => page_encoding = Some(self.parse_attribute()?.1),
+                "header_close" => break,
+                kind => return Err(anyhow::anyhow!("unexpected {}", kind)),
+            }
         }
         let close_bracket = node_location(self.cursor.node());
         self.cursor.goto_parent();
-        return Ok(JavaHeader {
+        return Ok(PageHeader {
             open_bracket,
             page,
             language,
             page_encoding,
             content_type,
+            imports,
             close_bracket,
         });
     }
 
     fn parse_taglib_header(&mut self) -> Result<TagLibImport> {
-        println!("parse taglib header");
         if !self.cursor.goto_first_child() {
             return Err(anyhow::anyhow!("java header is empty"));
         }
@@ -211,6 +848,80 @@ impl TreeParser<'_, '_> {
             origin,
             prefix,
             close_bracket,
+        });
+    }
+
+    fn parse_tags(&mut self) -> Result<Vec<Tag>> {
+        let mut tags = Vec::new();
+        loop {
+            if !self.cursor.goto_next_sibling() {
+                break;
+            }
+            let node = self.cursor.node();
+            match node.kind() {
+                "comment" | "xml_comment" | "text" | "xml_entity" => (),
+                "argument_tag" => tags.push(self.parse_sp_attribute()?),
+                // TODO: I don't want to handle each tag individually.
+                //       Can I write a macro for that or something?
+                _ => break,
+            };
+        }
+        return Ok(tags);
+    }
+
+    fn parse_sp_attribute(&mut self) -> Result<Tag> {
+        if !self.cursor.goto_first_child() {
+            return Err(anyhow::anyhow!("tag is empty"));
+        }
+        let open_location = node_location(self.cursor.node());
+        let mut condition_attribute = None;
+        let mut default_attribute = None;
+        let mut expression_attribute = None;
+        let mut locale_attribute = None;
+        let mut name_attribute = None;
+        let mut object_attribute = None;
+        let mut value_attribute = None;
+        let mut body = None;
+        loop {
+            if !self.cursor.goto_next_sibling() {
+                return Err(anyhow::anyhow!("sp:attribute tag is unclosed"));
+            }
+            let node = self.cursor.node();
+            match node.kind() {
+                "comment" | "xml_comment" => (),
+                "condition_attribute" => condition_attribute = Some(self.parse_attribute()?.1),
+                "default_attribute" => default_attribute = Some(self.parse_attribute()?.1),
+                "expression_attribute" => expression_attribute = Some(self.parse_attribute()?.1),
+                "locale_attribute" => locale_attribute = Some(self.parse_attribute()?.1),
+                "name_attribute" => name_attribute = Some(self.parse_attribute()?.1),
+                "object_attribute" => object_attribute = Some(self.parse_attribute()?.1),
+                "value_attribute" => value_attribute = Some(self.parse_attribute()?.1),
+                "self_closing_tag_end" => break,
+                ">" => body = Some(self.parse_tag_body()?),
+                _ => (),
+            };
+        }
+        let close_location = node_location(self.cursor.node());
+        return Ok(Tag::SpAttribute(SpAttribute {
+            open_location,
+            condition_attribute,
+            default_attribute,
+            expression_attribute,
+            locale_attribute,
+            name_attribute,
+            object_attribute,
+            value_attribute,
+            body,
+            close_location,
+        }));
+    }
+
+    fn parse_tag_body(&mut self) -> Result<TagBody> {
+        let open_location = node_location(self.cursor.node());
+        let tags = self.parse_tags()?;
+        return Ok(TagBody {
+            open_location,
+            tags,
         });
     }
 
@@ -267,7 +978,8 @@ impl Tree {
     pub(crate) fn new(ts: tree_sitter::Tree, text: String) -> Result<Self> {
         let parser = &mut TreeParser::new(ts.walk(), &text);
         let header = parser.parse_header()?;
-        return Ok(Tree { header });
+        let tags = parser.parse_tags()?;
+        return Ok(Tree { header, tags });
     }
 }
 
@@ -339,7 +1051,7 @@ pub(crate) fn attribute_name_and_value_of<'a>(
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::{Attribute, Header, JavaHeader, Location, TagLibImport, TagLibOrigin};
+    use crate::parser::{Attribute, Header, Location, PageHeader, TagLibImport, TagLibOrigin};
 
     use super::TreeParser;
     use anyhow::{Error, Result};
@@ -353,30 +1065,31 @@ mod tests {
             "%>\n"
         ));
         let expected = Header {
-            java_header: JavaHeader {
+            java_header: PageHeader {
                 open_bracket: Location::new(0, 0, 3),
                 page: Location::new(4, 0, 4),
-                language: Attribute {
+                language: Some(Attribute {
                     key_location: Location::new(9, 0, 8),
                     equals_location: Location::new(17, 0, 1),
                     opening_quote_location: Location::new(18, 0, 1),
                     value: "java".to_string(),
                     closing_quote_location: Location::new(23, 0, 1),
-                },
-                page_encoding: Attribute {
+                }),
+                page_encoding: Some(Attribute {
                     key_location: Location::new(25, 0, 12),
                     equals_location: Location::new(37, 0, 1),
                     opening_quote_location: Location::new(38, 0, 1),
                     value: "UTF-8".to_string(),
                     closing_quote_location: Location::new(44, 0, 1),
-                },
-                content_type: Attribute {
+                }),
+                content_type: Some(Attribute {
                     key_location: Location::new(46, 0, 11),
                     equals_location: Location::new(57, 0, 1),
                     opening_quote_location: Location::new(58, 0, 1),
                     value: "text/html; charset=UTF-8".to_string(),
                     closing_quote_location: Location::new(83, 0, 1),
-                },
+                }),
+                imports: vec![],
                 close_bracket: Location::new(0, 1, 2),
             },
             taglib_imports: vec![
@@ -516,9 +1229,7 @@ mod tests {
             .parse(&document, None)
             .ok_or_else(|| anyhow::anyhow!("treesitter parsing failed"))?;
         let parser = &mut TreeParser::new(ts_tree.walk(), &document);
-        println!("start parsing");
         let header = parser.parse_header()?;
-        println!("finished parsing");
         assert_eq!(header, expected);
         return Ok(());
     }
