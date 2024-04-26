@@ -1795,7 +1795,7 @@ impl TagDefinition {
         rules &[
             AttributeRule::Required("name"),
             AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
-            AttributeRule::ValueOneOf("type", &["date", "number", "text"]),
+            AttributeRule::ValueOneOf("type", &["date", "email", "number", "text", "url"]),
             AttributeRule::OnlyWithEitherValue("format", "type", &["date", "number"]),
         ]
     );
