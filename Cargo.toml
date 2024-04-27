@@ -2,6 +2,8 @@
 name = "lspml"
 version = "0.0.1"
 edition = "2021"
+repository = "https://github.com/DrWursterich/lspml"
+license = "MIT"
 
 [dependencies]
 anyhow = "1.0.79"
@@ -13,6 +15,6 @@ serde = "1.0.194"
 serde_json = "1.0.111"
 structured-logger = "1.0.3"
 tree-sitter = "0.22.2"
-tree-sitter-html = "0.20.0"
 tree-sitter-spml = { git = "https://github.com/DrWursterich/tree-sitter-spml.git", tag = "v0.0.1" }
+derive = { path = "./derive" }
 

@@ -16,7 +16,7 @@ use super::{
     Scanner,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum SyntaxFix {
     Insert(Position, String),
     Delete(Location),
@@ -79,7 +79,7 @@ impl SyntaxFix {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct SyntaxError {
     pub(crate) message: String,
     pub(crate) proposed_fixes: Vec<SyntaxFix>,
