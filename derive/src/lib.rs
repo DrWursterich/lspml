@@ -38,7 +38,7 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         let mut body = None;
                         loop {
                             if !parser.cursor.goto_next_sibling() {
-                                return Err(anyhow::anyhow!("sp:attribute tag is unclosed"));
+                                return Err(anyhow::anyhow!("{} tag is unclosed", #definition.name));
                             }
                             let node = parser.cursor.node();
                             match node.kind() {
