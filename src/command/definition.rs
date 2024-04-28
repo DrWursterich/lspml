@@ -1,19 +1,116 @@
 use lsp_server::ErrorCode;
-use lsp_types::{GotoDefinitionParams, Location, Position, Range, Url};
-use std::path::Path;
-use tree_sitter::{Query, QueryCursor};
+use lsp_types::{GotoDefinitionParams, Position, Range, Url};
+use std::{cmp::Ordering, path::Path};
+use tree_sitter::Point;
 
-use crate::{document_store, modules, parser};
+use crate::{
+    document_store::{self, Document},
+    grammar::{TagAttributeType, TagAttributes},
+    modules,
+    parser::{SpelAttribute, Tag},
+    spel::ast::{
+        Argument, Comparable, Condition, Expression, Function, Identifier, Location, Object, Query,
+        Regex, SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment,
+    },
+};
 
 use super::LsError;
 
-/**
- * variables (check)
- * includes (check)
- * imports
- * object params and functions? (would probably have to jump into java sources..)
- */
-pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location>, LsError> {
+type Variable = String;
+
+struct DefinitionsFinder<'a> {
+    document: &'a Document,
+    uri: &'a Url,
+    variable: Variable,
+    upper_bound: Position,
+    definitions: Vec<lsp_types::Location>,
+}
+
+impl DefinitionsFinder<'_> {
+    fn find(
+        upper_bound: Position,
+        document: &Document,
+        uri: &Url,
+        variable: Variable,
+    ) -> Vec<lsp_types::Location> {
+        let mut finder = DefinitionsFinder {
+            document,
+            uri,
+            upper_bound,
+            variable,
+            definitions: Vec::new(),
+        };
+        finder.collect();
+        return finder.definitions;
+    }
+
+    fn collect(&mut self) {
+        let tags = &self.document.tree.tags;
+        for tag in tags {
+            let open_location = tag.open_location();
+            if open_location.line > self.upper_bound.line as usize {
+                return;
+            }
+            if open_location.line == self.upper_bound.line as usize {
+                if open_location.char >= self.upper_bound.character as usize {
+                    return;
+                }
+            }
+            self.collect_from_tag(&tag);
+        }
+    }
+
+    fn collect_from_tag(&mut self, tag: &Tag) {
+        if let TagAttributes::These(attributes) = tag.definition().attributes {
+            for attribute in attributes {
+                if let TagAttributeType::Identifier = attribute.r#type {
+                    if let Some(SpelAttribute {
+                        spel:
+                            SpelAst::Identifier(SpelResult::Valid(Identifier::Name(Word { fragments }))),
+                        opening_quote_location,
+                        ..
+                    }) = tag.spel_attribute(&attribute.name)
+                    {
+                        if fragments.len() == 1 {
+                            if let WordFragment::String(StringLiteral { content, location }) =
+                                &fragments[0]
+                            {
+                                if *content == self.variable {
+                                    let start = Position {
+                                        line: opening_quote_location.line as u32
+                                            + location.line() as u32,
+                                        character: opening_quote_location.char as u32
+                                            + location.char() as u32
+                                            + 1,
+                                    };
+                                    self.definitions.push(lsp_types::Location {
+                                        uri: self.uri.clone(),
+                                        range: Range {
+                                            start,
+                                            end: Position {
+                                                line: start.line,
+                                                character: start.character + location.len() as u32,
+                                            },
+                                        },
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(body) = &tag.body() {
+            for tag in &body.tags {
+                self.collect_from_tag(tag);
+            }
+        }
+    }
+}
+
+pub(crate) fn definition(
+    params: GotoDefinitionParams,
+) -> Result<Option<Vec<lsp_types::Location>>, LsError> {
     let text_params = params.text_document_position_params;
     let file = &text_params.text_document.uri;
     let document = match document_store::get(file) {
@@ -28,340 +125,417 @@ pub(crate) fn definition(params: GotoDefinitionParams) -> Result<Option<Location
                 };
             }),
     }?;
-    let node =
-        parser::find_current_node(&document.tree, text_params.position).ok_or_else(|| LsError {
-            message: format!(
-                "could not determine node in {} at line {}, character {}",
-                file, text_params.position.line, text_params.position.character
-            ),
-            code: ErrorCode::RequestFailed,
-        })?;
-    return match node.kind() {
-        // check if string is evaluated ?
-        "string_content" => match node.parent().and_then(|p| p.parent()).map(|p| p.kind()) {
-            Some("uri_attribute")
-                if node
-                    .parent()
-                    .and_then(|parent| parent.parent())
-                    .and_then(|parent| parent.parent())
-                    .is_some_and(|tag| tag.kind() == "include_tag") =>
-            {
-                node.utf8_text(document.text.as_bytes())
-                    .map_err(|err| LsError {
-                        message: format!("error while reading file: {}", err),
-                        code: ErrorCode::RequestFailed,
-                    })
-                    .map(|path| {
-                        node.parent()
-                            .and_then(|p| p.parent())
-                            .and_then(|p| p.parent())
-                            .and_then(|p| {
-                                p.children(&mut document.tree.walk())
-                                    .find(|node| node.kind() == "module_attribute")
-                            })
-                            .and_then(|attribute| {
-                                parser::attribute_value_of(attribute, &document.text)
-                            })
-                            .filter(|module| *module != "${module.id}")
-                            .and_then(modules::find_module_by_name)
-                            .or_else(|| {
+    let cursor = text_params.position;
+    let mut tags = &document.tree.tags;
+    let mut current = None;
+    loop {
+        if let Some(tag) = find_tag_at(tags, cursor) {
+            current = Some(tag);
+            if let Some(body) = tag.body() {
+                tags = &body.tags;
+                continue;
+            }
+        }
+        break;
+    }
+    if let Some(tag) = current {
+        for (_, attribute) in tag.spel_attributes() {
+            if is_in_attribute_value(attribute, &cursor) {
+                let offset = Point {
+                    row: attribute.opening_quote_location.line + 1,
+                    column: attribute.opening_quote_location.char,
+                };
+                let node = match &attribute.spel {
+                    SpelAst::Comparable(SpelResult::Valid(comparable)) => {
+                        find_node_in_comparable(comparable, &cursor, &offset)
+                    }
+                    SpelAst::Condition(SpelResult::Valid(condition)) => {
+                        find_node_in_condition(condition, &cursor, &offset)
+                    }
+                    SpelAst::Expression(SpelResult::Valid(expression)) => {
+                        find_node_in_expression(expression, &cursor, &offset)
+                    }
+                    SpelAst::Identifier(SpelResult::Valid(identifier)) => {
+                        find_node_in_identifier(identifier, &cursor, &offset)
+                    }
+                    SpelAst::Object(SpelResult::Valid(object)) => {
+                        find_node_in_object(object, &cursor, &offset)
+                    }
+                    SpelAst::Query(SpelResult::Valid(query)) => {
+                        find_node_in_query(query, &cursor, &offset)
+                    }
+                    SpelAst::Regex(SpelResult::Valid(regex)) => {
+                        find_node_in_regex(regex, &cursor, &offset)
+                    }
+                    SpelAst::String(SpelResult::Valid(word)) => {
+                        find_node_in_text(word, &cursor, &offset)
+                    }
+                    SpelAst::Uri(SpelResult::Valid(Uri::Literal(uri))) => {
+                        let mut module = None;
+                        if let Some(SpelAttribute {
+                            spel: SpelAst::String(SpelResult::Valid(Word { fragments })),
+                            ..
+                        }) = tag.spel_attribute("module")
+                        // TODO: should use TagAttributeType::Uri { module_attribute} for this
+                        {
+                            if let [WordFragment::String(StringLiteral { content, .. })] =
+                                &fragments[..]
+                            {
+                                module = modules::find_module_by_name(&content)
+                            }
+                        }
+                        module =
+                            module.or_else(|| {
                                 text_params.text_document.uri.to_file_path().ok().and_then(
                                     |module| modules::find_module_for_file(module.as_path()),
                                 )
-                            })
-                            .map(|module| module.path + &path)
+                            });
+                        return Ok(module
+                            .map(|module| module.path + &uri.to_string())
                             .filter(|file| Path::new(&file).exists())
                             .and_then(|file| Url::parse(format!("file://{}", &file).as_str()).ok())
-                            .map(|uri| Location {
-                                range: Range {
-                                    ..Default::default()
-                                },
-                                uri,
-                            })
-                    })
-            }
-            Some("name_attribute")
-                if node
-                    .parent()
-                    .and_then(|parent| parent.parent())
-                    .is_some_and(|tag| tag.kind() == "argument_tag") =>
-            {
-                // goto param definition in included file
-                return Ok(None);
-            }
-            Some(kind) if kind.ends_with("_attribute") => {
-                let variable = &node.utf8_text(document.text.as_bytes()).unwrap();
-                return match Query::new(
-                    &tree_sitter_spml::language(),
-                    &create_definition_query(variable).as_str(),
-                ) {
-                    Ok(query) => Ok(QueryCursor::new()
-                        .matches(&query, document.tree.root_node(), document.text.as_bytes())
-                        .into_iter()
-                        .flat_map(|m| m.captures.iter())
-                        .map(|c| c.node)
-                        .min_by(|a, b| a.start_position().cmp(&b.start_position()))
-                        .map(|result| Location {
-                            range: Range {
-                                start: Position {
-                                    line: result.start_position().row as u32,
-                                    character: result.start_position().column as u32,
-                                },
-                                end: Position {
-                                    line: result.end_position().row as u32,
-                                    character: result.end_position().column as u32,
-                                },
-                            },
-                            uri: text_params.text_document.uri,
-                        })),
-                    Err(err) => {
-                        log::error!("error in definition query of {}: {}", variable, err);
-                        return Err(LsError {
-                            message: format!("error in definition query of {}: {}", variable, err),
-                            code: ErrorCode::RequestFailed,
-                        });
+                            .map(|uri| {
+                                vec![lsp_types::Location {
+                                    range: Range {
+                                        ..Default::default()
+                                    },
+                                    uri,
+                                }]
+                            }));
                     }
+                    SpelAst::Uri(SpelResult::Valid(uri)) => find_node_in_uri(uri, &cursor, &offset),
+                    _ => None,
                 };
+                if let Some(node) = node {
+                    let definitions = DefinitionsFinder::find(cursor, &document, file, node);
+                    return match definitions.len() {
+                        0 => Ok(None),
+                        _ => Ok(Some(definitions)),
+                    };
+                }
             }
-            _ => Ok(None),
-        },
-        // TODO: "java_code" | "script_tag" | "style_tag" | "interpolated_string"
-        _ => Ok(None),
+        }
+    }
+    return Ok(None);
+}
+
+pub(crate) fn find_tag_at(tags: &Vec<Tag>, cursor: Position) -> Option<&Tag> {
+    for tag in tags {
+        let range = tag.range();
+        if cursor > range.end {
+            continue;
+        }
+        if cursor < range.start {
+            break;
+        }
+        return Some(tag);
+    }
+    return None;
+}
+
+fn is_in_attribute_value(attribute: &SpelAttribute, position: &Position) -> bool {
+    let opening_line = attribute
+        .opening_quote_location
+        .line
+        .cmp(&(position.line as usize));
+    let opening_char = attribute
+        .opening_quote_location
+        .char
+        .cmp(&(position.character as usize));
+    match (opening_line, opening_char) {
+        (Ordering::Less, _) | (Ordering::Equal, Ordering::Less) => (),
+        _ => return false,
+    }
+    let closing_line = attribute
+        .closing_quote_location
+        .line
+        .cmp(&(position.line as usize));
+    let closing_char = attribute
+        .closing_quote_location
+        .char
+        .cmp(&(position.character as usize));
+    return match (closing_line, closing_char) {
+        (Ordering::Greater, _) | (Ordering::Equal, Ordering::Greater) => true,
+        _ => false,
     };
 }
 
-fn create_definition_query<'a>(variable: &'a str) -> String {
-    return format!(
-        r#"
-(
-    [
-        (attribute_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (barcode_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (calendarsheet_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (checkbox_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (
-            (collection_tag
-                (name_attribute
-                    (string
-                    (string_content) @attribute))
-                (action_attribute
-                    (string
-                        (string_content) @action)))
-            (.eq? @action "new")
-        )
-        (diff_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (filter_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (for_tag
-            (index_attribute
-                (string
-                    (string_content) @attribute)))
-        (hidden_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (include_tag
-            (return_attribute
-                (string
-                    (string_content) @attribute)))
-        (iterator_tag
-            (item_attribute
-                (string
-                    (string_content) @attribute)))
-        (json_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (linkedInformation_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (linktree_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (livetree_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (loop_tag
-            (item_attribute
-                (string
-                    (string_content) @attribute)))
-        (
-            (map_tag
-                (name_attribute
-                    (string
-                        (string_content) @attribute))
-                (action_attribute
-                    (string
-                        (string_content) @action)))
-            (.eq? @action "new")
-        )
-        (querytree_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (radio_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (range_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (sass_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (scaleimage_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (search_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (select_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (set_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (sort_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (subinformation_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (text_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (textarea_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (textimage_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (upload_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (worklist_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (zip_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_counter_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_date_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_email2img_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_encryptemail_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_escapeemail_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_formsolutions_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_id2url_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_imageeditor_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_iterator_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_link_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_number_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_personalization_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_prehtml_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_smarteditor_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_text_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_textarea_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_timestamp_tag
-            (connect_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_tinymce_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_updown_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-        (spt_upload_tag
-            (name_attribute
-                (string
-                    (string_content) @attribute)))
-    ]
-    (.eq? @attribute "{}")
-)"#,
-        variable,
-    );
+fn find_node_in_identifier(
+    identifier: &Identifier,
+    cursor: &Position,
+    offset: &Point,
+) -> Option<Variable> {
+    // TODO
+    match identifier {
+        Identifier::Name(Word { fragments }) => {
+            match fragments.len() {
+                1 => match &fragments[0] {
+                    WordFragment::String(_) => {
+                        // there are no doc comments in spml
+                    }
+                    WordFragment::Interpolation(interpolation) => {
+                        return find_node_in_object(&interpolation.content, cursor, offset);
+                    }
+                },
+                _ => {
+                    for fragment in fragments {
+                        if let WordFragment::Interpolation(interpolation) = fragment {
+                            if let Ordering::Less = compare_cursor_to_location(
+                                &interpolation.closing_bracket_location,
+                                cursor,
+                                offset,
+                            ) {
+                                return find_node_in_object(&interpolation.content, cursor, offset);
+                            };
+                        }
+                    }
+                }
+            };
+        }
+        _ => (),
+    };
+    return None;
+}
+
+fn find_node_in_comparable(
+    comparable: &Comparable,
+    cursor: &Position,
+    offset: &Point,
+) -> Option<Variable> {
+    return match comparable {
+        Comparable::Condition(condition) => find_node_in_condition(condition, cursor, offset),
+        Comparable::Expression(expression) => find_node_in_expression(expression, cursor, offset),
+        Comparable::Function(function) => find_node_in_global_function(function, cursor, offset),
+        Comparable::Object(interpolation) => {
+            find_node_in_object(&interpolation.content, cursor, offset)
+        }
+        // Comparable::String(_) => todo!(),
+        // Comparable::Null(_) => todo!(),
+        _ => None,
+    };
+}
+fn find_node_in_condition(
+    condition: &Condition,
+    cursor: &Position,
+    offset: &Point,
+) -> Option<Variable> {
+    return match condition {
+        Condition::Object(interpolation) => {
+            find_node_in_object(&interpolation.content, cursor, offset)
+        }
+        Condition::Function(function) => find_node_in_global_function(function, cursor, offset),
+        Condition::BinaryOperation {
+            left,
+            right,
+            operator_location,
+            ..
+        } => match compare_cursor_to_location(&operator_location, cursor, offset) {
+            Ordering::Less => find_node_in_condition(left, cursor, offset),
+            Ordering::Equal => None,
+            Ordering::Greater => find_node_in_condition(right, cursor, offset),
+        },
+        Condition::BracketedCondition { condition, .. } => {
+            find_node_in_condition(condition, cursor, offset)
+        }
+        Condition::NegatedCondition { condition, .. } => {
+            find_node_in_condition(condition, cursor, offset)
+        }
+        Condition::Comparisson {
+            left,
+            right,
+            operator_location,
+            ..
+        } => match compare_cursor_to_location(&operator_location, cursor, offset) {
+            Ordering::Less => find_node_in_comparable(left, cursor, offset),
+            Ordering::Equal => None,
+            Ordering::Greater => find_node_in_comparable(right, cursor, offset),
+        },
+        _ => None,
+    };
+}
+
+fn find_node_in_expression(
+    expression: &Expression,
+    cursor: &Position,
+    offset: &Point,
+) -> Option<Variable> {
+    return match expression {
+        // Expression::Number(_) => todo!(),
+        Expression::Function(function) => find_node_in_global_function(function, cursor, offset),
+        Expression::Object(interpolation) => {
+            find_node_in_object(&interpolation.content, cursor, offset)
+        }
+        Expression::SignedExpression { expression, .. } => {
+            find_node_in_expression(expression, cursor, offset)
+        }
+        Expression::BracketedExpression { expression, .. } => {
+            find_node_in_expression(expression, cursor, offset)
+        }
+        Expression::BinaryOperation {
+            left,
+            right,
+            operator_location,
+            ..
+        } => match compare_cursor_to_location(&operator_location, cursor, offset) {
+            Ordering::Less => find_node_in_expression(left, cursor, offset),
+            Ordering::Equal => None,
+            Ordering::Greater => find_node_in_expression(right, cursor, offset),
+        },
+        Expression::Ternary {
+            condition,
+            left,
+            right,
+            question_mark_location,
+            colon_location,
+        } => match compare_cursor_to_location(&question_mark_location, cursor, offset) {
+            Ordering::Less => find_node_in_condition(condition, cursor, offset),
+            Ordering::Equal => None,
+            Ordering::Greater => {
+                match compare_cursor_to_location(&colon_location, cursor, offset) {
+                    Ordering::Less => find_node_in_expression(left, cursor, offset),
+                    Ordering::Equal => None,
+                    Ordering::Greater => find_node_in_expression(right, cursor, offset),
+                }
+            }
+        },
+        _ => None,
+    };
+}
+
+fn find_node_in_object(object: &Object, cursor: &Position, offset: &Point) -> Option<Variable> {
+    return match object {
+        // Object::Anchor(_) => todo!(),
+        Object::Function(function) => find_node_in_global_function(function, cursor, offset),
+        Object::Name(Word { fragments }) => {
+            match fragments.len() {
+                1 => match &fragments[0] {
+                    WordFragment::String(StringLiteral { content, .. }) => {
+                        return Some(content.to_string());
+                    }
+                    WordFragment::Interpolation(interpolation) => {
+                        return find_node_in_object(&interpolation.content, cursor, offset);
+                    }
+                },
+                _ => {
+                    for fragment in fragments {
+                        if let WordFragment::Interpolation(interpolation) = fragment {
+                            if let Ordering::Less = compare_cursor_to_location(
+                                &interpolation.closing_bracket_location,
+                                cursor,
+                                offset,
+                            ) {
+                                return find_node_in_object(&interpolation.content, cursor, offset);
+                            };
+                        }
+                    }
+                }
+            };
+            return None;
+        }
+        // Object::Null(_) => todo!(),
+        // Object::String(_) => todo!(),
+        Object::FieldAccess {
+            object,
+            field: _field,
+            dot_location,
+        } => {
+            match compare_cursor_to_location(&dot_location, cursor, offset) {
+                Ordering::Less => find_node_in_object(object, cursor, offset),
+                Ordering::Equal => None,
+                Ordering::Greater => None, // TODO
+            }
+        }
+        Object::MethodAccess {
+            object,
+            function: _function,
+            dot_location,
+        } => {
+            match compare_cursor_to_location(&dot_location, cursor, offset) {
+                Ordering::Less => find_node_in_object(object, cursor, offset),
+                Ordering::Equal => None,
+                Ordering::Greater => None, // TODO
+            }
+        }
+        Object::ArrayAccess {
+            object,
+            index,
+            opening_bracket_location,
+            ..
+        } => match compare_cursor_to_location(&opening_bracket_location, cursor, offset) {
+            Ordering::Less => find_node_in_object(object, cursor, offset),
+            Ordering::Equal => None,
+            Ordering::Greater => find_node_in_expression(index, cursor, offset),
+        },
+        _ => None,
+    };
+}
+
+fn find_node_in_global_function(
+    function: &Function,
+    cursor: &Position,
+    offset: &Point,
+) -> Option<Variable> {
+    return match compare_cursor_to_location(&function.opening_bracket_location, cursor, offset) {
+        Ordering::Less => None,
+        Ordering::Equal => None,
+        Ordering::Greater => {
+            for argument in &function.arguments {
+                if argument
+                    .comma_location
+                    .as_ref()
+                    .filter(|l| compare_cursor_to_location(&l, cursor, offset) == Ordering::Less)
+                    .is_none()
+                {
+                    return match &argument.argument {
+                        // Argument::Anchor(_) => todo!(),
+                        Argument::Function(function) => {
+                            find_node_in_global_function(&function, cursor, offset)
+                        }
+                        // Argument::Null(_) => todo!(),
+                        // Argument::Number(_) => todo!(),
+                        Argument::Object(interpolation) => {
+                            find_node_in_object(&interpolation.content, cursor, offset)
+                        }
+                        // Argument::SignedNumber(_) => todo!(),
+                        // Argument::String(_) => todo!(),
+                        _ => None,
+                    };
+                }
+            }
+            return None;
+        }
+    };
+}
+
+fn find_node_in_query(_query: &Query, _cursor: &Position, _offset: &Point) -> Option<Variable> {
+    // TODO
+    return None;
+}
+
+fn find_node_in_regex(_regex: &Regex, _cursor: &Position, _offset: &Point) -> Option<Variable> {
+    // TODO
+    return None;
+}
+
+fn find_node_in_text(_text: &Word, _cursor: &Position, _offset: &Point) -> Option<Variable> {
+    // TODO
+    return None;
+}
+
+fn find_node_in_uri(_uri: &Uri, _cursor: &Position, _offset: &Point) -> Option<Variable> {
+    // TODO
+    return None;
+}
+
+// TODO: only respects single line spels
+fn compare_cursor_to_location(location: &Location, cursor: &Position, offset: &Point) -> Ordering {
+    let cursor = cursor.character as usize - offset.column;
+    let start = location.char() as usize;
+    if start > cursor {
+        return Ordering::Less;
+    }
+    if location.len() as usize + start < cursor {
+        return Ordering::Greater;
+    }
+    return Ordering::Equal;
 }

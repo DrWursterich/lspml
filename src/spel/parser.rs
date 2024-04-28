@@ -3,7 +3,6 @@ use std::fmt::Display;
 use anyhow::Result;
 use core::fmt;
 use lsp_types::{Position, Range, TextEdit};
-use tree_sitter::Point;
 
 use super::{
     ast::{
@@ -26,12 +25,12 @@ pub(crate) enum SyntaxFix {
 const ADDITIONAL_CHARS_IN_ANCHOR: [char; 1] = ['.'];
 
 impl SyntaxFix {
-    pub(crate) fn to_text_edit(&self, offset: &Point) -> TextEdit {
+    pub(crate) fn to_text_edit(&self, offset: &Position) -> TextEdit {
         return match self {
             SyntaxFix::Insert(position, text) => {
                 let position = Position {
-                    line: offset.row as u32 + position.line,
-                    character: offset.column as u32 + position.character,
+                    line: offset.line + position.line,
+                    character: offset.character + position.character,
                 };
                 TextEdit {
                     range: Range {
@@ -42,8 +41,8 @@ impl SyntaxFix {
                 }
             }
             SyntaxFix::Delete(location) => {
-                let line = offset.row as u32 + location.line() as u32;
-                let start = offset.column as u32 + location.char() as u32;
+                let line = offset.line + location.line() as u32;
+                let start = offset.character + location.char() as u32;
                 TextEdit {
                     range: Range {
                         start: Position {
@@ -59,8 +58,8 @@ impl SyntaxFix {
                 }
             }
             SyntaxFix::Replace(location, text) => {
-                let line = offset.row as u32 + location.line() as u32;
-                let start = offset.column as u32 + location.char() as u32;
+                let line = offset.line + location.line() as u32;
+                let start = offset.character + location.char() as u32;
                 TextEdit {
                     range: Range {
                         start: Position {

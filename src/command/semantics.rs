@@ -1,13 +1,13 @@
-use std::{collections::HashMap, str::FromStr};
+use std::cmp::Ordering;
 
 use anyhow::Result;
 use lsp_server::ErrorCode;
 use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensParams};
-use tree_sitter::{Node, Point};
 
 use crate::{
     document_store,
-    grammar::TagDefinition,
+    grammar::AttributeRule,
+    parser::{Tag, Tree},
     spel::ast::{
         Anchor, Argument, Comparable, Condition, Expression, Function, Identifier, Interpolation,
         Location, Null, Number, Object, Query, Regex, SignedNumber, SpelAst, SpelResult,
@@ -20,11 +20,38 @@ use super::{
     LsError,
 };
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct UnprocessedSemanticToken {
+    pub char: u32,
+    pub line: u32,
+    pub length: u32,
+    pub token_type: u32,
+    pub token_modifiers_bitset: u32,
+}
+
+impl PartialOrd for UnprocessedSemanticToken {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let cmp = self.line.cmp(&other.line);
+        if let Ordering::Equal = cmp {
+            return Some(self.char.cmp(&other.char));
+        }
+        return Some(cmp);
+    }
+}
+
+impl Ord for UnprocessedSemanticToken {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let cmp = self.line.cmp(&other.line);
+        if let Ordering::Equal = cmp {
+            return self.char.cmp(&other.char);
+        }
+        return cmp;
+    }
+}
+
 #[derive(Debug, PartialEq)]
 struct Tokenizer {
-    tokens: Vec<SemanticToken>,
-    cursor_line: u32,
-    cursor_char: u32,
+    tokens: Vec<UnprocessedSemanticToken>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -38,24 +65,7 @@ impl Tokenizer {
     fn new() -> Self {
         return Tokenizer {
             tokens: vec![],
-            cursor_line: 0,
-            cursor_char: 0,
         };
-    }
-
-    fn add_node(
-        &mut self,
-        node: Node,
-        r#type: &SemanticTokenType,
-        modifiers: &Vec<SemanticTokenModifier>,
-    ) {
-        self.add(
-            node.start_position().column as u32,
-            node.start_position().row as u32,
-            (node.end_byte() - node.start_byte()) as u32,
-            r#type,
-            modifiers,
-        );
     }
 
     fn add(
@@ -66,15 +76,9 @@ impl Tokenizer {
         r#type: &SemanticTokenType,
         modifiers: &Vec<SemanticTokenModifier>,
     ) {
-        // delta_line and delta_start are relative to each other
-        let delta_line = line - self.cursor_line;
-        let delta_start = match delta_line {
-            0 => char - self.cursor_char,
-            _ => char,
-        };
-        self.tokens.push(SemanticToken {
-            delta_line,
-            delta_start,
+        self.tokens.push(UnprocessedSemanticToken {
+            char,
+            line,
             length,
             token_type: TOKEN_TYPES
                 .iter()
@@ -93,12 +97,31 @@ impl Tokenizer {
                 })
                 .sum::<u32>(),
         });
-        self.cursor_line = line;
-        self.cursor_char = char;
     }
 
     fn collect(&self) -> Vec<SemanticToken> {
-        return self.tokens.to_vec();
+        let mut unprocessed = self.tokens.to_vec();
+        unprocessed.sort();
+        let mut processed = Vec::new();
+        let mut cursor_line = 0;
+        let mut cursor_char = 0;
+        for item in unprocessed {
+            let delta_line = item.line - cursor_line;
+            let delta_start = match delta_line {
+                0 => item.char - cursor_char,
+                _ => item.char,
+            };
+            processed.push(SemanticToken {
+                delta_line,
+                delta_start,
+                length: item.length,
+                token_type: item.token_type,
+                token_modifiers_bitset: item.token_modifiers_bitset,
+            });
+            cursor_line = item.line;
+            cursor_char = item.char;
+        }
+        return processed;
     }
 }
 
@@ -154,141 +177,79 @@ pub(crate) fn semantics(params: SemanticTokensParams) -> Result<Vec<SemanticToke
             }),
     }?;
     let tokenizer = &mut Tokenizer::new();
-    index_document(
-        document.tree.root_node(),
-        &document.text,
-        &document.spel,
-        tokenizer,
-    )
-    .map_err(|err| {
-        log::error!("semantic token parsing failed for {}: {}", uri, err);
-        return LsError {
-            message: format!("semantic token parsing failed for {}", uri),
-            code: ErrorCode::RequestFailed,
-        };
-    })?;
+    index_document(&document.tree, tokenizer);
     return Ok(tokenizer.collect());
 }
 
-fn index_document(
-    root: Node,
-    text: &String,
-    spel: &HashMap<Point, SpelAst>,
-    tokenizer: &mut Tokenizer,
-) -> Result<()> {
-    for node in root.children(&mut root.walk()) {
-        match node.kind() {
-            "page_header" | "import_header" | "taglib_header" | "html_doctype" | "text"
-            | "comment" | "xml_entity" => continue,
-            "html_tag" | "html_option_tag" | "html_void_tag" | "xml_comment" | "java_tag"
-            | "script_tag" | "style_tag" => index_children(node, &text, spel, tokenizer)?,
-            _ => match &TagDefinition::from_str(node.kind()) {
-                Ok(tag) => index_tag(tag, node, &text, spel, tokenizer)?,
-                Err(err) => log::info!(
-                    "error while trying to interprete node \"{}\" as tag: {}",
-                    node.kind(),
-                    err
-                ),
-            },
-        }
-    }
-    return Ok(());
+fn index_document(tree: &Tree, tokenizer: &mut Tokenizer) {
+    return index_children(&tree.tags, tokenizer);
 }
 
-fn index_tag(
-    tag: &TagDefinition,
-    node: Node,
-    text: &String,
-    spel: &HashMap<Point, SpelAst>,
-    tokenizer: &mut Tokenizer,
-) -> Result<()> {
-    if tag.deprecated {
-        tokenizer.add_node(
-            node,
+fn index_tag(tag: &Tag, tokenizer: &mut Tokenizer) {
+    if tag.definition().deprecated {
+        tokenizer.add(
+            tag.open_location().char as u32,
+            tag.open_location().line as u32,
+            tag.open_location().length as u32,
             &SemanticTokenType::MACRO,
             &vec![SemanticTokenModifier::DEPRECATED],
         );
     }
-    for child in node.children(&mut node.walk()) {
-        match child.kind() {
-            // may need to check on kind of missing child
-            "html_void_tag" | "java_tag" | "script_tag" | "style_tag" => {}
-            "ERROR" | "html_tag" | "html_option_tag" => {
-                index_children(child, text, spel, tokenizer)?
-            }
-            kind if kind.ends_with("_attribute") => {
-                let value_node = match child.child(2).and_then(|child| child.child(1)) {
-                    Some(node) => node,
-                    _ => continue,
-                };
-                let offset = value_node.start_position();
-                let mut token_collector =
-                    SpelTokenCollector::new(tokenizer, offset.row as u32, offset.column as u32);
-                match spel.get(&offset) {
-                    Some(SpelAst::Comparable(SpelResult::Valid(comparable))) => {
-                        index_comparable(&comparable, &mut token_collector)
-                    }
-                    Some(SpelAst::Condition(SpelResult::Valid(condition))) => {
-                        index_condition(&condition, &mut token_collector)
-                    }
-                    Some(SpelAst::Expression(SpelResult::Valid(expression))) => {
-                        index_expression(&expression, &mut token_collector)
-                    }
-                    Some(SpelAst::Identifier(SpelResult::Valid(identifier))) => {
-                        index_identifier(&identifier, &mut token_collector)
-                    }
-                    Some(SpelAst::Object(SpelResult::Valid(object))) => {
-                        index_object(&object, &mut token_collector)
-                    }
-                    Some(SpelAst::Query(SpelResult::Valid(query))) => {
-                        index_query(&query, &mut token_collector)
-                    }
-                    Some(SpelAst::Regex(SpelResult::Valid(regex))) => {
-                        index_regex(&regex, &mut token_collector)
-                    }
-                    Some(SpelAst::String(SpelResult::Valid(string))) => {
-                        index_word(&string, &mut token_collector, None, &vec![])
-                    }
-                    Some(SpelAst::Uri(SpelResult::Valid(uri))) => {
-                        index_uri(&uri, &mut token_collector)
-                    }
-                    _ => (),
-                };
-            }
-            kind if kind.ends_with("_tag") => match &TagDefinition::from_str(kind) {
-                Ok(child_tag) => index_tag(child_tag, child, text, spel, tokenizer)?,
-                Err(err) => {
-                    log::info!("expected sp or spt tag: {}", err);
-                }
-            },
-            _ => index_children(child, text, spel, tokenizer)?,
+    for (name, attribute) in tag.spel_attributes() {
+        if tag
+            .definition()
+            .attribute_rules
+            .iter()
+            .any(|rule| match rule {
+                AttributeRule::Deprecated(attribute) => return *attribute == name,
+                _ => false,
+            })
+        {
+            tokenizer.add(
+                attribute.key_location.char as u32,
+                attribute.key_location.line as u32,
+                attribute.key_location.length as u32,
+                &SemanticTokenType::MACRO,
+                &vec![SemanticTokenModifier::DEPRECATED],
+            );
         }
+        let offset = &attribute.opening_quote_location;
+        let mut token_collector =
+            SpelTokenCollector::new(tokenizer, offset.line as u32, offset.char as u32 + 1);
+        match &attribute.spel {
+            SpelAst::Comparable(SpelResult::Valid(comparable)) => {
+                index_comparable(&comparable, &mut token_collector)
+            }
+            SpelAst::Condition(SpelResult::Valid(condition)) => {
+                index_condition(&condition, &mut token_collector)
+            }
+            SpelAst::Expression(SpelResult::Valid(expression)) => {
+                index_expression(&expression, &mut token_collector)
+            }
+            SpelAst::Identifier(SpelResult::Valid(identifier)) => {
+                index_identifier(&identifier, &mut token_collector)
+            }
+            SpelAst::Object(SpelResult::Valid(object)) => {
+                index_object(&object, &mut token_collector)
+            }
+            SpelAst::Query(SpelResult::Valid(query)) => index_query(&query, &mut token_collector),
+            SpelAst::Regex(SpelResult::Valid(regex)) => index_regex(&regex, &mut token_collector),
+            SpelAst::String(SpelResult::Valid(string)) => {
+                index_word(&string, &mut token_collector, None, &vec![])
+            }
+            SpelAst::Uri(SpelResult::Valid(uri)) => index_uri(&uri, &mut token_collector),
+            _ => (),
+        };
     }
-    return Ok(());
+    if let Some(body) = tag.body() {
+        index_children(&body.tags, tokenizer);
+    }
 }
 
-fn index_children(
-    node: Node,
-    text: &String,
-    spel: &HashMap<Point, SpelAst>,
-    tokenizer: &mut Tokenizer,
-) -> Result<()> {
-    for child in node.children(&mut node.walk()) {
-        match child.kind() {
-            "text" | "java_tag" | "html_void_tag" => {}
-            "ERROR" | "html_tag" | "html_option_tag" | "script_tag" | "style_tag" => {
-                index_children(child, text, spel, tokenizer)?;
-            }
-            kind if kind.ends_with("_tag") => match &TagDefinition::from_str(kind) {
-                Ok(child_tag) => index_tag(child_tag, child, text, spel, tokenizer)?,
-                Err(err) => {
-                    log::info!("expected sp or spt tag: {}", err);
-                }
-            },
-            _ => index_children(child, text, spel, tokenizer)?,
-        }
+fn index_children(tags: &Vec<Tag>, tokenizer: &mut Tokenizer) {
+    for tag in tags {
+        index_tag(tag, tokenizer);
     }
-    return Ok(());
 }
 
 fn index_identifier(identifier: &Identifier, token_collector: &mut SpelTokenCollector) {
@@ -690,7 +651,7 @@ mod tests {
                 },
             })],
         });
-        crate::command::semantics::index_object(
+        super::index_object(
             &root_object,
             &mut SpelTokenCollector {
                 tokenizer,
@@ -732,7 +693,7 @@ mod tests {
                 },
             })],
         });
-        crate::command::semantics::index_object(
+        super::index_object(
             &root_object,
             &mut SpelTokenCollector {
                 tokenizer,
@@ -740,7 +701,7 @@ mod tests {
                 offset_char: 14,
             },
         );
-        crate::command::semantics::index_object(
+        super::index_object(
             &root_object,
             &mut SpelTokenCollector {
                 tokenizer,
@@ -781,6 +742,67 @@ mod tests {
                             }
                         })
                         .expect("no variable token exists"),
+                    token_modifiers_bitset: 0,
+                }
+            ],
+        );
+    }
+
+    #[test]
+    fn test_index_out_of_order() {
+        let tokenizer = &mut Tokenizer::new();
+        tokenizer.add(0, 0, 3, &SemanticTokenType::OPERATOR, &vec![]);
+        tokenizer.add(14, 0, 3, &SemanticTokenType::OPERATOR, &vec![]);
+        tokenizer.add(4, 0, 9, &SemanticTokenType::VARIABLE, &vec![]);
+        assert_eq!(
+            tokenizer.collect(),
+            vec![
+                SemanticToken {
+                    delta_start: 0,
+                    delta_line: 0,
+                    length: 3,
+                    token_type: TOKEN_TYPES
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, token_type)| {
+                            match *token_type == SemanticTokenType::OPERATOR {
+                                true => Some(index as u32),
+                                false => None,
+                            }
+                        })
+                        .expect("no operator token exists"),
+                    token_modifiers_bitset: 0,
+                },
+                SemanticToken {
+                    delta_start: 4,
+                    delta_line: 0,
+                    length: 9,
+                    token_type: TOKEN_TYPES
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, token_type)| {
+                            match *token_type == SemanticTokenType::VARIABLE {
+                                true => Some(index as u32),
+                                false => None,
+                            }
+                        })
+                        .expect("no variable token exists"),
+                    token_modifiers_bitset: 0,
+                },
+                SemanticToken {
+                    delta_start: 10,
+                    delta_line: 0,
+                    length: 3,
+                    token_type: TOKEN_TYPES
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, token_type)| {
+                            match *token_type == SemanticTokenType::OPERATOR {
+                                true => Some(index as u32),
+                                false => None,
+                            }
+                        })
+                        .expect("no operator token exists"),
                     token_modifiers_bitset: 0,
                 }
             ],

@@ -5,11 +5,11 @@ use lsp_types::{
     CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, Position, Range, TextEdit,
     Url, WorkspaceEdit,
 };
-use tree_sitter::{Node, Point};
 
 use crate::{
     capabilities::CodeActionImplementation,
-    document_store::{self, Document},
+    document_store,
+    parser::{SpIf, SpelAttribute, Tag},
     spel::ast::{
         Argument, Comparable, ComparissonOperator, Condition, Function, SpelAst, SpelResult,
     },
@@ -90,49 +90,48 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
             }
         }
     }
-    let node = document.tree.root_node().descendant_for_point_range(
-        Point {
-            row: params.range.start.line as usize,
-            column: params.range.start.character as usize,
-        },
-        Point {
-            row: params.range.end.line as usize,
-            column: params.range.end.character as usize,
-        },
-    );
-    match node {
-        Some(node) => match node.kind() {
-            "if_tag_open" => {
-                let attributes = collect_attributes(node);
-                if let Some(action) = construct_name_to_condition(&document, &uri, &attributes) {
-                    actions.push(action);
-                }
-                if let Some(action) = construct_condition_to_name(&document, &uri, &attributes) {
-                    actions.push(action);
-                }
+    let cursor = params.range.start;
+    let mut tags = &document.tree.tags;
+    let mut current = None;
+    loop {
+        if let Some(tag) = find_tag_at(tags, cursor) {
+            current = Some(tag);
+            if let Some(body) = tag.body() {
+                tags = &body.tags;
+                continue;
             }
-            _ => {}
-        },
-        None => {}
+        }
+        break;
+    }
+    match current {
+        Some(Tag::SpIf(tag)) => {
+            log::debug!("code-action triggered in sp:if");
+            if let Some(action) = construct_name_to_condition(&uri, &tag) {
+                log::debug!("build name-to-condition action");
+                actions.push(action);
+            }
+            if let Some(action) = construct_condition_to_name(&uri, &tag) {
+                log::debug!("build condition-to-name action");
+                actions.push(action);
+            }
+        }
+        _ => (),
     };
     return Ok(actions);
 }
 
-fn collect_attributes<'a>(mut node: Node<'a>) -> HashMap<&'a str, Node<'a>> {
-    let mut attributes = HashMap::new();
-    loop {
-        if let Some(sibling) = node
-            .next_sibling()
-            .filter(|n| n.kind().ends_with("_attribute"))
-        {
-            if let Some(value) = sibling.child(0) {
-                attributes.insert(value.kind(), sibling);
-                node = sibling;
-                continue;
-            }
+pub(crate) fn find_tag_at(tags: &Vec<Tag>, cursor: Position) -> Option<&Tag> {
+    for tag in tags {
+        let range = tag.range();
+        if cursor > range.end {
+            continue;
         }
-        return attributes;
+        if cursor < range.start {
+            break;
+        }
+        return Some(tag);
     }
+    return None;
 }
 
 fn construct_generate_default_header<'a>(uri: &Url) -> CodeActionOrCommand {
@@ -176,38 +175,32 @@ fn construct_fix_spel_syntax<'a>(
     });
 }
 
-fn construct_name_to_condition<'a>(
-    document: &Document,
-    uri: &Url,
-    attributes: &HashMap<&'a str, Node<'a>>,
-) -> Option<CodeActionOrCommand> {
-    let name_node = match attributes.get("name") {
+fn construct_name_to_condition<'a>(uri: &Url, if_tag: &SpIf) -> Option<CodeActionOrCommand> {
+    let name_attribute = match &if_tag.name_attribute {
         Some(v) => v,
-        None => return None,
+        _ => return None,
     };
-    let (operator, value_node) = match attributes.iter().find_map(|(k, v)| match *k {
-        k @ ("gt" | "gte" | "lt" | "lte" | "eq" | "neq" | "isNull") => Some((k, v)),
-        _ => None,
-    }) {
-        Some(v) => v,
-        None => return None,
+    log::debug!("got name_attribute");
+    let (operator, value_attribute) = match first_comparable_if_attribute(if_tag) {
+        Some((o, v)) => (o, v),
+        _ => return None,
     };
-    let name = match name_node
-        .named_child(0)
-        .and_then(|n| n.named_child(0))
-        .and_then(|n| n.utf8_text(document.text.as_bytes()).ok())
-    {
-        Some(v) => v,
-        None => return None,
+    log::debug!("got operator and value_attribute");
+    let name = match &name_attribute.spel {
+        SpelAst::Object(SpelResult::Valid(o)) => o,
+        _ => return None,
     };
-    let value = match value_node
-        .named_child(0)
-        .and_then(|n| n.named_child(0))
-        .and_then(|n| n.utf8_text(document.text.as_bytes()).ok())
-    {
-        Some(v) => v,
-        None => return None,
+    log::debug!("got name");
+    let value = match &value_attribute.spel {
+        SpelAst::Comparable(SpelResult::Valid(c)) => c.to_string(),
+        SpelAst::Condition(SpelResult::Valid(c)) => c.to_string(),
+        SpelAst::String(SpelResult::Valid(c)) => format!("'{}'", c),
+        x => {
+            log::debug!("unexpected value: {:?}", x);
+            return None;
+        }
     };
+    log::debug!("got value");
     let new_condition = match operator {
         "isNull" if value == "true" => format!("isNull(${{{}}})", name),
         "isNull" if value == "false" => format!("!isNull(${{{}}})", name),
@@ -219,7 +212,7 @@ fn construct_name_to_condition<'a>(
         "neq" => format!("${{{}}} != {}", name, value),
         _ => format!("${{{}}} == {}", name, value),
     };
-    let value_start = value_node.start_position();
+    log::debug!("got new_condition");
     return Some(CodeActionOrCommand::CodeAction(CodeAction {
         title: format!("transform \"name\" and \"{}\" to \"condition\"", operator),
         kind: Some(CodeActionImplementation::NameToCondition.to_kind()),
@@ -230,15 +223,31 @@ fn construct_name_to_condition<'a>(
                     TextEdit {
                         range: Range {
                             start: Position {
-                                line: value_start.row as u32,
-                                character: value_start.column as u32 - 1,
+                                line: value_attribute.key_location.line as u32,
+                                character: value_attribute.key_location.char as u32 - 1,
                             },
-                            end: point_to_position(&value_node.end_position()),
+                            end: Position {
+                                line: value_attribute.closing_quote_location.line as u32,
+                                character: (value_attribute.closing_quote_location.char
+                                    + value_attribute.closing_quote_location.length)
+                                    as u32,
+                            },
                         },
                         new_text: "".to_string(),
                     },
                     TextEdit {
-                        range: node_range(&name_node),
+                        range: Range {
+                            start: Position {
+                                line: name_attribute.key_location.line as u32,
+                                character: name_attribute.key_location.char as u32,
+                            },
+                            end: Position {
+                                line: name_attribute.closing_quote_location.line as u32,
+                                character: (name_attribute.closing_quote_location.char
+                                    + name_attribute.closing_quote_location.length)
+                                    as u32,
+                            },
+                        },
                         new_text: format!("condition=\"{}\"", new_condition),
                     },
                 ],
@@ -249,27 +258,54 @@ fn construct_name_to_condition<'a>(
     }));
 }
 
-fn construct_condition_to_name<'a>(
-    document: &Document,
-    uri: &Url,
-    attributes: &HashMap<&'a str, Node<'a>>,
-) -> Option<CodeActionOrCommand> {
-    let condition_node = match attributes.get("condition") {
+fn first_comparable_if_attribute(if_tag: &SpIf) -> Option<(&str, &SpelAttribute)> {
+    match &if_tag.gt_attribute {
+        Some(attribute) => return Some(("gt", attribute)),
+        None => (),
+    };
+    match &if_tag.gte_attribute {
+        Some(attribute) => return Some(("gte", attribute)),
+        None => (),
+    };
+    match &if_tag.lt_attribute {
+        Some(attribute) => return Some(("lt", attribute)),
+        None => (),
+    };
+    match &if_tag.lte_attribute {
+        Some(attribute) => return Some(("lte", attribute)),
+        None => (),
+    };
+    match &if_tag.eq_attribute {
+        Some(attribute) => return Some(("eq", attribute)),
+        None => (),
+    };
+    match &if_tag.neq_attribute {
+        Some(attribute) => return Some(("neq", attribute)),
+        None => (),
+    };
+    match &if_tag.isNull_attribute {
+        Some(attribute) => return Some(("isNull", attribute)),
+        None => (),
+    };
+    return None;
+}
+
+fn construct_condition_to_name<'a>(uri: &Url, if_tag: &SpIf) -> Option<CodeActionOrCommand> {
+    let condition_attribute = match &if_tag.condition_attribute {
         Some(v) => v,
         None => return None,
     };
-    let value_node = match condition_node.named_child(0).and_then(|n| n.named_child(0)) {
-        Some(v) => v,
-        None => return None,
+    let condition = match &condition_attribute.spel {
+        SpelAst::Condition(SpelResult::Valid(c)) => c,
+        _ => return None,
     };
-    let offset = value_node.start_position();
-    match document.spel.get(&offset) {
-        Some(SpelAst::Condition(SpelResult::Valid(Condition::Comparisson {
+    match condition {
+        Condition::Comparisson {
             left,
             operator,
             right,
             ..
-        }))) => {
+        } => {
             let operator_name;
             let new_text;
             match (&**left, &**right) {
@@ -311,7 +347,18 @@ fn construct_condition_to_name<'a>(
                     changes: Some(HashMap::from([(
                         uri.clone(),
                         vec![TextEdit {
-                            range: node_range(&condition_node),
+                            range: Range {
+                                start: Position {
+                                    line: condition_attribute.key_location.line as u32,
+                                    character: condition_attribute.key_location.char as u32,
+                                },
+                                end: Position {
+                                    line: condition_attribute.closing_quote_location.line as u32,
+                                    character: (condition_attribute.closing_quote_location.char
+                                        + condition_attribute.closing_quote_location.length)
+                                        as u32,
+                                },
+                            },
                             new_text,
                         }],
                     )])),
@@ -320,7 +367,7 @@ fn construct_condition_to_name<'a>(
                 ..CodeAction::default()
             }));
         }
-        Some(SpelAst::Condition(SpelResult::Valid(condition))) => {
+        condition => {
             return parse_is_null(&condition).map(|(name, value)| {
                 CodeActionOrCommand::CodeAction(CodeAction {
                     title: "transform \"condition\" to \"name\" and \"isNull\"".to_string(),
@@ -329,7 +376,19 @@ fn construct_condition_to_name<'a>(
                         changes: Some(HashMap::from([(
                             uri.clone(),
                             vec![TextEdit {
-                                range: node_range(&condition_node),
+                                range: Range {
+                                    start: Position {
+                                        line: condition_attribute.key_location.line as u32,
+                                        character: condition_attribute.key_location.char as u32,
+                                    },
+                                    end: Position {
+                                        line: condition_attribute.closing_quote_location.line
+                                            as u32,
+                                        character: (condition_attribute.closing_quote_location.char
+                                            + condition_attribute.closing_quote_location.length)
+                                            as u32,
+                                    },
+                                },
                                 new_text: format!("name=\"{}\" isNull=\"{}\"", name, value),
                             }],
                         )])),
@@ -339,7 +398,6 @@ fn construct_condition_to_name<'a>(
                 })
             })
         }
-        _ => None,
     }
 }
 
@@ -382,18 +440,4 @@ fn is_null_argument(root: &Condition) -> Option<String> {
         },
         _ => None,
     }
-}
-
-fn node_range(node: &Node<'_>) -> Range {
-    return Range {
-        start: point_to_position(&node.start_position()),
-        end: point_to_position(&node.end_position()),
-    };
-}
-
-fn point_to_position(point: &Point) -> Position {
-    return Position {
-        line: point.row as u32,
-        character: point.column as u32,
-    };
 }

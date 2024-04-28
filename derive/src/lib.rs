@@ -57,11 +57,15 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                                             .1),
                                 )*
                                 "self_closing_tag_end" => break,
-                                ">" => body = Some(parser.parse_tag_body()?),
+                                ">" => {
+                                    body = Some(parser.parse_tag_body()?);
+                                    break;
+                                },
                                 _ => (),
                             };
                         }
                         let close_location = node_location(parser.cursor.node());
+                        parser.cursor.goto_parent();
                         return Ok(Self {
                             open_location,
                             #(#plain_attribute_fields,)*
@@ -69,6 +73,55 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                             body,
                             close_location,
                         });
+                    }
+
+                    fn definition(&self) -> TagDefinition {
+                        return #definition;
+                    }
+
+                    fn open_location(&self) -> &Location {
+                        return &self.open_location;
+                    }
+
+                    fn close_location(&self) -> &Location {
+                        return &self.close_location;
+                    }
+
+                    fn range(&self) -> lsp_types::Range {
+                        return lsp_types::Range {
+                            start: lsp_types::Position {
+                                line: self.open_location.line as u32,
+                                character: self.open_location.char as u32,
+                            },
+                            end: lsp_types::Position {
+                                line: self.close_location.line as u32,
+                                character: (self.close_location.char + self.close_location.length)
+                                    as u32,
+                            },
+                        }
+                    }
+
+                    fn spel_attribute(&self, name: &str) -> Option<&SpelAttribute> {
+                        return match format!("{}_attribute", name).as_str() {
+                            #(
+                                stringify!(#spel_attribute_fields) =>
+                                    self.#spel_attribute_fields.as_ref(),
+                            )*
+                            _ => None,
+                        };
+                    }
+
+                    fn spel_attributes(&self) -> Vec<(&str, &SpelAttribute)> {
+                        let mut attributes = Vec::new();
+                        #(
+                            match self.#spel_attribute_fields.as_ref() {
+                                Some(field) => attributes.push(
+                                    (stringify!(#spel_attribute_fields), field)
+                                ),
+                                None => (),
+                            };
+                        )*
+                        return attributes;
                     }
                 }
             };

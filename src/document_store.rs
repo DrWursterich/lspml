@@ -1,28 +1,19 @@
 use std::{
     collections::HashMap,
     fs,
-    str::FromStr,
     sync::{Arc, Mutex, OnceLock},
 };
 
 use anyhow::{Error, Result};
 use lsp_types::Url;
-use tree_sitter::{Node, Parser, Point, Tree};
+use tree_sitter::Parser;
 
-use crate::{
-    grammar::{TagAttributeType, TagDefinition},
-    parser,
-    spel::{
-        self,
-        ast::{SpelAst, SpelResult},
-    },
-};
+use crate::parser::{Header, Tree};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Document {
     pub(crate) text: String,
     pub(crate) tree: Tree,
-    pub(crate) spel: HashMap<Point, SpelAst>,
 }
 
 impl Document {
@@ -31,8 +22,23 @@ impl Document {
         parser.set_language(&tree_sitter_spml::language())?;
         return match parser.parse(&text, None) {
             Some(tree) => {
-                let spel = collect_spels(tree.root_node(), &text);
-                Ok(Document { text, tree, spel })
+                match Tree::new(tree, &text) {
+                    Ok(tree) => Ok(Document { text, tree }),
+                    Err(err) => {
+                        log::info!("could not parse syntax tree: {}", err);
+                        // TODO: should be able to handle incomplete trees!
+                        Ok(Document {
+                            text,
+                            tree: Tree {
+                                header: Header {
+                                    java_headers: vec![],
+                                    taglib_imports: vec![],
+                                },
+                                tags: vec![],
+                            },
+                        })
+                    }
+                }
             }
             None => return Result::Err(anyhow::anyhow!("failed to parse text: {}", text)),
         };
@@ -68,149 +74,4 @@ pub(crate) fn put(uri: &Url, document: Document) -> Document {
         .expect("document_store mutex poisoned")
         .insert(uri.clone(), document.clone());
     return document;
-}
-
-fn collect_spels(root: Node, text: &String) -> HashMap<Point, SpelAst> {
-    let mut spels = HashMap::new();
-    for node in root.children(&mut root.walk()) {
-        match node.kind() {
-            "page_header" | "import_header" | "taglib_header" | "html_doctype" | "text"
-            | "comment" | "xml_entity" => continue,
-            "html_tag" | "html_option_tag" | "html_void_tag" | "xml_comment" | "java_tag"
-            | "script_tag" | "style_tag" => collect_from_children(node, text, &mut spels),
-            _ => match &TagDefinition::from_str(node.kind()) {
-                Ok(tag) => collect_from_tag(tag, node, &text, &mut spels),
-                Err(err) => log::info!(
-                    "error while trying to interprete node \"{}\" as tag: {}",
-                    node.kind(),
-                    err
-                ),
-            },
-        }
-    }
-    return spels;
-}
-
-fn collect_from_children(node: Node, text: &String, spels: &mut HashMap<Point, SpelAst>) {
-    for child in node.children(&mut node.walk()) {
-        match child.kind() {
-            "text" | "java_tag" | "html_void_tag" => {}
-            "ERROR" | "html_tag" | "html_option_tag" | "script_tag" | "style_tag" => {
-                collect_from_children(child, text, spels);
-            }
-            kind if kind.ends_with("_tag") => match &TagDefinition::from_str(kind) {
-                Ok(child_tag) => collect_from_tag(child_tag, child, text, spels),
-                Err(err) => {
-                    log::info!("expected sp or spt tag: {}", err);
-                }
-            },
-            _ => collect_from_children(child, text, spels),
-        }
-    }
-}
-
-fn collect_from_tag(
-    tag: &TagDefinition,
-    node: Node,
-    text: &String,
-    spel: &mut HashMap<Point, SpelAst>,
-) {
-    for child in node.children(&mut node.walk()) {
-        match child.kind() {
-            // may need to check on kind of missing child
-            "html_void_tag" | "java_tag" | "script_tag" | "style_tag" => (),
-            "ERROR" | "html_tag" | "html_option_tag" => collect_from_children(child, text, spel),
-            kind if kind.ends_with("_attribute") => {
-                match parser::attribute_name_of(child, text)
-                    .and_then(|attribute| tag.attributes.get_by_name(&attribute))
-                {
-                    Some(definition) => {
-                        let (position, text) = match child.child(2).and_then(|child| child.child(1))
-                        {
-                            Some(node) if node.kind() == "\"" => (node.start_position(), Ok("")),
-                            Some(node) if node.kind() == "string_content" => {
-                                (node.start_position(), node.utf8_text(&text.as_bytes()))
-                            }
-                            _ => continue,
-                        };
-                        match text
-                            .map_err(Error::from)
-                            .and_then(|text| spel_ast_of(text, &definition.r#type))
-                        {
-                            Ok(ast) => {
-                                spel.insert(position, ast);
-                            }
-                            Err(err) => log::error!(
-                                "could not parse spel at ({}, {}) as {:?}: {}",
-                                position.row,
-                                position.column,
-                                definition.r#type,
-                                err
-                            ),
-                        };
-                    }
-                    _ => (),
-                }
-            }
-            kind if kind.ends_with("_tag") => match &TagDefinition::from_str(kind) {
-                Ok(child_tag) => collect_from_tag(child_tag, child, text, spel),
-                Err(err) => {
-                    log::info!("expected sp or spt tag: {}", err);
-                }
-            },
-            _ => collect_from_children(child, text, spel),
-        }
-    }
-}
-fn spel_ast_of(text: &str, r#type: &TagAttributeType) -> Result<SpelAst> {
-    let parser = &mut spel::parser::Parser::new(text);
-    match r#type {
-        TagAttributeType::Comparable => Ok(match parser.parse_comparable() {
-            Ok(result) => SpelAst::Comparable(SpelResult::Valid(result)),
-            // workaround as comparables as attribute values do accept strings (without quotes)
-            // but comparables in actuall comparissons do not.
-            Err(err) => match spel::parser::Parser::new(text).parse_text() {
-                Ok(result) => SpelAst::String(SpelResult::Valid(result)),
-                Err(_) => SpelAst::Comparable(SpelResult::Invalid(err)),
-            },
-        }),
-        TagAttributeType::Condition => Ok(SpelAst::Condition(match parser.parse_condition_ast() {
-            Ok(result) => SpelResult::Valid(result.root),
-            Err(err) => SpelResult::Invalid(err),
-        })),
-        TagAttributeType::Expression => {
-            Ok(SpelAst::Expression(match parser.parse_expression_ast() {
-                Ok(result) => SpelResult::Valid(result.root),
-                Err(err) => SpelResult::Invalid(err),
-            }))
-        }
-        TagAttributeType::Identifier => Ok(SpelAst::Identifier(match parser.parse_identifier() {
-            Ok(result) => SpelResult::Valid(result),
-            Err(err) => SpelResult::Invalid(err),
-        })),
-        TagAttributeType::Module => Ok(SpelAst::String(match parser.parse_text() {
-            Ok(result) => SpelResult::Valid(result),
-            Err(err) => SpelResult::Invalid(err),
-        })),
-        TagAttributeType::Object => Ok(SpelAst::Object(match parser.parse_object_ast() {
-            Ok(result) => SpelResult::Valid(result.root),
-            Err(err) => SpelResult::Invalid(err),
-        })),
-        TagAttributeType::Regex => Ok(SpelAst::Regex(match parser.parse_regex() {
-            Ok(result) => SpelResult::Valid(result),
-            Err(err) => SpelResult::Invalid(err),
-        })),
-        TagAttributeType::String => Ok(SpelAst::String(match parser.parse_text() {
-            Ok(result) => SpelResult::Valid(result),
-            Err(err) => SpelResult::Invalid(err),
-        })),
-        TagAttributeType::Query => Ok(SpelAst::Query(match parser.parse_query() {
-            Ok(result) => SpelResult::Valid(result),
-            Err(err) => SpelResult::Invalid(err),
-        })),
-        TagAttributeType::Uri { .. } => Ok(SpelAst::Uri(match parser.parse_uri() {
-            Ok(result) => SpelResult::Valid(result),
-            Err(err) => SpelResult::Invalid(err),
-        })),
-    }
 }
