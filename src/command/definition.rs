@@ -7,7 +7,7 @@ use crate::{
     document_store::{self, Document},
     grammar::{TagAttributeType, TagAttributes},
     modules,
-    parser::{SpelAttribute, Tag},
+    parser::{ParsableTag, SpelAttribute, Tag},
     spel::ast::{
         Argument, Comparable, Condition, Expression, Function, Identifier, Location, Object, Query,
         Regex, SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment,

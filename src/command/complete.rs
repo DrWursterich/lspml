@@ -11,7 +11,7 @@ use crate::{
     document_store::{self, Document},
     grammar::{self, TagAttribute, TagAttributeType, TagAttributes, TagChildren, TagDefinition},
     modules::{self, Module},
-    parser::{SpelAttribute, Tag, TagBody},
+    parser::{ParsableTag, SpelAttribute, Tag, TagBody},
     spel::ast::{SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment},
 };
 

@@ -1,4 +1,4 @@
-use quote::quote;
+use quote::{quote, quote_spanned};
 use syn::{
     parse_macro_input, punctuated::Punctuated, AngleBracketedGenericArguments, DeriveInput, Expr,
     Field, GenericArgument, Ident, Path, PathArguments, PathSegment, Type, TypePath,
@@ -9,24 +9,24 @@ extern crate proc_macro;
 #[proc_macro_derive(ParsableTag, attributes(tag_definition))]
 pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let mut params: Option<Expr> = None;
-    for attr in &input.attrs {
-        if attr.path().is_ident("tag_definition") {
-            params = Some(attr.parse_args().unwrap());
-        }
-    }
-    let definition = params.unwrap();
     let name = input.ident;
-    match input.data {
+    let expanded = match input.data {
         syn::Data::Struct(syn::DataStruct {
             fields: syn::Fields::Named(syn::FieldsNamed { named, .. }),
             ..
         }) => {
+            let mut params: Option<Expr> = None;
+            for attr in &input.attrs {
+                if attr.path().is_ident("tag_definition") {
+                    params = Some(attr.parse_args().unwrap());
+                }
+            }
+            let definition = params.unwrap();
             let plain_attribute_fields: Vec<&syn::Ident> =
                 attribute_fields_with_option_value(&named, "PlainAttribute");
             let spel_attribute_fields: Vec<&syn::Ident> =
                 attribute_fields_with_option_value(&named, "SpelAttribute");
-            let expanded = quote! {
+            quote! {
                 impl ParsableTag for #name {
                     fn parse(parser: &mut TreeParser) -> Result<Self> {
                         if !parser.cursor.goto_first_child() {
@@ -87,6 +87,10 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         return &self.close_location;
                     }
 
+                    fn body(&self) -> &Option<TagBody> {
+                        return &self.body;
+                    }
+
                     fn range(&self) -> lsp_types::Range {
                         return lsp_types::Range {
                             start: lsp_types::Position {
@@ -101,16 +105,6 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         }
                     }
 
-                    fn spel_attribute(&self, name: &str) -> Option<&SpelAttribute> {
-                        return match format!("{}_attribute", name).as_str() {
-                            #(
-                                stringify!(#spel_attribute_fields) =>
-                                    self.#spel_attribute_fields.as_ref(),
-                            )*
-                            _ => None,
-                        };
-                    }
-
                     fn spel_attributes(&self) -> Vec<(&str, &SpelAttribute)> {
                         let mut attributes = Vec::new();
                         #(
@@ -123,12 +117,107 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         )*
                         return attributes;
                     }
+
+                    fn spel_attribute(&self, name: &str) -> Option<&SpelAttribute> {
+                        return match format!("{}_attribute", name).as_str() {
+                            #(
+                                stringify!(#spel_attribute_fields) =>
+                                    self.#spel_attribute_fields.as_ref(),
+                            )*
+                            _ => None,
+                        };
+                    }
                 }
-            };
-            return proc_macro::TokenStream::from(expanded);
+            }
         }
-        _ => panic!("requires struct with named fields!"),
+        syn::Data::Enum(syn::DataEnum { variants, .. }) => {
+            let mut definition = Vec::new();
+            let mut open_location = Vec::new();
+            let mut close_location = Vec::new();
+            let mut body = Vec::new();
+            let mut range = Vec::new();
+            let mut spel_attribute = Vec::new();
+            let mut spel_attributes = Vec::new();
+            for variant in variants {
+                if variant.fields.len() != 1 {
+                    panic!("ParseTag is only supported for enum values with exactly one field");
+                }
+                let name = &variant.ident;
+                definition.push(quote_spanned! {name.span()=>
+                    Tag::#name(inner) => inner.definition()
+                });
+                open_location.push(quote_spanned! {name.span()=>
+                    Tag::#name(inner) => inner.open_location()
+                });
+                close_location.push(quote_spanned! {name.span()=>
+                    Tag::#name(inner) => inner.close_location()
+                });
+                body.push(quote_spanned! {name.span()=>
+                    Tag::#name(inner) => inner.body()
+                });
+                range.push(quote_spanned! {name.span()=>
+                    Tag::#name(inner) => inner.range()
+                });
+                spel_attribute.push(quote_spanned! {name.span()=>
+                    Tag::#name(inner) => inner.spel_attribute(name)
+                });
+                spel_attributes.push(quote_spanned! {name.span()=>
+                    Tag::#name(inner) => inner.spel_attributes()
+                });
+            }
+            quote! {
+                impl ParsableTag for #name {
+                    fn parse(parser: &mut TreeParser) -> Result<Self> {
+                        unimplemented!();
+                    }
+
+                    fn definition(&self) -> TagDefinition {
+                        return match self {
+                            #(#definition,)*
+                        };
+                    }
+
+                    fn open_location(&self) -> &Location {
+                        return match self {
+                            #(#open_location,)*
+                        };
+                    }
+
+                    fn close_location(&self) -> &Location {
+                        return match self {
+                            #(#close_location,)*
+                        };
+                    }
+
+                    fn body(&self) -> &Option<TagBody> {
+                        return match self {
+                            #(#body,)*
+                        };
+                    }
+
+                    fn range(&self) -> lsp_types::Range {
+                        return match self {
+                            #(#range,)*
+                        };
+                    }
+
+                    fn spel_attributes(&self) -> Vec<(&str, &SpelAttribute)> {
+                        return match self {
+                            #(#spel_attributes,)*
+                        };
+                    }
+
+                    fn spel_attribute(&self, name: &str) -> Option<&SpelAttribute> {
+                        return match self {
+                            #(#spel_attribute,)*
+                        };
+                    }
+                }
+            }
+        },
+        _ => panic!("derive(ParsableTag) is only supported for structs and enums"),
     };
+    return proc_macro::TokenStream::from(expanded);
 }
 
 fn attribute_fields_with_option_value<'a, T>(

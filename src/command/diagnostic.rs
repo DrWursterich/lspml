@@ -12,7 +12,7 @@ use crate::{
     document_store,
     grammar::AttributeRule,
     modules,
-    parser::{Header, SpelAttribute, Tag, Tree},
+    parser::{Header, ParsableTag, SpelAttribute, Tag, Tree},
     spel::{
         ast::{
             self, Argument, Comparable, Condition, Expression, Identifier, Object, SpelAst,

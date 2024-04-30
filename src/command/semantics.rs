@@ -7,7 +7,7 @@ use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, Semanti
 use crate::{
     document_store,
     grammar::AttributeRule,
-    parser::{Tag, Tree},
+    parser::{ParsableTag, Tag, Tree},
     spel::ast::{
         Anchor, Argument, Comparable, Condition, Expression, Function, Identifier, Interpolation,
         Location, Null, Number, Object, Query, Regex, SignedNumber, SpelAst, SpelResult,

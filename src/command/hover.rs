@@ -8,7 +8,7 @@ use super::LsError;
 
 use crate::{
     document_store,
-    parser::{SpelAttribute, Tag},
+    parser::{ParsableTag, SpelAttribute, Tag},
     spel::{
         self,
         ast::{self, Location, SpelAst, SpelResult},

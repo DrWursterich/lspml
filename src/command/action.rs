@@ -9,7 +9,7 @@ use lsp_types::{
 use crate::{
     capabilities::CodeActionImplementation,
     document_store,
-    parser::{SpIf, SpelAttribute, Tag},
+    parser::{ParsableTag, SpIf, SpelAttribute, Tag},
     spel::ast::{
         Argument, Comparable, ComparissonOperator, Condition, Function, SpelAst, SpelResult,
     },
