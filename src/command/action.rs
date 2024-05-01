@@ -9,7 +9,7 @@ use lsp_types::{
 use crate::{
     capabilities::CodeActionImplementation,
     document_store,
-    parser::{ParsableTag, SpIf, SpelAttribute, Tag},
+    parser::{DocumentNode, Node, ParsableTag, SpIf, SpelAttribute, Tag},
     spel::ast::{
         Argument, Comparable, ComparissonOperator, Condition, Function, SpelAst, SpelResult,
     },
@@ -91,20 +91,22 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
         }
     }
     let cursor = params.range.start;
-    let mut tags = &document.tree.tags;
+    let mut nodes = &document.tree.nodes;
     let mut current = None;
     loop {
-        if let Some(tag) = find_tag_at(tags, cursor) {
-            current = Some(tag);
-            if let Some(body) = tag.body() {
-                tags = &body.tags;
-                continue;
+        if let Some(node) = find_tag_at(nodes, cursor) {
+            current = Some(node);
+            if let Node::Tag(tag) = node {
+                if let Some(body) = tag.body() {
+                    nodes = &body.nodes;
+                    continue;
+                }
             }
         }
         break;
     }
     match current {
-        Some(Tag::SpIf(tag)) => {
+        Some(Node::Tag(Tag::SpIf(tag))) => {
             log::debug!("code-action triggered in sp:if");
             if let Some(action) = construct_name_to_condition(&uri, &tag) {
                 log::debug!("build name-to-condition action");
@@ -120,16 +122,16 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
     return Ok(actions);
 }
 
-pub(crate) fn find_tag_at(tags: &Vec<Tag>, cursor: Position) -> Option<&Tag> {
-    for tag in tags {
-        let range = tag.range();
+pub(crate) fn find_tag_at(nodes: &Vec<Node>, cursor: Position) -> Option<&Node> {
+    for node in nodes {
+        let range = node.range();
         if cursor > range.end {
             continue;
         }
         if cursor < range.start {
             break;
         }
-        return Some(tag);
+        return Some(node);
     }
     return None;
 }

@@ -34,7 +34,7 @@ impl Document {
                                     java_headers: vec![],
                                     taglib_imports: vec![],
                                 },
-                                tags: vec![],
+                                nodes: vec![],
                             },
                         })
                     }

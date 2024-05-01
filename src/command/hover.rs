@@ -8,7 +8,7 @@ use super::LsError;
 
 use crate::{
     document_store,
-    parser::{ParsableTag, SpelAttribute, Tag},
+    parser::{DocumentNode, Node, ParsableTag, SpelAttribute},
     spel::{
         self,
         ast::{self, Location, SpelAst, SpelResult},
@@ -31,20 +31,22 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
             }),
     }?;
     let cursor = text_params.position;
-    let mut tags = &document.tree.tags;
+    let mut nodes = &document.tree.nodes;
     let mut current = None;
     loop {
-        if let Some(tag) = find_tag_at(tags, cursor) {
-            current = Some(tag);
-            if let Some(body) = tag.body() {
-                tags = &body.tags;
-                continue;
+        if let Some(node) = find_tag_at(nodes, cursor) {
+            current = Some(node);
+            if let Node::Tag(tag) = node {
+                if let Some(body) = tag.body() {
+                    nodes = &body.nodes;
+                    continue;
+                }
             }
         }
         break;
     }
     match current {
-        Some(tag) => {
+        Some(Node::Tag(tag)) => {
             log::debug!("found to be in tag {}", tag.definition().name);
             if tag.open_location().contains(cursor) || tag.close_location().contains(cursor) {
                 return Ok(tag.definition().documentation.map(|doc| Hover {
@@ -113,21 +115,23 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
                 }
             }
         }
+        Some(Node::Error(err)) => log::debug!("cursor is in error \"{}\"", err.content),
+        Some(Node::Text(text)) => log::debug!("cursor is in text \"{}\"", text.content),
         None => log::debug!("cursor is not in a tag"),
     };
     return Ok(None);
 }
 
-pub(crate) fn find_tag_at(tags: &Vec<Tag>, cursor: Position) -> Option<&Tag> {
-    for tag in tags {
-        let range = tag.range();
+pub(crate) fn find_tag_at(nodes: &Vec<Node>, cursor: Position) -> Option<&Node> {
+    for node in nodes {
+        let range = node.range();
         if cursor > range.end {
             continue;
         }
         if cursor < range.start {
             break;
         }
-        return Some(tag);
+        return Some(node);
     }
     return None;
 }

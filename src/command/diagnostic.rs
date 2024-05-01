@@ -12,7 +12,7 @@ use crate::{
     document_store,
     grammar::AttributeRule,
     modules,
-    parser::{Header, ParsableTag, SpelAttribute, Tag, Tree},
+    parser::{DocumentNode, ErrorNode, Header, Node, ParsableTag, SpelAttribute, Tag, Tree},
     spel::{
         ast::{
             self, Argument, Comparable, Condition, Expression, Identifier, Object, SpelAst,
@@ -40,11 +40,17 @@ impl DiagnosticCollector {
 
     pub(crate) fn validate_document(&mut self, tree: &Tree) -> Result<()> {
         self.validate_header(&tree.header)?;
-        for tag in &tree.tags {
-            match tag {
-                // "html_tag" | "html_option_tag" | "html_void_tag" | "xml_comment" | "java_tag"
-                // | "script_tag" | "style_tag" => self.validate_children(&node)?,
-                _ => self.validate_tag(tag)?,
+        for node in &tree.nodes {
+            match node {
+                Node::Tag(tag) => self.validate_tag(tag)?,
+                Node::Text(_) => (),
+                Node::Error(ErrorNode { content, range }) => {
+                    self.add_diagnostic(
+                        format!("syntax error: unexpected \"{}\"", content),
+                        DiagnosticSeverity::ERROR,
+                        *range,
+                    );
+                }
             }
         }
         return Ok(());
@@ -563,8 +569,10 @@ impl DiagnosticCollector {
         }
         match tag.body() {
             Some(body) => {
-                for child in &body.tags {
-                    self.validate_tag(&child)?;
+                for child in &body.nodes {
+                    if let Node::Tag(tag) = child {
+                        self.validate_tag(&tag)?;
+                    }
                 }
             }
             _ => (),

@@ -7,7 +7,7 @@ use crate::{
     document_store::{self, Document},
     grammar::{TagAttributeType, TagAttributes},
     modules,
-    parser::{ParsableTag, SpelAttribute, Tag},
+    parser::{DocumentNode, Node, ParsableTag, SpelAttribute, Tag},
     spel::ast::{
         Argument, Comparable, Condition, Expression, Function, Identifier, Location, Object, Query,
         Regex, SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment,
@@ -45,18 +45,20 @@ impl DefinitionsFinder<'_> {
     }
 
     fn collect(&mut self) {
-        let tags = &self.document.tree.tags;
-        for tag in tags {
-            let open_location = tag.open_location();
-            if open_location.line > self.upper_bound.line as usize {
-                return;
-            }
-            if open_location.line == self.upper_bound.line as usize {
-                if open_location.char >= self.upper_bound.character as usize {
+        let nodes = &self.document.tree.nodes;
+        for node in nodes {
+            if let Node::Tag(tag) = node {
+                let open_location = tag.open_location();
+                if open_location.line > self.upper_bound.line as usize {
                     return;
                 }
+                if open_location.line == self.upper_bound.line as usize {
+                    if open_location.char >= self.upper_bound.character as usize {
+                        return;
+                    }
+                }
+                self.collect_from_tag(&tag);
             }
-            self.collect_from_tag(&tag);
         }
     }
 
@@ -101,8 +103,10 @@ impl DefinitionsFinder<'_> {
             }
         }
         if let Some(body) = &tag.body() {
-            for tag in &body.tags {
-                self.collect_from_tag(tag);
+            for node in &body.nodes {
+                if let Node::Tag(tag) = node {
+                    self.collect_from_tag(tag)
+                };
             }
         }
     }
@@ -126,19 +130,21 @@ pub(crate) fn definition(
             }),
     }?;
     let cursor = text_params.position;
-    let mut tags = &document.tree.tags;
+    let mut nodes = &document.tree.nodes;
     let mut current = None;
     loop {
-        if let Some(tag) = find_tag_at(tags, cursor) {
-            current = Some(tag);
-            if let Some(body) = tag.body() {
-                tags = &body.tags;
-                continue;
+        if let Some(node) = find_tag_at(nodes, cursor) {
+            current = Some(node);
+            if let Node::Tag(tag) = node {
+                if let Some(body) = tag.body() {
+                    nodes = &body.nodes;
+                    continue;
+                }
             }
         }
         break;
     }
-    if let Some(tag) = current {
+    if let Some(Node::Tag(tag)) = current {
         for (_, attribute) in tag.spel_attributes() {
             if is_in_attribute_value(attribute, &cursor) {
                 let offset = Point {
@@ -219,16 +225,16 @@ pub(crate) fn definition(
     return Ok(None);
 }
 
-pub(crate) fn find_tag_at(tags: &Vec<Tag>, cursor: Position) -> Option<&Tag> {
-    for tag in tags {
-        let range = tag.range();
+pub(crate) fn find_tag_at(nodes: &Vec<Node>, cursor: Position) -> Option<&Node> {
+    for node in nodes {
+        let range = node.range();
         if cursor > range.end {
             continue;
         }
         if cursor < range.start {
             break;
         }
-        return Some(tag);
+        return Some(node);
     }
     return None;
 }

@@ -11,7 +11,7 @@ use crate::{
     document_store::{self, Document},
     grammar::{self, TagAttribute, TagAttributeType, TagAttributes, TagChildren, TagDefinition},
     modules::{self, Module},
-    parser::{ParsableTag, SpelAttribute, Tag, TagBody},
+    parser::{DocumentNode, Node, ParsableTag, SpelAttribute, Tag, TagBody},
     spel::ast::{SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment},
 };
 
@@ -39,23 +39,24 @@ impl CompletionCollector<'_> {
     }
 
     fn search_completions_in_document(&mut self) {
-        let mut tags = &self.document.tree.tags;
+        let mut nodes = &self.document.tree.nodes;
         let mut current = None;
         loop {
-            if let Some(tag) = find_tag_at(tags, self.cursor) {
-                current = Some(tag);
-                if let Some(body) = tag.body() {
-                    tags = &body.tags;
-                    continue;
+            if let Some(node) = find_tag_at(nodes, self.cursor) {
+                current = Some(node);
+                if let Node::Tag(tag) = node {
+                    if let Some(body) = tag.body() {
+                        nodes = &body.nodes;
+                        continue;
+                    }
                 }
             }
             break;
         }
-        // self.complete_closing_tag(node);
-        return match current {
-            Some(tag) => self.search_completions_in_tag(tag),
+        match current {
+            Some(Node::Tag(tag)) => self.search_completions_in_tag(tag),
             _ => self.complete_top_level_tags(),
-        };
+        }
     }
 
     fn complete_top_level_tags(&mut self) {
@@ -323,16 +324,16 @@ impl CompletionCollector<'_> {
     }
 }
 
-pub(crate) fn find_tag_at(tags: &Vec<Tag>, cursor: Position) -> Option<&Tag> {
-    for tag in tags {
-        let range = tag.range();
+pub(crate) fn find_tag_at(nodes: &Vec<Node>, cursor: Position) -> Option<&Node> {
+    for node in nodes {
+        let range = node.range();
         if cursor > range.end {
             continue;
         }
         if cursor < range.start {
             break;
         }
-        return Some(tag);
+        return Some(node);
     }
     return None;
 }

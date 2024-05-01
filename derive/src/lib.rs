@@ -6,6 +6,80 @@ use syn::{
 
 extern crate proc_macro;
 
+#[proc_macro_derive(DocumentNode)]
+pub fn document_node(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = input.ident;
+    let expanded = match input.data {
+        syn::Data::Struct(syn::DataStruct {
+            fields: syn::Fields::Named(syn::FieldsNamed { named, .. }),
+            ..
+        }) => {
+            let range_fields: Vec<&syn::Field> = named
+                .iter()
+                .filter(|field| {
+                    get_type(&field.ty)
+                        .and_then(|r#type| get_type_name(r#type))
+                        .is_some_and(|name| name == "Range")
+                })
+                .collect();
+            match range_fields.len() {
+                1 => {
+                    let field = &range_fields[0].ident;
+                    quote! {
+                        impl DocumentNode for #name {
+                            fn range(&self) -> Range {
+                                return self.#field.clone();
+                            }
+                        }
+                    }
+                },
+                _ => quote! {
+                    impl DocumentNode for #name {
+                        fn range(&self) -> Range {
+                            let open = self.open_location();
+                            let close = self.close_location();
+                            return lsp_types::Range {
+                                start: lsp_types::Position {
+                                    line: open.line as u32,
+                                    character: open.char as u32,
+                                },
+                                end: lsp_types::Position {
+                                    line: close.line as u32,
+                                    character: (close.char + close.length) as u32,
+                                },
+                            }
+                        }
+                    }
+                },
+            }
+        }
+        syn::Data::Enum(syn::DataEnum { variants, .. }) => {
+            let mut range = Vec::new();
+            for variant in variants {
+                if variant.fields.len() != 1 {
+                    panic!("DocumentNode is only supported for enum values with exactly one field");
+                }
+                let variant_name = &variant.ident;
+                range.push(quote_spanned! {name.span()=>
+                    #name::#variant_name(inner) => inner.range()
+                });
+            }
+            quote! {
+                impl DocumentNode for #name {
+                    fn range(&self) -> Range {
+                        return match self {
+                            #(#range,)*
+                        };
+                    }
+                }
+            }
+        }
+        _ => panic!("derive(DocumentNode) is only supported for structs and enums"),
+    };
+    return proc_macro::TokenStream::from(expanded);
+}
+
 #[proc_macro_derive(ParsableTag, attributes(tag_definition))]
 pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -42,7 +116,6 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                             }
                             let node = parser.cursor.node();
                             match node.kind() {
-                                "comment" | "xml_comment" => (),
                                 #(
                                     stringify!(#plain_attribute_fields) => #plain_attribute_fields =
                                         Some(parser.parse_plain_attribute()?.1),
@@ -91,20 +164,6 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         return &self.body;
                     }
 
-                    fn range(&self) -> lsp_types::Range {
-                        return lsp_types::Range {
-                            start: lsp_types::Position {
-                                line: self.open_location.line as u32,
-                                character: self.open_location.char as u32,
-                            },
-                            end: lsp_types::Position {
-                                line: self.close_location.line as u32,
-                                character: (self.close_location.char + self.close_location.length)
-                                    as u32,
-                            },
-                        }
-                    }
-
                     fn spel_attributes(&self) -> Vec<(&str, &SpelAttribute)> {
                         let mut attributes = Vec::new();
                         #(
@@ -135,7 +194,6 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             let mut open_location = Vec::new();
             let mut close_location = Vec::new();
             let mut body = Vec::new();
-            let mut range = Vec::new();
             let mut spel_attribute = Vec::new();
             let mut spel_attributes = Vec::new();
             for variant in variants {
@@ -154,9 +212,6 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 });
                 body.push(quote_spanned! {name.span()=>
                     Tag::#name(inner) => inner.body()
-                });
-                range.push(quote_spanned! {name.span()=>
-                    Tag::#name(inner) => inner.range()
                 });
                 spel_attribute.push(quote_spanned! {name.span()=>
                     Tag::#name(inner) => inner.spel_attribute(name)
@@ -195,12 +250,6 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         };
                     }
 
-                    fn range(&self) -> lsp_types::Range {
-                        return match self {
-                            #(#range,)*
-                        };
-                    }
-
                     fn spel_attributes(&self) -> Vec<(&str, &SpelAttribute)> {
                         return match self {
                             #(#spel_attributes,)*
@@ -214,7 +263,7 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     }
                 }
             }
-        },
+        }
         _ => panic!("derive(ParsableTag) is only supported for structs and enums"),
     };
     return proc_macro::TokenStream::from(expanded);

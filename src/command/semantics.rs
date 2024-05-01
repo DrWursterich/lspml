@@ -7,7 +7,7 @@ use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, Semanti
 use crate::{
     document_store,
     grammar::AttributeRule,
-    parser::{ParsableTag, Tag, Tree},
+    parser::{Node, ParsableTag, Tag, Tree},
     spel::ast::{
         Anchor, Argument, Comparable, Condition, Expression, Function, Identifier, Interpolation,
         Location, Null, Number, Object, Query, Regex, SignedNumber, SpelAst, SpelResult,
@@ -63,9 +63,7 @@ struct SpelTokenCollector<'a> {
 
 impl Tokenizer {
     fn new() -> Self {
-        return Tokenizer {
-            tokens: vec![],
-        };
+        return Tokenizer { tokens: vec![] };
     }
 
     fn add(
@@ -182,7 +180,7 @@ pub(crate) fn semantics(params: SemanticTokensParams) -> Result<Vec<SemanticToke
 }
 
 fn index_document(tree: &Tree, tokenizer: &mut Tokenizer) {
-    return index_children(&tree.tags, tokenizer);
+    return index_children(&tree.nodes, tokenizer);
 }
 
 fn index_tag(tag: &Tag, tokenizer: &mut Tokenizer) {
@@ -242,13 +240,16 @@ fn index_tag(tag: &Tag, tokenizer: &mut Tokenizer) {
         };
     }
     if let Some(body) = tag.body() {
-        index_children(&body.tags, tokenizer);
+        index_children(&body.nodes, tokenizer);
     }
 }
 
-fn index_children(tags: &Vec<Tag>, tokenizer: &mut Tokenizer) {
-    for tag in tags {
-        index_tag(tag, tokenizer);
+fn index_children(nodes: &Vec<Node>, tokenizer: &mut Tokenizer) {
+    for node in nodes {
+        match node {
+            Node::Tag(tag) => index_tag(tag, tokenizer),
+            Node::Text(_) | Node::Error(_) => (),
+        };
     }
 }
 
