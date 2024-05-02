@@ -7,7 +7,7 @@ use crate::{
     document_store::{self, Document},
     grammar::{TagAttributeType, TagAttributes},
     modules,
-    parser::{DocumentNode, Node, ParsableTag, SpelAttribute, Tag},
+    parser::{Node, ParsableTag, SpelAttribute, Tag},
     spel::ast::{
         Argument, Comparable, Condition, Expression, Function, Identifier, Location, Object, Query,
         Regex, SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment,
@@ -130,21 +130,7 @@ pub(crate) fn definition(
             }),
     }?;
     let cursor = text_params.position;
-    let mut nodes = &document.tree.nodes;
-    let mut current = None;
-    loop {
-        if let Some(node) = find_tag_at(nodes, cursor) {
-            current = Some(node);
-            if let Node::Tag(tag) = node {
-                if let Some(body) = tag.body() {
-                    nodes = &body.nodes;
-                    continue;
-                }
-            }
-        }
-        break;
-    }
-    if let Some(Node::Tag(tag)) = current {
+    if let Some(Node::Tag(tag)) = document.tree.node_at(cursor) {
         for (_, attribute) in tag.spel_attributes() {
             if is_in_attribute_value(attribute, &cursor) {
                 let offset = Point {
@@ -223,20 +209,6 @@ pub(crate) fn definition(
         }
     }
     return Ok(None);
-}
-
-pub(crate) fn find_tag_at(nodes: &Vec<Node>, cursor: Position) -> Option<&Node> {
-    for node in nodes {
-        let range = node.range();
-        if cursor > range.end {
-            continue;
-        }
-        if cursor < range.start {
-            break;
-        }
-        return Some(node);
-    }
-    return None;
 }
 
 fn is_in_attribute_value(attribute: &SpelAttribute, position: &Position) -> bool {

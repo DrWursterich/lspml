@@ -9,7 +9,7 @@ use lsp_types::{
 use crate::{
     capabilities::CodeActionImplementation,
     document_store,
-    parser::{DocumentNode, Node, ParsableTag, SpIf, SpelAttribute, Tag},
+    parser::{Node, SpIf, SpelAttribute, Tag},
     spel::ast::{
         Argument, Comparable, ComparissonOperator, Condition, Function, SpelAst, SpelResult,
     },
@@ -90,22 +90,7 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
             }
         }
     }
-    let cursor = params.range.start;
-    let mut nodes = &document.tree.nodes;
-    let mut current = None;
-    loop {
-        if let Some(node) = find_tag_at(nodes, cursor) {
-            current = Some(node);
-            if let Node::Tag(tag) = node {
-                if let Some(body) = tag.body() {
-                    nodes = &body.nodes;
-                    continue;
-                }
-            }
-        }
-        break;
-    }
-    match current {
+    match document.tree.node_at(params.range.start) {
         Some(Node::Tag(Tag::SpIf(tag))) => {
             log::debug!("code-action triggered in sp:if");
             if let Some(action) = construct_name_to_condition(&uri, &tag) {
@@ -120,20 +105,6 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
         _ => (),
     };
     return Ok(actions);
-}
-
-pub(crate) fn find_tag_at(nodes: &Vec<Node>, cursor: Position) -> Option<&Node> {
-    for node in nodes {
-        let range = node.range();
-        if cursor > range.end {
-            continue;
-        }
-        if cursor < range.start {
-            break;
-        }
-        return Some(node);
-    }
-    return None;
 }
 
 fn construct_generate_default_header<'a>(uri: &Url) -> CodeActionOrCommand {

@@ -12,7 +12,10 @@ use crate::{
     document_store,
     grammar::AttributeRule,
     modules,
-    parser::{DocumentNode, ErrorNode, Header, Node, ParsableTag, SpelAttribute, Tag, Tree},
+    parser::{
+        DocumentNode, ErrorNode, Header, HtmlNode, Node, ParsableTag, SpelAttribute, Tag, TagBody,
+        Tree,
+    },
     spel::{
         ast::{
             self, Argument, Comparable, Condition, Expression, Identifier, Object, SpelAst,
@@ -43,6 +46,7 @@ impl DiagnosticCollector {
         for node in &tree.nodes {
             match node {
                 Node::Tag(tag) => self.validate_tag(tag)?,
+                Node::Html(html) => self.validate_html(html)?,
                 Node::Text(_) => (),
                 Node::Error(ErrorNode { content, range }) => {
                     self.add_diagnostic(
@@ -91,55 +95,6 @@ impl DiagnosticCollector {
         for (_, attribute) in tag.spel_attributes() {
             SpelValidator::validate(self, &attribute)?;
         }
-        // for child in tags {
-        // match child.kind() {
-        //     // may need to check on kind of missing child
-        //     // _ if child.is_missing() => self.add_diagnostic(
-        //     //     format!("{} is never closed", node.kind()),
-        //     //     DiagnosticSeverity::ERROR,
-        //     //     self.node_tag_range(node),
-        //     // ),
-        //     // _ if child.is_error() => self.add_diagnostic(
-        //     //     format!("unexpected \"{}\"", child.utf8_text(self.text.as_bytes())?),
-        //     //     DiagnosticSeverity::ERROR,
-        //     //     self.node_range(&child),
-        //     // ),
-        //     "html_void_tag" | "java_tag" | "script_tag" | "style_tag" => {}
-        //     "html_tag" | "html_option_tag" => self.validate_children(&child, spel)?,
-        //     kind if kind.ends_with("_attribute") => {
-        //         let (attribute, value) =
-        //             match parser::attribute_name_and_value_of(child, self.text.as_str()) {
-        //                 Some((attribute, value)) => (attribute.to_string(), value.to_string()),
-        //                 _ => continue,
-        //             };
-        //         if let Some(value_node) = child.child(2).and_then(|child| child.child(1)) {
-        //             SpelValidator::validate(self, &value_node, spel)?;
-        //         };
-        //         if attributes.contains_key(&attribute) {
-        //             self.add_diagnostic(
-        //                 format!("duplicate {} attribute", attribute),
-        //                 DiagnosticSeverity::WARNING,
-        //                 self.node_tag_range(node),
-        //             );
-        //         } else {
-        //             attributes.insert(attribute, value);
-        //         }
-        //     }
-        //     kind if kind.ends_with("_tag") => match &TagDefinition::from_str(kind) {
-        //         Ok(child_tag) if self.can_have_child(&tag, child_tag) => {
-        //             self.validate_tag(child_tag, &child, spel)?;
-        //         }
-        //         Ok(_) => self.add_diagnostic(
-        //             format!("unexpected {} tag", &kind[..kind.find("_tag").unwrap()]),
-        //             DiagnosticSeverity::WARNING,
-        //             self.node_range(&child),
-        //         ),
-        //         Err(err) => log::info!("expected sp or spt tag: {}", err),
-        //     },
-        //     _ => self.validate_children(&child, spel)?,
-        // }
-        // self.validate_tag(&child)?;
-        // }
         for rule in tag.definition().attribute_rules {
             match rule {
                 AttributeRule::Deprecated(name) if tag.spel_attribute(*name).is_some() => {
@@ -567,54 +522,28 @@ impl DiagnosticCollector {
                 _ => {}
             }
         }
-        match tag.body() {
-            Some(body) => {
-                for child in &body.nodes {
-                    if let Node::Tag(tag) = child {
-                        self.validate_tag(&tag)?;
-                    }
-                }
-            }
-            _ => (),
-        };
+        if let Some(body) = tag.body() {
+            return self.validate_body(body);
+        }
         return Ok(());
     }
 
-    // fn can_have_child(&self, tag: &TagDefinition, child: &TagDefinition) -> bool {
-    //     return match &tag.children {
-    //         TagChildren::Any => true,
-    //         TagChildren::None => false,
-    //         TagChildren::Scalar(tag) => *child == **tag,
-    //         TagChildren::Vector(tags) => tags.iter().any(|tag| child == tag),
-    //     };
-    // }
+    fn validate_html(&mut self, html: &HtmlNode) -> Result<()> {
+        // TODO: html attributes can contain spml tags
+        if let Some(body) = html.body() {
+            return self.validate_body(body);
+        }
+        return Ok(());
+    }
 
-    // fn validate_children(&mut self, node: &Node, spel: &HashMap<Point, SpelAst>) -> Result<()> {
-    //     for child in node.children(&mut node.walk()) {
-    //         match child.kind() {
-    //             "ERROR" => self.add_diagnostic(
-    //                 format!("unexpected \"{}\"", child.utf8_text(self.text.as_bytes())?),
-    //                 DiagnosticSeverity::ERROR,
-    //                 self.node_range(&child),
-    //             ),
-    //             "text" => {
-    //                 // TODO: what tags can/cannot have text?
-    //             }
-    //             "html_tag" | "html_option_tag" | "html_void_tag" | "java_tag" | "script_tag"
-    //             | "style_tag" => {
-    //                 self.validate_children(&child, spel)?;
-    //             }
-    //             kind if kind.ends_with("_tag") => match &TagDefinition::from_str(kind) {
-    //                 Ok(child_tag) => self.validate_tag(child_tag, &child, spel)?,
-    //                 Err(err) => {
-    //                     log::info!("expected sp or spt tag: {}", err);
-    //                 }
-    //             },
-    //             _ => self.validate_children(&child, spel)?,
-    //         }
-    //     }
-    //     return Ok(());
-    // }
+    fn validate_body(&mut self, body: &TagBody) -> Result<()> {
+        for child in &body.nodes {
+            if let Node::Tag(tag) = child {
+                self.validate_tag(&tag)?;
+            }
+        }
+        return Ok(());
+    }
 
     fn add_diagnostic(&mut self, message: String, severity: DiagnosticSeverity, range: Range) {
         self.diagnostics.push(Diagnostic {
@@ -899,8 +828,8 @@ impl SpelValidator<'_> {
                 character: left.char() as u32 + self.offset.character,
             },
             end: Position {
-                line: right.line() as u32 + self.offset.character,
-                character: right.char() as u32 + right.len() as u32 + self.offset.line,
+                line: right.line() as u32 + self.offset.line,
+                character: right.char() as u32 + right.len() as u32 + self.offset.character,
             },
         };
     }

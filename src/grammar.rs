@@ -172,16 +172,6 @@ macro_rules! tag_definition {
 }
 
 impl TagDefinition {
-    pub(crate) const HTML: TagDefinition = TagDefinition {
-        name: "html",
-        detail: None,
-        documentation: None,
-        deprecated: false,
-        children: TagChildren::Any,
-        attributes: TagAttributes::None,
-        attribute_rules: &[],
-    };
-
     pub(crate) const SP_ARGUMENT: TagDefinition = tag_definition!(
         type "sp",
         name "argument",

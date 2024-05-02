@@ -249,6 +249,7 @@ fn index_children(nodes: &Vec<Node>, tokenizer: &mut Tokenizer) {
         match node {
             Node::Tag(tag) => index_tag(tag, tokenizer),
             Node::Text(_) | Node::Error(_) => (),
+            Node::Html(_) => (), // TODO: html attributes can contain spml tags
         };
     }
 }

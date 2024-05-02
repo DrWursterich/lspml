@@ -8,7 +8,7 @@ use anyhow::{Error, Result};
 use lsp_types::Url;
 use tree_sitter::Parser;
 
-use crate::parser::{Header, Tree};
+use crate::parser::Tree;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Document {
@@ -21,25 +21,7 @@ impl Document {
         let mut parser = Parser::new();
         parser.set_language(&tree_sitter_spml::language())?;
         return match parser.parse(&text, None) {
-            Some(tree) => {
-                match Tree::new(tree, &text) {
-                    Ok(tree) => Ok(Document { text, tree }),
-                    Err(err) => {
-                        log::info!("could not parse syntax tree: {}", err);
-                        // TODO: should be able to handle incomplete trees!
-                        Ok(Document {
-                            text,
-                            tree: Tree {
-                                header: Header {
-                                    java_headers: vec![],
-                                    taglib_imports: vec![],
-                                },
-                                nodes: vec![],
-                            },
-                        })
-                    }
-                }
-            }
+            Some(tree) => Tree::new(tree, &text).map(|tree| Document { text, tree }),
             None => return Result::Err(anyhow::anyhow!("failed to parse text: {}", text)),
         };
     }

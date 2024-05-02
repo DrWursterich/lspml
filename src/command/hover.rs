@@ -8,7 +8,7 @@ use super::LsError;
 
 use crate::{
     document_store,
-    parser::{DocumentNode, Node, ParsableTag, SpelAttribute},
+    parser::{Attribute, Node, ParsableTag},
     spel::{
         self,
         ast::{self, Location, SpelAst, SpelResult},
@@ -31,21 +31,7 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
             }),
     }?;
     let cursor = text_params.position;
-    let mut nodes = &document.tree.nodes;
-    let mut current = None;
-    loop {
-        if let Some(node) = find_tag_at(nodes, cursor) {
-            current = Some(node);
-            if let Node::Tag(tag) = node {
-                if let Some(body) = tag.body() {
-                    nodes = &body.nodes;
-                    continue;
-                }
-            }
-        }
-        break;
-    }
-    match current {
+    match document.tree.node_at(cursor) {
         Some(Node::Tag(tag)) => {
             log::debug!("found to be in tag {}", tag.definition().name);
             if tag.open_location().contains(cursor) || tag.close_location().contains(cursor) {
@@ -115,6 +101,14 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
                 }
             }
         }
+        Some(Node::Html(html)) => {
+            log::debug!("found to be in html {} tag", html.name);
+            // TODO: html attributes can contain spml tags
+            // for attribute in &html.attributes {
+            //     if is_in_attribute_value(attribute, &cursor) {
+            //     }
+            // }
+        }
         Some(Node::Error(err)) => log::debug!("cursor is in error \"{}\"", err.content),
         Some(Node::Text(text)) => log::debug!("cursor is in text \"{}\"", text.content),
         None => log::debug!("cursor is not in a tag"),
@@ -122,27 +116,13 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
     return Ok(None);
 }
 
-pub(crate) fn find_tag_at(nodes: &Vec<Node>, cursor: Position) -> Option<&Node> {
-    for node in nodes {
-        let range = node.range();
-        if cursor > range.end {
-            continue;
-        }
-        if cursor < range.start {
-            break;
-        }
-        return Some(node);
-    }
-    return None;
-}
-
-fn is_in_attribute_value(attribute: &SpelAttribute, position: &Position) -> bool {
+fn is_in_attribute_value(attribute: &impl Attribute, position: &Position) -> bool {
     let opening_line = attribute
-        .opening_quote_location
+        .opening_quote_location()
         .line
         .cmp(&(position.line as usize));
     let opening_char = attribute
-        .opening_quote_location
+        .opening_quote_location()
         .char
         .cmp(&(position.character as usize));
     match (opening_line, opening_char) {
@@ -150,11 +130,11 @@ fn is_in_attribute_value(attribute: &SpelAttribute, position: &Position) -> bool
         _ => return false,
     }
     let closing_line = attribute
-        .closing_quote_location
+        .closing_quote_location()
         .line
         .cmp(&(position.line as usize));
     let closing_char = attribute
-        .closing_quote_location
+        .closing_quote_location()
         .char
         .cmp(&(position.character as usize));
     return match (closing_line, closing_char) {

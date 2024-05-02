@@ -11,7 +11,7 @@ use crate::{
     document_store::{self, Document},
     grammar::{self, TagAttribute, TagAttributeType, TagAttributes, TagChildren, TagDefinition},
     modules::{self, Module},
-    parser::{DocumentNode, Node, ParsableTag, SpelAttribute, Tag, TagBody},
+    parser::{ErrorNode, Node, ParsableTag, SpelAttribute, Tag, TagBody},
     spel::ast::{SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment},
 };
 
@@ -39,22 +39,17 @@ impl CompletionCollector<'_> {
     }
 
     fn search_completions_in_document(&mut self) {
-        let mut nodes = &self.document.tree.nodes;
-        let mut current = None;
-        loop {
-            if let Some(node) = find_tag_at(nodes, self.cursor) {
-                current = Some(node);
-                if let Node::Tag(tag) = node {
-                    if let Some(body) = tag.body() {
-                        nodes = &body.nodes;
-                        continue;
-                    }
-                }
-            }
-            break;
-        }
-        match current {
+        match self.document.tree.node_at(self.cursor) {
             Some(Node::Tag(tag)) => self.search_completions_in_tag(tag),
+            Some(Node::Error(ErrorNode { content: _, range: _ })) => {
+                // TODO:!
+                // if self
+                //     .cut_text_up_to_cursor(content, range)
+                //     .is_some_and(|line| line.ends_with("</"))
+                // {
+                //     self.complete_closing_tag(previous);
+                // }
+            }
             _ => self.complete_top_level_tags(),
         }
     }
@@ -74,38 +69,45 @@ impl CompletionCollector<'_> {
             .push(Self::tag_to_completion(tag, self.determine_tag_range()));
     }
 
-    // fn complete_closing_tag(&mut self, mut current: Node) {
-    //     loop {
-    //         match current.prev_sibling().or_else(|| current.parent()) {
-    //             Some(next) => current = next,
-    //             None => return,
-    //         };
-    //         let tag = match current.kind() {
-    //             "html_tag_open" => current
-    //                 .utf8_text(self.document.text.as_bytes())
-    //                 .ok()
-    //                 .map(|tag| &tag[1..]),
-    //             "html_option_tag" => current
-    //                 .child(0)
-    //                 .and_then(|tag| tag.utf8_text(self.document.text.as_bytes()).ok())
-    //                 .map(|tag| &tag[1..]),
-    //             kind if kind.ends_with("_tag_open") => {
-    //                 TagDefinition::from_str(&kind[..kind.len() - "_open".len()])
-    //                     .ok()
-    //                     .map(|tag| tag.name)
+    // fn complete_closing_tag(&mut self, last_opend_tag: Option<&Node>) {
+    //     if let Some(Node::Tag(tag)) = last_opend_tag {
+    //         // TODO: tag.name() should be a function! html tags do not have a name currently!
+    //         self.completions.push(CompletionItem {
+    //             label: "</sp:".to_string() + &tag.definition().name,
+    //             kind: Some(CompletionItemKind::SNIPPET),
+    //             insert_text: Some("sp:".to_string() + &tag.definition().name),
+    //             ..Default::default()
+    //         });
+    //     };
+    // }
+
+    // fn cut_text_up_to_cursor<'a>(&self, text: &String, range: &Range) -> Option<String> {
+    //     // TODO: this needs to be tested!
+    //     return match self.cursor.cmp(&range.start) {
+    //         Ordering::Equal => Some("".to_string()),
+    //         Ordering::Less => None,
+    //         Ordering::Greater => match self.cursor.cmp(&range.end) {
+    //             Ordering::Equal => Some(text.to_string()),
+    //             Ordering::Less => {
+    //                 let expected_new_lines = (self.cursor.line - range.end.line) as usize;
+    //                 let mut position = 0;
+    //                 for (index, line) in text.splitn(expected_new_lines + 1, '\n').enumerate() {
+    //                     match index {
+    //                         0 => position = line.len(),
+    //                         n if n == expected_new_lines => {
+    //                             return Some(
+    //                                 text[0..position + 1 + self.cursor.character as usize]
+    //                                     .to_string(),
+    //                             );
+    //                         }
+    //                         _ => position += 1 + line.len(),
+    //                     }
+    //                 }
+    //                 return Some(text.to_string());
     //             }
-    //             _ => continue,
-    //         };
-    //         if let Some(tag) = tag.map(|tag| tag.to_string() + ">") {
-    //             self.completions.push(CompletionItem {
-    //                 label: "</".to_string() + &tag,
-    //                 kind: Some(CompletionItemKind::SNIPPET),
-    //                 insert_text: Some(tag),
-    //                 ..Default::default()
-    //             });
-    //         };
-    //         return;
-    //     }
+    //             Ordering::Greater => None,
+    //         },
+    //     };
     // }
 
     fn determine_tag_range(&self) -> Range {
@@ -322,20 +324,6 @@ impl CompletionCollector<'_> {
             TagChildren::Vector(tags) => self.complete_tags(tags.iter()),
         };
     }
-}
-
-pub(crate) fn find_tag_at(nodes: &Vec<Node>, cursor: Position) -> Option<&Node> {
-    for node in nodes {
-        let range = node.range();
-        if cursor > range.end {
-            continue;
-        }
-        if cursor < range.start {
-            break;
-        }
-        return Some(node);
-    }
-    return None;
 }
 
 fn is_in_attribute_value(attribute: &SpelAttribute, position: &Position) -> bool {

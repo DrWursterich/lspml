@@ -82,8 +82,32 @@ pub(crate) struct TagBody {
 #[derive(Clone, Debug, PartialEq, DocumentNode)]
 pub(crate) enum Node {
     Tag(Tag),
+    Html(HtmlNode),
     Text(TextNode),
     Error(ErrorNode),
+}
+
+#[derive(Clone, Debug, PartialEq, DocumentNode)]
+pub(crate) struct HtmlNode {
+    pub(crate) open_location: Location,
+    pub(crate) name: String,
+    pub(crate) attributes: Vec<PlainAttribute>,
+    pub(crate) body: Option<TagBody>,
+    pub(crate) close_location: Location,
+}
+
+impl HtmlNode {
+    pub(crate) fn open_location(&self) -> &Location {
+        return &self.open_location;
+    }
+
+    pub(crate) fn close_location(&self) -> &Location {
+        return &self.close_location;
+    }
+
+    pub(crate) fn body(&self) -> &Option<TagBody> {
+        return &self.body;
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, DocumentNode)]
@@ -100,7 +124,6 @@ pub(crate) struct ErrorNode {
 
 #[derive(Clone, Debug, PartialEq, DocumentNode, ParsableTag)]
 pub(crate) enum Tag {
-    Html(Html),
     SpArgument(SpArgument),
     SpAttribute(SpAttribute),
     SpBarcode(SpBarcode),
@@ -182,77 +205,6 @@ pub(crate) enum Tag {
     SptUpdown(SptUpdown),
     SptUpload(SptUpload),
     SptWorklist(SptWorklist),
-}
-
-#[derive(Clone, Debug, PartialEq, DocumentNode)]
-pub(crate) struct Html {
-    pub open_location: Location,
-    pub body: Option<TagBody>,
-    pub close_location: Location,
-}
-
-impl ParsableTag for Html {
-    fn parse(parser: &mut TreeParser) -> Result<Html> {
-        if !parser.cursor.goto_first_child() {
-            return Err(anyhow::anyhow!("html tag is empty"));
-        }
-        let node = parser.cursor.node();
-        let has_to_be_closed = node.kind() != "html_void_tag_open";
-        let open_location = node_location(node);
-        let mut body = None;
-        loop {
-            if !parser.cursor.goto_next_sibling() {
-                return Err(anyhow::anyhow!("html tag is unclosed"));
-            }
-            let node = parser.cursor.node();
-            match node.kind() {
-                "dynamic_attribute" => (), // TODO: html attributes can contain spml tags
-                "self_closing_tag_end" => break,
-                ">" => {
-                    if has_to_be_closed {
-                        body = Some(parser.parse_tag_body()?);
-                    }
-                    break;
-                }
-                _ => (),
-            };
-        }
-        let close_location = node_location(parser.cursor.node());
-        parser.cursor.goto_parent();
-        return Ok(Html {
-            open_location,
-            body,
-            close_location,
-        });
-    }
-
-    fn definition(&self) -> TagDefinition {
-        return TagDefinition::HTML;
-    }
-
-    fn open_location(&self) -> &Location {
-        return &self.open_location;
-    }
-
-    fn close_location(&self) -> &Location {
-        return &self.close_location;
-    }
-
-    fn body(&self) -> &Option<TagBody> {
-        return &self.body;
-    }
-
-    fn spel_attributes(&self) -> Vec<(&str, &SpelAttribute)> {
-        return Html::SPEL_ATTRIBUTES;
-    }
-
-    fn spel_attribute(&self, _name: &str) -> Option<&SpelAttribute> {
-        return None;
-    }
-}
-
-impl Html {
-    const SPEL_ATTRIBUTES: Vec<(&'static str, &'static SpelAttribute)> = vec![];
 }
 
 macro_rules! tag_struct {
@@ -1240,19 +1192,41 @@ tag_struct!(
     }
 );
 
-// #[derive(Clone, Debug, PartialEq)]
-// pub(crate) enum Attribute {
-//     Plain(PlainAttribute),
-//     Spel(SpelAttribute),
-// }
+pub(crate) trait Attribute {
+    // fn key_location(&self) -> &Location;
+
+    // fn equals_location(&self) -> &Location;
+
+    fn opening_quote_location(&self) -> &Location;
+
+    fn closing_quote_location(&self) -> &Location;
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct PlainAttribute {
-    key_location: Location,
-    equals_location: Location,
-    opening_quote_location: Location,
-    value: String,
-    closing_quote_location: Location,
+    pub(crate) key_location: Location,
+    pub(crate) equals_location: Location,
+    pub(crate) opening_quote_location: Location,
+    pub(crate) value: String,
+    pub(crate) closing_quote_location: Location,
+}
+
+impl Attribute for PlainAttribute {
+    // fn key_location(&self) -> &Location {
+    //     return &self.key_location;
+    // }
+
+    // fn equals_location(&self) -> &Location {
+    //     return &self.equals_location;
+    // }
+
+    fn opening_quote_location(&self) -> &Location {
+        return &self.opening_quote_location;
+    }
+
+    fn closing_quote_location(&self) -> &Location {
+        return &self.closing_quote_location;
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1262,6 +1236,24 @@ pub(crate) struct SpelAttribute {
     pub(crate) opening_quote_location: Location,
     pub(crate) spel: SpelAst,
     pub(crate) closing_quote_location: Location,
+}
+
+impl Attribute for SpelAttribute {
+    // fn key_location(&self) -> &Location {
+    //     return &self.key_location;
+    // }
+
+    // fn equals_location(&self) -> &Location {
+    //     return &self.equals_location;
+    // }
+
+    fn opening_quote_location(&self) -> &Location {
+        return &self.opening_quote_location;
+    }
+
+    fn closing_quote_location(&self) -> &Location {
+        return &self.closing_quote_location;
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1436,7 +1428,7 @@ impl TreeParser<'_, '_> {
                 }
                 "ERROR" => tags.push(self.parse_error().map(Node::Error)?),
                 "html_tag" | "html_option_tag" | "html_void_tag" | "script_tag" | "style_tag" => {
-                    tags.push(Html::parse(self).map(Tag::Html).map(Node::Tag)?);
+                    tags.push(self.parse_html().map(Node::Html)?);
                 }
                 "attribute_tag" => tags.push(
                     SpAttribute::parse(self)
@@ -1671,6 +1663,45 @@ impl TreeParser<'_, '_> {
         return Ok(tags);
     }
 
+    fn parse_html(&mut self) -> Result<HtmlNode> {
+        if !self.cursor.goto_first_child() {
+            return Err(anyhow::anyhow!("html tag is empty"));
+        }
+        let node = self.cursor.node();
+        let name = node.utf8_text(self.text_bytes)?.to_string();
+        let has_to_be_closed = node.kind() != "html_void_tag_open";
+        let open_location = node_location(node);
+        let mut attributes = Vec::new();
+        let mut body = None;
+        loop {
+            if !self.cursor.goto_next_sibling() {
+                return Err(anyhow::anyhow!("html tag is unclosed"));
+            }
+            let node = self.cursor.node();
+            match node.kind() {
+                // TODO: html attributes can contain spml tags
+                "dynamic_attribute" => attributes.push(self.parse_plain_attribute()?.1),
+                "self_closing_tag_end" => break,
+                ">" => {
+                    if has_to_be_closed {
+                        body = Some(self.parse_tag_body()?);
+                    }
+                    break;
+                }
+                _ => (),
+            };
+        }
+        let close_location = node_location(self.cursor.node());
+        self.cursor.goto_parent();
+        return Ok(HtmlNode {
+            open_location,
+            name,
+            attributes,
+            body,
+            close_location,
+        });
+    }
+
     fn parse_text(&mut self) -> Result<TextNode> {
         let mut node = self.cursor.node();
         let start = node.start_position();
@@ -1804,7 +1835,7 @@ impl TreeParser<'_, '_> {
             TagAttributeType::Comparable => match parser.parse_comparable() {
                 Ok(result) => SpelAst::Comparable(SpelResult::Valid(result)),
                 // workaround as comparables as attribute values do accept strings (without quotes)
-                // but comparables in actuall comparissons do not.
+                // but comparables in actual comparissons do not.
                 Err(err) => match spel::parser::Parser::new(&text).parse_text() {
                     Ok(result) => SpelAst::String(SpelResult::Valid(result)),
                     Err(_) => SpelAst::Comparable(SpelResult::Invalid(err)),
@@ -1892,6 +1923,47 @@ impl Tree {
         let nodes = parser.parse_tags()?;
         return Ok(Tree { header, nodes });
     }
+
+    pub(crate) fn node_at(&self, position: Position) -> Option<&Node> {
+        let mut nodes = &self.nodes;
+        let mut current = None;
+        loop {
+            if let Some(node) = find_tag_at(nodes, position) {
+                current = Some(node);
+                match node {
+                    Node::Tag(tag) => {
+                        if let Some(body) = tag.body() {
+                            nodes = &body.nodes;
+                            continue;
+                        }
+                    }
+                    Node::Html(tag) => {
+                        // TODO: html attributes can contain spml tags
+                        if let Some(body) = tag.body() {
+                            nodes = &body.nodes;
+                            continue;
+                        }
+                    }
+                    _ => (),
+                };
+            }
+            return current;
+        }
+    }
+}
+
+fn find_tag_at(nodes: &Vec<Node>, position: Position) -> Option<&Node> {
+    for node in nodes {
+        let range = node.range();
+        if position > range.end {
+            continue;
+        }
+        if position < range.start {
+            break;
+        }
+        return Some(node);
+    }
+    return None;
 }
 
 #[cfg(test)]
@@ -1948,130 +2020,42 @@ mod tests {
             }],
             taglib_imports: vec![
                 TagLibImport {
-                    open_bracket: Location {
-                        char: 2,
-                        line: 1,
-                        length: 3,
-                    },
-                    taglib: Location {
-                        char: 6,
-                        line: 1,
-                        length: 6,
-                    },
+                    open_bracket: Location::new(2, 1, 3),
+                    taglib: Location::new(6, 1, 6),
                     origin: TagLibOrigin::Uri(PlainAttribute {
-                        key_location: Location {
-                            char: 13,
-                            line: 1,
-                            length: 3,
-                        },
-                        equals_location: Location {
-                            char: 16,
-                            line: 1,
-                            length: 1,
-                        },
-                        opening_quote_location: Location {
-                            char: 17,
-                            line: 1,
-                            length: 1,
-                        },
+                        key_location: Location::new(13, 1, 3),
+                        equals_location: Location::new(16, 1, 1),
+                        opening_quote_location: Location::new(17, 1, 1),
                         value: "http://www.sitepark.com/taglibs/core".to_string(),
-                        closing_quote_location: Location {
-                            char: 54,
-                            line: 1,
-                            length: 1,
-                        },
+                        closing_quote_location: Location::new(54, 1, 1),
                     }),
                     prefix: PlainAttribute {
-                        key_location: Location {
-                            char: 56,
-                            line: 1,
-                            length: 6,
-                        },
-                        equals_location: Location {
-                            char: 62,
-                            line: 1,
-                            length: 1,
-                        },
-                        opening_quote_location: Location {
-                            char: 63,
-                            line: 1,
-                            length: 1,
-                        },
+                        key_location: Location::new(56, 1, 6),
+                        equals_location: Location::new(62, 1, 1),
+                        opening_quote_location: Location::new(63, 1, 1),
                         value: "sp".to_string(),
-                        closing_quote_location: Location {
-                            char: 66,
-                            line: 1,
-                            length: 1,
-                        },
+                        closing_quote_location: Location::new(66, 1, 1),
                     },
-                    close_bracket: Location {
-                        char: 0,
-                        line: 2,
-                        length: 2,
-                    },
+                    close_bracket: Location::new(0, 2, 2),
                 },
                 TagLibImport {
-                    open_bracket: Location {
-                        char: 2,
-                        line: 2,
-                        length: 3,
-                    },
-                    taglib: Location {
-                        char: 6,
-                        line: 2,
-                        length: 6,
-                    },
+                    open_bracket: Location::new(2, 2, 3),
+                    taglib: Location::new(6, 2, 6),
                     origin: TagLibOrigin::TagDir(PlainAttribute {
-                        key_location: Location {
-                            char: 13,
-                            line: 2,
-                            length: 6,
-                        },
-                        equals_location: Location {
-                            char: 19,
-                            line: 2,
-                            length: 1,
-                        },
-                        opening_quote_location: Location {
-                            char: 20,
-                            line: 2,
-                            length: 1,
-                        },
+                        key_location: Location::new(13, 2, 6),
+                        equals_location: Location::new(19, 2, 1),
+                        opening_quote_location: Location::new(20, 2, 1),
                         value: "/WEB-INF/tags/spt".to_string(),
-                        closing_quote_location: Location {
-                            char: 38,
-                            line: 2,
-                            length: 1,
-                        },
+                        closing_quote_location: Location::new(38, 2, 1),
                     }),
                     prefix: PlainAttribute {
-                        key_location: Location {
-                            char: 40,
-                            line: 2,
-                            length: 6,
-                        },
-                        equals_location: Location {
-                            char: 46,
-                            line: 2,
-                            length: 1,
-                        },
-                        opening_quote_location: Location {
-                            char: 47,
-                            line: 2,
-                            length: 1,
-                        },
+                        key_location: Location::new(40, 2, 6),
+                        equals_location: Location::new(46, 2, 1),
+                        opening_quote_location: Location::new(47, 2, 1),
                         value: "spt".to_string(),
-                        closing_quote_location: Location {
-                            char: 51,
-                            line: 2,
-                            length: 1,
-                        },
+                        closing_quote_location: Location::new(51, 2, 1),
                     },
-                    close_bracket: Location {
-                        char: 0,
-                        line: 3,
-                        length: 2,
-                    },
+                    close_bracket: Location::new(0, 3, 2),
                 },
             ],
         };
