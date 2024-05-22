@@ -129,5 +129,5 @@ Install [the lsp package](https://lsp.sublimetext.io/) and follow their setup in
 
 ### visual studio code
 
-An extension wrapping `lspml` is currently beeing worked on. As soon as it is ready it will be published and linked here.
+The [spml-vscode](https://github.com/sitepark/spml-vscode) extension wraps `lspml` and provides all of it's features.
 
