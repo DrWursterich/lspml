@@ -41,14 +41,36 @@ impl CompletionCollector<'_> {
     fn search_completions_in_document(&mut self) {
         match self.document.tree.node_at(self.cursor) {
             Some(Node::Tag(tag)) => self.search_completions_in_tag(tag),
-            Some(Node::Error(ErrorNode { content: _, range: _ })) => {
-                // TODO:!
-                // if self
-                //     .cut_text_up_to_cursor(content, range)
-                //     .is_some_and(|line| line.ends_with("</"))
-                // {
-                //     self.complete_closing_tag(previous);
-                // }
+            Some(Node::Error(ErrorNode { content, range })) => {
+                // TODO: this is very fragile!
+                match self.cut_text_up_to_cursor(content, range) {
+                    Some(error) if error.ends_with("</") => {
+                        error
+                            .rsplit(">")
+                            .filter(|str| !str.ends_with("/"))
+                            .filter(|str| !str.ends_with("%"))
+                            .filter_map(|str| {
+                                str.rfind("<").map(|i| {
+                                    str[i + 1..]
+                                        .chars()
+                                        .take_while(|c| !c.is_whitespace())
+                                        .collect::<String>()
+                                })
+                            })
+                            .filter(|str| !str.starts_with("/"))
+                            .filter(|str| !str.starts_with("!"))
+                            .enumerate()
+                            .map(|(i, tag)| CompletionItem {
+                                label: "</".to_string() + &tag + ">",
+                                kind: Some(CompletionItemKind::SNIPPET),
+                                insert_text: Some(tag.to_string() + ">"),
+                                preselect: Some(i == 0),
+                                ..Default::default()
+                            })
+                            .for_each(|item| self.completions.push(item));
+                    }
+                    _ => (),
+                }
             }
             _ => self.complete_top_level_tags(),
         }
@@ -81,34 +103,34 @@ impl CompletionCollector<'_> {
     //     };
     // }
 
-    // fn cut_text_up_to_cursor<'a>(&self, text: &String, range: &Range) -> Option<String> {
-    //     // TODO: this needs to be tested!
-    //     return match self.cursor.cmp(&range.start) {
-    //         Ordering::Equal => Some("".to_string()),
-    //         Ordering::Less => None,
-    //         Ordering::Greater => match self.cursor.cmp(&range.end) {
-    //             Ordering::Equal => Some(text.to_string()),
-    //             Ordering::Less => {
-    //                 let expected_new_lines = (self.cursor.line - range.end.line) as usize;
-    //                 let mut position = 0;
-    //                 for (index, line) in text.splitn(expected_new_lines + 1, '\n').enumerate() {
-    //                     match index {
-    //                         0 => position = line.len(),
-    //                         n if n == expected_new_lines => {
-    //                             return Some(
-    //                                 text[0..position + 1 + self.cursor.character as usize]
-    //                                     .to_string(),
-    //                             );
-    //                         }
-    //                         _ => position += 1 + line.len(),
-    //                     }
-    //                 }
-    //                 return Some(text.to_string());
-    //             }
-    //             Ordering::Greater => None,
-    //         },
-    //     };
-    // }
+    fn cut_text_up_to_cursor<'a>(&self, text: &String, range: &Range) -> Option<String> {
+        // TODO: this needs to be tested!
+        return match self.cursor.cmp(&range.start) {
+            Ordering::Equal => Some("".to_string()),
+            Ordering::Less => None,
+            Ordering::Greater => match self.cursor.cmp(&range.end) {
+                Ordering::Equal => Some(text.to_string()),
+                Ordering::Less => {
+                    let expected_new_lines = (self.cursor.line - range.start.line) as usize;
+                    let mut position = 0;
+                    for (index, line) in text.splitn(expected_new_lines + 1, '\n').enumerate() {
+                        match index {
+                            0 => position = line.len(),
+                            n if n == expected_new_lines => {
+                                return Some(
+                                    text[0..position + 1 + self.cursor.character as usize]
+                                        .to_string(),
+                                );
+                            }
+                            _ => position += 1 + line.len(),
+                        }
+                    }
+                    return Some(text.to_string());
+                }
+                Ordering::Greater => None,
+            },
+        };
+    }
 
     fn determine_tag_range(&self) -> Range {
         let line = self

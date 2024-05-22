@@ -13,8 +13,7 @@ use crate::{
     grammar::AttributeRule,
     modules,
     parser::{
-        DocumentNode, ErrorNode, Header, HtmlNode, Node, ParsableTag, SpelAttribute, Tag, TagBody,
-        Tree,
+        DocumentNode, ErrorNode, Header, HtmlNode, Node, ParsableTag, ParsedNode, SpelAttribute, Tag, TagBody, Tree
     },
     spel::{
         ast::{
@@ -79,6 +78,38 @@ impl DiagnosticCollector {
                 CodeActionImplementation::GENERATE_DEFAULT_HEADER_CODE,
                 None,
             );
+        }
+        for header in &header.java_headers {
+            match header {
+                ParsedNode::Valid(_header) => {
+                    // TODO
+                },
+                ParsedNode::Incomplete(header) => {
+                    if let Some(range) = header.range() {
+                        if header.open_bracket.is_none() {
+                            self.add_diagnostic(
+                                "invalid java header: missing '<%@'".to_string(),
+                                DiagnosticSeverity::ERROR,
+                                range,
+                            );
+                        }
+                        if header.page.is_none() {
+                            self.add_diagnostic(
+                                "invalid java header: missing 'page'".to_string(),
+                                DiagnosticSeverity::ERROR,
+                                range,
+                            );
+                        }
+                        if header.close_bracket.is_none() {
+                            self.add_diagnostic(
+                                "java header is unclosed".to_string(),
+                                DiagnosticSeverity::ERROR,
+                                range,
+                            );
+                        }
+                    }
+                },
+            }
         }
         return Ok(());
     }

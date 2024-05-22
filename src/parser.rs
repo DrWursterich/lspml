@@ -42,20 +42,102 @@ pub(crate) struct Tree {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub(crate) enum ParsedNode<R, E> {
+    Valid(R),
+    Incomplete(E),
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Header {
-    pub(crate) java_headers: Vec<PageHeader>,
+    pub(crate) java_headers: Vec<ParsedNode<PageHeader, IncompletePageHeader>>,
     pub(crate) taglib_imports: Vec<TagLibImport>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct PageHeader {
-    open_bracket: Location,
-    page: Location,
-    language: Option<PlainAttribute>,
-    page_encoding: Option<PlainAttribute>,
-    content_type: Option<PlainAttribute>,
-    imports: Vec<PlainAttribute>,
-    close_bracket: Location,
+    pub(crate) open_bracket: Location,
+    pub(crate) page: Location,
+    pub(crate) language: Option<PlainAttribute>,
+    pub(crate) page_encoding: Option<PlainAttribute>,
+    pub(crate) content_type: Option<PlainAttribute>,
+    pub(crate) imports: Vec<PlainAttribute>,
+    pub(crate) close_bracket: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct IncompletePageHeader {
+    pub(crate) open_bracket: Option<Location>,
+    pub(crate) page: Option<Location>,
+    pub(crate) language: Option<PlainAttribute>,
+    pub(crate) page_encoding: Option<PlainAttribute>,
+    pub(crate) content_type: Option<PlainAttribute>,
+    pub(crate) imports: Vec<PlainAttribute>,
+    pub(crate) close_bracket: Option<Location>,
+}
+
+impl IncompletePageHeader {
+    // TODO: this
+    //       a) has to be implemented better
+    //       b) should be a trait
+    pub(crate) fn range(&self) -> Option<Range> {
+        let mut start = None;
+        for field in [
+            &self.open_bracket,
+            &self.page,
+            &self.language.as_ref().map(|e| e.key_location.clone()),
+            &self.page_encoding.as_ref().map(|e| e.key_location.clone()),
+            &self.content_type.as_ref().map(|e| e.key_location.clone()),
+        ] {
+            if field.is_some() {
+                start = field.to_owned();
+                break;
+            }
+        }
+        let start = match start
+            .or_else(|| self.imports.first().map(|e| e.key_location.clone()))
+            .or_else(|| self.close_bracket.clone()) {
+            Some(start) => start,
+            None => return None,
+        };
+        let mut end = self.close_bracket.clone().or_else(|| {
+            self.imports
+                .last()
+                .map(|e| e.closing_quote_location.clone())
+        });
+        if end.is_none() {
+            for field in [
+                &self
+                    .content_type
+                    .as_ref()
+                    .map(|e| e.closing_quote_location.clone()),
+                &self
+                    .page_encoding
+                    .as_ref()
+                    .map(|e| e.closing_quote_location.clone()),
+                &self
+                    .language
+                    .as_ref()
+                    .map(|e| e.closing_quote_location.clone()),
+                &self.page,
+                &self.open_bracket,
+            ] {
+                if field.is_some() {
+                    end = field.to_owned();
+                    break;
+                }
+            }
+        }
+        return end.map(|end| Range {
+            start: Position {
+                character: start.char as u32,
+                line: start.line as u32,
+            },
+            end: Position {
+                character: end.char as u32,
+                line: end.line as u32,
+            },
+        });
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1322,28 +1404,37 @@ impl TreeParser<'_, '_> {
         });
     }
 
-    fn parse_page_header(&mut self) -> Result<PageHeader> {
+    fn parse_page_header(&mut self) -> Result<ParsedNode<PageHeader, IncompletePageHeader>> {
         if !self.cursor.goto_first_child() {
             return Err(anyhow::anyhow!("java header is empty"));
         }
-        let open_bracket = node_location(self.cursor.node());
+        let node = self.cursor.node();
+        let open_bracket = match node.is_missing() {
+            true => None,
+            false => Some(node_location(node)),
+        };
 
         if !self.cursor.goto_next_sibling() {
             return Err(anyhow::anyhow!(
                 "java header is missing the \"page\" keyword"
             ));
         }
-        let page = node_location(self.cursor.node());
+        let node = self.cursor.node();
+        let page = match node.is_missing() {
+            true => None,
+            false => Some(node_location(node)),
+        };
 
         let mut content_type = None;
         let mut language = None;
         let mut page_encoding = None;
         let mut imports = Vec::new();
+        let mut node;
         loop {
             if !self.cursor.goto_next_sibling() {
                 return Err(anyhow::anyhow!("java header is unclosed"));
             }
-            let node = self.cursor.node();
+            node = self.cursor.node();
             match node.kind() {
                 "import_attribute" => imports.push(self.parse_plain_attribute()?.1),
                 "contentType_attribute" => content_type = Some(self.parse_plain_attribute()?.1),
@@ -1353,16 +1444,32 @@ impl TreeParser<'_, '_> {
                 kind => return Err(anyhow::anyhow!("unexpected {}", kind)),
             }
         }
-        let close_bracket = node_location(self.cursor.node());
+        let close_bracket = match node.is_missing() {
+            true => None,
+            false => Some(node_location(node)),
+        };
         self.cursor.goto_parent();
-        return Ok(PageHeader {
-            open_bracket,
-            page,
-            language,
-            page_encoding,
-            content_type,
-            imports,
-            close_bracket,
+        return Ok(match (open_bracket, page, close_bracket) {
+            (Some(open_bracket), Some(page), Some(close_bracket)) => {
+                ParsedNode::Valid(PageHeader {
+                    open_bracket,
+                    page,
+                    language,
+                    page_encoding,
+                    content_type,
+                    imports,
+                    close_bracket,
+                })
+            }
+            (open_bracket, page, close_bracket) => ParsedNode::Incomplete(IncompletePageHeader {
+                open_bracket,
+                page,
+                language,
+                page_encoding,
+                content_type,
+                imports,
+                close_bracket,
+            }),
         });
     }
 

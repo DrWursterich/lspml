@@ -202,7 +202,7 @@ dependencies = [
  "quote",
  "syn",
  "tree-sitter",
- "tree-sitter-spml",
+ "tree-sitter-spml 0.0.1 (git+https://github.com/DrWursterich/tree-sitter-spml.git?tag=v0.0.1)",
 ]
 
 [[package]]
@@ -316,7 +316,7 @@ dependencies = [
  "serde_json",
  "structured-logger",
  "tree-sitter",
- "tree-sitter-spml",
+ "tree-sitter-spml 0.0.1 (git+https://github.com/DrWursterich/tree-sitter-spml.git)",
 ]
 
 [[package]]
@@ -658,6 +658,15 @@ dependencies = [
 name = "tree-sitter-spml"
 version = "0.0.1"
 source = "git+https://github.com/DrWursterich/tree-sitter-spml.git?tag=v0.0.1#b44d1cd6b5b0fe867996feb06b7ea2a43af23f53"
+dependencies = [
+ "cc",
+ "tree-sitter",
+]
+
+[[package]]
+name = "tree-sitter-spml"
+version = "0.0.1"
+source = "git+https://github.com/DrWursterich/tree-sitter-spml.git#2c5f71d992d450889b6ddeb4574e9879a2451fce"
 dependencies = [
  "cc",
  "tree-sitter",
