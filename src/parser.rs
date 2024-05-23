@@ -47,10 +47,14 @@ pub(crate) enum ParsedNode<R, E> {
     Incomplete(E),
 }
 
+pub(crate) trait RangedNode {
+    fn range(&self) -> Option<Range>;
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Header {
     pub(crate) java_headers: Vec<ParsedNode<PageHeader, IncompletePageHeader>>,
-    pub(crate) taglib_imports: Vec<TagLibImport>,
+    pub(crate) taglib_imports: Vec<ParsedNode<TagLibImport, IncompleteTagLibImport>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -75,11 +79,9 @@ pub(crate) struct IncompletePageHeader {
     pub(crate) close_bracket: Option<Location>,
 }
 
-impl IncompletePageHeader {
-    // TODO: this
-    //       a) has to be implemented better
-    //       b) should be a trait
-    pub(crate) fn range(&self) -> Option<Range> {
+impl RangedNode for IncompletePageHeader {
+    // TODO: this has to be implemented better
+    fn range(&self) -> Option<Range> {
         let mut start = None;
         for field in [
             &self.open_bracket,
@@ -143,13 +145,52 @@ impl IncompletePageHeader {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TagLibImport {
-    open_bracket: Location,
-    taglib: Location,
-    origin: TagLibOrigin,
-    prefix: PlainAttribute,
-    close_bracket: Location,
+    pub(crate) open_bracket: Location,
+    pub(crate) taglib: Location,
+    pub(crate) origin: TagLibOrigin,
+    pub(crate) prefix: PlainAttribute,
+    pub(crate) close_bracket: Location,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct IncompleteTagLibImport {
+    pub(crate) open_bracket: Option<Location>,
+    pub(crate) taglib: Option<Location>,
+    pub(crate) origin: TagLibOrigin,
+    pub(crate) prefix: PlainAttribute,
+    pub(crate) close_bracket: Option<Location>,
+}
+
+impl RangedNode for IncompleteTagLibImport {
+    // TODO: this has to be implemented better
+    fn range(&self) -> Option<Range> {
+        let mut start = None;
+        for field in [&self.open_bracket, &self.taglib] {
+            if field.is_some() {
+                start = field.to_owned();
+                break;
+            }
+        }
+        let start = start.unwrap_or_else(|| match &self.origin {
+            TagLibOrigin::Uri(uri) => uri.key_location.clone(),
+            TagLibOrigin::TagDir(tagdir) => tagdir.key_location.clone(),
+        });
+        let end = self
+            .close_bracket
+            .clone()
+            .unwrap_or_else(|| self.prefix.key_location.clone());
+        return Some(Range {
+            start: Position {
+                character: start.char as u32,
+                line: start.line as u32,
+            },
+            end: Position {
+                character: end.char as u32,
+                line: end.line as u32,
+            },
+        });
+    }
+}
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum TagLibOrigin {
     Uri(PlainAttribute),
@@ -1474,17 +1515,25 @@ impl TreeParser<'_, '_> {
         });
     }
 
-    fn parse_taglib_header(&mut self) -> Result<TagLibImport> {
+    fn parse_taglib_header(&mut self) -> Result<ParsedNode<TagLibImport, IncompleteTagLibImport>> {
         if !self.cursor.goto_first_child() {
             return Err(anyhow::anyhow!("java header is empty"));
         }
-        let open_bracket = node_location(self.cursor.node());
+        let node = self.cursor.node();
+        let open_bracket = match node.is_missing() {
+            true => None,
+            false => Some(node_location(node)),
+        };
         if !self.cursor.goto_next_sibling() {
             return Err(anyhow::anyhow!(
                 "java header is missing the \"page\" keyword"
             ));
         }
-        let taglib = node_location(self.cursor.node());
+        let node = self.cursor.node();
+        let taglib = match node.is_missing() {
+            true => None,
+            false => Some(node_location(node)),
+        };
         if !self.cursor.goto_next_sibling() {
             return Err(anyhow::anyhow!(
                 "java header is missing the \"language\" attribute"
@@ -1513,14 +1562,31 @@ impl TreeParser<'_, '_> {
                 "java header is missing the \"page\" keyword"
             ));
         }
-        let close_bracket = node_location(self.cursor.node());
+        let node = self.cursor.node();
+        let close_bracket = match node.is_missing() {
+            true => None,
+            false => Some(node_location(node)),
+        };
         self.cursor.goto_parent();
-        return Ok(TagLibImport {
-            open_bracket,
-            taglib,
-            origin,
-            prefix,
-            close_bracket,
+        return Ok(match (open_bracket, taglib, close_bracket) {
+            (Some(open_bracket), Some(taglib), Some(close_bracket)) => {
+                ParsedNode::Valid(TagLibImport {
+                    open_bracket,
+                    taglib,
+                    origin,
+                    prefix,
+                    close_bracket,
+                })
+            }
+            (open_bracket, taglib, close_bracket) => {
+                ParsedNode::Incomplete(IncompleteTagLibImport {
+                    open_bracket,
+                    taglib,
+                    origin,
+                    prefix,
+                    close_bracket,
+                })
+            }
         });
     }
 
@@ -2127,7 +2193,7 @@ mod tests {
                 close_bracket: Location::new(0, 1, 2),
             })],
             taglib_imports: vec![
-                TagLibImport {
+                ParsedNode::Valid(TagLibImport {
                     open_bracket: Location::new(2, 1, 3),
                     taglib: Location::new(6, 1, 6),
                     origin: TagLibOrigin::Uri(PlainAttribute {
@@ -2145,8 +2211,8 @@ mod tests {
                         closing_quote_location: Location::new(66, 1, 1),
                     },
                     close_bracket: Location::new(0, 2, 2),
-                },
-                TagLibImport {
+                }),
+                ParsedNode::Valid(TagLibImport {
                     open_bracket: Location::new(2, 2, 3),
                     taglib: Location::new(6, 2, 6),
                     origin: TagLibOrigin::TagDir(PlainAttribute {
@@ -2164,7 +2230,7 @@ mod tests {
                         closing_quote_location: Location::new(51, 2, 1),
                     },
                     close_bracket: Location::new(0, 3, 2),
-                },
+                }),
             ],
         };
         let mut ts_parser = tree_sitter::Parser::new();
