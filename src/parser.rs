@@ -50,7 +50,7 @@ pub(crate) enum ParsedNode<R, E> {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum ParsedLocation {
     Valid(Location),
-    Erroneous(Location),
+    Erroneous(Location), // TODO: needs info about error
     Missing,
 }
 
@@ -130,7 +130,7 @@ impl RangedNode for IncompletePageHeader {
                 line: start.line as u32,
             },
             end: Position {
-                character: end.char as u32,
+                character: (end.char + end.length) as u32,
                 line: end.line as u32,
             },
         });
@@ -150,9 +150,10 @@ pub(crate) struct TagLibImport {
 pub(crate) struct IncompleteTagLibImport {
     pub(crate) open_bracket: ParsedLocation,
     pub(crate) taglib: ParsedLocation,
-    pub(crate) origin: TagLibOrigin,
-    pub(crate) prefix: PlainAttribute,
+    pub(crate) origin: Option<TagLibOrigin>,
+    pub(crate) prefix: Option<PlainAttribute>,
     pub(crate) close_bracket: ParsedLocation,
+    pub(crate) errors: Vec<ErrorNode>,
 }
 
 impl RangedNode for IncompleteTagLibImport {
@@ -161,21 +162,37 @@ impl RangedNode for IncompleteTagLibImport {
             .open_bracket
             .location()
             .or_else(|| self.taglib.location())
-            .unwrap_or_else(|| match &self.origin {
-                TagLibOrigin::Uri(uri) => &uri.key_location,
-                TagLibOrigin::TagDir(tagdir) => &tagdir.key_location,
-            });
+            .or_else(|| {
+                self.origin.as_ref().map(|origin| match origin {
+                    TagLibOrigin::Uri(uri) => &uri.key_location,
+                    TagLibOrigin::TagDir(tagdir) => &tagdir.key_location,
+                })
+            })
+            .or_else(|| self.prefix.as_ref().map(|prefix| &prefix.key_location))
+            .or_else(|| self.close_bracket.location())?;
         let end = self
             .close_bracket
             .location()
-            .unwrap_or_else(|| &self.prefix.key_location);
+            .or_else(|| {
+                self.prefix
+                    .as_ref()
+                    .map(|prefix| &prefix.closing_quote_location)
+            })
+            .or_else(|| {
+                self.origin.as_ref().map(|origin| match origin {
+                    TagLibOrigin::Uri(uri) => &uri.closing_quote_location,
+                    TagLibOrigin::TagDir(tagdir) => &tagdir.closing_quote_location,
+                })
+            })
+            .or_else(|| self.taglib.location())
+            .or_else(|| self.open_bracket.location())?;
         return Some(Range {
             start: Position {
                 character: start.char as u32,
                 line: start.line as u32,
             },
             end: Position {
-                character: end.char as u32,
+                character: (end.char + end.length) as u32,
                 line: end.line as u32,
             },
         });
@@ -1525,83 +1542,114 @@ impl TreeParser<'_, '_> {
     }
 
     fn parse_taglib_header(&mut self) -> Result<ParsedNode<TagLibImport, IncompleteTagLibImport>> {
+        let mut open_bracket = ParsedLocation::Missing;
+        let mut taglib = ParsedLocation::Missing;
+        let mut origin = None;
+        let mut prefix = None;
+        let mut close_bracket = ParsedLocation::Missing;
+        let mut errors = Vec::new();
         if !self.cursor.goto_first_child() {
             return Err(anyhow::anyhow!("java header is empty"));
         }
         let node = self.cursor.node();
-        let open_bracket = match (node.is_missing(), node.is_error()) {
-            (false, false) => ParsedLocation::Valid(node_location(node)),
-            (_, true) => ParsedLocation::Erroneous(node_location(node)),
-            (true, _) => ParsedLocation::Missing,
-        };
-        if !self.cursor.goto_next_sibling() {
-            return Err(anyhow::anyhow!(
-                "java header is missing the \"page\" keyword"
-            ));
-        }
-        let node = self.cursor.node();
-        let taglib = match (node.is_missing(), node.is_error()) {
-            (false, false) => ParsedLocation::Valid(node_location(node)),
-            (_, true) => ParsedLocation::Erroneous(node_location(node)),
-            (true, _) => ParsedLocation::Missing,
-        };
-        if !self.cursor.goto_next_sibling() {
-            return Err(anyhow::anyhow!(
-                "java header is missing the \"language\" attribute"
-            ));
-        }
-        // TODO: attribute order should not matter
-        let (name, attribute) = self.parse_plain_attribute()?;
-        let origin = match name.as_str() {
-            "uri" => TagLibOrigin::Uri(attribute),
-            "tagdir" => TagLibOrigin::TagDir(attribute),
-            name => {
-                return Err(anyhow::anyhow!(
-                    "unexpected \"{}\" attribute in taglib header",
-                    name
-                ))
+        match node.kind() {
+            "ERROR" => {
+                errors.push(self.parse_error()?);
+                if self.cursor.goto_next_sibling() {
+                    // TODO
+                }
             }
-        };
-        if !self.cursor.goto_next_sibling() {
-            return Err(anyhow::anyhow!(
-                "java header is missing the \"pageEncoding\" attribute"
-            ));
+            "header_open" => {
+                if !node.is_missing() {
+                    open_bracket = ParsedLocation::Valid(node_location(node));
+                }
+                if self.cursor.goto_next_sibling() {
+                    let node = self.cursor.node();
+                    match node.kind() {
+                        "ERROR" => {
+                            errors.push(self.parse_error()?);
+                            if self.cursor.goto_next_sibling() {
+                                // TODO
+                            }
+                        }
+                        "taglib" => {
+                            if !node.is_missing() {
+                                taglib = ParsedLocation::Valid(node_location(node));
+                            }
+                            while self.cursor.goto_next_sibling() {
+                                let node = self.cursor.node();
+                                match node.kind() {
+                                    "ERROR" => {
+                                        errors.push(self.parse_error()?);
+                                    }
+                                    "uri_attribute" => {
+                                        origin =
+                                            Some(TagLibOrigin::Uri(self.parse_plain_attribute()?.1))
+                                    }
+                                    "tagdir_attribute" => {
+                                        origin = Some(TagLibOrigin::TagDir(
+                                            self.parse_plain_attribute()?.1,
+                                        ))
+                                    }
+                                    "prefix_attribute" => {
+                                        prefix = Some(self.parse_plain_attribute()?.1)
+                                    }
+                                    "header_close" => {
+                                        if !node.is_missing() {
+                                            close_bracket =
+                                                ParsedLocation::Valid(node_location(node));
+                                        }
+                                        break;
+                                    },
+                                    kind => return Err(anyhow::anyhow!(
+                                        "expected 'uri' attribute, 'tagdir' attribute, 'prefix' attribute or '%>', got '{}'",
+                                        kind
+                                    )),
+                                };
+                            }
+                        }
+                        kind => return Err(anyhow::anyhow!("expected 'taglib', got '{}'", kind)),
+                    };
+                }
+            }
+            kind => return Err(anyhow::anyhow!("expected taglib header, got '{}'", kind)),
         }
-        let (_, prefix) = self.parse_plain_attribute()?;
-        if !self.cursor.goto_next_sibling() {
-            return Err(anyhow::anyhow!(
-                "java header is missing the \"page\" keyword"
-            ));
-        }
-        let node = self.cursor.node();
-        let close_bracket = match (node.is_missing(), node.is_error()) {
-            (false, false) => ParsedLocation::Valid(node_location(node)),
-            (_, true) => ParsedLocation::Erroneous(node_location(node)),
-            (true, _) => ParsedLocation::Missing,
-        };
         self.cursor.goto_parent();
-        return Ok(match (open_bracket, taglib, close_bracket) {
-            (
-                ParsedLocation::Valid(open_bracket),
-                ParsedLocation::Valid(taglib),
-                ParsedLocation::Valid(close_bracket),
-            ) => ParsedNode::Valid(TagLibImport {
+        return Ok(
+            match (
                 open_bracket,
                 taglib,
                 origin,
                 prefix,
                 close_bracket,
-            }),
-            (open_bracket, taglib, close_bracket) => {
-                ParsedNode::Incomplete(IncompleteTagLibImport {
+                errors.len(),
+            ) {
+                (
+                    ParsedLocation::Valid(open_bracket),
+                    ParsedLocation::Valid(taglib),
+                    Some(origin),
+                    Some(prefix),
+                    ParsedLocation::Valid(close_bracket),
+                    0,
+                ) => ParsedNode::Valid(TagLibImport {
                     open_bracket,
                     taglib,
                     origin,
                     prefix,
                     close_bracket,
-                })
-            }
-        });
+                }),
+                (open_bracket, taglib, origin, prefix, close_bracket, _) => {
+                    ParsedNode::Incomplete(IncompleteTagLibImport {
+                        open_bracket,
+                        taglib,
+                        origin,
+                        prefix,
+                        close_bracket,
+                        errors,
+                    })
+                }
+            },
+        );
     }
 
     fn parse_tags(&mut self) -> Result<Vec<Node>> {
@@ -2167,8 +2215,9 @@ mod tests {
         },
     };
 
-    use super::TreeParser;
+    use super::{ErrorNode, IncompleteTagLibImport, ParsedLocation, RangedNode, TreeParser};
     use anyhow::{Error, Result};
+    use lsp_types::{Position, Range};
 
     #[test]
     fn test_parse_header() -> Result<()> {
@@ -2334,6 +2383,48 @@ mod tests {
         let _header = parser.parse_header()?;
         let tags = parser.parse_tags()?;
         assert_eq!(tags, expected);
+        return Ok(());
+    }
+
+    #[test]
+    pub fn test_incomplete_taglib_header_range() -> Result<()> {
+        let header = IncompleteTagLibImport {
+            open_bracket: ParsedLocation::Valid(Location {
+                char: 2,
+                line: 2,
+                length: 3,
+            }),
+            taglib: ParsedLocation::Missing,
+            origin: None,
+            prefix: None,
+            close_bracket: ParsedLocation::Missing,
+            errors: vec![ErrorNode {
+                content: "tagli uri=\"http://www.sitepark.com/taglibs/core\" prefix=\"sp\"\n%><%@"
+                    .to_string(),
+                range: Range {
+                    start: Position {
+                        line: 2,
+                        character: 6,
+                    },
+                    end: Position {
+                        line: 3,
+                        character: 5,
+                    },
+                },
+            }],
+        };
+        let range = header.range();
+        let expected = Range {
+            start: Position {
+                line: 2,
+                character: 2,
+            },
+            end: Position {
+                line: 2,
+                character: 5,
+            },
+        };
+        assert_eq!(range, Some(expected));
         return Ok(());
     }
 }

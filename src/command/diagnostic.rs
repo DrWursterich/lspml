@@ -160,6 +160,22 @@ impl DiagnosticCollector {
                                 range,
                             ),
                         };
+                        match &header.origin {
+                            Some(_) => (),
+                            None => self.add_diagnostic(
+                                "invalid taglib header: missing 'uri' or 'tagdir' attribute".to_string(),
+                                DiagnosticSeverity::ERROR,
+                                range,
+                            ),
+                        };
+                        match &header.prefix {
+                            Some(_) => (),
+                            None => self.add_diagnostic(
+                                "invalid taglib header: missing 'prefix' attribute".to_string(),
+                                DiagnosticSeverity::ERROR,
+                                range,
+                            ),
+                        };
                         match &header.close_bracket {
                             ParsedLocation::Valid(_) => (),
                             ParsedLocation::Erroneous(location) => self.add_diagnostic(
@@ -172,6 +188,13 @@ impl DiagnosticCollector {
                                 DiagnosticSeverity::ERROR,
                                 range,
                             ),
+                        }
+                        for error in &header.errors {
+                            self.add_diagnostic(
+                                format!("syntax error: unexpected \"{}\"", error.content),
+                                DiagnosticSeverity::ERROR,
+                                error.range,
+                            )
                         }
                     }
                 }
