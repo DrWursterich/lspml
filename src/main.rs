@@ -157,6 +157,6 @@ fn saved(params: DidSaveTextDocumentParams) -> Result<()> {
 }
 
 fn closed(_: DidCloseTextDocumentParams) -> Result<()> {
-    // could free the document... ?
+    // document_store::free(&uri); ?
     return Ok(());
 }
