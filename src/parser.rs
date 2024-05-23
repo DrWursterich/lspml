@@ -47,6 +47,23 @@ pub(crate) enum ParsedNode<R, E> {
     Incomplete(E),
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum ParsedLocation {
+    Valid(Location),
+    Erroneous(Location),
+    Missing,
+}
+
+impl ParsedLocation {
+    pub(crate) fn location(&self) -> Option<&Location> {
+        return match &self {
+            ParsedLocation::Valid(location) => Some(location),
+            ParsedLocation::Erroneous(location) => Some(location),
+            ParsedLocation::Missing => None,
+        };
+    }
+}
+
 pub(crate) trait RangedNode {
     fn range(&self) -> Option<Range>;
 }
@@ -70,67 +87,44 @@ pub(crate) struct PageHeader {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct IncompletePageHeader {
-    pub(crate) open_bracket: Option<Location>,
-    pub(crate) page: Option<Location>,
+    pub(crate) open_bracket: ParsedLocation,
+    pub(crate) page: ParsedLocation,
     pub(crate) language: Option<PlainAttribute>,
     pub(crate) page_encoding: Option<PlainAttribute>,
     pub(crate) content_type: Option<PlainAttribute>,
     pub(crate) imports: Vec<PlainAttribute>,
-    pub(crate) close_bracket: Option<Location>,
+    pub(crate) close_bracket: ParsedLocation,
 }
 
 impl RangedNode for IncompletePageHeader {
-    // TODO: this has to be implemented better
     fn range(&self) -> Option<Range> {
-        let mut start = None;
-        for field in [
-            &self.open_bracket,
-            &self.page,
-            &self.language.as_ref().map(|e| e.key_location.clone()),
-            &self.page_encoding.as_ref().map(|e| e.key_location.clone()),
-            &self.content_type.as_ref().map(|e| e.key_location.clone()),
-        ] {
-            if field.is_some() {
-                start = field.to_owned();
-                break;
-            }
-        }
-        let start = match start
-            .or_else(|| self.imports.first().map(|e| e.key_location.clone()))
-            .or_else(|| self.close_bracket.clone())
-        {
-            Some(start) => start,
-            None => return None,
-        };
-        let mut end = self.close_bracket.clone().or_else(|| {
-            self.imports
-                .last()
-                .map(|e| e.closing_quote_location.clone())
-        });
-        if end.is_none() {
-            for field in [
-                &self
-                    .content_type
+        let start = self
+            .open_bracket
+            .location()
+            .or_else(|| self.page.location())
+            .or_else(|| self.language.as_ref().map(|e| &e.key_location))
+            .or_else(|| self.page_encoding.as_ref().map(|e| &e.key_location))
+            .or_else(|| self.content_type.as_ref().map(|e| &e.key_location))
+            .or_else(|| self.imports.first().map(|e| &e.key_location))
+            .or_else(|| self.close_bracket.location())?;
+        let end = self
+            .close_bracket
+            .location()
+            .or_else(|| self.imports.last().map(|e| &e.closing_quote_location))
+            .or_else(|| {
+                self.content_type
                     .as_ref()
-                    .map(|e| e.closing_quote_location.clone()),
-                &self
-                    .page_encoding
+                    .map(|e| &e.closing_quote_location)
+            })
+            .or_else(|| {
+                self.page_encoding
                     .as_ref()
-                    .map(|e| e.closing_quote_location.clone()),
-                &self
-                    .language
-                    .as_ref()
-                    .map(|e| e.closing_quote_location.clone()),
-                &self.page,
-                &self.open_bracket,
-            ] {
-                if field.is_some() {
-                    end = field.to_owned();
-                    break;
-                }
-            }
-        }
-        return end.map(|end| Range {
+                    .map(|e| &e.closing_quote_location)
+            })
+            .or_else(|| self.language.as_ref().map(|e| &e.closing_quote_location))
+            .or_else(|| self.page.location())
+            .or_else(|| self.open_bracket.location())?;
+        return Some(Range {
             start: Position {
                 character: start.char as u32,
                 line: start.line as u32,
@@ -154,31 +148,27 @@ pub(crate) struct TagLibImport {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct IncompleteTagLibImport {
-    pub(crate) open_bracket: Option<Location>,
-    pub(crate) taglib: Option<Location>,
+    pub(crate) open_bracket: ParsedLocation,
+    pub(crate) taglib: ParsedLocation,
     pub(crate) origin: TagLibOrigin,
     pub(crate) prefix: PlainAttribute,
-    pub(crate) close_bracket: Option<Location>,
+    pub(crate) close_bracket: ParsedLocation,
 }
 
 impl RangedNode for IncompleteTagLibImport {
-    // TODO: this has to be implemented better
     fn range(&self) -> Option<Range> {
-        let mut start = None;
-        for field in [&self.open_bracket, &self.taglib] {
-            if field.is_some() {
-                start = field.to_owned();
-                break;
-            }
-        }
-        let start = start.unwrap_or_else(|| match &self.origin {
-            TagLibOrigin::Uri(uri) => uri.key_location.clone(),
-            TagLibOrigin::TagDir(tagdir) => tagdir.key_location.clone(),
-        });
+        let start = self
+            .open_bracket
+            .location()
+            .or_else(|| self.taglib.location())
+            .unwrap_or_else(|| match &self.origin {
+                TagLibOrigin::Uri(uri) => &uri.key_location,
+                TagLibOrigin::TagDir(tagdir) => &tagdir.key_location,
+            });
         let end = self
             .close_bracket
-            .clone()
-            .unwrap_or_else(|| self.prefix.key_location.clone());
+            .location()
+            .unwrap_or_else(|| &self.prefix.key_location);
         return Some(Range {
             start: Position {
                 character: start.char as u32,
@@ -191,6 +181,7 @@ impl RangedNode for IncompleteTagLibImport {
         });
     }
 }
+
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum TagLibOrigin {
     Uri(PlainAttribute),
@@ -1397,6 +1388,19 @@ impl Location {
             && self.char <= position.character as usize
             && self.char + self.length > position.character as usize;
     }
+
+    pub(crate) fn range(&self) -> Range {
+        return Range {
+            start: Position {
+                line: self.line as u32,
+                character: self.char as u32,
+            },
+            end: Position {
+                line: self.line as u32,
+                character: (self.char + self.length) as u32,
+            },
+        };
+    }
 }
 
 pub(crate) struct TreeParser<'a, 'b> {
@@ -1451,9 +1455,10 @@ impl TreeParser<'_, '_> {
             return Err(anyhow::anyhow!("java header is empty"));
         }
         let node = self.cursor.node();
-        let open_bracket = match node.is_missing() {
-            true => None,
-            false => Some(node_location(node)),
+        let open_bracket = match (node.is_missing(), node.is_error()) {
+            (false, false) => ParsedLocation::Valid(node_location(node)),
+            (_, true) => ParsedLocation::Erroneous(node_location(node)),
+            (true, _) => ParsedLocation::Missing,
         };
 
         if !self.cursor.goto_next_sibling() {
@@ -1462,9 +1467,10 @@ impl TreeParser<'_, '_> {
             ));
         }
         let node = self.cursor.node();
-        let page = match node.is_missing() {
-            true => None,
-            false => Some(node_location(node)),
+        let page = match (node.is_missing(), node.is_error()) {
+            (false, false) => ParsedLocation::Valid(node_location(node)),
+            (_, true) => ParsedLocation::Erroneous(node_location(node)),
+            (true, _) => ParsedLocation::Missing,
         };
 
         let mut content_type = None;
@@ -1486,23 +1492,26 @@ impl TreeParser<'_, '_> {
                 kind => return Err(anyhow::anyhow!("unexpected {}", kind)),
             }
         }
-        let close_bracket = match node.is_missing() {
-            true => None,
-            false => Some(node_location(node)),
+        let close_bracket = match (node.is_missing(), node.is_error()) {
+            (false, false) => ParsedLocation::Valid(node_location(node)),
+            (_, true) => ParsedLocation::Erroneous(node_location(node)),
+            (true, _) => ParsedLocation::Missing,
         };
         self.cursor.goto_parent();
         return Ok(match (open_bracket, page, close_bracket) {
-            (Some(open_bracket), Some(page), Some(close_bracket)) => {
-                ParsedNode::Valid(PageHeader {
-                    open_bracket,
-                    page,
-                    language,
-                    page_encoding,
-                    content_type,
-                    imports,
-                    close_bracket,
-                })
-            }
+            (
+                ParsedLocation::Valid(open_bracket),
+                ParsedLocation::Valid(page),
+                ParsedLocation::Valid(close_bracket),
+            ) => ParsedNode::Valid(PageHeader {
+                open_bracket,
+                page,
+                language,
+                page_encoding,
+                content_type,
+                imports,
+                close_bracket,
+            }),
             (open_bracket, page, close_bracket) => ParsedNode::Incomplete(IncompletePageHeader {
                 open_bracket,
                 page,
@@ -1520,9 +1529,10 @@ impl TreeParser<'_, '_> {
             return Err(anyhow::anyhow!("java header is empty"));
         }
         let node = self.cursor.node();
-        let open_bracket = match node.is_missing() {
-            true => None,
-            false => Some(node_location(node)),
+        let open_bracket = match (node.is_missing(), node.is_error()) {
+            (false, false) => ParsedLocation::Valid(node_location(node)),
+            (_, true) => ParsedLocation::Erroneous(node_location(node)),
+            (true, _) => ParsedLocation::Missing,
         };
         if !self.cursor.goto_next_sibling() {
             return Err(anyhow::anyhow!(
@@ -1530,9 +1540,10 @@ impl TreeParser<'_, '_> {
             ));
         }
         let node = self.cursor.node();
-        let taglib = match node.is_missing() {
-            true => None,
-            false => Some(node_location(node)),
+        let taglib = match (node.is_missing(), node.is_error()) {
+            (false, false) => ParsedLocation::Valid(node_location(node)),
+            (_, true) => ParsedLocation::Erroneous(node_location(node)),
+            (true, _) => ParsedLocation::Missing,
         };
         if !self.cursor.goto_next_sibling() {
             return Err(anyhow::anyhow!(
@@ -1563,21 +1574,24 @@ impl TreeParser<'_, '_> {
             ));
         }
         let node = self.cursor.node();
-        let close_bracket = match node.is_missing() {
-            true => None,
-            false => Some(node_location(node)),
+        let close_bracket = match (node.is_missing(), node.is_error()) {
+            (false, false) => ParsedLocation::Valid(node_location(node)),
+            (_, true) => ParsedLocation::Erroneous(node_location(node)),
+            (true, _) => ParsedLocation::Missing,
         };
         self.cursor.goto_parent();
         return Ok(match (open_bracket, taglib, close_bracket) {
-            (Some(open_bracket), Some(taglib), Some(close_bracket)) => {
-                ParsedNode::Valid(TagLibImport {
-                    open_bracket,
-                    taglib,
-                    origin,
-                    prefix,
-                    close_bracket,
-                })
-            }
+            (
+                ParsedLocation::Valid(open_bracket),
+                ParsedLocation::Valid(taglib),
+                ParsedLocation::Valid(close_bracket),
+            ) => ParsedNode::Valid(TagLibImport {
+                open_bracket,
+                taglib,
+                origin,
+                prefix,
+                close_bracket,
+            }),
             (open_bracket, taglib, close_bracket) => {
                 ParsedNode::Incomplete(IncompleteTagLibImport {
                     open_bracket,

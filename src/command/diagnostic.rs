@@ -13,8 +13,8 @@ use crate::{
     grammar::AttributeRule,
     modules,
     parser::{
-        DocumentNode, ErrorNode, Header, HtmlNode, Node, ParsableTag, ParsedNode, RangedNode,
-        SpelAttribute, Tag, TagBody, Tree,
+        DocumentNode, ErrorNode, Header, HtmlNode, Node, ParsableTag, ParsedLocation, ParsedNode,
+        RangedNode, SpelAttribute, Tag, TagBody, Tree,
     },
     spel::{
         ast::{
@@ -82,31 +82,47 @@ impl DiagnosticCollector {
         }
         for header in &header.java_headers {
             match header {
-                ParsedNode::Valid(_header) => {
-                    // TODO
-                }
+                ParsedNode::Valid(_header) => (),
                 ParsedNode::Incomplete(header) => {
                     if let Some(range) = header.range() {
-                        if header.open_bracket.is_none() {
-                            self.add_diagnostic(
+                        match &header.open_bracket {
+                            ParsedLocation::Valid(_) => (),
+                            ParsedLocation::Erroneous(location) => self.add_diagnostic(
+                                "invalid java header opening bracket. should be '<%@'".to_string(),
+                                DiagnosticSeverity::ERROR,
+                                location.range(),
+                            ),
+                            ParsedLocation::Missing => self.add_diagnostic(
                                 "invalid java header: missing '<%@'".to_string(),
                                 DiagnosticSeverity::ERROR,
                                 range,
-                            );
-                        }
-                        if header.page.is_none() {
-                            self.add_diagnostic(
+                            ),
+                        };
+                        match &header.page {
+                            ParsedLocation::Valid(_) => (),
+                            ParsedLocation::Erroneous(location) => self.add_diagnostic(
+                                "invalid java header 'page'".to_string(),
+                                DiagnosticSeverity::ERROR,
+                                location.range(),
+                            ),
+                            ParsedLocation::Missing => self.add_diagnostic(
                                 "invalid java header: missing 'page'".to_string(),
                                 DiagnosticSeverity::ERROR,
                                 range,
-                            );
-                        }
-                        if header.close_bracket.is_none() {
-                            self.add_diagnostic(
+                            ),
+                        };
+                        match &header.close_bracket {
+                            ParsedLocation::Valid(_) => (),
+                            ParsedLocation::Erroneous(location) => self.add_diagnostic(
+                                "invalid java header closing bracket. should be '%>'".to_string(),
+                                DiagnosticSeverity::ERROR,
+                                location.range(),
+                            ),
+                            ParsedLocation::Missing => self.add_diagnostic(
                                 "java header is unclosed".to_string(),
                                 DiagnosticSeverity::ERROR,
                                 range,
-                            );
+                            ),
                         }
                     }
                 }
@@ -114,31 +130,48 @@ impl DiagnosticCollector {
         }
         for header in &header.taglib_imports {
             match header {
-                ParsedNode::Valid(_header) => {
-                    // TODO
-                }
+                ParsedNode::Valid(_header) => (),
                 ParsedNode::Incomplete(header) => {
                     if let Some(range) = header.range() {
-                        if header.open_bracket.is_none() {
-                            self.add_diagnostic(
-                                "invalid java header: missing '<%@'".to_string(),
+                        match &header.open_bracket {
+                            ParsedLocation::Valid(_) => (),
+                            ParsedLocation::Erroneous(location) => self.add_diagnostic(
+                                "invalid taglib header opening bracket. should be '<%@'"
+                                    .to_string(),
+                                DiagnosticSeverity::ERROR,
+                                location.range(),
+                            ),
+                            ParsedLocation::Missing => self.add_diagnostic(
+                                "invalid taglib header: missing '<%@'".to_string(),
                                 DiagnosticSeverity::ERROR,
                                 range,
-                            );
-                        }
-                        if header.taglib.is_none() {
-                            self.add_diagnostic(
-                                "invalid java header: missing 'taglib'".to_string(),
+                            ),
+                        };
+                        match &header.taglib {
+                            ParsedLocation::Valid(_) => (),
+                            ParsedLocation::Erroneous(location) => self.add_diagnostic(
+                                "invalid taglib header 'taglib'".to_string(),
+                                DiagnosticSeverity::ERROR,
+                                location.range(),
+                            ),
+                            ParsedLocation::Missing => self.add_diagnostic(
+                                "invalid taglib header: missing 'taglib'".to_string(),
                                 DiagnosticSeverity::ERROR,
                                 range,
-                            );
-                        }
-                        if header.close_bracket.is_none() {
-                            self.add_diagnostic(
-                                "java header is unclosed".to_string(),
+                            ),
+                        };
+                        match &header.close_bracket {
+                            ParsedLocation::Valid(_) => (),
+                            ParsedLocation::Erroneous(location) => self.add_diagnostic(
+                                "invalid taglib header closing bracket. should be '%>'".to_string(),
+                                DiagnosticSeverity::ERROR,
+                                location.range(),
+                            ),
+                            ParsedLocation::Missing => self.add_diagnostic(
+                                "taglib header is unclosed".to_string(),
                                 DiagnosticSeverity::ERROR,
                                 range,
-                            );
+                            ),
                         }
                     }
                 }
