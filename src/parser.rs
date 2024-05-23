@@ -95,7 +95,8 @@ impl IncompletePageHeader {
         }
         let start = match start
             .or_else(|| self.imports.first().map(|e| e.key_location.clone()))
-            .or_else(|| self.close_bracket.clone()) {
+            .or_else(|| self.close_bracket.clone())
+        {
             Some(start) => start,
             None => return None,
         };
@@ -2077,8 +2078,8 @@ fn find_tag_at(nodes: &Vec<Node>, position: Position) -> Option<&Node> {
 mod tests {
     use crate::{
         parser::{
-            Header, Location, Node, PageHeader, PlainAttribute, SpBarcode, SpelAttribute, Tag,
-            TagLibImport, TagLibOrigin,
+            Header, Location, Node, PageHeader, ParsedNode, PlainAttribute, SpBarcode,
+            SpelAttribute, Tag, TagLibImport, TagLibOrigin,
         },
         spel::{
             self,
@@ -2098,7 +2099,7 @@ mod tests {
             "%>\n"
         ));
         let expected = Header {
-            java_headers: vec![PageHeader {
+            java_headers: vec![ParsedNode::Valid(PageHeader {
                 open_bracket: Location::new(0, 0, 3),
                 page: Location::new(4, 0, 4),
                 language: Some(PlainAttribute {
@@ -2124,7 +2125,7 @@ mod tests {
                 }),
                 imports: vec![],
                 close_bracket: Location::new(0, 1, 2),
-            }],
+            })],
             taglib_imports: vec![
                 TagLibImport {
                     open_bracket: Location::new(2, 1, 3),
