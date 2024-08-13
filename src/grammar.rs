@@ -343,7 +343,12 @@ impl TagDefinition {
             AttributeRule::ExactlyOneOfOrBodyWithEitherValue(
                 &["index", "value", "object"],
                 "action",
-                &["remove", "replace"],
+                &["remove"],
+            ),
+            AttributeRule::ExactlyOneOfOrBodyWithEitherValue(
+                &["value", "object"],
+                "action",
+                &["replace"],
             ),
             AttributeRule::ExactlyOneOfOrBodyWithValue(&["object", "query"], "action", "addAll"),
             AttributeRule::BodyOnlyWithEitherValue(
@@ -357,7 +362,7 @@ impl TagDefinition {
                     "replace",
                 ],
             ),
-            AttributeRule::RequiredWithValue("index", "action", "insert"),
+            AttributeRule::RequiredWithEitherValue("index", "action", &["insert", "replace"]),
             AttributeRule::OnlyWithEitherValue(
                 "value",
                 "action",
