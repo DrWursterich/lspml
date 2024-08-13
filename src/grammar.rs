@@ -333,7 +333,6 @@ impl TagDefinition {
                     "unique",
                 ],
             ),
-            AttributeRule::ValueOneOf("publisher", &["current", "ignore", "all", "auto"]),
             AttributeRule::ValueOneOf("scope", &["page", "request"]),
             AttributeRule::ExactlyOneOfOrBodyWithEitherValue(
                 &["value", "object", "expression", "condition"],
