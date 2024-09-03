@@ -1658,9 +1658,11 @@ impl TagDefinition {
             ("min", TagAttributeType::Expression),
             ("name", TagAttributeType::Identifier),
             ("readonly", TagAttributeType::Condition),
+            ("skipmarks", TagAttributeType::String),
         rules &[
             AttributeRule::Required("name"),
             AttributeRule::ValueOneOf("layout", &["standard", "plain"]),
+            AttributeRule::ValueOneOf("skipmarks", &["true", "false"]),
         ]
     );
 
