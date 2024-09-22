@@ -86,6 +86,16 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
                             ))
                         });
                 }
+                Some(CodeActionImplementation::REMOVE_SUPERFLUOUS_CODE) => {
+                    actions.push(construct_fix_spel_syntax(
+                        &uri,
+                        format!("quick-fix: {}", diagnostic.message),
+                        vec![TextEdit {
+                            range: diagnostic.range,
+                            new_text: "".to_string(),
+                        }],
+                    ));
+                }
                 _ => (),
             }
         }

@@ -219,14 +219,12 @@ impl DiagnosticCollector {
             let attribute = match attribute {
                 ParsedAttribute::Valid(attribute) => attribute,
                 ParsedAttribute::Erroneous(attribute, errors) => {
-                    // TODO: match, html, code, ...
                     for error in errors {
-                        self.add_diagnostic_with_tag(
-                            "this is unnecessary".to_string(),
-                            DiagnosticSeverity::ERROR,
-                            error.location().range(),
-                            DiagnosticTag::UNNECESSARY,
-                        );
+                        match error {
+                            AttributeError::Superfluous(text, location) => {
+                                self.add_superfluous_diagnostic(text, location.range());
+                            }
+                        }
                     }
                     attribute
                 }
@@ -697,15 +695,11 @@ impl DiagnosticCollector {
                 ParsedAttribute::Valid(_) => (),
                 ParsedAttribute::Erroneous(_, errors) => {
                     for error in errors {
-                        self.add_diagnostic(
-                            match error {
-                                AttributeError::Superfluous(text, _) => {
-                                    format!("\"{}\" is superfluous", text)
-                                }
-                            },
-                            DiagnosticSeverity::ERROR,
-                            error.location().range(),
-                        );
+                        match error {
+                            AttributeError::Superfluous(text, location) => {
+                                self.add_superfluous_diagnostic(text, location.range());
+                            }
+                        }
                     }
                 }
                 ParsedAttribute::Unparsable(message, location) => {
@@ -747,14 +741,14 @@ impl DiagnosticCollector {
         message: String,
         severity: DiagnosticSeverity,
         range: Range,
-        tags: DiagnosticTag,
+        tag: DiagnosticTag,
     ) {
         self.diagnostics.push(Diagnostic {
             message,
             severity: Some(severity),
             range,
             source: Some(String::from("lspml")),
-            tags: Some(vec![tags]),
+            tags: Some(vec![tag]),
             ..Default::default()
         });
     }
@@ -774,6 +768,18 @@ impl DiagnosticCollector {
             source: Some(String::from("lspml")),
             code: Some(code),
             data,
+            ..Default::default()
+        });
+    }
+
+    fn add_superfluous_diagnostic(&mut self, text: &String, range: Range) {
+        self.diagnostics.push(Diagnostic {
+            message: format!("\"{}\" is superfluous", text),
+            severity: Some(DiagnosticSeverity::ERROR),
+            range,
+            source: Some(String::from("lspml")),
+            tags: Some(vec![DiagnosticTag::UNNECESSARY]),
+            code: Some(CodeActionImplementation::REMOVE_SUPERFLUOUS_CODE),
             ..Default::default()
         });
     }

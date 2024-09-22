@@ -1434,14 +1434,6 @@ pub(crate) enum AttributeError {
     Superfluous(String, Location),
 }
 
-impl AttributeError {
-    pub(crate) fn location(&self) -> &Location {
-        return match &self {
-            AttributeError::Superfluous(_, location) => location,
-        };
-    }
-}
-
 impl Attribute for PlainAttribute {
     fn start(&self) -> &Location {
         return &self.key_location;

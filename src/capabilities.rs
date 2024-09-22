@@ -37,11 +37,13 @@ pub(crate) enum CodeActionImplementation {
     NameToCondition,
     ConditionToName,
     FixSpelSyntax,
+    RemoveSuperfluousCode,
 }
 
 impl CodeActionImplementation {
     pub(crate) const GENERATE_DEFAULT_HEADER_CODE: NumberOrString = NumberOrString::Number(7126);
     pub(crate) const FIX_SPEL_SYNTAX_CODE: NumberOrString = NumberOrString::Number(7127);
+    pub(crate) const REMOVE_SUPERFLUOUS_CODE: NumberOrString = NumberOrString::Number(7128);
 
     pub(crate) fn kinds() -> Vec<CodeActionKind> {
         return vec![
@@ -49,6 +51,7 @@ impl CodeActionImplementation {
             CodeActionImplementation::NameToCondition.to_kind(),
             CodeActionImplementation::ConditionToName.to_kind(),
             CodeActionImplementation::FixSpelSyntax.to_kind(),
+            CodeActionImplementation::RemoveSuperfluousCode.to_kind(),
             CodeActionKind::SOURCE_FIX_ALL,
         ];
     }
@@ -59,6 +62,7 @@ impl CodeActionImplementation {
             CodeActionImplementation::NameToCondition => "refactor.name_to_condition",
             CodeActionImplementation::ConditionToName => "refactor.condition_to_name",
             CodeActionImplementation::FixSpelSyntax => "quickfix.fix_spel_syntax",
+            CodeActionImplementation::RemoveSuperfluousCode => "quickfix.remove_superfluous_code",
         });
     }
 }
@@ -70,6 +74,7 @@ impl Display for CodeActionImplementation {
             CodeActionImplementation::NameToCondition => "refactor.name_to_condition",
             CodeActionImplementation::ConditionToName => "refactor.condition_to_name",
             CodeActionImplementation::FixSpelSyntax => "quickfix.fix_spel_syntax",
+            CodeActionImplementation::RemoveSuperfluousCode => "quickfix.remove_superfluous_code",
         })
     }
 }
