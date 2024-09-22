@@ -12,8 +12,8 @@ use crate::{
     grammar::{self, TagAttribute, TagAttributeType, TagAttributes, TagChildren, TagDefinition},
     modules::{self, Module},
     parser::{
-        AttributeValue, ErrorNode, Node, ParsableTag, SpelAttribute, SpelAttributeValue, Tag,
-        TagBody,
+        AttributeValue, ErrorNode, Node, ParsableTag, ParsedAttribute, SpelAttribute,
+        SpelAttributeValue, Tag, TagBody,
     },
     spel::ast::{SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment},
 };
@@ -188,6 +188,13 @@ impl CompletionCollector<'_> {
             }
         }
         for (name, attribute) in &tag.spel_attributes() {
+            // TODO: might need to think of something if treesitter does not understand
+            // `<tag attribute="` as Erroneous ...
+            let attribute = match attribute {
+                ParsedAttribute::Valid(attribute) => attribute,
+                ParsedAttribute::Erroneous(attribute, _) => attribute,
+                ParsedAttribute::Unparsable(_, _) => continue,
+            };
             if attribute.value.is_inside(&self.cursor) {
                 let definition = tag.definition();
                 let attribute_type = name
@@ -245,6 +252,11 @@ impl CompletionCollector<'_> {
                             ..
                         }) = attribute_type
                         {
+                            let module_attribute = match tag.spel_attribute(&module_attribute) {
+                                Some(ParsedAttribute::Valid(attribute)) => Some(attribute),
+                                Some(ParsedAttribute::Erroneous(attribute, _)) => Some(attribute),
+                                _ => None,
+                            };
                             if let Some(SpelAttribute {
                                 value:
                                     SpelAttributeValue {
@@ -252,7 +264,7 @@ impl CompletionCollector<'_> {
                                         ..
                                     },
                                 ..
-                            }) = tag.spel_attribute(&module_attribute)
+                            }) = module_attribute
                             {
                                 if fragments.len() == 1 {
                                     if let WordFragment::String(StringLiteral { content, .. }) =

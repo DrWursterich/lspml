@@ -8,7 +8,7 @@ use super::LsError;
 
 use crate::{
     document_store,
-    parser::{AttributeValue, Node, ParsableTag, Tag},
+    parser::{AttributeValue, Node, ParsableTag, ParsedAttribute, Tag},
     spel::{
         self,
         ast::{self, Location, SpelAst, SpelResult},
@@ -75,6 +75,11 @@ fn hover_tag(tag: &Tag, cursor: &Position) -> Result<Option<Hover>, LsError> {
         }));
     }
     for (name, attribute) in tag.spel_attributes() {
+        let attribute = match attribute {
+            ParsedAttribute::Valid(attribute) => attribute,
+            ParsedAttribute::Erroneous(attribute, _) => attribute,
+            ParsedAttribute::Unparsable(_, _) => continue,
+        };
         if attribute.key_location.contains(cursor) {
             return Ok(tag
                 .definition()

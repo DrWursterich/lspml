@@ -7,7 +7,7 @@ use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, Semanti
 use crate::{
     document_store,
     grammar::AttributeRule,
-    parser::{Node, ParsableTag, Tag, Tree},
+    parser::{Node, ParsableTag, ParsedAttribute, Tag, Tree},
     spel::ast::{
         Anchor, Argument, Comparable, Condition, Expression, Function, Identifier, Interpolation,
         Location, Null, Number, Object, Query, Regex, SignedNumber, SpelAst, SpelResult,
@@ -194,6 +194,11 @@ fn index_tag(tag: &Tag, tokenizer: &mut Tokenizer) {
         );
     }
     for (name, attribute) in tag.spel_attributes() {
+        let attribute = match attribute {
+            ParsedAttribute::Valid(attribute) => attribute,
+            ParsedAttribute::Erroneous(attribute, _) => attribute,
+            ParsedAttribute::Unparsable(_, _) => continue,
+        };
         if tag
             .definition()
             .attribute_rules

@@ -1,5 +1,8 @@
 use std::{
-    collections::HashMap, fs, path::Path, sync::{Arc, Mutex, OnceLock}
+    collections::HashMap,
+    fs,
+    path::Path,
+    sync::{Arc, Mutex, OnceLock},
 };
 
 use anyhow::{Error, Result};

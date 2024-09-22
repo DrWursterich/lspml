@@ -7,7 +7,9 @@ use crate::{
     document_store::{self, Document},
     grammar::{TagAttributeType, TagAttributes},
     modules,
-    parser::{AttributeValue, Node, ParsableTag, SpelAttribute, SpelAttributeValue, Tag},
+    parser::{
+        AttributeValue, Node, ParsableTag, ParsedAttribute, SpelAttribute, SpelAttributeValue, Tag,
+    },
     spel::ast::{
         Argument, Comparable, Condition, Expression, Function, Identifier, Location, Object, Query,
         Regex, SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment,
@@ -66,7 +68,7 @@ impl DefinitionsFinder<'_> {
         if let TagAttributes::These(attributes) = tag.definition().attributes {
             for attribute in attributes {
                 if let TagAttributeType::Identifier = attribute.r#type {
-                    if let Some(SpelAttribute {
+                    if let Some(ParsedAttribute::Valid(SpelAttribute {
                         value:
                             SpelAttributeValue {
                                 spel:
@@ -77,7 +79,7 @@ impl DefinitionsFinder<'_> {
                                 ..
                             },
                         ..
-                    }) = tag.spel_attribute(&attribute.name)
+                    })) = tag.spel_attribute(&attribute.name)
                     {
                         if fragments.len() == 1 {
                             if let WordFragment::String(StringLiteral { content, location }) =
@@ -138,6 +140,11 @@ pub(crate) fn definition(
     let cursor = text_params.position;
     if let Some(Node::Tag(tag)) = document.tree.node_at(cursor) {
         for (_, attribute) in tag.spel_attributes() {
+            let attribute = match attribute {
+                ParsedAttribute::Valid(attribute) => attribute,
+                ParsedAttribute::Erroneous(attribute, _) => attribute,
+                ParsedAttribute::Unparsable(_, _) => continue,
+            };
             if attribute.value.is_inside(&cursor) {
                 let offset = Point {
                     row: attribute.value.opening_quote_location.line + 1,
@@ -170,6 +177,11 @@ pub(crate) fn definition(
                     }
                     SpelAst::Uri(SpelResult::Valid(Uri::Literal(uri))) => {
                         let mut module = None;
+                        let module_attribute = match tag.spel_attribute("module") {
+                            Some(ParsedAttribute::Valid(attribute)) => Some(attribute),
+                            Some(ParsedAttribute::Erroneous(attribute, _)) => Some(attribute),
+                            _ => None,
+                        };
                         if let Some(SpelAttribute {
                             value:
                                 SpelAttributeValue {
@@ -177,7 +189,7 @@ pub(crate) fn definition(
                                     ..
                                 },
                             ..
-                        }) = tag.spel_attribute("module")
+                        }) = module_attribute
                         // TODO: should use TagAttributeType::Uri { module_attribute} for this
                         {
                             if let [WordFragment::String(StringLiteral { content, .. })] =

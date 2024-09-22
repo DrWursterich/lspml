@@ -33,7 +33,7 @@ pub fn document_node(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
                             }
                         }
                     }
-                },
+                }
                 _ => quote! {
                     impl DocumentNode for #name {
                         fn range(&self) -> Range {
@@ -99,7 +99,7 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             let plain_attribute_fields: Vec<&syn::Ident> =
                 attribute_fields_with_option_value(&named, "PlainAttribute");
             let spel_attribute_fields: Vec<&syn::Ident> =
-                attribute_fields_with_option_value(&named, "SpelAttribute");
+                attribute_fields_with_option_of_parsed_attribute_value(&named, "SpelAttribute");
             quote! {
                 impl ParsableTag for #name {
                     fn parse(parser: &mut TreeParser) -> Result<Self> {
@@ -164,7 +164,7 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         return &self.body;
                     }
 
-                    fn spel_attributes(&self) -> Vec<(&str, &SpelAttribute)> {
+                    fn spel_attributes(&self) -> Vec<(&str, &ParsedAttribute<SpelAttribute>)> {
                         let mut attributes = Vec::new();
                         #(
                             match self.#spel_attribute_fields.as_ref() {
@@ -177,7 +177,7 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         return attributes;
                     }
 
-                    fn spel_attribute(&self, name: &str) -> Option<&SpelAttribute> {
+                    fn spel_attribute(&self, name: &str) -> Option<&ParsedAttribute<SpelAttribute>> {
                         return match format!("{}_attribute", name).as_str() {
                             #(
                                 stringify!(#spel_attribute_fields) =>
@@ -250,13 +250,13 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         };
                     }
 
-                    fn spel_attributes(&self) -> Vec<(&str, &SpelAttribute)> {
+                    fn spel_attributes(&self) -> Vec<(&str, &ParsedAttribute<SpelAttribute>)> {
                         return match self {
                             #(#spel_attributes,)*
                         };
                     }
 
-                    fn spel_attribute(&self, name: &str) -> Option<&SpelAttribute> {
+                    fn spel_attribute(&self, name: &str) -> Option<&ParsedAttribute<SpelAttribute>> {
                         return match self {
                             #(#spel_attribute,)*
                         };
@@ -280,6 +280,17 @@ fn attribute_fields_with_option_value<'a, T>(
         .collect()
 }
 
+fn attribute_fields_with_option_of_parsed_attribute_value<'a, T>(
+    fields: &'a Punctuated<Field, T>,
+    value_type_name: &str,
+) -> Vec<&'a Ident> {
+    fields
+        .iter()
+        .filter(|field| is_type_option_of_parsed_attribute_of(field, &value_type_name))
+        .filter_map(|field| is_attribute_field(field))
+        .collect()
+}
+
 fn is_attribute_field(field: &Field) -> Option<&Ident> {
     field.ident.as_ref().filter(|ident| {
         ident
@@ -290,19 +301,39 @@ fn is_attribute_field(field: &Field) -> Option<&Ident> {
 }
 
 fn is_type_option_of(field: &Field, type_name: &str) -> bool {
-    if let Some(r#type) = get_type(&field.ty) {
-        if get_type_name(r#type).is_some_and(|name| name == "Option") {
-            if let PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }) =
-                &r#type.arguments
-            {
-                if let Some(GenericArgument::Type(Type::Path(TypePath { path, .. }))) = args.first()
-                {
-                    return path.is_ident(type_name);
-                }
-            }
+    return get_first_generic_type_of(&field.ty, "Option")
+        .and_then(|a| match a {
+            Type::Path(TypePath { path, .. }) => Some(path),
+            _ => None,
+        })
+        .is_some_and(|path| path.is_ident(type_name));
+}
+
+fn is_type_option_of_parsed_attribute_of(field: &Field, type_name: &str) -> bool {
+    return get_first_generic_type_of(&field.ty, "Option")
+        .and_then(|r#type| get_first_generic_type_of(r#type, "ParsedAttribute"))
+        .and_then(|a| match a {
+            Type::Path(TypePath { path, .. }) => Some(path),
+            _ => None,
+        })
+        .is_some_and(|path| path.is_ident(type_name));
+}
+
+fn get_first_generic_type_of<'a>(r#type: &'a Type, type_name: &str) -> Option<&'a Type> {
+    return get_type(r#type)
+        .filter(|r#type| get_type_name(r#type).is_some_and(|name| name == type_name))
+        .and_then(get_first_generic_type);
+}
+
+fn get_first_generic_type(path: &PathSegment) -> Option<&Type> {
+    if let PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }) =
+        &path.arguments
+    {
+        if let Some(GenericArgument::Type(r#type)) = args.first() {
+            return Some(r#type);
         }
     }
-    return false;
+    return None;
 }
 
 fn get_type(r#type: &Type) -> Option<&PathSegment> {

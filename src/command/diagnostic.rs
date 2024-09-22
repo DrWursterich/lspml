@@ -216,6 +216,29 @@ impl DiagnosticCollector {
             );
         }
         for (_, attribute) in tag.spel_attributes() {
+            let attribute = match attribute {
+                ParsedAttribute::Valid(attribute) => attribute,
+                ParsedAttribute::Erroneous(attribute, errors) => {
+                    // TODO: match, html, code, ...
+                    for error in errors {
+                        self.add_diagnostic_with_tag(
+                            "this is unnecessary".to_string(),
+                            DiagnosticSeverity::ERROR,
+                            error.location().range(),
+                            DiagnosticTag::UNNECESSARY,
+                        );
+                    }
+                    attribute
+                }
+                ParsedAttribute::Unparsable(message, location) => {
+                    self.add_diagnostic(
+                        message.to_string(),
+                        DiagnosticSeverity::ERROR,
+                        location.range(),
+                    );
+                    continue;
+                }
+            };
             SpelValidator::validate(self, &attribute)?;
         }
         for rule in tag.definition().attribute_rules {
@@ -397,6 +420,11 @@ impl DiagnosticCollector {
                     );
                 }
                 AttributeRule::UriExists(uri_name, module_name) => {
+                    let uri_attribute = match tag.spel_attribute(*uri_name) {
+                        Some(ParsedAttribute::Valid(attribute)) => Some(attribute),
+                        Some(ParsedAttribute::Erroneous(attribute, _)) => Some(attribute),
+                        _ => None,
+                    };
                     if let Some(SpelAttribute {
                         value:
                             SpelAttributeValue {
@@ -404,9 +432,14 @@ impl DiagnosticCollector {
                                 ..
                             },
                         ..
-                    }) = tag.spel_attribute(*uri_name)
+                    }) = uri_attribute
                     {
-                        let module_value = match tag.spel_attribute(*module_name) {
+                        let module_attribute = match tag.spel_attribute(*module_name) {
+                            Some(ParsedAttribute::Valid(attribute)) => Some(attribute),
+                            Some(ParsedAttribute::Erroneous(attribute, _)) => Some(attribute),
+                            _ => None,
+                        };
+                        let module_value = match module_attribute {
                             Some(SpelAttribute {
                                 value:
                                     SpelAttributeValue {
@@ -746,19 +779,21 @@ impl DiagnosticCollector {
     }
 }
 
-fn string_literal_attribute_value(attribute: Option<&SpelAttribute>) -> Option<&String> {
-    return match attribute {
-        Some(SpelAttribute {
-            value:
-                SpelAttributeValue {
-                    spel: SpelAst::String(SpelResult::Valid(Word { fragments })),
-                    ..
-                },
-            ..
-        }) if fragments.len() == 1 => match &fragments[0] {
-            WordFragment::String(StringLiteral { content, .. }) => Some(content),
-            _ => None,
-        },
+fn string_literal_attribute_value(
+    attribute: Option<&ParsedAttribute<SpelAttribute>>,
+) -> Option<&String> {
+    let attribute = match attribute {
+        Some(ParsedAttribute::Valid(attribute)) => attribute,
+        Some(ParsedAttribute::Erroneous(attribute, _)) => attribute,
+        _ => return None,
+    };
+    return match &attribute.value.spel {
+        SpelAst::String(SpelResult::Valid(Word { fragments })) if fragments.len() == 1 => {
+            match &fragments[0] {
+                WordFragment::String(StringLiteral { content, .. }) => Some(content),
+                _ => None,
+            }
+        }
         _ => None,
     };
 }

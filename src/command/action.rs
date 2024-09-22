@@ -9,7 +9,7 @@ use lsp_types::{
 use crate::{
     capabilities::CodeActionImplementation,
     document_store,
-    parser::{Node, SpIf, SpelAttribute, Tag},
+    parser::{Node, ParsedAttribute, SpIf, SpelAttribute, Tag},
     spel::ast::{
         Argument, Comparable, ComparissonOperator, Condition, Function, SpelAst, SpelResult,
     },
@@ -150,7 +150,8 @@ fn construct_fix_spel_syntax<'a>(
 
 fn construct_name_to_condition<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActionOrCommand> {
     let name_attribute = match &if_tag.name_attribute {
-        Some(v) => v,
+        Some(ParsedAttribute::Valid(attribute)) => attribute,
+        Some(ParsedAttribute::Erroneous(attribute, _)) => attribute,
         _ => return None,
     };
     log::debug!("got name_attribute");
@@ -233,40 +234,48 @@ fn construct_name_to_condition<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
 
 fn first_comparable_if_attribute(if_tag: &SpIf) -> Option<(&str, &SpelAttribute)> {
     match &if_tag.gt_attribute {
-        Some(attribute) => return Some(("gt", attribute)),
-        None => (),
+        Some(ParsedAttribute::Valid(attribute)) => return Some(("gt", attribute)),
+        Some(ParsedAttribute::Erroneous(attribute, _)) => return Some(("gt", attribute)),
+        _ => (),
     };
     match &if_tag.gte_attribute {
-        Some(attribute) => return Some(("gte", attribute)),
-        None => (),
+        Some(ParsedAttribute::Valid(attribute)) => return Some(("gte", attribute)),
+        Some(ParsedAttribute::Erroneous(attribute, _)) => return Some(("gte", attribute)),
+        _ => (),
     };
     match &if_tag.lt_attribute {
-        Some(attribute) => return Some(("lt", attribute)),
-        None => (),
+        Some(ParsedAttribute::Valid(attribute)) => return Some(("lt", attribute)),
+        Some(ParsedAttribute::Erroneous(attribute, _)) => return Some(("lt", attribute)),
+        _ => (),
     };
     match &if_tag.lte_attribute {
-        Some(attribute) => return Some(("lte", attribute)),
-        None => (),
+        Some(ParsedAttribute::Valid(attribute)) => return Some(("lte", attribute)),
+        Some(ParsedAttribute::Erroneous(attribute, _)) => return Some(("lte", attribute)),
+        _ => (),
     };
     match &if_tag.eq_attribute {
-        Some(attribute) => return Some(("eq", attribute)),
-        None => (),
+        Some(ParsedAttribute::Valid(attribute)) => return Some(("eq", attribute)),
+        Some(ParsedAttribute::Erroneous(attribute, _)) => return Some(("eq", attribute)),
+        _ => (),
     };
     match &if_tag.neq_attribute {
-        Some(attribute) => return Some(("neq", attribute)),
-        None => (),
+        Some(ParsedAttribute::Valid(attribute)) => return Some(("neq", attribute)),
+        Some(ParsedAttribute::Erroneous(attribute, _)) => return Some(("neq", attribute)),
+        _ => (),
     };
     match &if_tag.isNull_attribute {
-        Some(attribute) => return Some(("isNull", attribute)),
-        None => (),
+        Some(ParsedAttribute::Valid(attribute)) => return Some(("isNull", attribute)),
+        Some(ParsedAttribute::Erroneous(attribute, _)) => return Some(("isNull", attribute)),
+        _ => (),
     };
     return None;
 }
 
 fn construct_condition_to_name<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActionOrCommand> {
     let condition_attribute = match &if_tag.condition_attribute {
-        Some(v) => v,
-        None => return None,
+        Some(ParsedAttribute::Valid(attribute)) => attribute,
+        Some(ParsedAttribute::Erroneous(attribute, _)) => attribute,
+        _ => return None,
     };
     let condition = match &condition_attribute.value.spel {
         SpelAst::Condition(SpelResult::Valid(c)) => c,

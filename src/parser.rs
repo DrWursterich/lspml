@@ -32,9 +32,9 @@ pub(crate) trait ParsableTag {
 
     fn body(&self) -> &Option<TagBody>;
 
-    fn spel_attributes(&self) -> Vec<(&str, &SpelAttribute)>;
+    fn spel_attributes(&self) -> Vec<(&str, &ParsedAttribute<SpelAttribute>)>;
 
-    fn spel_attribute(&self, name: &str) -> Option<&SpelAttribute>;
+    fn spel_attribute(&self, name: &str) -> Option<&ParsedAttribute<SpelAttribute>>;
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -341,7 +341,7 @@ macro_rules! tag_struct {
         #[tag_definition($definition)]
         pub(crate) struct $name {
             pub(crate) open_location: Location,
-            $(pub(crate) $param: Option<SpelAttribute>,)*
+            $(pub(crate) $param: Option<ParsedAttribute<SpelAttribute>>,)*
             pub(crate) body: Option<TagBody>,
             pub(crate) close_location: Location,
         }
@@ -1564,6 +1564,25 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         return result;
     }
 
+    // fn html(
+    //     tree_parser: &'a mut TreeParser<'b>,
+    // ) -> Result<(String, ParsedAttribute<HtmlAttribute>)> {
+    //     let mut parser = AttributeParser::new(tree_parser);
+    //     let result = parser.parse_plain();
+    //     parser.walk_back();
+    //     return result;
+    // }
+
+    fn spel(
+        tree_parser: &'a mut TreeParser<'b>,
+        r#type: &TagAttributeType,
+    ) -> Result<(String, ParsedAttribute<SpelAttribute>)> {
+        let mut parser = AttributeParser::new(tree_parser);
+        let result = parser.parse_spel(r#type);
+        parser.walk_back();
+        return result;
+    }
+
     fn new(tree_parser: &'a mut TreeParser<'b>) -> Self {
         let parent_node = tree_parser.cursor.node();
         return AttributeParser {
@@ -1636,6 +1655,76 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         let attribute = PlainAttribute {
             key_location,
             value,
+        };
+        let parsed = match &self.errors {
+            Some(errors) => ParsedAttribute::Erroneous(attribute, errors.to_vec()),
+            None => ParsedAttribute::Valid(attribute),
+        };
+        return Ok((key, parsed));
+    }
+
+    fn parse_spel(
+        &mut self,
+        r#type: &TagAttributeType,
+    ) -> Result<(String, ParsedAttribute<SpelAttribute>)> {
+        let key_node = match self.parse_key()? {
+            IntermediateAttributeParsingResult::Failed(message, location) => {
+                return Ok((
+                    // TODO: this is ass
+                    "".to_string(),
+                    ParsedAttribute::Unparsable(message, location),
+                ));
+            }
+            IntermediateAttributeParsingResult::Partial(e) => e,
+        };
+        let key_location = node_location(key_node);
+        let key = self.tree_parser.node_text(&key_node)?.to_string();
+        let equals_location = match self.parse_equals(&key_node)? {
+            IntermediateAttributeParsingResult::Failed(message, location) => {
+                return Ok((key, ParsedAttribute::Unparsable(message, location)))
+            }
+            IntermediateAttributeParsingResult::Partial(Some(e)) => e,
+            IntermediateAttributeParsingResult::Partial(None) => {
+                return Ok((
+                    key,
+                    ParsedAttribute::Unparsable(
+                        "missing \"=\"".to_string(),
+                        node_location(self.parent_node),
+                    ),
+                ))
+            }
+        };
+        if let IntermediateAttributeParsingResult::Failed(message, location) =
+            self.parse_string(&key_node)?
+        {
+            return Ok((key, ParsedAttribute::Unparsable(message, location)));
+        }
+        let opening_quote_location = match self.parse_opening_quote(&key_node)? {
+            IntermediateAttributeParsingResult::Failed(message, location) => {
+                return Ok((key, ParsedAttribute::Unparsable(message, location)))
+            }
+            IntermediateAttributeParsingResult::Partial(e) => e,
+        };
+        let (spel, movement) = match self.parse_spel_content(&key_node, r#type)? {
+            IntermediateAttributeParsingResult::Failed(message, location) => {
+                return Ok((key, ParsedAttribute::Unparsable(message, location)))
+            }
+            IntermediateAttributeParsingResult::Partial(e) => e,
+        };
+        let closing_quote_location = match self.parse_closing_quote(&key_node, movement)? {
+            IntermediateAttributeParsingResult::Failed(message, location) => {
+                return Ok((key, ParsedAttribute::Unparsable(message, location)))
+            }
+            IntermediateAttributeParsingResult::Partial(e) => e,
+        };
+        let attribute = SpelAttribute {
+            key_location,
+            value: SpelAttributeValue {
+                equals_location,
+                opening_quote_location,
+                spel,
+                closing_quote_location,
+            },
         };
         let parsed = match &self.errors {
             Some(errors) => ParsedAttribute::Erroneous(attribute, errors.to_vec()),
@@ -1835,13 +1924,80 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                         NodeMovement::Current,
                     ))
                 }
-                NodeMovingResult::Ok(node) => {
-                    IntermediateAttributeParsingResult::Partial((
+                NodeMovingResult::Ok(node) => IntermediateAttributeParsingResult::Partial((
                     self.tree_parser.node_text(&node)?.to_string(),
                     NodeMovement::NextSibling,
-                ))},
+                )),
             });
         }
+    }
+
+    fn parse_spel_content(
+        &mut self,
+        key_node: &tree_sitter::Node<'a>,
+        r#type: &TagAttributeType,
+    ) -> Result<IntermediateAttributeParsingResult<(SpelAst, NodeMovement)>> {
+        let (text, movement) = match self.parse_string_content(key_node)? {
+            IntermediateAttributeParsingResult::Partial(e) => e,
+            IntermediateAttributeParsingResult::Failed(message, location) => {
+                return Ok(IntermediateAttributeParsingResult::Failed(
+                    message, location,
+                ))
+            }
+        };
+        let parser = &mut spel::parser::Parser::new(&text);
+        let spel = match r#type {
+            TagAttributeType::Comparable => match parser.parse_comparable() {
+                Ok(result) => SpelAst::Comparable(SpelResult::Valid(result)),
+                // workaround as comparables as attribute values do accept strings (without quotes)
+                // but comparables in actual comparissons do not.
+                Err(err) => match spel::parser::Parser::new(&text).parse_text() {
+                    Ok(result) => SpelAst::String(SpelResult::Valid(result)),
+                    Err(_) => SpelAst::Comparable(SpelResult::Invalid(err)),
+                },
+            },
+            TagAttributeType::Condition => SpelAst::Condition(match parser.parse_condition_ast() {
+                Ok(result) => SpelResult::Valid(result.root),
+                Err(err) => SpelResult::Invalid(err),
+            }),
+            TagAttributeType::Expression => {
+                SpelAst::Expression(match parser.parse_expression_ast() {
+                    Ok(result) => SpelResult::Valid(result.root),
+                    Err(err) => SpelResult::Invalid(err),
+                })
+            }
+            TagAttributeType::Identifier => SpelAst::Identifier(match parser.parse_identifier() {
+                Ok(result) => SpelResult::Valid(result),
+                Err(err) => SpelResult::Invalid(err),
+            }),
+            TagAttributeType::Module => SpelAst::String(match parser.parse_text() {
+                Ok(result) => SpelResult::Valid(result),
+                Err(err) => SpelResult::Invalid(err),
+            }),
+            TagAttributeType::Object => SpelAst::Object(match parser.parse_object_ast() {
+                Ok(result) => SpelResult::Valid(result.root),
+                Err(err) => SpelResult::Invalid(err),
+            }),
+            TagAttributeType::Regex => SpelAst::Regex(match parser.parse_regex() {
+                Ok(result) => SpelResult::Valid(result),
+                Err(err) => SpelResult::Invalid(err),
+            }),
+            TagAttributeType::String => SpelAst::String(match parser.parse_text() {
+                Ok(result) => SpelResult::Valid(result),
+                Err(err) => SpelResult::Invalid(err),
+            }),
+            TagAttributeType::Query => SpelAst::Query(match parser.parse_query() {
+                Ok(result) => SpelResult::Valid(result),
+                Err(err) => SpelResult::Invalid(err),
+            }),
+            TagAttributeType::Uri { .. } => SpelAst::Uri(match parser.parse_uri() {
+                Ok(result) => SpelResult::Valid(result),
+                Err(err) => SpelResult::Invalid(err),
+            }),
+        };
+        return Ok(IntermediateAttributeParsingResult::Partial((
+            spel, movement,
+        )));
     }
 
     fn parse_closing_quote(
@@ -1851,33 +2007,27 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
     ) -> Result<IntermediateAttributeParsingResult<Location>> {
         loop {
             return Ok(match self.goto(&movement) {
-                NodeMovingResult::NonExistent => {
-                    IntermediateAttributeParsingResult::Failed(
-                            format!(
-                                "\"{}\" attribute value string is unclosed",
-                                self.tree_parser.node_text(&key_node)?
-                            ),
-                            node_location(self.parent_node),
-                        )
-                }
-                NodeMovingResult::Missing(_) => {
-                        IntermediateAttributeParsingResult::Failed(
-                            format!(
-                                "\"{}\" attribute value string is unclosed",
-                                self.tree_parser.node_text(&key_node)?
-                            ),
-                            node_location(self.parent_node),
-                        )
-                }
-                NodeMovingResult::Erroneous(node) => {
-                        IntermediateAttributeParsingResult::Failed(
-                            format!(
-                                "expected \"\"\", found \"{}\"",
-                                self.tree_parser.node_text(&node)?
-                            ),
-                            node_location(node),
-                        )
-                }
+                NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "\"{}\" attribute value string is unclosed",
+                        self.tree_parser.node_text(&key_node)?
+                    ),
+                    node_location(self.parent_node),
+                ),
+                NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "\"{}\" attribute value string is unclosed",
+                        self.tree_parser.node_text(&key_node)?
+                    ),
+                    node_location(self.parent_node),
+                ),
+                NodeMovingResult::Erroneous(node) => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "expected \"\"\", found \"{}\"",
+                        self.tree_parser.node_text(&node)?
+                    ),
+                    node_location(node),
+                ),
                 NodeMovingResult::Superfluous(node) => {
                     self.add_error(AttributeError::Superfluous(
                         self.tree_parser.node_text(&node)?.to_string(),
@@ -1885,7 +2035,9 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                     ));
                     continue;
                 }
-                NodeMovingResult::Ok(node) => IntermediateAttributeParsingResult::Partial(node_location(node)),
+                NodeMovingResult::Ok(node) => {
+                    IntermediateAttributeParsingResult::Partial(node_location(node))
+                }
             });
         }
     }
@@ -2495,103 +2647,8 @@ impl<'a> TreeParser<'a> {
     fn parse_spel_attribute(
         &mut self,
         r#type: &TagAttributeType,
-    ) -> Result<(String, SpelAttribute)> {
-        if !self.cursor.goto_first_child() {
-            return Err(anyhow::anyhow!("attribute is empty"));
-        }
-        let key_node = self.cursor.node();
-        let key_location = node_location(key_node);
-        let key = key_node.kind().to_string();
-        if !self.cursor.goto_next_sibling() {
-            return Err(anyhow::anyhow!("attribute is missing a value"));
-        }
-        let equals_location = node_location(self.cursor.node());
-        if !self.cursor.goto_next_sibling() {
-            return Err(anyhow::anyhow!("attribute is missing a value"));
-        }
-        let _string_node = self.cursor.node();
-        if !self.cursor.goto_first_child() {
-            return Err(anyhow::anyhow!("attribute value is empty"));
-        }
-        let opening_quote_location = node_location(self.cursor.node());
-        if !self.cursor.goto_next_sibling() {
-            return Err(anyhow::anyhow!("attribute value string is unclosed"));
-        }
-        let node = self.cursor.node();
-        let text;
-        match node.kind() {
-            "string_content" => {
-                text = self.cursor.node().utf8_text(self.text_bytes)?.to_string();
-                if !self.cursor.goto_next_sibling() {
-                    return Err(anyhow::anyhow!("attribute value string is unclosed"));
-                }
-            }
-            "\"" => text = "".to_string(),
-            _ => return Err(anyhow::anyhow!("attribute value string is unclosed")),
-        }
-        let parser = &mut spel::parser::Parser::new(&text);
-        let spel = match r#type {
-            TagAttributeType::Comparable => match parser.parse_comparable() {
-                Ok(result) => SpelAst::Comparable(SpelResult::Valid(result)),
-                // workaround as comparables as attribute values do accept strings (without quotes)
-                // but comparables in actual comparissons do not.
-                Err(err) => match spel::parser::Parser::new(&text).parse_text() {
-                    Ok(result) => SpelAst::String(SpelResult::Valid(result)),
-                    Err(_) => SpelAst::Comparable(SpelResult::Invalid(err)),
-                },
-            },
-            TagAttributeType::Condition => SpelAst::Condition(match parser.parse_condition_ast() {
-                Ok(result) => SpelResult::Valid(result.root),
-                Err(err) => SpelResult::Invalid(err),
-            }),
-            TagAttributeType::Expression => {
-                SpelAst::Expression(match parser.parse_expression_ast() {
-                    Ok(result) => SpelResult::Valid(result.root),
-                    Err(err) => SpelResult::Invalid(err),
-                })
-            }
-            TagAttributeType::Identifier => SpelAst::Identifier(match parser.parse_identifier() {
-                Ok(result) => SpelResult::Valid(result),
-                Err(err) => SpelResult::Invalid(err),
-            }),
-            TagAttributeType::Module => SpelAst::String(match parser.parse_text() {
-                Ok(result) => SpelResult::Valid(result),
-                Err(err) => SpelResult::Invalid(err),
-            }),
-            TagAttributeType::Object => SpelAst::Object(match parser.parse_object_ast() {
-                Ok(result) => SpelResult::Valid(result.root),
-                Err(err) => SpelResult::Invalid(err),
-            }),
-            TagAttributeType::Regex => SpelAst::Regex(match parser.parse_regex() {
-                Ok(result) => SpelResult::Valid(result),
-                Err(err) => SpelResult::Invalid(err),
-            }),
-            TagAttributeType::String => SpelAst::String(match parser.parse_text() {
-                Ok(result) => SpelResult::Valid(result),
-                Err(err) => SpelResult::Invalid(err),
-            }),
-            TagAttributeType::Query => SpelAst::Query(match parser.parse_query() {
-                Ok(result) => SpelResult::Valid(result),
-                Err(err) => SpelResult::Invalid(err),
-            }),
-            TagAttributeType::Uri { .. } => SpelAst::Uri(match parser.parse_uri() {
-                Ok(result) => SpelResult::Valid(result),
-                Err(err) => SpelResult::Invalid(err),
-            }),
-        };
-        let closing_quote_location = node_location(self.cursor.node());
-        self.cursor.goto_parent();
-        self.cursor.goto_parent();
-        let attribute = SpelAttribute {
-            key_location,
-            value: SpelAttributeValue {
-                equals_location,
-                opening_quote_location,
-                spel,
-                closing_quote_location,
-            },
-        };
-        return Ok((key, attribute));
+    ) -> Result<(String, ParsedAttribute<SpelAttribute>)> {
+        return AttributeParser::spel(self, r#type);
     }
 }
 
@@ -2800,7 +2857,7 @@ mod tests {
             open_location: Location::new(0, 2, 11),
             height_attribute: None,
             locale_attribute: None,
-            name_attribute: Some(SpelAttribute {
+            name_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
                 key_location: Location::new(12, 2, 4),
                 value: SpelAttributeValue {
                     equals_location: Location::new(16, 2, 1),
@@ -2817,8 +2874,8 @@ mod tests {
                     }))),
                     closing_quote_location: Location::new(27, 2, 1),
                 },
-            }),
-            scope_attribute: Some(SpelAttribute {
+            })),
+            scope_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
                 key_location: Location::new(46, 2, 5),
                 value: SpelAttributeValue {
                     equals_location: Location::new(51, 2, 1),
@@ -2835,8 +2892,8 @@ mod tests {
                     })),
                     closing_quote_location: Location::new(57, 2, 1),
                 },
-            }),
-            text_attribute: Some(SpelAttribute {
+            })),
+            text_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
                 key_location: Location::new(29, 2, 4),
                 value: SpelAttributeValue {
                     equals_location: Location::new(33, 2, 1),
@@ -2853,7 +2910,7 @@ mod tests {
                     })),
                     closing_quote_location: Location::new(44, 2, 1),
                 },
-            }),
+            })),
             type_attribute: None,
             body: None,
             close_location: Location::new(58, 2, 2),
