@@ -4,7 +4,7 @@ use anyhow::Result;
 use lsp_server::ErrorCode;
 use lsp_types::{
     Diagnostic, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticParams, NumberOrString,
-    Position, Range, TextEdit, Url,
+    Position, Range, TextEdit, Uri as Url,
 };
 
 use crate::{
@@ -18,10 +18,11 @@ use crate::{
     },
     spel::{
         ast::{
-            self, Argument, Comparable, Condition, Expression, Identifier, Object, SpelAst,
-            SpelResult, StringLiteral, Uri, Word, WordFragment,
+            Argument, Comparable, Condition, Expression, Function, Identifier, Interpolation,
+            Location, Object, Query, Regex, SpelAst, SpelResult, StringLiteral, Uri, Word,
+            WordFragment,
         },
-        grammar::{ArgumentNumber, Function},
+        grammar::{self, ArgumentNumber},
         parser::SyntaxError,
     },
 };
@@ -163,7 +164,8 @@ impl DiagnosticCollector {
                         match &header.origin {
                             Some(_) => (),
                             None => self.add_diagnostic(
-                                "invalid taglib header: missing 'uri' or 'tagdir' attribute".to_string(),
+                                "invalid taglib header: missing 'uri' or 'tagdir' attribute"
+                                    .to_string(),
                                 DiagnosticSeverity::ERROR,
                                 range,
                             ),
@@ -408,11 +410,9 @@ impl DiagnosticCollector {
                             None => None,
                         };
                         let module = match module_value {
-                            Some(WordFragment::Interpolation(_)) | None => self
-                                .file
-                                .to_file_path()
-                                .ok()
-                                .and_then(|file| modules::find_module_for_file(file.as_path())),
+                            Some(WordFragment::Interpolation(_)) | None => {
+                                modules::find_module_for_file(Path::new(self.file.path().as_str()))
+                            }
                             Some(WordFragment::String(StringLiteral { ref content, .. })) => {
                                 modules::find_module_by_name(&content)
                             }
@@ -735,7 +735,7 @@ impl SpelValidator<'_> {
         return SpelValidator { collector, offset };
     }
 
-    fn validate_identifier(&mut self, identifier: &ast::Identifier) -> Result<()> {
+    fn validate_identifier(&mut self, identifier: &Identifier) -> Result<()> {
         match identifier {
             Identifier::Name(name) => {
                 self.validate_interpolations_in_word(&name)?;
@@ -750,7 +750,7 @@ impl SpelValidator<'_> {
         return Ok(());
     }
 
-    fn validate_object(&mut self, object: &ast::Object) -> Result<()> {
+    fn validate_object(&mut self, object: &Object) -> Result<()> {
         match object {
             Object::Anchor(anchor) => {
                 self.validate_interpolations_in_word(&anchor.name)?;
@@ -783,7 +783,7 @@ impl SpelValidator<'_> {
         return Ok(());
     }
 
-    fn validate_expression(&mut self, expression: &ast::Expression) -> Result<()> {
+    fn validate_expression(&mut self, expression: &Expression) -> Result<()> {
         match expression {
             // Expression::Number(number) => todo!(),
             // Expression::Null(null) => todo!(),
@@ -816,9 +816,9 @@ impl SpelValidator<'_> {
         return Ok(());
     }
 
-    fn validate_condition(&mut self, condition: &ast::Condition) -> Result<()> {
+    fn validate_condition(&mut self, condition: &Condition) -> Result<()> {
         match condition {
-            Condition::Object(ast::Interpolation { content, .. }) => {
+            Condition::Object(Interpolation { content, .. }) => {
                 self.validate_object(content)?;
             }
             Condition::Function(function) => self.validate_global_function(function)?,
@@ -839,7 +839,7 @@ impl SpelValidator<'_> {
         return Ok(());
     }
 
-    fn validate_comparable(&mut self, comparable: &ast::Comparable) -> Result<()> {
+    fn validate_comparable(&mut self, comparable: &Comparable) -> Result<()> {
         match comparable {
             Comparable::Condition(condition) => self.validate_condition(condition),
             Comparable::Expression(expression) => self.validate_expression(expression),
@@ -851,9 +851,9 @@ impl SpelValidator<'_> {
         }
     }
 
-    fn validate_global_function(&mut self, function: &ast::Function) -> Result<()> {
+    fn validate_global_function(&mut self, function: &Function) -> Result<()> {
         let argument_count = function.arguments.len();
-        match Function::from_str(function.name.as_str()) {
+        match grammar::Function::from_str(function.name.as_str()) {
             Ok(definition) => match definition.argument_number {
                 ArgumentNumber::AtLeast(number) if argument_count < number => {
                     self.collector.add_diagnostic(
@@ -917,22 +917,22 @@ impl SpelValidator<'_> {
         return Ok(());
     }
 
-    fn validate_query(&mut self, _query: &ast::Query) -> Result<()> {
+    fn validate_query(&mut self, _query: &Query) -> Result<()> {
         // TODO!
         return Ok(());
     }
 
-    fn validate_regex(&mut self, _regex: &ast::Regex) -> Result<()> {
+    fn validate_regex(&mut self, _regex: &Regex) -> Result<()> {
         // TODO!
         return Ok(());
     }
 
-    fn validate_uri(&mut self, _uri: &ast::Uri) -> Result<()> {
+    fn validate_uri(&mut self, _uri: &Uri) -> Result<()> {
         // TODO!
         return Ok(());
     }
 
-    fn validate_interpolations_in_word(&mut self, word: &ast::Word) -> Result<()> {
+    fn validate_interpolations_in_word(&mut self, word: &Word) -> Result<()> {
         for fragment in &word.fragments {
             if let WordFragment::Interpolation(interpolation) = fragment {
                 self.validate_object(&interpolation.content)?;
@@ -941,7 +941,7 @@ impl SpelValidator<'_> {
         return Ok(());
     }
 
-    fn locations_range(&self, left: &ast::Location, right: &ast::Location) -> Range {
+    fn locations_range(&self, left: &Location, right: &Location) -> Range {
         return Range {
             start: Position {
                 line: left.line() as u32 + self.offset.line,
@@ -1051,9 +1051,9 @@ pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnos
         None => document_store::Document::from_uri(&uri)
             .map(|document| document_store::put(&uri, document))
             .map_err(|err| {
-                log::error!("failed to read {}: {}", uri, err);
+                log::error!("failed to read {:?}: {}", uri, err);
                 return LsError {
-                    message: format!("cannot read file {}", uri),
+                    message: format!("cannot read file {:?}", uri),
                     code: ErrorCode::RequestFailed,
                 };
             }),

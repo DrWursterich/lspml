@@ -167,9 +167,9 @@ pub(crate) fn semantics(params: SemanticTokensParams) -> Result<Vec<SemanticToke
         None => document_store::Document::from_uri(&uri)
             .map(|document| document_store::put(&uri, document))
             .map_err(|err| {
-                log::error!("failed to read {}: {}", uri, err);
+                log::error!("failed to read {:?}: {}", uri, err);
                 return LsError {
-                    message: format!("cannot read file {}", uri),
+                    message: format!("cannot read file {:?}", uri),
                     code: ErrorCode::RequestFailed,
                 };
             }),

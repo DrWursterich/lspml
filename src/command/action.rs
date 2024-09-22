@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use lsp_server::ErrorCode;
 use lsp_types::{
     CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, Position, Range, TextEdit,
-    Url, WorkspaceEdit,
+    Uri, WorkspaceEdit,
 };
 
 use crate::{
@@ -31,9 +31,9 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
         None => document_store::Document::from_uri(&uri)
             .map(|document| document_store::put(&uri, document))
             .map_err(|err| {
-                log::error!("failed to read {}: {}", uri, err);
+                log::error!("failed to read {:?}: {}", uri, err);
                 return LsError {
-                    message: format!("cannot read file {}", uri),
+                    message: format!("cannot read file {:?}", uri),
                     code: ErrorCode::RequestFailed,
                 };
             }),
@@ -107,7 +107,7 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
     return Ok(actions);
 }
 
-fn construct_generate_default_header<'a>(uri: &Url) -> CodeActionOrCommand {
+fn construct_generate_default_header<'a>(uri: &Uri) -> CodeActionOrCommand {
     let document_start = Position {
         line: 0,
         character: 0,
@@ -133,7 +133,7 @@ fn construct_generate_default_header<'a>(uri: &Url) -> CodeActionOrCommand {
 }
 
 fn construct_fix_spel_syntax<'a>(
-    uri: &Url,
+    uri: &Uri,
     title: String,
     edits: Vec<TextEdit>,
 ) -> CodeActionOrCommand {
@@ -148,7 +148,7 @@ fn construct_fix_spel_syntax<'a>(
     });
 }
 
-fn construct_name_to_condition<'a>(uri: &Url, if_tag: &SpIf) -> Option<CodeActionOrCommand> {
+fn construct_name_to_condition<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActionOrCommand> {
     let name_attribute = match &if_tag.name_attribute {
         Some(v) => v,
         _ => return None,
@@ -263,7 +263,7 @@ fn first_comparable_if_attribute(if_tag: &SpIf) -> Option<(&str, &SpelAttribute)
     return None;
 }
 
-fn construct_condition_to_name<'a>(uri: &Url, if_tag: &SpIf) -> Option<CodeActionOrCommand> {
+fn construct_condition_to_name<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActionOrCommand> {
     let condition_attribute = match &if_tag.condition_attribute {
         Some(v) => v,
         None => return None,

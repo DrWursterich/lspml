@@ -1,11 +1,9 @@
 use std::{
-    collections::HashMap,
-    fs,
-    sync::{Arc, Mutex, OnceLock},
+    collections::HashMap, fs, path::Path, sync::{Arc, Mutex, OnceLock}
 };
 
 use anyhow::{Error, Result};
-use lsp_types::Url;
+use lsp_types::Uri;
 use tree_sitter::Parser;
 
 use crate::parser::Tree;
@@ -26,23 +24,22 @@ impl Document {
         };
     }
 
-    pub(crate) fn from_uri(uri: &Url) -> Result<Document> {
-        return match uri.to_file_path() {
-            Ok(path) if path.exists() => fs::read_to_string(path.to_owned())
+    pub(crate) fn from_uri(uri: &Uri) -> Result<Document> {
+        return match Path::new(uri.path().as_str()) {
+            path if path.exists() => fs::read_to_string(path.to_owned())
                 .map(|text| Document::new(text))
                 .map_err(Error::from),
-            Ok(path) => Err(anyhow::anyhow!("file {:?} does not exist", path)),
-            Err(_) => Err(anyhow::anyhow!("failed to read file path from uri {}", uri)),
+            path => Err(anyhow::anyhow!("file {:?} does not exist", path)),
         }?;
     }
 }
 
-fn document_store() -> &'static Arc<Mutex<HashMap<Url, Document>>> {
-    static DOCUMENT_STORE: OnceLock<Arc<Mutex<HashMap<Url, Document>>>> = OnceLock::new();
+fn document_store() -> &'static Arc<Mutex<HashMap<Uri, Document>>> {
+    static DOCUMENT_STORE: OnceLock<Arc<Mutex<HashMap<Uri, Document>>>> = OnceLock::new();
     return DOCUMENT_STORE.get_or_init(|| Arc::new(Mutex::new(HashMap::new())));
 }
 
-pub(crate) fn get(uri: &Url) -> Option<Document> {
+pub(crate) fn get(uri: &Uri) -> Option<Document> {
     return document_store()
         .lock()
         .expect("document_store mutex poisoned")
@@ -50,7 +47,7 @@ pub(crate) fn get(uri: &Url) -> Option<Document> {
         .cloned();
 }
 
-pub(crate) fn put(uri: &Url, document: Document) -> Document {
+pub(crate) fn put(uri: &Uri, document: Document) -> Document {
     document_store()
         .lock()
         .expect("document_store mutex poisoned")

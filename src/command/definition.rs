@@ -1,5 +1,5 @@
 use lsp_server::ErrorCode;
-use lsp_types::{GotoDefinitionParams, Position, Range, Url};
+use lsp_types::{GotoDefinitionParams, Position, Range, Uri as Url};
 use std::{cmp::Ordering, path::Path};
 use tree_sitter::Point;
 
@@ -122,9 +122,9 @@ pub(crate) fn definition(
         None => document_store::Document::from_uri(file)
             .map(|document| document_store::put(file, document))
             .map_err(|err| {
-                log::error!("failed to read {}: {}", file, err);
+                log::error!("failed to read {:?}: {}", file, err);
                 return LsError {
-                    message: format!("cannot read file {}", file),
+                    message: format!("cannot read file {:?}", file),
                     code: ErrorCode::RequestFailed,
                 };
             }),
@@ -176,16 +176,15 @@ pub(crate) fn definition(
                                 module = modules::find_module_by_name(&content)
                             }
                         }
-                        module =
-                            module.or_else(|| {
-                                text_params.text_document.uri.to_file_path().ok().and_then(
-                                    |module| modules::find_module_for_file(module.as_path()),
-                                )
-                            });
+                        module = module.or_else(|| {
+                            modules::find_module_for_file(Path::new(
+                                text_params.text_document.uri.path().as_str(),
+                            ))
+                        });
                         return Ok(module
                             .map(|module| module.path + &uri.to_string())
                             .filter(|file| Path::new(&file).exists())
-                            .and_then(|file| Url::parse(format!("file://{}", &file).as_str()).ok())
+                            .and_then(|file| format!("file://{}", &file).parse().ok())
                             .map(|uri| {
                                 vec![lsp_types::Location {
                                     range: Range {

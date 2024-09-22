@@ -4,7 +4,7 @@ use anyhow::Result;
 use lsp_server::ErrorCode;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionParams, CompletionTextEdit, Documentation,
-    MarkupContent, MarkupKind, Position, Range, TextDocumentPositionParams, TextEdit, Url,
+    MarkupContent, MarkupKind, Position, Range, TextDocumentPositionParams, TextEdit, Uri as Url,
 };
 
 use crate::{
@@ -257,10 +257,9 @@ impl CompletionCollector<'_> {
                             }
                         }
                         let module = module.or_else(|| {
-                            self.file
-                                .to_file_path()
-                                .ok()
-                                .and_then(|file| modules::find_module_for_file(file.as_path()))
+                            modules::find_module_for_file(std::path::Path::new(
+                                self.file.path().as_str(),
+                            ))
                         });
                         if let Some(module) = &module {
                             if let Err(err) = self.complete_uri(uri, module) {
@@ -385,9 +384,9 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
         None => document_store::Document::from_uri(uri)
             .map(|document| document_store::put(uri, document))
             .map_err(|err| {
-                log::error!("failed to read {}: {}", uri, err);
+                log::error!("failed to read {:?}: {}", uri, err);
                 return LsError {
-                    message: format!("cannot read file {}", uri),
+                    message: format!("cannot read file {:?}", uri),
                     code: ErrorCode::RequestFailed,
                 };
             }),
@@ -401,7 +400,7 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
 // mod tests {
 //     use lsp_types::{
 //         CompletionParams, PartialResultParams, Position, TextDocumentIdentifier,
-//         TextDocumentPositionParams, Url, WorkDoneProgressParams,
+//         TextDocumentPositionParams, Uri as Url, WorkDoneProgressParams,
 //     };
 
 //     use crate::document_store::Document;
@@ -418,7 +417,7 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
 //         let params: CompletionParams = CompletionParams {
 //             text_document_position: TextDocumentPositionParams {
 //                 text_document: TextDocumentIdentifier {
-//                     uri: Url::parse("file:///some/test/file.spml").unwrap(),
+//                     uri: "file:///some/test/file.spml".parse().unwrap(),
 //                 },
 //                 position: Position {
 //                     line: 2,

@@ -23,9 +23,9 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
         None => document_store::Document::from_uri(file)
             .map(|document| document_store::put(file, document))
             .map_err(|err| {
-                log::error!("failed to read {}: {}", file, err);
+                log::error!("failed to read {:?}: {}", file, err);
                 return LsError {
-                    message: format!("cannot read file {}", file),
+                    message: format!("cannot read file {:?}", file),
                     code: ErrorCode::RequestFailed,
                 };
             }),
