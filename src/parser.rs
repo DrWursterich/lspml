@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 
+use std::{cmp::Ordering, str::Utf8Error};
+
 use anyhow::Result;
 use lsp_types::{Position, Range};
 
@@ -78,10 +80,10 @@ pub(crate) struct Header {
 pub(crate) struct PageHeader {
     pub(crate) open_bracket: Location,
     pub(crate) page: Location,
-    pub(crate) language: Option<PlainAttribute>,
-    pub(crate) page_encoding: Option<PlainAttribute>,
-    pub(crate) content_type: Option<PlainAttribute>,
-    pub(crate) imports: Vec<PlainAttribute>,
+    pub(crate) language: Option<ParsedAttribute<PlainAttribute>>,
+    pub(crate) page_encoding: Option<ParsedAttribute<PlainAttribute>>,
+    pub(crate) content_type: Option<ParsedAttribute<PlainAttribute>>,
+    pub(crate) imports: Vec<ParsedAttribute<PlainAttribute>>,
     pub(crate) close_bracket: Location,
 }
 
@@ -89,10 +91,10 @@ pub(crate) struct PageHeader {
 pub(crate) struct IncompletePageHeader {
     pub(crate) open_bracket: ParsedLocation,
     pub(crate) page: ParsedLocation,
-    pub(crate) language: Option<PlainAttribute>,
-    pub(crate) page_encoding: Option<PlainAttribute>,
-    pub(crate) content_type: Option<PlainAttribute>,
-    pub(crate) imports: Vec<PlainAttribute>,
+    pub(crate) language: Option<ParsedAttribute<PlainAttribute>>,
+    pub(crate) page_encoding: Option<ParsedAttribute<PlainAttribute>>,
+    pub(crate) content_type: Option<ParsedAttribute<PlainAttribute>>,
+    pub(crate) imports: Vec<ParsedAttribute<PlainAttribute>>,
     pub(crate) close_bracket: ParsedLocation,
 }
 
@@ -102,26 +104,18 @@ impl RangedNode for IncompletePageHeader {
             .open_bracket
             .location()
             .or_else(|| self.page.location())
-            .or_else(|| self.language.as_ref().map(|e| &e.key_location))
-            .or_else(|| self.page_encoding.as_ref().map(|e| &e.key_location))
-            .or_else(|| self.content_type.as_ref().map(|e| &e.key_location))
-            .or_else(|| self.imports.first().map(|e| &e.key_location))
+            .or_else(|| self.language.as_ref().map(|a| a.start()))
+            .or_else(|| self.page_encoding.as_ref().map(|a| a.start()))
+            .or_else(|| self.content_type.as_ref().map(|a| a.start()))
+            .or_else(|| self.imports.first().map(|a| a.start()))
             .or_else(|| self.close_bracket.location())?;
         let end = self
             .close_bracket
             .location()
-            .or_else(|| self.imports.last().map(|e| &e.closing_quote_location))
-            .or_else(|| {
-                self.content_type
-                    .as_ref()
-                    .map(|e| &e.closing_quote_location)
-            })
-            .or_else(|| {
-                self.page_encoding
-                    .as_ref()
-                    .map(|e| &e.closing_quote_location)
-            })
-            .or_else(|| self.language.as_ref().map(|e| &e.closing_quote_location))
+            .or_else(|| self.imports.last().map(|a| a.start()))
+            .or_else(|| self.content_type.as_ref().map(|a| a.start()))
+            .or_else(|| self.page_encoding.as_ref().map(|a| a.start()))
+            .or_else(|| self.language.as_ref().map(|a| a.start()))
             .or_else(|| self.page.location())
             .or_else(|| self.open_bracket.location())?;
         return Some(Range {
@@ -142,7 +136,7 @@ pub(crate) struct TagLibImport {
     pub(crate) open_bracket: Location,
     pub(crate) taglib: Location,
     pub(crate) origin: TagLibOrigin,
-    pub(crate) prefix: PlainAttribute,
+    pub(crate) prefix: ParsedAttribute<PlainAttribute>,
     pub(crate) close_bracket: Location,
 }
 
@@ -151,7 +145,7 @@ pub(crate) struct IncompleteTagLibImport {
     pub(crate) open_bracket: ParsedLocation,
     pub(crate) taglib: ParsedLocation,
     pub(crate) origin: Option<TagLibOrigin>,
-    pub(crate) prefix: Option<PlainAttribute>,
+    pub(crate) prefix: Option<ParsedAttribute<PlainAttribute>>,
     pub(crate) close_bracket: ParsedLocation,
     pub(crate) errors: Vec<ErrorNode>,
 }
@@ -162,28 +156,14 @@ impl RangedNode for IncompleteTagLibImport {
             .open_bracket
             .location()
             .or_else(|| self.taglib.location())
-            .or_else(|| {
-                self.origin.as_ref().map(|origin| match origin {
-                    TagLibOrigin::Uri(uri) => &uri.key_location,
-                    TagLibOrigin::TagDir(tagdir) => &tagdir.key_location,
-                })
-            })
-            .or_else(|| self.prefix.as_ref().map(|prefix| &prefix.key_location))
+            .or_else(|| self.origin.as_ref().map(|e| e.start()))
+            .or_else(|| self.prefix.as_ref().map(|e| e.start()))
             .or_else(|| self.close_bracket.location())?;
         let end = self
             .close_bracket
             .location()
-            .or_else(|| {
-                self.prefix
-                    .as_ref()
-                    .map(|prefix| &prefix.closing_quote_location)
-            })
-            .or_else(|| {
-                self.origin.as_ref().map(|origin| match origin {
-                    TagLibOrigin::Uri(uri) => &uri.closing_quote_location,
-                    TagLibOrigin::TagDir(tagdir) => &tagdir.closing_quote_location,
-                })
-            })
+            .or_else(|| self.prefix.as_ref().map(|e| e.end()))
+            .or_else(|| self.origin.as_ref().map(|e| e.end()))
             .or_else(|| self.taglib.location())
             .or_else(|| self.open_bracket.location())?;
         return Some(Range {
@@ -201,8 +181,24 @@ impl RangedNode for IncompleteTagLibImport {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum TagLibOrigin {
-    Uri(PlainAttribute),
-    TagDir(PlainAttribute),
+    Uri(ParsedAttribute<PlainAttribute>),
+    TagDir(ParsedAttribute<PlainAttribute>),
+}
+
+impl TagLibOrigin {
+    fn start(&self) -> &Location {
+        return match &self {
+            TagLibOrigin::Uri(uri) => uri.start(),
+            TagLibOrigin::TagDir(tagdir) => tagdir.start(),
+        };
+    }
+
+    fn end(&self) -> &Location {
+        return match &self {
+            TagLibOrigin::Uri(uri) => uri.end(),
+            TagLibOrigin::TagDir(tagdir) => tagdir.end(),
+        };
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -223,7 +219,7 @@ pub(crate) enum Node {
 pub(crate) struct HtmlNode {
     pub(crate) open_location: Location,
     pub(crate) name: String,
-    pub(crate) attributes: Vec<PlainAttribute>,
+    pub(crate) attributes: Vec<ParsedAttribute<PlainAttribute>>,
     pub(crate) body: Option<TagBody>,
     pub(crate) close_location: Location,
 }
@@ -1325,33 +1321,80 @@ tag_struct!(
 );
 
 pub(crate) trait Attribute {
-    // fn key_location(&self) -> &Location;
+    fn start(&self) -> &Location;
 
-    // fn equals_location(&self) -> &Location;
+    fn end(&self) -> &Location;
+}
 
+pub(crate) trait AttributeValue {
     fn opening_quote_location(&self) -> &Location;
 
     fn closing_quote_location(&self) -> &Location;
+
+    fn is_inside(&self, position: &Position) -> bool {
+        let opening_line = self
+            .opening_quote_location()
+            .line
+            .cmp(&(position.line as usize));
+        let opening_char = self
+            .opening_quote_location()
+            .char
+            .cmp(&(position.character as usize));
+        match (opening_line, opening_char) {
+            (Ordering::Less, _) | (Ordering::Equal, Ordering::Less) => (),
+            _ => return false,
+        }
+        let closing_line = self
+            .closing_quote_location()
+            .line
+            .cmp(&(position.line as usize));
+        let closing_char = self
+            .closing_quote_location()
+            .char
+            .cmp(&(position.character as usize));
+        return match (closing_line, closing_char) {
+            (Ordering::Greater, _) | (Ordering::Equal, Ordering::Greater) => true,
+            _ => false,
+        };
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct PlainAttribute {
     pub(crate) key_location: Location,
+    pub(crate) value: Option<PlainAttributeValue>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct PlainAttributeValue {
     pub(crate) equals_location: Location,
     pub(crate) opening_quote_location: Location,
     pub(crate) value: String,
     pub(crate) closing_quote_location: Location,
 }
 
-impl Attribute for PlainAttribute {
-    // fn key_location(&self) -> &Location {
-    //     return &self.key_location;
-    // }
+// TODO:
+// PlainAttribute should be HtmlAttribute
+// PlainAttribute.value should not be an Option
 
-    // fn equals_location(&self) -> &Location {
-    //     return &self.equals_location;
-    // }
+// #[derive(Clone, Debug, PartialEq)]
+// pub(crate) struct HtmlAttributeValue {
+//     pub(crate) equals_location: Location,
+//     pub(crate) opening_quote_location: Location,
+//     pub(crate) fragments: HtmlAttributeValueFragments,
+//     pub(crate) closing_quote_location: Location,
+// }
 
+// #[derive(Clone, Debug, PartialEq)]
+// pub(crate) struct HtmlAttributeValueFragments(Vec<HtmlAttributeValueFragment>);
+
+// #[derive(Clone, Debug, PartialEq)]
+// pub(crate) enum HtmlAttributeValueFragment {
+//     Plain(String),
+//     Tag(Tag),
+// }
+
+impl AttributeValue for PlainAttributeValue {
     fn opening_quote_location(&self) -> &Location {
         return &self.opening_quote_location;
     }
@@ -1362,23 +1405,81 @@ impl Attribute for PlainAttribute {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub(crate) enum ParsedAttribute<A: Attribute> {
+    Valid(A),
+    Erroneous(A, Vec<AttributeError>),
+    Unparsable(String, Location),
+}
+
+impl<R: Attribute> ParsedAttribute<R> {
+    fn start(&self) -> &Location {
+        return match &self {
+            ParsedAttribute::Valid(a) => a.start(),
+            ParsedAttribute::Erroneous(a, _) => a.start(),
+            ParsedAttribute::Unparsable(_, location) => location,
+        };
+    }
+
+    fn end(&self) -> &Location {
+        return match &self {
+            ParsedAttribute::Valid(attribute) => attribute.end(),
+            ParsedAttribute::Erroneous(attribute, _) => attribute.end(),
+            ParsedAttribute::Unparsable(_, location) => location,
+        };
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum AttributeError {
+    Superfluous(String, Location),
+}
+
+impl AttributeError {
+    pub(crate) fn location(&self) -> &Location {
+        return match &self {
+            AttributeError::Superfluous(_, location) => location,
+        };
+    }
+}
+
+impl Attribute for PlainAttribute {
+    fn start(&self) -> &Location {
+        return &self.key_location;
+    }
+
+    fn end(&self) -> &Location {
+        return match &self.value {
+            Some(value) => &value.closing_quote_location,
+            None => &self.key_location,
+        };
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct SpelAttribute {
     pub(crate) key_location: Location,
+    pub(crate) value: SpelAttributeValue,
+}
+
+impl Attribute for SpelAttribute {
+    fn start(&self) -> &Location {
+        return &self.key_location;
+    }
+
+    fn end(&self) -> &Location {
+        return &self.value.closing_quote_location;
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SpelAttributeValue {
     pub(crate) equals_location: Location,
     pub(crate) opening_quote_location: Location,
     pub(crate) spel: SpelAst,
     pub(crate) closing_quote_location: Location,
 }
 
-impl Attribute for SpelAttribute {
-    // fn key_location(&self) -> &Location {
-    //     return &self.key_location;
-    // }
-
-    // fn equals_location(&self) -> &Location {
-    //     return &self.equals_location;
-    // }
-
+impl AttributeValue for SpelAttributeValue {
     fn opening_quote_location(&self) -> &Location {
         return &self.opening_quote_location;
     }
@@ -1400,7 +1501,7 @@ impl Location {
         return Location { char, line, length };
     }
 
-    pub(crate) fn contains(&self, position: Position) -> bool {
+    pub(crate) fn contains(&self, position: &Position) -> bool {
         return self.line == position.line as usize
             && self.char <= position.character as usize
             && self.char + self.length > position.character as usize;
@@ -1420,20 +1521,425 @@ impl Location {
     }
 }
 
-pub(crate) struct TreeParser<'a, 'b> {
-    cursor: tree_sitter::TreeCursor<'b>,
-    text_bytes: &'a [u8],
+pub(crate) struct TreeParser<'tree> {
+    cursor: tree_sitter::TreeCursor<'tree>,
+    text_bytes: &'tree [u8],
 }
 
-impl TreeParser<'_, '_> {
-    pub(crate) fn new<'a, 'b>(
-        cursor: tree_sitter::TreeCursor<'b>,
-        text: &'a String,
-    ) -> TreeParser<'a, 'b> {
+#[derive(Clone, Debug, PartialEq)]
+enum NodeMovement {
+    NextSibling,
+    FirstChild,
+    Current,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum NodeMovingResult<'a> {
+    NonExistent,
+    Missing(tree_sitter::Node<'a>),
+    Erroneous(tree_sitter::Node<'a>),
+    Superfluous(tree_sitter::Node<'a>),
+    Ok(tree_sitter::Node<'a>),
+}
+
+struct AttributeParser<'a, 'b> {
+    tree_parser: &'a mut TreeParser<'b>,
+    parent_node: tree_sitter::Node<'b>,
+    errors: Option<Vec<AttributeError>>,
+    depth: u8,
+}
+
+enum IntermediateAttributeParsingResult<R> {
+    Failed(String, Location),
+    Partial(R),
+}
+
+impl<'a, 'b> AttributeParser<'a, 'b> {
+    fn plain(
+        tree_parser: &'a mut TreeParser<'b>,
+    ) -> Result<(String, ParsedAttribute<PlainAttribute>)> {
+        let mut parser = AttributeParser::new(tree_parser);
+        let result = parser.parse_plain();
+        parser.walk_back();
+        return result;
+    }
+
+    fn new(tree_parser: &'a mut TreeParser<'b>) -> Self {
+        let parent_node = tree_parser.cursor.node();
+        return AttributeParser {
+            tree_parser,
+            parent_node,
+            errors: None,
+            depth: 0,
+        };
+    }
+
+    fn walk_back(&mut self) {
+        for _ in 0..self.depth {
+            self.tree_parser.cursor.goto_parent();
+        }
+    }
+
+    fn parse_plain(&mut self) -> Result<(String, ParsedAttribute<PlainAttribute>)> {
+        let key_node = match self.parse_key()? {
+            IntermediateAttributeParsingResult::Failed(message, location) => {
+                return Ok((
+                    // TODO: this is ass
+                    "".to_string(),
+                    ParsedAttribute::Unparsable(message, location),
+                ));
+            }
+            IntermediateAttributeParsingResult::Partial(e) => e,
+        };
+        let key_location = node_location(key_node);
+        let key = self.tree_parser.node_text(&key_node)?.to_string();
+        let equals_location = match self.parse_equals(&key_node)? {
+            IntermediateAttributeParsingResult::Failed(message, location) => {
+                return Ok((key, ParsedAttribute::Unparsable(message, location)))
+            }
+            IntermediateAttributeParsingResult::Partial(e) => e,
+        };
+        let value = match equals_location {
+            Some(equals_location) => {
+                if let IntermediateAttributeParsingResult::Failed(message, location) =
+                    self.parse_string(&key_node)?
+                {
+                    return Ok((key, ParsedAttribute::Unparsable(message, location)));
+                }
+                let opening_quote_location = match self.parse_opening_quote(&key_node)? {
+                    IntermediateAttributeParsingResult::Failed(message, location) => {
+                        return Ok((key, ParsedAttribute::Unparsable(message, location)))
+                    }
+                    IntermediateAttributeParsingResult::Partial(e) => e,
+                };
+                let (value, movement) = match self.parse_string_content(&key_node)? {
+                    IntermediateAttributeParsingResult::Failed(message, location) => {
+                        return Ok((key, ParsedAttribute::Unparsable(message, location)))
+                    }
+                    IntermediateAttributeParsingResult::Partial(e) => e,
+                };
+                let closing_quote_location = match self.parse_closing_quote(&key_node, movement)? {
+                    IntermediateAttributeParsingResult::Failed(message, location) => {
+                        return Ok((key, ParsedAttribute::Unparsable(message, location)))
+                    }
+                    IntermediateAttributeParsingResult::Partial(e) => e,
+                };
+                Some(PlainAttributeValue {
+                    equals_location,
+                    opening_quote_location,
+                    value,
+                    closing_quote_location,
+                })
+            }
+            None => None,
+        };
+        let attribute = PlainAttribute {
+            key_location,
+            value,
+        };
+        let parsed = match &self.errors {
+            Some(errors) => ParsedAttribute::Erroneous(attribute, errors.to_vec()),
+            None => ParsedAttribute::Valid(attribute),
+        };
+        return Ok((key, parsed));
+    }
+
+    fn parse_key(&mut self) -> Result<IntermediateAttributeParsingResult<tree_sitter::Node<'a>>> {
+        let mut movement = &NodeMovement::FirstChild;
+        loop {
+            match self.goto(movement) {
+                // probably cannot happen...
+                NodeMovingResult::NonExistent | NodeMovingResult::Missing(_) => {
+                    return Ok(IntermediateAttributeParsingResult::Failed(
+                        "missing attribute".to_string(),
+                        node_location(self.parent_node),
+                    ));
+                }
+                NodeMovingResult::Erroneous(node) => {
+                    return Ok(IntermediateAttributeParsingResult::Failed(
+                        format!(
+                            "invalid attribute \"{}\"",
+                            self.tree_parser.node_text(&node)?
+                        ),
+                        node_location(node),
+                    ));
+                }
+                NodeMovingResult::Superfluous(node) => {
+                    self.add_error(AttributeError::Superfluous(
+                        self.tree_parser.node_text(&node)?.to_string(),
+                        node_location(node),
+                    ));
+                    movement = &NodeMovement::NextSibling;
+                    continue;
+                }
+                NodeMovingResult::Ok(node) => {
+                    return Ok(IntermediateAttributeParsingResult::Partial(node))
+                }
+            };
+        }
+    }
+
+    fn parse_equals(
+        &mut self,
+        key_node: &tree_sitter::Node<'a>,
+    ) -> Result<IntermediateAttributeParsingResult<Option<Location>>> {
+        loop {
+            return Ok(match self.goto(&NodeMovement::NextSibling) {
+                NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Partial(None),
+                NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "missing \"=\" after attribute name \"{}\"",
+                        self.tree_parser.node_text(key_node)?
+                    ),
+                    node_location(self.parent_node),
+                ),
+                NodeMovingResult::Erroneous(node) => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "expected \"=\", found \"{}\"",
+                        self.tree_parser.node_text(&node)?
+                    ),
+                    node_location(node),
+                ),
+                NodeMovingResult::Superfluous(node) => {
+                    self.add_error(AttributeError::Superfluous(
+                        self.tree_parser.node_text(&node)?.to_string(),
+                        node_location(node),
+                    ));
+                    continue;
+                }
+                NodeMovingResult::Ok(node) => {
+                    IntermediateAttributeParsingResult::Partial(Some(node_location(node)))
+                }
+            });
+        }
+    }
+
+    fn parse_string(
+        &mut self,
+        key_node: &tree_sitter::Node<'a>,
+    ) -> Result<IntermediateAttributeParsingResult<()>> {
+        loop {
+            return Ok(match self.goto(&NodeMovement::NextSibling) {
+                NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "missing attribute value for \"{}\"",
+                        self.tree_parser.node_text(&key_node)?
+                    ),
+                    node_location(self.parent_node),
+                ),
+                // TODO: Missing may be recoverable
+                NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "missing attribute value for \"{}\"",
+                        self.tree_parser.node_text(&key_node)?
+                    ),
+                    node_location(self.parent_node),
+                ),
+                NodeMovingResult::Erroneous(node) => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "expected attribute value, found \"{}\"",
+                        self.tree_parser.node_text(&node)?
+                    ),
+                    node_location(node),
+                ),
+                NodeMovingResult::Superfluous(node) => {
+                    self.add_error(AttributeError::Superfluous(
+                        self.tree_parser.node_text(&node)?.to_string(),
+                        node_location(node),
+                    ));
+                    continue;
+                }
+                NodeMovingResult::Ok(_) => IntermediateAttributeParsingResult::Partial(()),
+            });
+        }
+    }
+
+    fn parse_opening_quote(
+        &mut self,
+        key_node: &tree_sitter::Node<'a>,
+    ) -> Result<IntermediateAttributeParsingResult<Location>> {
+        loop {
+            return Ok(match self.goto(&NodeMovement::FirstChild) {
+                NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "attribute \"{}\" is missing a value",
+                        self.tree_parser.node_text(&key_node)?
+                    ),
+                    node_location(self.parent_node),
+                ),
+                NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "missing \"\"\" after attribute name \"{}=\"",
+                        self.tree_parser.node_text(&key_node)?
+                    ),
+                    node_location(self.parent_node),
+                ),
+                NodeMovingResult::Erroneous(node) => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "expected \"\"\", found \"{}\"",
+                        self.tree_parser.node_text(&node)?
+                    ),
+                    node_location(node),
+                ),
+                NodeMovingResult::Superfluous(node) => {
+                    self.add_error(AttributeError::Superfluous(
+                        self.tree_parser.node_text(&node)?.to_string(),
+                        node_location(node),
+                    ));
+                    continue;
+                }
+                NodeMovingResult::Ok(node) => {
+                    IntermediateAttributeParsingResult::Partial(node_location(node))
+                }
+            });
+        }
+    }
+
+    fn parse_string_content(
+        &mut self,
+        key_node: &tree_sitter::Node<'a>,
+    ) -> Result<IntermediateAttributeParsingResult<(String, NodeMovement)>> {
+        loop {
+            return Ok(match self.goto(&NodeMovement::NextSibling) {
+                NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "\"{}\" attribute value string is unclosed",
+                        self.tree_parser.node_text(&key_node)?
+                    ),
+                    node_location(self.parent_node),
+                ),
+                NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "\"{}\" attribute value string is unclosed",
+                        self.tree_parser.node_text(&key_node)?
+                    ),
+                    node_location(self.parent_node),
+                ),
+                NodeMovingResult::Erroneous(node) => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "expected \"\"\", found \"{}\"",
+                        self.tree_parser.node_text(&node)?
+                    ),
+                    node_location(node),
+                ),
+                NodeMovingResult::Superfluous(node) => {
+                    self.add_error(AttributeError::Superfluous(
+                        self.tree_parser.node_text(&node)?.to_string(),
+                        node_location(node),
+                    ));
+                    continue;
+                }
+                NodeMovingResult::Ok(node) if node.kind() == "\"" => {
+                    IntermediateAttributeParsingResult::Partial((
+                        "".to_string(),
+                        NodeMovement::Current,
+                    ))
+                }
+                NodeMovingResult::Ok(node) => {
+                    IntermediateAttributeParsingResult::Partial((
+                    self.tree_parser.node_text(&node)?.to_string(),
+                    NodeMovement::NextSibling,
+                ))},
+            });
+        }
+    }
+
+    fn parse_closing_quote(
+        &mut self,
+        key_node: &tree_sitter::Node<'a>,
+        movement: NodeMovement,
+    ) -> Result<IntermediateAttributeParsingResult<Location>> {
+        loop {
+            return Ok(match self.goto(&movement) {
+                NodeMovingResult::NonExistent => {
+                    IntermediateAttributeParsingResult::Failed(
+                            format!(
+                                "\"{}\" attribute value string is unclosed",
+                                self.tree_parser.node_text(&key_node)?
+                            ),
+                            node_location(self.parent_node),
+                        )
+                }
+                NodeMovingResult::Missing(_) => {
+                        IntermediateAttributeParsingResult::Failed(
+                            format!(
+                                "\"{}\" attribute value string is unclosed",
+                                self.tree_parser.node_text(&key_node)?
+                            ),
+                            node_location(self.parent_node),
+                        )
+                }
+                NodeMovingResult::Erroneous(node) => {
+                        IntermediateAttributeParsingResult::Failed(
+                            format!(
+                                "expected \"\"\", found \"{}\"",
+                                self.tree_parser.node_text(&node)?
+                            ),
+                            node_location(node),
+                        )
+                }
+                NodeMovingResult::Superfluous(node) => {
+                    self.add_error(AttributeError::Superfluous(
+                        self.tree_parser.node_text(&node)?.to_string(),
+                        node_location(node),
+                    ));
+                    continue;
+                }
+                NodeMovingResult::Ok(node) => IntermediateAttributeParsingResult::Partial(node_location(node)),
+            });
+        }
+    }
+
+    fn goto(&mut self, movement: &NodeMovement) -> NodeMovingResult<'a> {
+        if movement == &NodeMovement::FirstChild {
+            self.depth += 1;
+        }
+        return self.tree_parser.goto(movement);
+    }
+
+    fn add_error(&mut self, error: AttributeError) {
+        match &mut self.errors {
+            None => self.errors = Some(vec![error]),
+            Some(errors) => errors.push(error),
+        }
+    }
+}
+
+impl<'a> TreeParser<'a> {
+    pub(crate) fn new<'tree>(
+        cursor: tree_sitter::TreeCursor<'tree>,
+        text: &'tree String,
+    ) -> TreeParser<'tree> {
         return TreeParser {
             cursor,
             text_bytes: text.as_bytes(),
         };
+    }
+
+    fn goto(&mut self, movement: &NodeMovement) -> NodeMovingResult<'a> {
+        let moved = match movement {
+            NodeMovement::NextSibling => self.cursor.goto_next_sibling(),
+            NodeMovement::FirstChild => self.cursor.goto_first_child(),
+            NodeMovement::Current => true,
+        };
+        if !moved {
+            return NodeMovingResult::NonExistent;
+        }
+        let node = self.cursor.node();
+        if !node.is_missing() {
+            if !node.is_extra() {
+                if !node.is_error() {
+                    return NodeMovingResult::Ok(node);
+                }
+                return NodeMovingResult::Erroneous(node);
+            }
+            return NodeMovingResult::Superfluous(node);
+        }
+        return NodeMovingResult::Missing(node);
+    }
+
+    fn node_text(&self, node: &tree_sitter::Node<'_>) -> Result<&str, Utf8Error> {
+        return node.utf8_text(self.text_bytes);
     }
 
     pub(crate) fn parse_header(&mut self) -> Result<Header> {
@@ -1982,51 +2488,8 @@ impl TreeParser<'_, '_> {
         });
     }
 
-    fn parse_plain_attribute(&mut self) -> Result<(String, PlainAttribute)> {
-        if !self.cursor.goto_first_child() {
-            return Err(anyhow::anyhow!("attribute is empty"));
-        }
-        let key_node = self.cursor.node();
-        let key_location = node_location(key_node);
-        let key = key_node.kind().to_string();
-        if !self.cursor.goto_next_sibling() {
-            return Err(anyhow::anyhow!("attribute is missing a value"));
-        }
-        let equals_location = node_location(self.cursor.node());
-        if !self.cursor.goto_next_sibling() {
-            return Err(anyhow::anyhow!("attribute is missing a value"));
-        }
-        let _string_node = self.cursor.node();
-        if !self.cursor.goto_first_child() {
-            return Err(anyhow::anyhow!("attribute value is empty"));
-        }
-        let opening_quote_location = node_location(self.cursor.node());
-        if !self.cursor.goto_next_sibling() {
-            return Err(anyhow::anyhow!("attribute value string is unclosed"));
-        }
-        let node = self.cursor.node();
-        let value;
-        match node.kind() {
-            "string_content" => {
-                value = self.cursor.node().utf8_text(self.text_bytes)?.to_string();
-                if !self.cursor.goto_next_sibling() {
-                    return Err(anyhow::anyhow!("attribute value string is unclosed"));
-                }
-            }
-            "\"" => value = "".to_string(),
-            _ => return Err(anyhow::anyhow!("attribute value string is unclosed")),
-        }
-        let closing_quote_location = node_location(self.cursor.node());
-        self.cursor.goto_parent();
-        self.cursor.goto_parent();
-        let attribute = PlainAttribute {
-            key_location,
-            equals_location,
-            opening_quote_location,
-            value,
-            closing_quote_location,
-        };
-        return Ok((key, attribute));
+    fn parse_plain_attribute(&mut self) -> Result<(String, ParsedAttribute<PlainAttribute>)> {
+        return AttributeParser::plain(self);
     }
 
     fn parse_spel_attribute(
@@ -2121,10 +2584,12 @@ impl TreeParser<'_, '_> {
         self.cursor.goto_parent();
         let attribute = SpelAttribute {
             key_location,
-            equals_location,
-            opening_quote_location,
-            spel,
-            closing_quote_location,
+            value: SpelAttributeValue {
+                equals_location,
+                opening_quote_location,
+                spel,
+                closing_quote_location,
+            },
         };
         return Ok((key, attribute));
     }
@@ -2206,8 +2671,9 @@ fn find_tag_at(nodes: &Vec<Node>, position: Position) -> Option<&Node> {
 mod tests {
     use crate::{
         parser::{
-            Header, Location, Node, PageHeader, ParsedNode, PlainAttribute, SpBarcode,
-            SpelAttribute, Tag, TagLibImport, TagLibOrigin,
+            Header, Location, Node, PageHeader, ParsedAttribute, ParsedNode, PlainAttribute,
+            PlainAttributeValue, SpBarcode, SpelAttribute, SpelAttributeValue, Tag, TagLibImport,
+            TagLibOrigin,
         },
         spel::{
             self,
@@ -2231,27 +2697,33 @@ mod tests {
             java_headers: vec![ParsedNode::Valid(PageHeader {
                 open_bracket: Location::new(0, 0, 3),
                 page: Location::new(4, 0, 4),
-                language: Some(PlainAttribute {
+                language: Some(ParsedAttribute::Valid(PlainAttribute {
                     key_location: Location::new(9, 0, 8),
-                    equals_location: Location::new(17, 0, 1),
-                    opening_quote_location: Location::new(18, 0, 1),
-                    value: "java".to_string(),
-                    closing_quote_location: Location::new(23, 0, 1),
-                }),
-                page_encoding: Some(PlainAttribute {
+                    value: Some(PlainAttributeValue {
+                        equals_location: Location::new(17, 0, 1),
+                        opening_quote_location: Location::new(18, 0, 1),
+                        value: "java".to_string(),
+                        closing_quote_location: Location::new(23, 0, 1),
+                    }),
+                })),
+                page_encoding: Some(ParsedAttribute::Valid(PlainAttribute {
                     key_location: Location::new(25, 0, 12),
-                    equals_location: Location::new(37, 0, 1),
-                    opening_quote_location: Location::new(38, 0, 1),
-                    value: "UTF-8".to_string(),
-                    closing_quote_location: Location::new(44, 0, 1),
-                }),
-                content_type: Some(PlainAttribute {
+                    value: Some(PlainAttributeValue {
+                        equals_location: Location::new(37, 0, 1),
+                        opening_quote_location: Location::new(38, 0, 1),
+                        value: "UTF-8".to_string(),
+                        closing_quote_location: Location::new(44, 0, 1),
+                    }),
+                })),
+                content_type: Some(ParsedAttribute::Valid(PlainAttribute {
                     key_location: Location::new(46, 0, 11),
-                    equals_location: Location::new(57, 0, 1),
-                    opening_quote_location: Location::new(58, 0, 1),
-                    value: "text/html; charset=UTF-8".to_string(),
-                    closing_quote_location: Location::new(83, 0, 1),
-                }),
+                    value: Some(PlainAttributeValue {
+                        equals_location: Location::new(57, 0, 1),
+                        opening_quote_location: Location::new(58, 0, 1),
+                        value: "text/html; charset=UTF-8".to_string(),
+                        closing_quote_location: Location::new(83, 0, 1),
+                    }),
+                })),
                 imports: vec![],
                 close_bracket: Location::new(0, 1, 2),
             })],
@@ -2259,39 +2731,47 @@ mod tests {
                 ParsedNode::Valid(TagLibImport {
                     open_bracket: Location::new(2, 1, 3),
                     taglib: Location::new(6, 1, 6),
-                    origin: TagLibOrigin::Uri(PlainAttribute {
+                    origin: TagLibOrigin::Uri(ParsedAttribute::Valid(PlainAttribute {
                         key_location: Location::new(13, 1, 3),
-                        equals_location: Location::new(16, 1, 1),
-                        opening_quote_location: Location::new(17, 1, 1),
-                        value: "http://www.sitepark.com/taglibs/core".to_string(),
-                        closing_quote_location: Location::new(54, 1, 1),
-                    }),
-                    prefix: PlainAttribute {
+                        value: Some(PlainAttributeValue {
+                            equals_location: Location::new(16, 1, 1),
+                            opening_quote_location: Location::new(17, 1, 1),
+                            value: "http://www.sitepark.com/taglibs/core".to_string(),
+                            closing_quote_location: Location::new(54, 1, 1),
+                        }),
+                    })),
+                    prefix: ParsedAttribute::Valid(PlainAttribute {
                         key_location: Location::new(56, 1, 6),
-                        equals_location: Location::new(62, 1, 1),
-                        opening_quote_location: Location::new(63, 1, 1),
-                        value: "sp".to_string(),
-                        closing_quote_location: Location::new(66, 1, 1),
-                    },
+                        value: Some(PlainAttributeValue {
+                            equals_location: Location::new(62, 1, 1),
+                            opening_quote_location: Location::new(63, 1, 1),
+                            value: "sp".to_string(),
+                            closing_quote_location: Location::new(66, 1, 1),
+                        }),
+                    }),
                     close_bracket: Location::new(0, 2, 2),
                 }),
                 ParsedNode::Valid(TagLibImport {
                     open_bracket: Location::new(2, 2, 3),
                     taglib: Location::new(6, 2, 6),
-                    origin: TagLibOrigin::TagDir(PlainAttribute {
+                    origin: TagLibOrigin::TagDir(ParsedAttribute::Valid(PlainAttribute {
                         key_location: Location::new(13, 2, 6),
-                        equals_location: Location::new(19, 2, 1),
-                        opening_quote_location: Location::new(20, 2, 1),
-                        value: "/WEB-INF/tags/spt".to_string(),
-                        closing_quote_location: Location::new(38, 2, 1),
-                    }),
-                    prefix: PlainAttribute {
+                        value: Some(PlainAttributeValue {
+                            equals_location: Location::new(19, 2, 1),
+                            opening_quote_location: Location::new(20, 2, 1),
+                            value: "/WEB-INF/tags/spt".to_string(),
+                            closing_quote_location: Location::new(38, 2, 1),
+                        }),
+                    })),
+                    prefix: ParsedAttribute::Valid(PlainAttribute {
                         key_location: Location::new(40, 2, 6),
-                        equals_location: Location::new(46, 2, 1),
-                        opening_quote_location: Location::new(47, 2, 1),
-                        value: "spt".to_string(),
-                        closing_quote_location: Location::new(51, 2, 1),
-                    },
+                        value: Some(PlainAttributeValue {
+                            equals_location: Location::new(46, 2, 1),
+                            opening_quote_location: Location::new(47, 2, 1),
+                            value: "spt".to_string(),
+                            closing_quote_location: Location::new(51, 2, 1),
+                        }),
+                    }),
                     close_bracket: Location::new(0, 3, 2),
                 }),
             ],
@@ -2322,51 +2802,57 @@ mod tests {
             locale_attribute: None,
             name_attribute: Some(SpelAttribute {
                 key_location: Location::new(12, 2, 4),
-                equals_location: Location::new(16, 2, 1),
-                opening_quote_location: Location::new(17, 2, 1),
-                spel: SpelAst::Identifier(SpelResult::Valid(Identifier::Name(Word {
-                    fragments: vec![WordFragment::String(StringLiteral {
-                        content: "_testName".to_string(),
-                        location: spel::ast::Location::VariableLength {
-                            char: 0,
-                            line: 0,
-                            length: 9,
-                        },
-                    })],
-                }))),
-                closing_quote_location: Location::new(27, 2, 1),
+                value: SpelAttributeValue {
+                    equals_location: Location::new(16, 2, 1),
+                    opening_quote_location: Location::new(17, 2, 1),
+                    spel: SpelAst::Identifier(SpelResult::Valid(Identifier::Name(Word {
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "_testName".to_string(),
+                            location: spel::ast::Location::VariableLength {
+                                char: 0,
+                                line: 0,
+                                length: 9,
+                            },
+                        })],
+                    }))),
+                    closing_quote_location: Location::new(27, 2, 1),
+                },
             }),
             scope_attribute: Some(SpelAttribute {
                 key_location: Location::new(46, 2, 5),
-                equals_location: Location::new(51, 2, 1),
-                opening_quote_location: Location::new(52, 2, 1),
-                spel: SpelAst::String(SpelResult::Valid(Word {
-                    fragments: vec![WordFragment::String(StringLiteral {
-                        content: "page".to_string(),
-                        location: spel::ast::Location::VariableLength {
-                            char: 0,
-                            line: 0,
-                            length: 4,
-                        },
-                    })],
-                })),
-                closing_quote_location: Location::new(57, 2, 1),
+                value: SpelAttributeValue {
+                    equals_location: Location::new(51, 2, 1),
+                    opening_quote_location: Location::new(52, 2, 1),
+                    spel: SpelAst::String(SpelResult::Valid(Word {
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "page".to_string(),
+                            location: spel::ast::Location::VariableLength {
+                                char: 0,
+                                line: 0,
+                                length: 4,
+                            },
+                        })],
+                    })),
+                    closing_quote_location: Location::new(57, 2, 1),
+                },
             }),
             text_attribute: Some(SpelAttribute {
                 key_location: Location::new(29, 2, 4),
-                equals_location: Location::new(33, 2, 1),
-                opening_quote_location: Location::new(34, 2, 1),
-                spel: SpelAst::String(SpelResult::Valid(Word {
-                    fragments: vec![WordFragment::String(StringLiteral {
-                        content: "some text".to_string(),
-                        location: spel::ast::Location::VariableLength {
-                            char: 0,
-                            line: 0,
-                            length: 9,
-                        },
-                    })],
-                })),
-                closing_quote_location: Location::new(44, 2, 1),
+                value: SpelAttributeValue {
+                    equals_location: Location::new(33, 2, 1),
+                    opening_quote_location: Location::new(34, 2, 1),
+                    spel: SpelAst::String(SpelResult::Valid(Word {
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "some text".to_string(),
+                            location: spel::ast::Location::VariableLength {
+                                char: 0,
+                                line: 0,
+                                length: 9,
+                            },
+                        })],
+                    })),
+                    closing_quote_location: Location::new(44, 2, 1),
+                },
             }),
             type_attribute: None,
             body: None,

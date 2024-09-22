@@ -211,10 +211,10 @@ fn index_tag(tag: &Tag, tokenizer: &mut Tokenizer) {
                 &vec![SemanticTokenModifier::DEPRECATED],
             );
         }
-        let offset = &attribute.opening_quote_location;
+        let offset = &attribute.value.opening_quote_location;
         let mut token_collector =
             SpelTokenCollector::new(tokenizer, offset.line as u32, offset.char as u32 + 1);
-        match &attribute.spel {
+        match &attribute.value.spel {
             SpelAst::Comparable(SpelResult::Valid(comparable)) => {
                 index_comparable(&comparable, &mut token_collector)
             }

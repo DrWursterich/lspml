@@ -159,12 +159,12 @@ fn construct_name_to_condition<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
         _ => return None,
     };
     log::debug!("got operator and value_attribute");
-    let name = match &name_attribute.spel {
+    let name = match &name_attribute.value.spel {
         SpelAst::Object(SpelResult::Valid(o)) => o,
         _ => return None,
     };
     log::debug!("got name");
-    let value = match &value_attribute.spel {
+    let value = match &value_attribute.value.spel {
         SpelAst::Comparable(SpelResult::Valid(c)) => c.to_string(),
         SpelAst::Condition(SpelResult::Valid(c)) => c.to_string(),
         SpelAst::String(SpelResult::Valid(c)) => format!("'{}'", c),
@@ -200,9 +200,9 @@ fn construct_name_to_condition<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
                                 character: value_attribute.key_location.char as u32 - 1,
                             },
                             end: Position {
-                                line: value_attribute.closing_quote_location.line as u32,
-                                character: (value_attribute.closing_quote_location.char
-                                    + value_attribute.closing_quote_location.length)
+                                line: value_attribute.value.closing_quote_location.line as u32,
+                                character: (value_attribute.value.closing_quote_location.char
+                                    + value_attribute.value.closing_quote_location.length)
                                     as u32,
                             },
                         },
@@ -215,9 +215,9 @@ fn construct_name_to_condition<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
                                 character: name_attribute.key_location.char as u32,
                             },
                             end: Position {
-                                line: name_attribute.closing_quote_location.line as u32,
-                                character: (name_attribute.closing_quote_location.char
-                                    + name_attribute.closing_quote_location.length)
+                                line: name_attribute.value.closing_quote_location.line as u32,
+                                character: (name_attribute.value.closing_quote_location.char
+                                    + name_attribute.value.closing_quote_location.length)
                                     as u32,
                             },
                         },
@@ -268,7 +268,7 @@ fn construct_condition_to_name<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
         Some(v) => v,
         None => return None,
     };
-    let condition = match &condition_attribute.spel {
+    let condition = match &condition_attribute.value.spel {
         SpelAst::Condition(SpelResult::Valid(c)) => c,
         _ => return None,
     };
@@ -326,9 +326,13 @@ fn construct_condition_to_name<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
                                     character: condition_attribute.key_location.char as u32,
                                 },
                                 end: Position {
-                                    line: condition_attribute.closing_quote_location.line as u32,
-                                    character: (condition_attribute.closing_quote_location.char
-                                        + condition_attribute.closing_quote_location.length)
+                                    line: condition_attribute.value.closing_quote_location.line
+                                        as u32,
+                                    character: (condition_attribute
+                                        .value
+                                        .closing_quote_location
+                                        .char
+                                        + condition_attribute.value.closing_quote_location.length)
                                         as u32,
                                 },
                             },
@@ -355,10 +359,16 @@ fn construct_condition_to_name<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
                                         character: condition_attribute.key_location.char as u32,
                                     },
                                     end: Position {
-                                        line: condition_attribute.closing_quote_location.line
+                                        line: condition_attribute.value.closing_quote_location.line
                                             as u32,
-                                        character: (condition_attribute.closing_quote_location.char
-                                            + condition_attribute.closing_quote_location.length)
+                                        character: (condition_attribute
+                                            .value
+                                            .closing_quote_location
+                                            .char
+                                            + condition_attribute
+                                                .value
+                                                .closing_quote_location
+                                                .length)
                                             as u32,
                                     },
                                 },

@@ -8,7 +8,7 @@ use super::LsError;
 
 use crate::{
     document_store,
-    parser::{Attribute, Node, ParsableTag},
+    parser::{AttributeValue, Node, ParsableTag, Tag},
     spel::{
         self,
         ast::{self, Location, SpelAst, SpelResult},
@@ -32,80 +32,27 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
     }?;
     let cursor = text_params.position;
     match document.tree.node_at(cursor) {
-        Some(Node::Tag(tag)) => {
-            log::debug!("found to be in tag {}", tag.definition().name);
-            if tag.open_location().contains(cursor) || tag.close_location().contains(cursor) {
-                return Ok(tag.definition().documentation.map(|doc| Hover {
-                    contents: HoverContents::Markup(MarkupContent {
-                        kind: MarkupKind::Markdown,
-                        value: doc.to_string(),
-                    }),
-                    range: None,
-                }));
-            }
-            for (name, attribute) in tag.spel_attributes() {
-                if attribute.key_location.contains(cursor) {
-                    return Ok(tag
-                        .definition()
-                        .attributes
-                        .get_by_name(name.strip_suffix("_attribute").unwrap_or(name))
-                        .and_then(|attribute| attribute.documentation)
-                        .map(|doc| Hover {
-                            contents: HoverContents::Markup(MarkupContent {
-                                kind: MarkupKind::Markdown,
-                                value: doc.to_string(),
-                            }),
-                            range: None,
-                        }));
-                }
-                if is_in_attribute_value(attribute, &cursor) {
-                    let offset = Point {
-                        row: attribute.opening_quote_location.line,
-                        column: attribute.opening_quote_location.char + 1,
-                    };
-                    return Ok(match &attribute.spel {
-                        SpelAst::Comparable(SpelResult::Valid(comparable)) => {
-                            hover_comparable(comparable, &cursor, &offset)
-                        }
-                        SpelAst::Condition(SpelResult::Valid(condition)) => {
-                            hover_condition(condition, &cursor, &offset)
-                        }
-                        SpelAst::Expression(SpelResult::Valid(expression)) => {
-                            hover_expression(expression, &cursor, &offset)
-                        }
-                        SpelAst::Identifier(SpelResult::Valid(identifier)) => {
-                            hover_identifier(identifier, &cursor, &offset)
-                        }
-                        SpelAst::Object(SpelResult::Valid(object)) => {
-                            hover_object(object, &cursor, &offset)
-                        }
-                        SpelAst::Query(SpelResult::Valid(query)) => {
-                            hover_query(query, &cursor, &offset)
-                        }
-                        SpelAst::Regex(SpelResult::Valid(regex)) => {
-                            hover_regex(regex, &cursor, &offset)
-                        }
-                        SpelAst::String(SpelResult::Valid(word)) => {
-                            hover_text(word, &cursor, &offset)
-                        }
-                        SpelAst::Uri(SpelResult::Valid(uri)) => hover_uri(uri, &cursor, &offset),
-                        _ => None,
-                    }
-                    .map(|value| Hover {
-                        contents: HoverContents::Markup(MarkupContent {
-                            kind: MarkupKind::Markdown,
-                            value,
-                        }),
-                        range: None,
-                    }));
-                }
-            }
-        }
+        Some(Node::Tag(tag)) => return hover_tag(tag, &cursor),
         Some(Node::Html(html)) => {
             log::debug!("found to be in html {} tag", html.name);
-            // TODO: html attributes can contain spml tags
+            // TODO: html attributes can contain spml tags!
             // for attribute in &html.attributes {
-            //     if is_in_attribute_value(attribute, &cursor) {
+            //     match attribute {
+            //         ParsedAttribute::Valid(PlainAttribute {
+            //             value: Some(FragmentedAttributeValue {
+            //                 fragments,
+            //                 ..
+            //             }),
+            //             ..
+            //         }) => {
+            //             for fragment in fragments {
+            //                 match fragment {
+            //                     AttributeValueFragment::Plain(_) => (),
+            //                     AttributeValueFragment::Spel(spel) => hover_tag(spel, &cursor),
+            //                 }
+            //             }
+            //         },
+            //         _ => (),
             //     }
             // }
         }
@@ -116,31 +63,69 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
     return Ok(None);
 }
 
-fn is_in_attribute_value(attribute: &impl Attribute, position: &Position) -> bool {
-    let opening_line = attribute
-        .opening_quote_location()
-        .line
-        .cmp(&(position.line as usize));
-    let opening_char = attribute
-        .opening_quote_location()
-        .char
-        .cmp(&(position.character as usize));
-    match (opening_line, opening_char) {
-        (Ordering::Less, _) | (Ordering::Equal, Ordering::Less) => (),
-        _ => return false,
+fn hover_tag(tag: &Tag, cursor: &Position) -> Result<Option<Hover>, LsError> {
+    log::debug!("found to be in tag {}", tag.definition().name);
+    if tag.open_location().contains(cursor) || tag.close_location().contains(cursor) {
+        return Ok(tag.definition().documentation.map(|doc| Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: doc.to_string(),
+            }),
+            range: None,
+        }));
     }
-    let closing_line = attribute
-        .closing_quote_location()
-        .line
-        .cmp(&(position.line as usize));
-    let closing_char = attribute
-        .closing_quote_location()
-        .char
-        .cmp(&(position.character as usize));
-    return match (closing_line, closing_char) {
-        (Ordering::Greater, _) | (Ordering::Equal, Ordering::Greater) => true,
-        _ => false,
-    };
+    for (name, attribute) in tag.spel_attributes() {
+        if attribute.key_location.contains(cursor) {
+            return Ok(tag
+                .definition()
+                .attributes
+                .get_by_name(name.strip_suffix("_attribute").unwrap_or(name))
+                .and_then(|attribute| attribute.documentation)
+                .map(|doc| Hover {
+                    contents: HoverContents::Markup(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value: doc.to_string(),
+                    }),
+                    range: None,
+                }));
+        }
+        if attribute.value.is_inside(&cursor) {
+            let offset = Point {
+                row: attribute.value.opening_quote_location.line,
+                column: attribute.value.opening_quote_location.char + 1,
+            };
+            return Ok(match &attribute.value.spel {
+                SpelAst::Comparable(SpelResult::Valid(comparable)) => {
+                    hover_comparable(comparable, &cursor, &offset)
+                }
+                SpelAst::Condition(SpelResult::Valid(condition)) => {
+                    hover_condition(condition, &cursor, &offset)
+                }
+                SpelAst::Expression(SpelResult::Valid(expression)) => {
+                    hover_expression(expression, &cursor, &offset)
+                }
+                SpelAst::Identifier(SpelResult::Valid(identifier)) => {
+                    hover_identifier(identifier, &cursor, &offset)
+                }
+                SpelAst::Object(SpelResult::Valid(object)) => {
+                    hover_object(object, &cursor, &offset)
+                }
+                SpelAst::Query(SpelResult::Valid(query)) => hover_query(query, &cursor, &offset),
+                SpelAst::Regex(SpelResult::Valid(regex)) => hover_regex(regex, &cursor, &offset),
+                SpelAst::String(SpelResult::Valid(word)) => hover_text(word, &cursor, &offset),
+                SpelAst::Uri(SpelResult::Valid(uri)) => hover_uri(uri, &cursor, &offset),
+                _ => None,
+            }
+            .map(|value| Hover {
+                contents: HoverContents::Markup(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value,
+                }),
+                range: None,
+            }));
+        }
+    }
+    return Ok(None);
 }
 
 fn hover_identifier(

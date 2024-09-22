@@ -11,7 +11,10 @@ use crate::{
     document_store::{self, Document},
     grammar::{self, TagAttribute, TagAttributeType, TagAttributes, TagChildren, TagDefinition},
     modules::{self, Module},
-    parser::{ErrorNode, Node, ParsableTag, SpelAttribute, Tag, TagBody},
+    parser::{
+        AttributeValue, ErrorNode, Node, ParsableTag, SpelAttribute, SpelAttributeValue, Tag,
+        TagBody,
+    },
     spel::ast::{SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment},
 };
 
@@ -185,12 +188,12 @@ impl CompletionCollector<'_> {
             }
         }
         for (name, attribute) in &tag.spel_attributes() {
-            if is_in_attribute_value(attribute, &self.cursor) {
+            if attribute.value.is_inside(&self.cursor) {
                 let definition = tag.definition();
                 let attribute_type = name
                     .strip_suffix("_attribute")
                     .and_then(|name| definition.attributes.get_by_name(name));
-                return match &attribute.spel {
+                return match &attribute.value.spel {
                     // SpelAst::Comparable(_) => (),
                     // SpelAst::Condition(_) => (),
                     // SpelAst::Expression(_) => (),
@@ -243,7 +246,11 @@ impl CompletionCollector<'_> {
                         }) = attribute_type
                         {
                             if let Some(SpelAttribute {
-                                spel: SpelAst::String(SpelResult::Valid(Word { fragments })),
+                                value:
+                                    SpelAttributeValue {
+                                        spel: SpelAst::String(SpelResult::Valid(Word { fragments })),
+                                        ..
+                                    },
                                 ..
                             }) = tag.spel_attribute(&module_attribute)
                             {
@@ -345,35 +352,6 @@ impl CompletionCollector<'_> {
             TagChildren::Vector(tags) => self.complete_tags(tags.iter()),
         };
     }
-}
-
-fn is_in_attribute_value(attribute: &SpelAttribute, position: &Position) -> bool {
-    let opening_line = attribute
-        .opening_quote_location
-        .line
-        .cmp(&(position.line as usize));
-    let opening_char = attribute
-        .opening_quote_location
-        .char
-        .cmp(&(position.character as usize));
-    match (opening_line, opening_char) {
-        (Ordering::Less, _) | (Ordering::Equal, Ordering::Less) => (),
-        _ => return false,
-    }
-    let closing_line = attribute
-        .closing_quote_location
-        .line
-        .cmp(&(position.line as usize));
-    let closing_char = attribute
-        .closing_quote_location
-        .char
-        .cmp(&(position.character as usize));
-    return match (closing_line, closing_char) {
-        (Ordering::Greater, _)
-        | (Ordering::Equal, Ordering::Greater)
-        | (Ordering::Equal, Ordering::Equal) => true,
-        _ => false,
-    };
 }
 
 pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, LsError> {

@@ -13,8 +13,9 @@ use crate::{
     grammar::AttributeRule,
     modules,
     parser::{
-        DocumentNode, ErrorNode, Header, HtmlNode, Node, ParsableTag, ParsedLocation, ParsedNode,
-        RangedNode, SpelAttribute, Tag, TagBody, Tree,
+        AttributeError, DocumentNode, ErrorNode, Header, HtmlNode, Node, ParsableTag,
+        ParsedAttribute, ParsedLocation, ParsedNode, RangedNode, SpelAttribute, SpelAttributeValue,
+        Tag, TagBody, Tree,
     },
     spel::{
         ast::{
@@ -397,13 +398,21 @@ impl DiagnosticCollector {
                 }
                 AttributeRule::UriExists(uri_name, module_name) => {
                     if let Some(SpelAttribute {
-                        spel: SpelAst::Uri(SpelResult::Valid(Uri::Literal(uri))),
+                        value:
+                            SpelAttributeValue {
+                                spel: SpelAst::Uri(SpelResult::Valid(Uri::Literal(uri))),
+                                ..
+                            },
                         ..
                     }) = tag.spel_attribute(*uri_name)
                     {
                         let module_value = match tag.spel_attribute(*module_name) {
                             Some(SpelAttribute {
-                                spel: SpelAst::String(SpelResult::Valid(Word { fragments })),
+                                value:
+                                    SpelAttributeValue {
+                                        spel: SpelAst::String(SpelResult::Valid(Word { fragments })),
+                                        ..
+                                    },
                                 ..
                             }) if fragments.len() == 1 => Some(fragments[0].clone()),
                             Some(_) => continue,
@@ -650,8 +659,33 @@ impl DiagnosticCollector {
 
     fn validate_html(&mut self, html: &HtmlNode) -> Result<()> {
         // TODO: html attributes can contain spml tags
+        for attribute in &html.attributes {
+            match attribute {
+                ParsedAttribute::Valid(_) => (),
+                ParsedAttribute::Erroneous(_, errors) => {
+                    for error in errors {
+                        self.add_diagnostic(
+                            match error {
+                                AttributeError::Superfluous(text, _) => {
+                                    format!("\"{}\" is superfluous", text)
+                                }
+                            },
+                            DiagnosticSeverity::ERROR,
+                            error.location().range(),
+                        );
+                    }
+                }
+                ParsedAttribute::Unparsable(message, location) => {
+                    self.add_diagnostic(
+                        message.to_string(),
+                        DiagnosticSeverity::ERROR,
+                        location.range(),
+                    );
+                }
+            }
+        }
         if let Some(body) = html.body() {
-            return self.validate_body(body);
+            self.validate_body(body)?;
         }
         return Ok(());
     }
@@ -715,7 +749,11 @@ impl DiagnosticCollector {
 fn string_literal_attribute_value(attribute: Option<&SpelAttribute>) -> Option<&String> {
     return match attribute {
         Some(SpelAttribute {
-            spel: SpelAst::String(SpelResult::Valid(Word { fragments })),
+            value:
+                SpelAttributeValue {
+                    spel: SpelAst::String(SpelResult::Valid(Word { fragments })),
+                    ..
+                },
             ..
         }) if fragments.len() == 1 => match &fragments[0] {
             WordFragment::String(StringLiteral { content, .. }) => Some(content),
@@ -959,11 +997,11 @@ impl SpelValidator<'_> {
         attribute: &SpelAttribute,
     ) -> Result<()> {
         let offset = Position {
-            line: attribute.opening_quote_location.line as u32,
-            character: attribute.opening_quote_location.char as u32 + 1,
+            line: attribute.value.opening_quote_location.line as u32,
+            character: attribute.value.opening_quote_location.char as u32 + 1,
         };
         let mut validator = SpelValidator::new(collector, offset);
-        match &attribute.spel {
+        match &attribute.value.spel {
             SpelAst::Comparable(result) => match result {
                 SpelResult::Valid(comparable) => validator.validate_comparable(comparable)?,
                 SpelResult::Invalid(err) => validator.parse_failed(attribute, err, "comparable"),
@@ -1007,12 +1045,12 @@ impl SpelValidator<'_> {
     fn parse_failed(&mut self, attribute: &SpelAttribute, err: &SyntaxError, r#type: &str) -> () {
         let range = Range {
             start: Position {
-                line: attribute.opening_quote_location.line as u32,
-                character: attribute.opening_quote_location.char as u32,
+                line: attribute.value.opening_quote_location.line as u32,
+                character: attribute.value.opening_quote_location.char as u32,
             },
             end: Position {
-                line: attribute.closing_quote_location.line as u32,
-                character: attribute.closing_quote_location.char as u32,
+                line: attribute.value.closing_quote_location.line as u32,
+                character: attribute.value.closing_quote_location.char as u32,
             },
         };
         match err.proposed_fixes.len() {
@@ -1023,8 +1061,8 @@ impl SpelValidator<'_> {
             ),
             _ => {
                 let offset = Position {
-                    line: attribute.opening_quote_location.line as u32,
-                    character: attribute.opening_quote_location.char as u32 + 1,
+                    line: attribute.value.opening_quote_location.line as u32,
+                    character: attribute.value.opening_quote_location.char as u32 + 1,
                 };
                 self.collector.add_diagnostic_with_code(
                     format!("invalid {}: {}", r#type, err.message),

@@ -7,7 +7,7 @@ use crate::{
     document_store::{self, Document},
     grammar::{TagAttributeType, TagAttributes},
     modules,
-    parser::{Node, ParsableTag, SpelAttribute, Tag},
+    parser::{AttributeValue, Node, ParsableTag, SpelAttribute, SpelAttributeValue, Tag},
     spel::ast::{
         Argument, Comparable, Condition, Expression, Function, Identifier, Location, Object, Query,
         Regex, SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment,
@@ -67,9 +67,15 @@ impl DefinitionsFinder<'_> {
             for attribute in attributes {
                 if let TagAttributeType::Identifier = attribute.r#type {
                     if let Some(SpelAttribute {
-                        spel:
-                            SpelAst::Identifier(SpelResult::Valid(Identifier::Name(Word { fragments }))),
-                        opening_quote_location,
+                        value:
+                            SpelAttributeValue {
+                                spel:
+                                    SpelAst::Identifier(SpelResult::Valid(Identifier::Name(Word {
+                                        fragments,
+                                    }))),
+                                opening_quote_location,
+                                ..
+                            },
                         ..
                     }) = tag.spel_attribute(&attribute.name)
                     {
@@ -132,12 +138,12 @@ pub(crate) fn definition(
     let cursor = text_params.position;
     if let Some(Node::Tag(tag)) = document.tree.node_at(cursor) {
         for (_, attribute) in tag.spel_attributes() {
-            if is_in_attribute_value(attribute, &cursor) {
+            if attribute.value.is_inside(&cursor) {
                 let offset = Point {
-                    row: attribute.opening_quote_location.line + 1,
-                    column: attribute.opening_quote_location.char,
+                    row: attribute.value.opening_quote_location.line + 1,
+                    column: attribute.value.opening_quote_location.char,
                 };
-                let node = match &attribute.spel {
+                let node = match &attribute.value.spel {
                     SpelAst::Comparable(SpelResult::Valid(comparable)) => {
                         find_node_in_comparable(comparable, &cursor, &offset)
                     }
@@ -165,7 +171,11 @@ pub(crate) fn definition(
                     SpelAst::Uri(SpelResult::Valid(Uri::Literal(uri))) => {
                         let mut module = None;
                         if let Some(SpelAttribute {
-                            spel: SpelAst::String(SpelResult::Valid(Word { fragments })),
+                            value:
+                                SpelAttributeValue {
+                                    spel: SpelAst::String(SpelResult::Valid(Word { fragments })),
+                                    ..
+                                },
                             ..
                         }) = tag.spel_attribute("module")
                         // TODO: should use TagAttributeType::Uri { module_attribute} for this
@@ -208,33 +218,6 @@ pub(crate) fn definition(
         }
     }
     return Ok(None);
-}
-
-fn is_in_attribute_value(attribute: &SpelAttribute, position: &Position) -> bool {
-    let opening_line = attribute
-        .opening_quote_location
-        .line
-        .cmp(&(position.line as usize));
-    let opening_char = attribute
-        .opening_quote_location
-        .char
-        .cmp(&(position.character as usize));
-    match (opening_line, opening_char) {
-        (Ordering::Less, _) | (Ordering::Equal, Ordering::Less) => (),
-        _ => return false,
-    }
-    let closing_line = attribute
-        .closing_quote_location
-        .line
-        .cmp(&(position.line as usize));
-    let closing_char = attribute
-        .closing_quote_location
-        .char
-        .cmp(&(position.character as usize));
-    return match (closing_line, closing_char) {
-        (Ordering::Greater, _) | (Ordering::Equal, Ordering::Greater) => true,
-        _ => false,
-    };
 }
 
 fn find_node_in_identifier(
