@@ -12,8 +12,8 @@ use crate::{
     grammar::{self, TagAttribute, TagAttributeType, TagAttributes, TagChildren, TagDefinition},
     modules::{self, Module},
     parser::{
-        AttributeValue, ErrorNode, Node, ParsableTag, ParsedAttribute, SpelAttribute,
-        SpelAttributeValue, Tag, TagBody,
+        AttributeValue, ErrorNode, Node, ParsableTag, ParsedAttribute, ParsedTag, SpelAttribute,
+        SpelAttributeValue, SpmlTag, TagBody, TagError,
     },
     spel::ast::{SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment},
 };
@@ -42,41 +42,88 @@ impl CompletionCollector<'_> {
     }
 
     fn search_completions_in_document(&mut self) {
-        match self.document.tree.node_at(self.cursor) {
-            Some(Node::Tag(tag)) => self.search_completions_in_tag(tag),
+        return match self.document.tree.node_at(self.cursor) {
+            Some(Node::Tag(ParsedTag::Valid(tag))) => self.search_completions_in_tag(tag),
+            Some(Node::Tag(ParsedTag::Erroneous(tag, errors))) => {
+                for error in errors {
+                    if let TagError::Superfluous(_, location) = error {
+                        if location.contains(&self.cursor) {
+                            return self.complete_attributes_of(tag);
+                        }
+                    }
+                }
+                self.search_completions_in_tag(tag);
+                // "/>" e.g. is always added as missing right after the last non-whitespace
+                // character, terminating it's parent node. that means that our cursor can never be
+                // placed after all attributes and still be considered inside the tag node. the
+                // only case we could ever trigger this is by moving the cursor in front of an
+                // attribute - where it could be arguably okay to suggest "/>" - but that is not
+                // the intended usecase here.
+                // in order to change this we would have to instead check the closes node before
+                // the cursor for missing operators (maybe even skipping text nodes?) in addition
+                // to what we're completing originally...
+                //
+                // if let Some(Node::Tag(ParsedTag::Erroneous(tag, errors))) =
+                //     self.document.tree.closest_node_prior_to(self.cursor)
+                // {
+                //     for error in errors {
+                //         if let TagError::Missing(text, _) = error {
+                //             self.completions.push(CompletionItem {
+                //                 label: format!(
+                //                     "close {} tag with \"{}\"",
+                //                     tag.definition().name,
+                //                     text
+                //                 ),
+                //                 kind: Some(CompletionItemKind::OPERATOR), // ?
+                //                 insert_text: Some(text.to_string()),
+                //                 ..Default::default()
+                //             })
+                //         }
+                //     }
+                // }
+            }
+            Some(Node::Tag(ParsedTag::Unparsable(text, location))) => {
+                return self.completions.push(CompletionItem {
+                    label: format!("unparsable \"{}\"", text),
+                    kind: Some(CompletionItemKind::TEXT),
+                    text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+                        new_text: text.to_string(),
+                        range: location.range(),
+                    })),
+                    ..Default::default()
+                });
+            }
             Some(Node::Error(ErrorNode { content, range })) => {
                 // TODO: this is very fragile!
                 match self.cut_text_up_to_cursor(content, range) {
-                    Some(error) if error.ends_with("</") => {
-                        error
-                            .rsplit(">")
-                            .filter(|str| !str.ends_with("/"))
-                            .filter(|str| !str.ends_with("%"))
-                            .filter_map(|str| {
-                                str.rfind("<").map(|i| {
-                                    str[i + 1..]
-                                        .chars()
-                                        .take_while(|c| !c.is_whitespace())
-                                        .collect::<String>()
-                                })
+                    Some(error) if error.ends_with("</") => error
+                        .rsplit(">")
+                        .filter(|str| !str.ends_with("/"))
+                        .filter(|str| !str.ends_with("%"))
+                        .filter_map(|str| {
+                            str.rfind("<").map(|i| {
+                                str[i + 1..]
+                                    .chars()
+                                    .take_while(|c| !c.is_whitespace())
+                                    .collect::<String>()
                             })
-                            .filter(|str| !str.starts_with("/"))
-                            .filter(|str| !str.starts_with("!"))
-                            .enumerate()
-                            .map(|(i, tag)| CompletionItem {
-                                label: "</".to_string() + &tag + ">",
-                                kind: Some(CompletionItemKind::SNIPPET),
-                                insert_text: Some(tag.to_string() + ">"),
-                                preselect: Some(i == 0),
-                                ..Default::default()
-                            })
-                            .for_each(|item| self.completions.push(item));
-                    }
+                        })
+                        .filter(|str| !str.starts_with("/"))
+                        .filter(|str| !str.starts_with("!"))
+                        .enumerate()
+                        .map(|(i, tag)| CompletionItem {
+                            label: "</".to_string() + &tag + ">",
+                            kind: Some(CompletionItemKind::SNIPPET),
+                            insert_text: Some(tag.to_string() + ">"),
+                            preselect: Some(i == 0),
+                            ..Default::default()
+                        })
+                        .for_each(|item| self.completions.push(item)),
                     _ => (),
                 }
             }
             _ => self.complete_top_level_tags(),
-        }
+        };
     }
 
     fn complete_top_level_tags(&mut self) {
@@ -181,14 +228,14 @@ impl CompletionCollector<'_> {
         };
     }
 
-    fn search_completions_in_tag(&mut self, tag: &Tag) {
+    fn search_completions_in_tag(&mut self, tag: &SpmlTag) {
         if let Some(body) = tag.body() {
             if self.is_cursor_in_body(body) {
                 return self.complete_children_of(tag);
             }
         }
         for (name, attribute) in &tag.spel_attributes() {
-            // TODO: might need to think of something if treesitter does not understand
+            // TODO: might need to think of something else if treesitter does not understand
             // `<tag attribute="` as Erroneous ...
             let attribute = match attribute {
                 ParsedAttribute::Valid(attribute) => attribute,
@@ -334,7 +381,7 @@ impl CompletionCollector<'_> {
         return Ok(());
     }
 
-    fn complete_attributes_of(&mut self, tag: &Tag) {
+    fn complete_attributes_of(&mut self, tag: &SpmlTag) {
         if let TagAttributes::These(possible) = tag.definition().attributes {
             possible
                 .iter()
@@ -356,7 +403,7 @@ impl CompletionCollector<'_> {
         };
     }
 
-    fn complete_children_of(&mut self, tag: &Tag) {
+    fn complete_children_of(&mut self, tag: &SpmlTag) {
         match tag.definition().children {
             TagChildren::Any => self.complete_top_level_tags(),
             TagChildren::None => (),

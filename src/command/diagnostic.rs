@@ -14,8 +14,8 @@ use crate::{
     modules,
     parser::{
         AttributeError, DocumentNode, ErrorNode, Header, HtmlNode, Node, ParsableTag,
-        ParsedAttribute, ParsedLocation, ParsedNode, RangedNode, SpelAttribute, SpelAttributeValue,
-        Tag, TagBody, Tree,
+        ParsedAttribute, ParsedLocation, ParsedNode, ParsedTag, RangedNode, SpelAttribute,
+        SpelAttributeValue, SpmlTag, TagError, Tree,
     },
     spel::{
         ast::{
@@ -45,20 +45,7 @@ impl DiagnosticCollector {
 
     pub(crate) fn validate_document(&mut self, tree: &Tree) -> Result<()> {
         self.validate_header(&tree.header)?;
-        for node in &tree.nodes {
-            match node {
-                Node::Tag(tag) => self.validate_tag(tag)?,
-                Node::Html(html) => self.validate_html(html)?,
-                Node::Text(_) => (),
-                Node::Error(ErrorNode { content, range }) => {
-                    self.add_diagnostic(
-                        format!("syntax error: unexpected \"{}\"", content),
-                        DiagnosticSeverity::ERROR,
-                        *range,
-                    );
-                }
-            }
-        }
+        self.validate_nodes(&tree.nodes)?;
         return Ok(());
     }
 
@@ -206,7 +193,55 @@ impl DiagnosticCollector {
         return Ok(());
     }
 
-    fn validate_tag(&mut self, tag: &Tag) -> Result<()> {
+    fn validate_nodes(&mut self, nodes: &Vec<Node>) -> Result<()> {
+        for node in nodes {
+            match node {
+                Node::Tag(ParsedTag::Valid(tag)) => self.validate_tag(tag)?,
+                Node::Tag(ParsedTag::Erroneous(tag, errors)) => {
+                    for error in errors {
+                        match error {
+                            TagError::Superfluous(text, location) => {
+                                self.add_superfluous_diagnostic(text, location.range());
+                            }
+                            TagError::Missing(text, location) => {
+                                self.add_diagnostic_with_code(
+                                    format!("\"{}\" is missing", text),
+                                    DiagnosticSeverity::ERROR,
+                                    node.range(),
+                                    CodeActionImplementation::ADD_MISSING_CODE,
+                                    serde_json::to_value(TextEdit {
+                                        range: location.range(),
+                                        new_text: text.to_string(),
+                                    })
+                                    .ok(),
+                                );
+                            }
+                        }
+                    }
+                    self.validate_tag(tag)?;
+                }
+                Node::Tag(ParsedTag::Unparsable(message, location)) => {
+                    self.add_diagnostic(
+                        message.to_string(),
+                        DiagnosticSeverity::ERROR,
+                        location.range(),
+                    );
+                }
+                Node::Html(html) => self.validate_html(html)?,
+                Node::Text(_) => (),
+                Node::Error(ErrorNode { content, range }) => {
+                    self.add_diagnostic(
+                        format!("syntax error: unexpected \"{}\"", content),
+                        DiagnosticSeverity::ERROR,
+                        *range,
+                    );
+                }
+            }
+        }
+        return Ok(());
+    }
+
+    fn validate_tag(&mut self, tag: &SpmlTag) -> Result<()> {
         if tag.definition().deprecated {
             self.add_diagnostic_with_tag(
                 format!("{} tag is deprecated", tag.definition().name),
@@ -682,10 +717,10 @@ impl DiagnosticCollector {
                 _ => {}
             }
         }
-        if let Some(body) = tag.body() {
-            return self.validate_body(body);
-        }
-        return Ok(());
+        return match tag.body() {
+            Some(body) => self.validate_nodes(&body.nodes),
+            None => Ok(()),
+        };
     }
 
     fn validate_html(&mut self, html: &HtmlNode) -> Result<()> {
@@ -711,19 +746,10 @@ impl DiagnosticCollector {
                 }
             }
         }
-        if let Some(body) = html.body() {
-            self.validate_body(body)?;
-        }
-        return Ok(());
-    }
-
-    fn validate_body(&mut self, body: &TagBody) -> Result<()> {
-        for child in &body.nodes {
-            if let Node::Tag(tag) = child {
-                self.validate_tag(&tag)?;
-            }
-        }
-        return Ok(());
+        return match html.body() {
+            Some(body) => self.validate_nodes(&body.nodes),
+            None => Ok(()),
+        };
     }
 
     fn add_diagnostic(&mut self, message: String, severity: DiagnosticSeverity, range: Range) {

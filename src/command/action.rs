@@ -9,7 +9,7 @@ use lsp_types::{
 use crate::{
     capabilities::CodeActionImplementation,
     document_store,
-    parser::{Node, ParsedAttribute, SpIf, SpelAttribute, Tag},
+    parser::{Node, ParsedAttribute, ParsedTag, SpIf, SpelAttribute, SpmlTag},
     spel::ast::{
         Argument, Comparable, ComparissonOperator, Condition, Function, SpelAst, SpelResult,
     },
@@ -96,24 +96,33 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
                         }],
                     ));
                 }
+                Some(CodeActionImplementation::ADD_MISSING_CODE) => {
+                    diagnostic
+                        .data
+                        .and_then(|data| serde_json::from_value(data).ok())
+                        .map(|edit| {
+                            actions.push(construct_fix_spel_syntax(
+                                &uri,
+                                format!("quick-fix: {}", diagnostic.message),
+                                vec![edit],
+                            ))
+                        });
+                }
                 _ => (),
             }
         }
     }
-    match document.tree.node_at(params.range.start) {
-        Some(Node::Tag(Tag::SpIf(tag))) => {
-            log::debug!("code-action triggered in sp:if");
-            if let Some(action) = construct_name_to_condition(&uri, &tag) {
-                log::debug!("build name-to-condition action");
-                actions.push(action);
-            }
-            if let Some(action) = construct_condition_to_name(&uri, &tag) {
-                log::debug!("build condition-to-name action");
-                actions.push(action);
-            }
-        }
-        _ => (),
+    let if_tag = match document.tree.node_at(params.range.start) {
+        Some(Node::Tag(ParsedTag::Erroneous(SpmlTag::SpIf(tag), _))) => tag,
+        Some(Node::Tag(ParsedTag::Valid(SpmlTag::SpIf(tag)))) => tag,
+        _ => return Ok(actions),
     };
+    if let Some(action) = construct_name_to_condition(&uri, &if_tag) {
+        actions.push(action);
+    }
+    if let Some(action) = construct_condition_to_name(&uri, &if_tag) {
+        actions.push(action);
+    }
     return Ok(actions);
 }
 

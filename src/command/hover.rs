@@ -8,7 +8,7 @@ use super::LsError;
 
 use crate::{
     document_store,
-    parser::{AttributeValue, Node, ParsableTag, ParsedAttribute, Tag},
+    parser::{AttributeValue, Node, ParsableTag, ParsedAttribute, ParsedTag, SpmlTag},
     spel::{
         self,
         ast::{self, Location, SpelAst, SpelResult},
@@ -31,10 +31,10 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
             }),
     }?;
     let cursor = text_params.position;
-    match document.tree.node_at(cursor) {
-        Some(Node::Tag(tag)) => return hover_tag(tag, &cursor),
-        Some(Node::Html(html)) => {
-            log::debug!("found to be in html {} tag", html.name);
+    return match document.tree.node_at(cursor) {
+        Some(Node::Tag(ParsedTag::Valid(tag))) => hover_tag(tag, &cursor),
+        Some(Node::Tag(ParsedTag::Erroneous(tag, _))) => hover_tag(tag, &cursor),
+        Some(Node::Html(_html)) => {
             // TODO: html attributes can contain spml tags!
             // for attribute in &html.attributes {
             //     match attribute {
@@ -55,15 +55,13 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
             //         _ => (),
             //     }
             // }
+            Ok(None)
         }
-        Some(Node::Error(err)) => log::debug!("cursor is in error \"{}\"", err.content),
-        Some(Node::Text(text)) => log::debug!("cursor is in text \"{}\"", text.content),
-        None => log::debug!("cursor is not in a tag"),
+        _ => Ok(None),
     };
-    return Ok(None);
 }
 
-fn hover_tag(tag: &Tag, cursor: &Position) -> Result<Option<Hover>, LsError> {
+fn hover_tag(tag: &SpmlTag, cursor: &Position) -> Result<Option<Hover>, LsError> {
     log::debug!("found to be in tag {}", tag.definition().name);
     if tag.open_location().contains(cursor) || tag.close_location().contains(cursor) {
         return Ok(tag.definition().documentation.map(|doc| Hover {

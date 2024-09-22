@@ -8,7 +8,7 @@ use crate::{
     grammar::{TagAttributeType, TagAttributes},
     modules,
     parser::{
-        AttributeValue, Node, ParsableTag, ParsedAttribute, SpelAttribute, SpelAttributeValue, Tag,
+        AttributeValue, Node, ParsableTag, ParsedAttribute, ParsedTag, SpelAttribute, SpelAttributeValue, SpmlTag
     },
     spel::ast::{
         Argument, Comparable, Condition, Expression, Function, Identifier, Location, Object, Query,
@@ -49,22 +49,25 @@ impl DefinitionsFinder<'_> {
     fn collect(&mut self) {
         let nodes = &self.document.tree.nodes;
         for node in nodes {
-            if let Node::Tag(tag) = node {
-                let open_location = tag.open_location();
-                if open_location.line > self.upper_bound.line as usize {
+            let tag = match node {
+                Node::Tag(ParsedTag::Valid(tag)) => tag,
+                Node::Tag(ParsedTag::Erroneous(tag, _)) => tag,
+                _ => continue,
+            };
+            let open_location = tag.open_location();
+            if open_location.line > self.upper_bound.line as usize {
+                return;
+            }
+            if open_location.line == self.upper_bound.line as usize {
+                if open_location.char >= self.upper_bound.character as usize {
                     return;
                 }
-                if open_location.line == self.upper_bound.line as usize {
-                    if open_location.char >= self.upper_bound.character as usize {
-                        return;
-                    }
-                }
-                self.collect_from_tag(&tag);
             }
+            self.collect_from_tag(&tag);
         }
     }
 
-    fn collect_from_tag(&mut self, tag: &Tag) {
+    fn collect_from_tag(&mut self, tag: &SpmlTag) {
         if let TagAttributes::These(attributes) = tag.definition().attributes {
             for attribute in attributes {
                 if let TagAttributeType::Identifier = attribute.r#type {
@@ -112,9 +115,12 @@ impl DefinitionsFinder<'_> {
         }
         if let Some(body) = &tag.body() {
             for node in &body.nodes {
-                if let Node::Tag(tag) = node {
-                    self.collect_from_tag(tag)
+                let tag = match node {
+                    Node::Tag(ParsedTag::Valid(tag)) => tag,
+                    Node::Tag(ParsedTag::Erroneous(tag, _)) => tag,
+                    _ => continue,
                 };
+                self.collect_from_tag(tag)
             }
         }
     }
@@ -138,94 +144,97 @@ pub(crate) fn definition(
             }),
     }?;
     let cursor = text_params.position;
-    if let Some(Node::Tag(tag)) = document.tree.node_at(cursor) {
-        for (_, attribute) in tag.spel_attributes() {
-            let attribute = match attribute {
-                ParsedAttribute::Valid(attribute) => attribute,
-                ParsedAttribute::Erroneous(attribute, _) => attribute,
-                ParsedAttribute::Unparsable(_, _) => continue,
+    let tag = match document.tree.node_at(cursor) {
+        Some(Node::Tag(ParsedTag::Valid(tag))) => tag,
+        Some(Node::Tag(ParsedTag::Erroneous(tag, _))) => tag,
+        _ => return Ok(None),
+    };
+    for (_, attribute) in tag.spel_attributes() {
+        let attribute = match attribute {
+            ParsedAttribute::Valid(attribute) => attribute,
+            ParsedAttribute::Erroneous(attribute, _) => attribute,
+            ParsedAttribute::Unparsable(_, _) => continue,
+        };
+        if attribute.value.is_inside(&cursor) {
+            let offset = Point {
+                row: attribute.value.opening_quote_location.line + 1,
+                column: attribute.value.opening_quote_location.char,
             };
-            if attribute.value.is_inside(&cursor) {
-                let offset = Point {
-                    row: attribute.value.opening_quote_location.line + 1,
-                    column: attribute.value.opening_quote_location.char,
-                };
-                let node = match &attribute.value.spel {
-                    SpelAst::Comparable(SpelResult::Valid(comparable)) => {
-                        find_node_in_comparable(comparable, &cursor, &offset)
-                    }
-                    SpelAst::Condition(SpelResult::Valid(condition)) => {
-                        find_node_in_condition(condition, &cursor, &offset)
-                    }
-                    SpelAst::Expression(SpelResult::Valid(expression)) => {
-                        find_node_in_expression(expression, &cursor, &offset)
-                    }
-                    SpelAst::Identifier(SpelResult::Valid(identifier)) => {
-                        find_node_in_identifier(identifier, &cursor, &offset)
-                    }
-                    SpelAst::Object(SpelResult::Valid(object)) => {
-                        find_node_in_object(object, &cursor, &offset)
-                    }
-                    SpelAst::Query(SpelResult::Valid(query)) => {
-                        find_node_in_query(query, &cursor, &offset)
-                    }
-                    SpelAst::Regex(SpelResult::Valid(regex)) => {
-                        find_node_in_regex(regex, &cursor, &offset)
-                    }
-                    SpelAst::String(SpelResult::Valid(word)) => {
-                        find_node_in_text(word, &cursor, &offset)
-                    }
-                    SpelAst::Uri(SpelResult::Valid(Uri::Literal(uri))) => {
-                        let mut module = None;
-                        let module_attribute = match tag.spel_attribute("module") {
-                            Some(ParsedAttribute::Valid(attribute)) => Some(attribute),
-                            Some(ParsedAttribute::Erroneous(attribute, _)) => Some(attribute),
-                            _ => None,
-                        };
-                        if let Some(SpelAttribute {
-                            value:
-                                SpelAttributeValue {
-                                    spel: SpelAst::String(SpelResult::Valid(Word { fragments })),
-                                    ..
-                                },
-                            ..
-                        }) = module_attribute
-                        // TODO: should use TagAttributeType::Uri { module_attribute} for this
-                        {
-                            if let [WordFragment::String(StringLiteral { content, .. })] =
-                                &fragments[..]
-                            {
-                                module = modules::find_module_by_name(&content)
-                            }
-                        }
-                        module = module.or_else(|| {
-                            modules::find_module_for_file(Path::new(
-                                text_params.text_document.uri.path().as_str(),
-                            ))
-                        });
-                        return Ok(module
-                            .map(|module| module.path + &uri.to_string())
-                            .filter(|file| Path::new(&file).exists())
-                            .and_then(|file| format!("file://{}", &file).parse().ok())
-                            .map(|uri| {
-                                vec![lsp_types::Location {
-                                    range: Range {
-                                        ..Default::default()
-                                    },
-                                    uri,
-                                }]
-                            }));
-                    }
-                    SpelAst::Uri(SpelResult::Valid(uri)) => find_node_in_uri(uri, &cursor, &offset),
-                    _ => None,
-                };
-                if let Some(node) = node {
-                    let definitions = DefinitionsFinder::find(cursor, &document, file, node);
-                    return match definitions.len() {
-                        0 => Ok(None),
-                        _ => Ok(Some(definitions)),
-                    };
+            let node = match &attribute.value.spel {
+                SpelAst::Comparable(SpelResult::Valid(comparable)) => {
+                    find_node_in_comparable(comparable, &cursor, &offset)
                 }
+                SpelAst::Condition(SpelResult::Valid(condition)) => {
+                    find_node_in_condition(condition, &cursor, &offset)
+                }
+                SpelAst::Expression(SpelResult::Valid(expression)) => {
+                    find_node_in_expression(expression, &cursor, &offset)
+                }
+                SpelAst::Identifier(SpelResult::Valid(identifier)) => {
+                    find_node_in_identifier(identifier, &cursor, &offset)
+                }
+                SpelAst::Object(SpelResult::Valid(object)) => {
+                    find_node_in_object(object, &cursor, &offset)
+                }
+                SpelAst::Query(SpelResult::Valid(query)) => {
+                    find_node_in_query(query, &cursor, &offset)
+                }
+                SpelAst::Regex(SpelResult::Valid(regex)) => {
+                    find_node_in_regex(regex, &cursor, &offset)
+                }
+                SpelAst::String(SpelResult::Valid(word)) => {
+                    find_node_in_text(word, &cursor, &offset)
+                }
+                SpelAst::Uri(SpelResult::Valid(Uri::Literal(uri))) => {
+                    let mut module = None;
+                    let module_attribute = match tag.spel_attribute("module") {
+                        Some(ParsedAttribute::Valid(attribute)) => Some(attribute),
+                        Some(ParsedAttribute::Erroneous(attribute, _)) => Some(attribute),
+                        _ => None,
+                    };
+                    if let Some(SpelAttribute {
+                        value:
+                            SpelAttributeValue {
+                                spel: SpelAst::String(SpelResult::Valid(Word { fragments })),
+                                ..
+                            },
+                        ..
+                    }) = module_attribute
+                    // TODO: should use TagAttributeType::Uri { module_attribute} for this
+                    {
+                        if let [WordFragment::String(StringLiteral { content, .. })] =
+                            &fragments[..]
+                        {
+                            module = modules::find_module_by_name(&content)
+                        }
+                    }
+                    module = module.or_else(|| {
+                        modules::find_module_for_file(Path::new(
+                            text_params.text_document.uri.path().as_str(),
+                        ))
+                    });
+                    return Ok(module
+                        .map(|module| module.path + &uri.to_string())
+                        .filter(|file| Path::new(&file).exists())
+                        .and_then(|file| format!("file://{}", &file).parse().ok())
+                        .map(|uri| {
+                            vec![lsp_types::Location {
+                                range: Range {
+                                    ..Default::default()
+                                },
+                                uri,
+                            }]
+                        }));
+                }
+                SpelAst::Uri(SpelResult::Valid(uri)) => find_node_in_uri(uri, &cursor, &offset),
+                _ => None,
+            };
+            if let Some(node) = node {
+                let definitions = DefinitionsFinder::find(cursor, &document, file, node);
+                return match definitions.len() {
+                    0 => Ok(None),
+                    _ => Ok(Some(definitions)),
+                };
             }
         }
     }
