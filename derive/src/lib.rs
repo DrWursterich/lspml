@@ -37,18 +37,9 @@ pub fn document_node(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
                 _ => quote! {
                     impl DocumentNode for #name {
                         fn range(&self) -> Range {
-                            let open = self.open_location();
-                            let close = self.close_location();
-                            return lsp_types::Range {
-                                start: lsp_types::Position {
-                                    line: open.line as u32,
-                                    character: open.char as u32,
-                                },
-                                end: lsp_types::Position {
-                                    line: close.line as u32,
-                                    character: (close.char + close.length) as u32,
-                                },
-                            }
+                            let start = self.open_location().start();
+                            let end = self.close_location().end();
+                            return Range { start, end };
                         }
                     }
                 },
@@ -128,7 +119,16 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                                     movement = NodeMovement::NextSibling;
                                     continue;
                                 },
-                                NodeMovingResult::Ok(node) => node_location(parser.cursor.node()),
+                                NodeMovingResult::Ok(node) => match node_location(node) {
+                                    Location::SingleLine(location) => location,
+                                    location => return Ok(ParsedTag::Unparsable(
+                                        format!(
+                                            "\"{}\" should be on a single line",
+                                            parser.node_text(&node)?,
+                                        ),
+                                        location,
+                                    ))
+                                },
                             };
                             break;
                         }
@@ -216,7 +216,17 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                             // NodeMovingResult::NonExistent cannot happen with NodeMovement::Current
                             _ => (),
                         }
-                        let close_location = node_location(parser.cursor.node());
+                        let node = parser.cursor.node();
+                        let close_location =  match node_location(node) {
+                            Location::SingleLine(location) => location,
+                            location => return Ok(ParsedTag::Unparsable(
+                                format!(
+                                    "\"{}\" should be on a single line",
+                                    parser.node_text(&node)?,
+                                ),
+                                location,
+                            ))
+                        };
                         let tag = Self {
                             open_location,
                             #(#plain_attribute_fields,)*
@@ -246,11 +256,11 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         return #definition;
                     }
 
-                    fn open_location(&self) -> &Location {
+                    fn open_location(&self) -> &SingleLineLocation {
                         return &self.open_location;
                     }
 
-                    fn close_location(&self) -> &Location {
+                    fn close_location(&self) -> &SingleLineLocation {
                         return &self.close_location;
                     }
 
@@ -326,13 +336,13 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         };
                     }
 
-                    fn open_location(&self) -> &Location {
+                    fn open_location(&self) -> &SingleLineLocation {
                         return match self {
                             #(#open_location,)*
                         };
                     }
 
-                    fn close_location(&self) -> &Location {
+                    fn close_location(&self) -> &SingleLineLocation {
                         return match self {
                             #(#close_location,)*
                         };

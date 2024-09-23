@@ -28,9 +28,9 @@ pub(crate) trait ParsableTag {
 
     fn definition(&self) -> TagDefinition;
 
-    fn open_location(&self) -> &Location;
+    fn open_location(&self) -> &SingleLineLocation;
 
-    fn close_location(&self) -> &Location;
+    fn close_location(&self) -> &SingleLineLocation;
 
     fn body(&self) -> &Option<TagBody>;
 
@@ -80,13 +80,13 @@ pub(crate) struct Header {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct PageHeader {
-    pub(crate) open_bracket: Location,
-    pub(crate) page: Location,
+    pub(crate) open_bracket: SingleLineLocation,
+    pub(crate) page: SingleLineLocation,
     pub(crate) language: Option<ParsedAttribute<PlainAttribute>>,
     pub(crate) page_encoding: Option<ParsedAttribute<PlainAttribute>>,
     pub(crate) content_type: Option<ParsedAttribute<PlainAttribute>>,
     pub(crate) imports: Vec<ParsedAttribute<PlainAttribute>>,
-    pub(crate) close_bracket: Location,
+    pub(crate) close_bracket: SingleLineLocation,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -106,40 +106,37 @@ impl RangedNode for IncompletePageHeader {
             .open_bracket
             .location()
             .or_else(|| self.page.location())
+            .map(|location| location.start())
             .or_else(|| self.language.as_ref().map(|a| a.start()))
             .or_else(|| self.page_encoding.as_ref().map(|a| a.start()))
             .or_else(|| self.content_type.as_ref().map(|a| a.start()))
             .or_else(|| self.imports.first().map(|a| a.start()))
-            .or_else(|| self.close_bracket.location())?;
+            .or_else(|| {
+                self.close_bracket
+                    .location()
+                    .map(|location| location.start())
+            })?;
         let end = self
             .close_bracket
             .location()
-            .or_else(|| self.imports.last().map(|a| a.start()))
-            .or_else(|| self.content_type.as_ref().map(|a| a.start()))
-            .or_else(|| self.page_encoding.as_ref().map(|a| a.start()))
-            .or_else(|| self.language.as_ref().map(|a| a.start()))
-            .or_else(|| self.page.location())
-            .or_else(|| self.open_bracket.location())?;
-        return Some(Range {
-            start: Position {
-                character: start.char as u32,
-                line: start.line as u32,
-            },
-            end: Position {
-                character: (end.char + end.length) as u32,
-                line: end.line as u32,
-            },
-        });
+            .map(|location| location.end())
+            .or_else(|| self.imports.last().map(|a| a.end()))
+            .or_else(|| self.content_type.as_ref().map(|a| a.end()))
+            .or_else(|| self.page_encoding.as_ref().map(|a| a.end()))
+            .or_else(|| self.language.as_ref().map(|a| a.end()))
+            .or_else(|| self.page.location().map(|location| location.end()))
+            .or_else(|| self.open_bracket.location().map(|location| location.end()))?;
+        return Some(Range { start, end });
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TagLibImport {
-    pub(crate) open_bracket: Location,
-    pub(crate) taglib: Location,
+    pub(crate) open_bracket: SingleLineLocation,
+    pub(crate) taglib: SingleLineLocation,
     pub(crate) origin: TagLibOrigin,
     pub(crate) prefix: ParsedAttribute<PlainAttribute>,
-    pub(crate) close_bracket: Location,
+    pub(crate) close_bracket: SingleLineLocation,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -157,27 +154,24 @@ impl RangedNode for IncompleteTagLibImport {
         let start = self
             .open_bracket
             .location()
-            .or_else(|| self.taglib.location())
+            .map(|location| location.start())
+            .or_else(|| self.taglib.location().map(|location| location.start()))
             .or_else(|| self.origin.as_ref().map(|e| e.start()))
             .or_else(|| self.prefix.as_ref().map(|e| e.start()))
-            .or_else(|| self.close_bracket.location())?;
+            .or_else(|| {
+                self.close_bracket
+                    .location()
+                    .map(|location| location.start())
+            })?;
         let end = self
             .close_bracket
             .location()
+            .map(|location| location.end())
             .or_else(|| self.prefix.as_ref().map(|e| e.end()))
             .or_else(|| self.origin.as_ref().map(|e| e.end()))
-            .or_else(|| self.taglib.location())
-            .or_else(|| self.open_bracket.location())?;
-        return Some(Range {
-            start: Position {
-                character: start.char as u32,
-                line: start.line as u32,
-            },
-            end: Position {
-                character: (end.char + end.length) as u32,
-                line: end.line as u32,
-            },
-        });
+            .or_else(|| self.taglib.location().map(|location| location.end()))
+            .or_else(|| self.open_bracket.location().map(|location| location.end()))?;
+        return Some(Range { start, end });
     }
 }
 
@@ -188,14 +182,14 @@ pub(crate) enum TagLibOrigin {
 }
 
 impl TagLibOrigin {
-    fn start(&self) -> &Location {
+    fn start(&self) -> Position {
         return match &self {
             TagLibOrigin::Uri(uri) => uri.start(),
             TagLibOrigin::TagDir(tagdir) => tagdir.start(),
         };
     }
 
-    fn end(&self) -> &Location {
+    fn end(&self) -> Position {
         return match &self {
             TagLibOrigin::Uri(uri) => uri.end(),
             TagLibOrigin::TagDir(tagdir) => tagdir.end(),
@@ -205,7 +199,7 @@ impl TagLibOrigin {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TagBody {
-    pub(crate) open_location: Location,
+    pub(crate) open_location: SingleLineLocation,
     pub(crate) nodes: Vec<Node>,
 }
 
@@ -219,19 +213,19 @@ pub(crate) enum Node {
 
 #[derive(Clone, Debug, PartialEq, DocumentNode)]
 pub(crate) struct HtmlNode {
-    pub(crate) open_location: Location,
+    pub(crate) open_location: SingleLineLocation,
     pub(crate) name: String,
     pub(crate) attributes: Vec<ParsedAttribute<PlainAttribute>>,
     pub(crate) body: Option<TagBody>,
-    pub(crate) close_location: Location,
+    pub(crate) close_location: SingleLineLocation,
 }
 
 impl HtmlNode {
-    pub(crate) fn open_location(&self) -> &Location {
+    pub(crate) fn open_location(&self) -> &SingleLineLocation {
         return &self.open_location;
     }
 
-    pub(crate) fn close_location(&self) -> &Location {
+    pub(crate) fn close_location(&self) -> &SingleLineLocation {
         return &self.close_location;
     }
 
@@ -339,7 +333,7 @@ pub(crate) enum SpmlTag {
 
 // TODO: ...
 impl Tag for SpmlTag {
-    fn start(&self) -> &Location {
+    fn start(&self) -> Position {
         return match &self {
             SpmlTag::SpArgument(tag) => tag.start(),
             SpmlTag::SpAttribute(tag) => tag.start(),
@@ -425,7 +419,7 @@ impl Tag for SpmlTag {
         };
     }
 
-    fn end(&self) -> &Location {
+    fn end(&self) -> Position {
         return match &self {
             SpmlTag::SpArgument(tag) => tag.end(),
             SpmlTag::SpAttribute(tag) => tag.end(),
@@ -536,19 +530,19 @@ macro_rules! tag_struct {
         #[derive(Clone, Debug, PartialEq, DocumentNode, ParsableTag)]
         #[tag_definition($definition)]
         pub(crate) struct $name {
-            pub(crate) open_location: Location,
+            pub(crate) open_location: SingleLineLocation,
             $(pub(crate) $param: Option<ParsedAttribute<SpelAttribute>>,)*
             pub(crate) body: Option<TagBody>,
-            pub(crate) close_location: Location,
+            pub(crate) close_location: SingleLineLocation,
         }
 
         impl Tag for $name {
-            fn start(&self) -> &Location {
-                return &self.open_location;
+            fn start(&self) -> Position {
+                return self.open_location.start();
             }
 
-            fn end(&self) -> &Location {
-                return &self.close_location;
+            fn end(&self) -> Position {
+                return self.close_location.end();
             }
         }
     };
@@ -1527,21 +1521,21 @@ tag_struct!(
 );
 
 pub(crate) trait Tag {
-    fn start(&self) -> &Location;
+    fn start(&self) -> Position;
 
-    fn end(&self) -> &Location;
+    fn end(&self) -> Position;
 }
 
 pub(crate) trait Attribute {
-    fn start(&self) -> &Location;
+    fn start(&self) -> Position;
 
-    fn end(&self) -> &Location;
+    fn end(&self) -> Position;
 }
 
 pub(crate) trait AttributeValue {
-    fn opening_quote_location(&self) -> &Location;
+    fn opening_quote_location(&self) -> &SingleLineLocation;
 
-    fn closing_quote_location(&self) -> &Location;
+    fn closing_quote_location(&self) -> &SingleLineLocation;
 
     fn is_inside(&self, position: &Position) -> bool {
         let opening_line = self
@@ -1575,16 +1569,16 @@ pub(crate) trait AttributeValue {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct PlainAttribute {
-    pub(crate) key_location: Location,
+    pub(crate) key_location: SingleLineLocation,
     pub(crate) value: Option<PlainAttributeValue>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct PlainAttributeValue {
-    pub(crate) equals_location: Location,
-    pub(crate) opening_quote_location: Location,
+    pub(crate) equals_location: SingleLineLocation,
+    pub(crate) opening_quote_location: SingleLineLocation,
     pub(crate) value: String,
-    pub(crate) closing_quote_location: Location,
+    pub(crate) closing_quote_location: SingleLineLocation,
 }
 
 // TODO:
@@ -1609,11 +1603,11 @@ pub(crate) struct PlainAttributeValue {
 // }
 
 impl AttributeValue for PlainAttributeValue {
-    fn opening_quote_location(&self) -> &Location {
-        return &self.opening_quote_location;
+    fn opening_quote_location(&self) -> &SingleLineLocation {
+        &self.opening_quote_location
     }
 
-    fn closing_quote_location(&self) -> &Location {
+    fn closing_quote_location(&self) -> &SingleLineLocation {
         return &self.closing_quote_location;
     }
 }
@@ -1626,19 +1620,19 @@ pub(crate) enum ParsedAttribute<A: Attribute> {
 }
 
 impl<R: Attribute> ParsedAttribute<R> {
-    fn start(&self) -> &Location {
+    fn start(&self) -> Position {
         return match &self {
-            ParsedAttribute::Valid(a) => a.start(),
-            ParsedAttribute::Erroneous(a, _) => a.start(),
-            ParsedAttribute::Unparsable(_, location) => location,
+            ParsedAttribute::Valid(attribute) => attribute.start(),
+            ParsedAttribute::Erroneous(attribute, _) => attribute.start(),
+            ParsedAttribute::Unparsable(_, location) => location.start(),
         };
     }
 
-    fn end(&self) -> &Location {
+    fn end(&self) -> Position {
         return match &self {
             ParsedAttribute::Valid(attribute) => attribute.end(),
             ParsedAttribute::Erroneous(attribute, _) => attribute.end(),
-            ParsedAttribute::Unparsable(_, location) => location,
+            ParsedAttribute::Unparsable(_, location) => location.end(),
         };
     }
 }
@@ -1679,16 +1673,7 @@ impl<T: Tag> DocumentNode for ParsedTag<T> {
             ParsedTag::Erroneous(tag, _) => (tag.start(), tag.end()),
             ParsedTag::Unparsable(_, location) => return location.range(),
         };
-        return Range {
-            start: Position {
-                line: start.line as u32,
-                character: start.char as u32,
-            },
-            end: Position {
-                line: end.line as u32,
-                character: (end.char + end.length) as u32,
-            },
-        };
+        return Range { start, end };
     }
 }
 
@@ -1699,62 +1684,106 @@ pub(crate) enum TagError {
 }
 
 impl Attribute for PlainAttribute {
-    fn start(&self) -> &Location {
-        return &self.key_location;
+    fn start(&self) -> Position {
+        return self.key_location.start();
     }
 
-    fn end(&self) -> &Location {
+    fn end(&self) -> Position {
         return match &self.value {
-            Some(value) => &value.closing_quote_location,
-            None => &self.key_location,
+            Some(value) => value.closing_quote_location.end(),
+            None => self.key_location.end(),
         };
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct SpelAttribute {
-    pub(crate) key_location: Location,
+    pub(crate) key_location: SingleLineLocation,
     pub(crate) value: SpelAttributeValue,
 }
 
 impl Attribute for SpelAttribute {
-    fn start(&self) -> &Location {
-        return &self.key_location;
+    fn start(&self) -> Position {
+        return self.key_location.start();
     }
 
-    fn end(&self) -> &Location {
-        return &self.value.closing_quote_location;
+    fn end(&self) -> Position {
+        return self.value.closing_quote_location.start();
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct SpelAttributeValue {
-    pub(crate) equals_location: Location,
-    pub(crate) opening_quote_location: Location,
+    pub(crate) equals_location: SingleLineLocation,
+    pub(crate) opening_quote_location: SingleLineLocation,
     pub(crate) spel: SpelAst,
-    pub(crate) closing_quote_location: Location,
+    pub(crate) closing_quote_location: SingleLineLocation,
 }
 
 impl AttributeValue for SpelAttributeValue {
-    fn opening_quote_location(&self) -> &Location {
+    fn opening_quote_location(&self) -> &SingleLineLocation {
         return &self.opening_quote_location;
     }
 
-    fn closing_quote_location(&self) -> &Location {
+    fn closing_quote_location(&self) -> &SingleLineLocation {
         return &self.closing_quote_location;
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Location {
+pub(crate) enum Location {
+    SingleLine(SingleLineLocation),
+    MultiLine(MultiLineLocation),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SingleLineLocation {
     pub(crate) char: usize,
     pub(crate) line: usize,
     pub(crate) length: usize,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct MultiLineLocation {
+    pub(crate) start_char: usize,
+    pub(crate) start_line: usize,
+    pub(crate) end_char: usize,
+    pub(crate) end_line: usize,
+}
+
 impl Location {
+    pub(crate) fn contains(&self, position: &Position) -> bool {
+        return match &self {
+            Location::SingleLine(location) => location.contains(position),
+            Location::MultiLine(location) => location.contains(position),
+        };
+    }
+
+    pub(crate) fn start(&self) -> Position {
+        return match &self {
+            Location::SingleLine(location) => location.start(),
+            Location::MultiLine(location) => location.start(),
+        };
+    }
+
+    pub(crate) fn end(&self) -> Position {
+        return match &self {
+            Location::SingleLine(location) => location.end(),
+            Location::MultiLine(location) => location.end(),
+        };
+    }
+
+    pub(crate) fn range(&self) -> Range {
+        return match &self {
+            Location::SingleLine(location) => location.range(),
+            Location::MultiLine(location) => location.range(),
+        };
+    }
+}
+
+impl SingleLineLocation {
     pub(crate) fn new(char: usize, line: usize, length: usize) -> Self {
-        return Location { char, line, length };
+        return SingleLineLocation { char, line, length };
     }
 
     pub(crate) fn contains(&self, position: &Position) -> bool {
@@ -1763,16 +1792,73 @@ impl Location {
             && self.char + self.length > position.character as usize;
     }
 
+    pub(crate) fn start(&self) -> Position {
+        return Position {
+            line: self.line as u32,
+            character: self.char as u32,
+        };
+    }
+
+    pub(crate) fn end(&self) -> Position {
+        return Position {
+            line: self.line as u32,
+            character: (self.char + self.length) as u32,
+        };
+    }
+
     pub(crate) fn range(&self) -> Range {
         return Range {
-            start: Position {
-                line: self.line as u32,
-                character: self.char as u32,
+            start: self.start(),
+            end: self.end(),
+        };
+    }
+}
+
+impl MultiLineLocation {
+    pub(crate) fn new(
+        start_char: usize,
+        start_line: usize,
+        end_char: usize,
+        end_line: usize,
+    ) -> Self {
+        return MultiLineLocation {
+            start_char,
+            start_line,
+            end_char,
+            end_line,
+        };
+    }
+
+    pub(crate) fn contains(&self, position: &Position) -> bool {
+        return match self.start_line.cmp(&(position.line as usize)) {
+            Ordering::Greater => false,
+            Ordering::Equal => self.start_char <= position.character as usize,
+            Ordering::Less => match self.end_line.cmp(&(position.line as usize)) {
+                Ordering::Greater => true,
+                Ordering::Equal => self.end_char > position.character as usize,
+                Ordering::Less => false,
             },
-            end: Position {
-                line: self.line as u32,
-                character: (self.char + self.length) as u32,
-            },
+        };
+    }
+
+    pub(crate) fn start(&self) -> Position {
+        return Position {
+            line: self.start_line as u32,
+            character: self.start_char as u32,
+        };
+    }
+
+    pub(crate) fn end(&self) -> Position {
+        return Position {
+            line: self.end_line as u32,
+            character: self.end_char as u32,
+        };
+    }
+
+    pub(crate) fn range(&self) -> Range {
+        return Range {
+            start: self.start(),
+            end: self.end(),
         };
     }
 }
@@ -1866,7 +1952,19 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
-        let key_location = node_location(key_node);
+        let key_location = match node_location(key_node) {
+            Location::SingleLine(location) => location,
+            location => {
+                return Ok((
+                    // TODO: this is ass
+                    "".to_string(),
+                    ParsedAttribute::Unparsable(
+                        "attribute key should be on a single line".to_string(),
+                        location,
+                    ),
+                ));
+            }
+        };
         let key = self.tree_parser.node_text(&key_node)?.to_string();
         let equals_location = match self.parse_equals(&key_node)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
@@ -1933,7 +2031,19 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
-        let key_location = node_location(key_node);
+        let key_location = match node_location(key_node) {
+            Location::SingleLine(location) => location,
+            location => {
+                return Ok((
+                    // TODO: this is ass
+                    "".to_string(),
+                    ParsedAttribute::Unparsable(
+                        "attribute key should be on a single line".to_string(),
+                        location,
+                    ),
+                ));
+            }
+        };
         let key = self.tree_parser.node_text(&key_node)?.to_string();
         let equals_location = match self.parse_equals(&key_node)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
@@ -2027,7 +2137,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
     fn parse_equals(
         &mut self,
         key_node: &tree_sitter::Node<'a>,
-    ) -> Result<IntermediateAttributeParsingResult<Option<Location>>> {
+    ) -> Result<IntermediateAttributeParsingResult<Option<SingleLineLocation>>> {
         loop {
             return Ok(match self.goto(&NodeMovement::NextSibling) {
                 NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Partial(None),
@@ -2052,9 +2162,15 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                     ));
                     continue;
                 }
-                NodeMovingResult::Ok(node) => {
-                    IntermediateAttributeParsingResult::Partial(Some(node_location(node)))
-                }
+                NodeMovingResult::Ok(node) => match node_location(node) {
+                    Location::SingleLine(location) => {
+                        IntermediateAttributeParsingResult::Partial(Some(location))
+                    }
+                    location => IntermediateAttributeParsingResult::Failed(
+                        "\"=\" should be on a single line".to_string(),
+                        location,
+                    ),
+                },
             });
         }
     }
@@ -2102,7 +2218,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
     fn parse_opening_quote(
         &mut self,
         key_node: &tree_sitter::Node<'a>,
-    ) -> Result<IntermediateAttributeParsingResult<Location>> {
+    ) -> Result<IntermediateAttributeParsingResult<SingleLineLocation>> {
         loop {
             return Ok(match self.goto(&NodeMovement::FirstChild) {
                 NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
@@ -2133,9 +2249,15 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                     ));
                     continue;
                 }
-                NodeMovingResult::Ok(node) => {
-                    IntermediateAttributeParsingResult::Partial(node_location(node))
-                }
+                NodeMovingResult::Ok(node) => match node_location(node) {
+                    Location::SingleLine(location) => {
+                        IntermediateAttributeParsingResult::Partial(location)
+                    }
+                    location => IntermediateAttributeParsingResult::Failed(
+                        "\"\"\" should be on a single line".to_string(),
+                        location,
+                    ),
+                },
             });
         }
     }
@@ -2260,7 +2382,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         &mut self,
         key_node: &tree_sitter::Node<'a>,
         movement: NodeMovement,
-    ) -> Result<IntermediateAttributeParsingResult<Location>> {
+    ) -> Result<IntermediateAttributeParsingResult<SingleLineLocation>> {
         loop {
             return Ok(match self.goto(&movement) {
                 NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
@@ -2291,9 +2413,15 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                     ));
                     continue;
                 }
-                NodeMovingResult::Ok(node) => {
-                    IntermediateAttributeParsingResult::Partial(node_location(node))
-                }
+                NodeMovingResult::Ok(node) => match node_location(node) {
+                    Location::SingleLine(location) => {
+                        IntermediateAttributeParsingResult::Partial(location)
+                    }
+                    location => IntermediateAttributeParsingResult::Failed(
+                        "\"\"\" should be on a single line".to_string(),
+                        location,
+                    ),
+                },
             });
         }
     }
@@ -2387,6 +2515,7 @@ impl<'a> TreeParser<'a> {
         });
     }
 
+    // TODO: use self.goto()
     fn parse_page_header(&mut self) -> Result<ParsedNode<PageHeader, IncompletePageHeader>> {
         if !self.cursor.goto_first_child() {
             return Err(anyhow::anyhow!("java header is empty"));
@@ -2437,9 +2566,9 @@ impl<'a> TreeParser<'a> {
         self.cursor.goto_parent();
         return Ok(match (open_bracket, page, close_bracket) {
             (
-                ParsedLocation::Valid(open_bracket),
-                ParsedLocation::Valid(page),
-                ParsedLocation::Valid(close_bracket),
+                ParsedLocation::Valid(Location::SingleLine(open_bracket)),
+                ParsedLocation::Valid(Location::SingleLine(page)),
+                ParsedLocation::Valid(Location::SingleLine(close_bracket)),
             ) => ParsedNode::Valid(PageHeader {
                 open_bracket,
                 page,
@@ -2461,6 +2590,7 @@ impl<'a> TreeParser<'a> {
         });
     }
 
+    // TODO: use self.goto()
     fn parse_taglib_header(&mut self) -> Result<ParsedNode<TagLibImport, IncompleteTagLibImport>> {
         let mut open_bracket = ParsedLocation::Missing;
         let mut taglib = ParsedLocation::Missing;
@@ -2545,11 +2675,11 @@ impl<'a> TreeParser<'a> {
                 errors.len(),
             ) {
                 (
-                    ParsedLocation::Valid(open_bracket),
-                    ParsedLocation::Valid(taglib),
+                    ParsedLocation::Valid(Location::SingleLine(open_bracket)),
+                    ParsedLocation::Valid(Location::SingleLine(taglib)),
                     Some(origin),
                     Some(prefix),
-                    ParsedLocation::Valid(close_bracket),
+                    ParsedLocation::Valid(Location::SingleLine(close_bracket)),
                     0,
                 ) => ParsedNode::Valid(TagLibImport {
                     open_bracket,
@@ -3001,6 +3131,7 @@ impl<'a> TreeParser<'a> {
         return Ok(tags);
     }
 
+    // TODO: use self.goto()
     fn parse_html(&mut self) -> Result<HtmlNode> {
         if !self.cursor.goto_first_child() {
             return Err(anyhow::anyhow!("html tag is empty"));
@@ -3008,7 +3139,10 @@ impl<'a> TreeParser<'a> {
         let node = self.cursor.node();
         let name = node.utf8_text(self.text_bytes)?.to_string();
         let has_to_be_closed = node.kind() != "html_void_tag_open";
-        let open_location = node_location(node);
+        let open_location = match node_location(node) {
+            Location::SingleLine(location) => location,
+            _ => return Err(anyhow::anyhow!("\"<{}\" should be on a single line", name)),
+        };
         let mut attributes = Vec::new();
         let mut body = None;
         loop {
@@ -3029,7 +3163,15 @@ impl<'a> TreeParser<'a> {
                 _ => (),
             };
         }
-        let close_location = node_location(self.cursor.node());
+        let close_location = match node_location(node) {
+            Location::SingleLine(location) => location,
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "\"{}\" should be on a single line",
+                    node.utf8_text(self.text_bytes)?
+                ))
+            }
+        };
         self.cursor.goto_parent();
         return Ok(HtmlNode {
             open_location,
@@ -3073,7 +3215,11 @@ impl<'a> TreeParser<'a> {
     }
 
     fn parse_tag_body(&mut self) -> Result<TagBody> {
-        let open_location = node_location(self.cursor.node());
+        let node = self.cursor.node();
+        let open_location = match node_location(node) {
+            Location::SingleLine(location) => location,
+            _ => return Err(anyhow::anyhow!("\"<\" should be on a single line")),
+        };
         if !self.cursor.goto_next_sibling() {
             return Err(anyhow::anyhow!("tag is unclosed"));
         }
@@ -3100,16 +3246,18 @@ fn node_location(node: tree_sitter::Node) -> Location {
     let start = node.start_position();
     let end = node.end_position();
     if start.row != end.row {
-        // TODO: we need a representation for that!
-        log::warn!(
-            "tried to create location from multiline node {:?} at {}",
-            node,
-            std::backtrace::Backtrace::force_capture()
-        );
-        // This is highly inaccurate!
-        return Location::new(start.column, start.row, node.end_byte() - node.start_byte());
+        return Location::MultiLine(MultiLineLocation::new(
+            start.column,
+            start.row,
+            end.column,
+            end.row,
+        ));
     }
-    return Location::new(start.column, start.row, end.column - start.column);
+    return Location::SingleLine(SingleLineLocation::new(
+        start.column,
+        start.row,
+        end.column - start.column,
+    ));
 }
 
 fn range_from_points(start: tree_sitter::Point, end: tree_sitter::Point) -> Range {
@@ -3185,8 +3333,8 @@ mod tests {
     use crate::{
         parser::{
             Header, Location, Node, PageHeader, ParsedAttribute, ParsedNode, ParsedTag,
-            PlainAttribute, PlainAttributeValue, SpBarcode, SpelAttribute, SpelAttributeValue,
-            SpmlTag, TagLibImport, TagLibOrigin,
+            PlainAttribute, PlainAttributeValue, SingleLineLocation, SpBarcode, SpelAttribute,
+            SpelAttributeValue, SpmlTag, TagLibImport, TagLibOrigin,
         },
         spel::{
             self,
@@ -3208,84 +3356,84 @@ mod tests {
         ));
         let expected = Header {
             java_headers: vec![ParsedNode::Valid(PageHeader {
-                open_bracket: Location::new(0, 0, 3),
-                page: Location::new(4, 0, 4),
+                open_bracket: SingleLineLocation::new(0, 0, 3),
+                page: SingleLineLocation::new(4, 0, 4),
                 language: Some(ParsedAttribute::Valid(PlainAttribute {
-                    key_location: Location::new(9, 0, 8),
+                    key_location: SingleLineLocation::new(9, 0, 8),
                     value: Some(PlainAttributeValue {
-                        equals_location: Location::new(17, 0, 1),
-                        opening_quote_location: Location::new(18, 0, 1),
+                        equals_location: SingleLineLocation::new(17, 0, 1),
+                        opening_quote_location: SingleLineLocation::new(18, 0, 1),
                         value: "java".to_string(),
-                        closing_quote_location: Location::new(23, 0, 1),
+                        closing_quote_location: SingleLineLocation::new(23, 0, 1),
                     }),
                 })),
                 page_encoding: Some(ParsedAttribute::Valid(PlainAttribute {
-                    key_location: Location::new(25, 0, 12),
+                    key_location: SingleLineLocation::new(25, 0, 12),
                     value: Some(PlainAttributeValue {
-                        equals_location: Location::new(37, 0, 1),
-                        opening_quote_location: Location::new(38, 0, 1),
+                        equals_location: SingleLineLocation::new(37, 0, 1),
+                        opening_quote_location: SingleLineLocation::new(38, 0, 1),
                         value: "UTF-8".to_string(),
-                        closing_quote_location: Location::new(44, 0, 1),
+                        closing_quote_location: SingleLineLocation::new(44, 0, 1),
                     }),
                 })),
                 content_type: Some(ParsedAttribute::Valid(PlainAttribute {
-                    key_location: Location::new(46, 0, 11),
+                    key_location: SingleLineLocation::new(46, 0, 11),
                     value: Some(PlainAttributeValue {
-                        equals_location: Location::new(57, 0, 1),
-                        opening_quote_location: Location::new(58, 0, 1),
+                        equals_location: SingleLineLocation::new(57, 0, 1),
+                        opening_quote_location: SingleLineLocation::new(58, 0, 1),
                         value: "text/html; charset=UTF-8".to_string(),
-                        closing_quote_location: Location::new(83, 0, 1),
+                        closing_quote_location: SingleLineLocation::new(83, 0, 1),
                     }),
                 })),
                 imports: vec![],
-                close_bracket: Location::new(0, 1, 2),
+                close_bracket: SingleLineLocation::new(0, 1, 2),
             })],
             taglib_imports: vec![
                 ParsedNode::Valid(TagLibImport {
-                    open_bracket: Location::new(2, 1, 3),
-                    taglib: Location::new(6, 1, 6),
+                    open_bracket: SingleLineLocation::new(2, 1, 3),
+                    taglib: SingleLineLocation::new(6, 1, 6),
                     origin: TagLibOrigin::Uri(ParsedAttribute::Valid(PlainAttribute {
-                        key_location: Location::new(13, 1, 3),
+                        key_location: SingleLineLocation::new(13, 1, 3),
                         value: Some(PlainAttributeValue {
-                            equals_location: Location::new(16, 1, 1),
-                            opening_quote_location: Location::new(17, 1, 1),
+                            equals_location: SingleLineLocation::new(16, 1, 1),
+                            opening_quote_location: SingleLineLocation::new(17, 1, 1),
                             value: "http://www.sitepark.com/taglibs/core".to_string(),
-                            closing_quote_location: Location::new(54, 1, 1),
+                            closing_quote_location: SingleLineLocation::new(54, 1, 1),
                         }),
                     })),
                     prefix: ParsedAttribute::Valid(PlainAttribute {
-                        key_location: Location::new(56, 1, 6),
+                        key_location: SingleLineLocation::new(56, 1, 6),
                         value: Some(PlainAttributeValue {
-                            equals_location: Location::new(62, 1, 1),
-                            opening_quote_location: Location::new(63, 1, 1),
+                            equals_location: SingleLineLocation::new(62, 1, 1),
+                            opening_quote_location: SingleLineLocation::new(63, 1, 1),
                             value: "sp".to_string(),
-                            closing_quote_location: Location::new(66, 1, 1),
+                            closing_quote_location: SingleLineLocation::new(66, 1, 1),
                         }),
                     }),
-                    close_bracket: Location::new(0, 2, 2),
+                    close_bracket: SingleLineLocation::new(0, 2, 2),
                 }),
                 ParsedNode::Valid(TagLibImport {
-                    open_bracket: Location::new(2, 2, 3),
-                    taglib: Location::new(6, 2, 6),
+                    open_bracket: SingleLineLocation::new(2, 2, 3),
+                    taglib: SingleLineLocation::new(6, 2, 6),
                     origin: TagLibOrigin::TagDir(ParsedAttribute::Valid(PlainAttribute {
-                        key_location: Location::new(13, 2, 6),
+                        key_location: SingleLineLocation::new(13, 2, 6),
                         value: Some(PlainAttributeValue {
-                            equals_location: Location::new(19, 2, 1),
-                            opening_quote_location: Location::new(20, 2, 1),
+                            equals_location: SingleLineLocation::new(19, 2, 1),
+                            opening_quote_location: SingleLineLocation::new(20, 2, 1),
                             value: "/WEB-INF/tags/spt".to_string(),
-                            closing_quote_location: Location::new(38, 2, 1),
+                            closing_quote_location: SingleLineLocation::new(38, 2, 1),
                         }),
                     })),
                     prefix: ParsedAttribute::Valid(PlainAttribute {
-                        key_location: Location::new(40, 2, 6),
+                        key_location: SingleLineLocation::new(40, 2, 6),
                         value: Some(PlainAttributeValue {
-                            equals_location: Location::new(46, 2, 1),
-                            opening_quote_location: Location::new(47, 2, 1),
+                            equals_location: SingleLineLocation::new(46, 2, 1),
+                            opening_quote_location: SingleLineLocation::new(47, 2, 1),
                             value: "spt".to_string(),
-                            closing_quote_location: Location::new(51, 2, 1),
+                            closing_quote_location: SingleLineLocation::new(51, 2, 1),
                         }),
                     }),
-                    close_bracket: Location::new(0, 3, 2),
+                    close_bracket: SingleLineLocation::new(0, 3, 2),
                 }),
             ],
         };
@@ -3310,14 +3458,14 @@ mod tests {
             "<sp:barcode name=\"_testName\" text=\"some text\" scope=\"page\"/>\n",
         ));
         let expected = vec![Node::Tag(ParsedTag::Valid(SpmlTag::SpBarcode(SpBarcode {
-            open_location: Location::new(0, 2, 11),
+            open_location: SingleLineLocation::new(0, 2, 11),
             height_attribute: None,
             locale_attribute: None,
             name_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
-                key_location: Location::new(12, 2, 4),
+                key_location: SingleLineLocation::new(12, 2, 4),
                 value: SpelAttributeValue {
-                    equals_location: Location::new(16, 2, 1),
-                    opening_quote_location: Location::new(17, 2, 1),
+                    equals_location: SingleLineLocation::new(16, 2, 1),
+                    opening_quote_location: SingleLineLocation::new(17, 2, 1),
                     spel: SpelAst::Identifier(SpelResult::Valid(Identifier::Name(Word {
                         fragments: vec![WordFragment::String(StringLiteral {
                             content: "_testName".to_string(),
@@ -3328,14 +3476,14 @@ mod tests {
                             },
                         })],
                     }))),
-                    closing_quote_location: Location::new(27, 2, 1),
+                    closing_quote_location: SingleLineLocation::new(27, 2, 1),
                 },
             })),
             scope_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
-                key_location: Location::new(46, 2, 5),
+                key_location: SingleLineLocation::new(46, 2, 5),
                 value: SpelAttributeValue {
-                    equals_location: Location::new(51, 2, 1),
-                    opening_quote_location: Location::new(52, 2, 1),
+                    equals_location: SingleLineLocation::new(51, 2, 1),
+                    opening_quote_location: SingleLineLocation::new(52, 2, 1),
                     spel: SpelAst::String(SpelResult::Valid(Word {
                         fragments: vec![WordFragment::String(StringLiteral {
                             content: "page".to_string(),
@@ -3346,14 +3494,14 @@ mod tests {
                             },
                         })],
                     })),
-                    closing_quote_location: Location::new(57, 2, 1),
+                    closing_quote_location: SingleLineLocation::new(57, 2, 1),
                 },
             })),
             text_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
-                key_location: Location::new(29, 2, 4),
+                key_location: SingleLineLocation::new(29, 2, 4),
                 value: SpelAttributeValue {
-                    equals_location: Location::new(33, 2, 1),
-                    opening_quote_location: Location::new(34, 2, 1),
+                    equals_location: SingleLineLocation::new(33, 2, 1),
+                    opening_quote_location: SingleLineLocation::new(34, 2, 1),
                     spel: SpelAst::String(SpelResult::Valid(Word {
                         fragments: vec![WordFragment::String(StringLiteral {
                             content: "some text".to_string(),
@@ -3364,12 +3512,12 @@ mod tests {
                             },
                         })],
                     })),
-                    closing_quote_location: Location::new(44, 2, 1),
+                    closing_quote_location: SingleLineLocation::new(44, 2, 1),
                 },
             })),
             type_attribute: None,
             body: None,
-            close_location: Location::new(58, 2, 2),
+            close_location: SingleLineLocation::new(58, 2, 2),
         })))];
         let mut ts_parser = tree_sitter::Parser::new();
         ts_parser
@@ -3388,11 +3536,9 @@ mod tests {
     #[test]
     pub fn test_incomplete_taglib_header_range() -> Result<()> {
         let header = IncompleteTagLibImport {
-            open_bracket: ParsedLocation::Valid(Location {
-                char: 2,
-                line: 2,
-                length: 3,
-            }),
+            open_bracket: ParsedLocation::Valid(Location::SingleLine(SingleLineLocation::new(
+                2, 2, 3,
+            ))),
             taglib: ParsedLocation::Missing,
             origin: None,
             prefix: None,
