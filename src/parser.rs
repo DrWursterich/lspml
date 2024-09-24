@@ -1569,10 +1569,7 @@ pub(crate) trait AttributeValue {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AttributeKey {
-    // TODO: THIS CAUSES A STACKOVERFLOW!
-    //       regardless of how much content the file has and how many Box
-    //       indirections i throw in the datastructures...
-    // pub(crate) value: String,
+    pub(crate) value: String,
     pub(crate) location: SingleLineLocation,
 }
 
@@ -1955,7 +1952,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         };
         let key = match node_location(key_node) {
             Location::SingleLine(location) => AttributeKey {
-                // value: self.tree_parser.node_text(&key_node)?.to_string(),
+                value: self.tree_parser.node_text(&key_node)?.to_string(),
                 location,
             },
             location => {
@@ -2025,7 +2022,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         };
         let key = match node_location(key_node) {
             Location::SingleLine(location) => AttributeKey {
-                // value: self.tree_parser.node_text(&key_node)?.to_string(),
+                value: self.tree_parser.node_text(&key_node)?.to_string(),
                 location,
             },
             location => {
@@ -3186,7 +3183,7 @@ mod tests {
                 page: SingleLineLocation::new(4, 0, 4),
                 language: Some(ParsedAttribute::Valid(PlainAttribute {
                     key: AttributeKey {
-                        // value: "language".to_string(),
+                        value: "language".to_string(),
                         location: SingleLineLocation::new(9, 0, 8),
                     },
                     value: Some(PlainAttributeValue {
@@ -3198,7 +3195,7 @@ mod tests {
                 })),
                 page_encoding: Some(ParsedAttribute::Valid(PlainAttribute {
                     key: AttributeKey {
-                        // value: "pageEncoding".to_string(),
+                        value: "pageEncoding".to_string(),
                         location: SingleLineLocation::new(25, 0, 12),
                     },
                     value: Some(PlainAttributeValue {
@@ -3210,7 +3207,7 @@ mod tests {
                 })),
                 content_type: Some(ParsedAttribute::Valid(PlainAttribute {
                     key: AttributeKey {
-                        // value: "contentType".to_string(),
+                        value: "contentType".to_string(),
                         location: SingleLineLocation::new(46, 0, 11),
                     },
                     value: Some(PlainAttributeValue {
@@ -3229,7 +3226,7 @@ mod tests {
                     taglib: SingleLineLocation::new(6, 1, 6),
                     origin: TagLibOrigin::Uri(ParsedAttribute::Valid(PlainAttribute {
                         key: AttributeKey {
-                            // value: "uri".to_string(),
+                            value: "uri".to_string(),
                             location: SingleLineLocation::new(13, 1, 3),
                         },
                         value: Some(PlainAttributeValue {
@@ -3241,7 +3238,7 @@ mod tests {
                     })),
                     prefix: ParsedAttribute::Valid(PlainAttribute {
                         key: AttributeKey {
-                            // value: "prefix".to_string(),
+                            value: "prefix".to_string(),
                             location: SingleLineLocation::new(56, 1, 6),
                         },
                         value: Some(PlainAttributeValue {
@@ -3258,7 +3255,7 @@ mod tests {
                     taglib: SingleLineLocation::new(6, 2, 6),
                     origin: TagLibOrigin::TagDir(ParsedAttribute::Valid(PlainAttribute {
                         key: AttributeKey {
-                            // value: "tagdir".to_string(),
+                            value: "tagdir".to_string(),
                             location: SingleLineLocation::new(13, 2, 6),
                         },
                         value: Some(PlainAttributeValue {
@@ -3270,7 +3267,7 @@ mod tests {
                     })),
                     prefix: ParsedAttribute::Valid(PlainAttribute {
                         key: AttributeKey {
-                            // value: "prefix".to_string(),
+                            value: "prefix".to_string(),
                             location: SingleLineLocation::new(40, 2, 6),
                         },
                         value: Some(PlainAttributeValue {
@@ -3311,7 +3308,7 @@ mod tests {
                 locale_attribute: None,
                 name_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
                     key: AttributeKey {
-                        // value: "name".to_string(),
+                        value: "name".to_string(),
                         location: SingleLineLocation::new(12, 2, 4),
                     },
                     value: SpelAttributeValue {
@@ -3332,7 +3329,7 @@ mod tests {
                 })),
                 scope_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
                     key: AttributeKey {
-                        // value: "scope".to_string(),
+                        value: "scope".to_string(),
                         location: SingleLineLocation::new(46, 2, 5),
                     },
                     value: SpelAttributeValue {
@@ -3353,7 +3350,7 @@ mod tests {
                 })),
                 text_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
                     key: AttributeKey {
-                        // value: "text".to_string(),
+                        value: "text".to_string(),
                         location: SingleLineLocation::new(29, 2, 4),
                     },
                     value: SpelAttributeValue {
