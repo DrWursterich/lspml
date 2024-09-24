@@ -1899,21 +1899,21 @@ enum IntermediateAttributeParsingResult<R> {
 }
 
 impl<'a, 'b> AttributeParser<'a, 'b> {
-    fn plain(
-        tree_parser: &'a mut TreeParser<'b>,
-    ) -> Result<ParsedAttribute<PlainAttribute>> {
-        let mut parser = AttributeParser::new(tree_parser);
-        let result = parser.parse_plain();
-        parser.walk_back();
-        return result;
+    fn plain(tree_parser: &'a mut TreeParser<'b>) -> Result<ParsedAttribute<PlainAttribute>> {
+        let parser = AttributeParser::new(tree_parser);
+        let (depth, result) = parser.parse_plain()?;
+        for _ in 0..depth {
+            tree_parser.cursor.goto_parent();
+        }
+        return Ok(result);
     }
 
-    // fn html(
-    //     tree_parser: &'a mut TreeParser<'b>,
-    // ) -> Result<(String, ParsedAttribute<HtmlAttribute>)> {
+    // fn html(tree_parser: &'a mut TreeParser<'b>) -> Result<ParsedAttribute<HtmlAttribute>> {
     //     let mut parser = AttributeParser::new(tree_parser);
-    //     let result = parser.parse_plain();
-    //     parser.walk_back();
+    //     let (depth, result) = parser.parse_plain();
+    //     for _ in 0..depth {
+    //         tree_parser.cursor.goto_parent();
+    //     }
     //     return result;
     // }
 
@@ -1921,10 +1921,12 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         tree_parser: &'a mut TreeParser<'b>,
         r#type: &TagAttributeType,
     ) -> Result<ParsedAttribute<SpelAttribute>> {
-        let mut parser = AttributeParser::new(tree_parser);
-        let result = parser.parse_spel(r#type);
-        parser.walk_back();
-        return result;
+        let parser = AttributeParser::new(tree_parser);
+        let (depth, result) = parser.parse_spel(r#type)?;
+        for _ in 0..depth {
+            tree_parser.cursor.goto_parent();
+        }
+        return Ok(result);
     }
 
     fn new(tree_parser: &'a mut TreeParser<'b>) -> Self {
@@ -1937,16 +1939,10 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         };
     }
 
-    fn walk_back(&mut self) {
-        for _ in 0..self.depth {
-            self.tree_parser.cursor.goto_parent();
-        }
-    }
-
-    fn parse_plain(&mut self) -> Result<ParsedAttribute<PlainAttribute>> {
+    fn parse_plain(mut self) -> Result<(u8, ParsedAttribute<PlainAttribute>)> {
         let key_node = match self.parse_key()? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok(ParsedAttribute::Unparsable(message, location));
+                return Ok((self.depth, ParsedAttribute::Unparsable(message, location)));
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
@@ -1956,17 +1952,18 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 location,
             },
             location => {
-                return Ok(
+                return Ok((
+                    self.depth,
                     ParsedAttribute::Unparsable(
                         "attribute key should be on a single line".to_string(),
                         location,
                     ),
-                );
+                ));
             }
         };
         let equals_location = match self.parse_equals(&key_node)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok(ParsedAttribute::Unparsable(message, location))
+                return Ok((self.depth, ParsedAttribute::Unparsable(message, location)))
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
@@ -1975,23 +1972,23 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 if let IntermediateAttributeParsingResult::Failed(message, location) =
                     self.parse_string(&key_node)?
                 {
-                    return Ok(ParsedAttribute::Unparsable(message, location));
+                    return Ok((self.depth, ParsedAttribute::Unparsable(message, location)));
                 }
                 let opening_quote_location = match self.parse_opening_quote(&key_node)? {
                     IntermediateAttributeParsingResult::Failed(message, location) => {
-                        return Ok(ParsedAttribute::Unparsable(message, location))
+                        return Ok((self.depth, ParsedAttribute::Unparsable(message, location)))
                     }
                     IntermediateAttributeParsingResult::Partial(e) => e,
                 };
                 let (value, movement) = match self.parse_string_content(&key_node)? {
                     IntermediateAttributeParsingResult::Failed(message, location) => {
-                        return Ok(ParsedAttribute::Unparsable(message, location))
+                        return Ok((self.depth, ParsedAttribute::Unparsable(message, location)))
                     }
                     IntermediateAttributeParsingResult::Partial(e) => e,
                 };
                 let closing_quote_location = match self.parse_closing_quote(&key_node, movement)? {
                     IntermediateAttributeParsingResult::Failed(message, location) => {
-                        return Ok(ParsedAttribute::Unparsable(message, location))
+                        return Ok((self.depth, ParsedAttribute::Unparsable(message, location)))
                     }
                     IntermediateAttributeParsingResult::Partial(e) => e,
                 };
@@ -2005,18 +2002,22 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
             None => None,
         };
         let attribute = PlainAttribute { key, value };
-        return Ok(
-            match &self.errors {
-                Some(errors) => ParsedAttribute::Erroneous(attribute, errors.to_vec()),
+        return Ok((
+            self.depth,
+            match self.errors {
+                Some(errors) => ParsedAttribute::Erroneous(attribute, errors),
                 None => ParsedAttribute::Valid(attribute),
             },
-        );
+        ));
     }
 
-    fn parse_spel(&mut self, r#type: &TagAttributeType) -> Result<ParsedAttribute<SpelAttribute>> {
+    fn parse_spel(
+        mut self,
+        r#type: &TagAttributeType,
+    ) -> Result<(u8, ParsedAttribute<SpelAttribute>)> {
         let key_node = match self.parse_key()? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok(ParsedAttribute::Unparsable(message, location));
+                return Ok((self.depth, ParsedAttribute::Unparsable(message, location)));
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
@@ -2026,48 +2027,50 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 location,
             },
             location => {
-                return Ok(
+                return Ok((
+                    self.depth,
                     ParsedAttribute::Unparsable(
                         "attribute key should be on a single line".to_string(),
                         location,
                     ),
-                );
+                ));
             }
         };
         let equals_location = match self.parse_equals(&key_node)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok(ParsedAttribute::Unparsable(message, location))
+                return Ok((self.depth, ParsedAttribute::Unparsable(message, location)))
             }
             IntermediateAttributeParsingResult::Partial(Some(e)) => e,
             IntermediateAttributeParsingResult::Partial(None) => {
-                return Ok(
+                return Ok((
+                    self.depth,
                     ParsedAttribute::Unparsable(
                         "missing \"=\"".to_string(),
                         node_location(self.parent_node),
                     ),
-                )
+                ))
             }
         };
         if let IntermediateAttributeParsingResult::Failed(message, location) =
             self.parse_string(&key_node)?
         {
-            return Ok(ParsedAttribute::Unparsable(message, location));
+            return Ok((self.depth, ParsedAttribute::Unparsable(message, location)));
         }
         let opening_quote_location = match self.parse_opening_quote(&key_node)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok(ParsedAttribute::Unparsable(message, location))
+                return Ok((self.depth, ParsedAttribute::Unparsable(message, location)))
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
         let (spel, movement) = match self.parse_spel_content(&key_node, r#type)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok(ParsedAttribute::Unparsable(message, location))
+                return Ok((self.depth, ParsedAttribute::Unparsable(message, location)))
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
         let closing_quote_location = match self.parse_closing_quote(&key_node, movement)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok(ParsedAttribute::Unparsable(message, location))
+                return Ok((self.depth, ParsedAttribute::Unparsable(message, location)))
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
@@ -2080,12 +2083,13 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 closing_quote_location,
             },
         };
-        return Ok(
-            match &self.errors {
-                Some(errors) => ParsedAttribute::Erroneous(attribute, errors.to_vec()),
+        return Ok((
+            self.depth,
+            match self.errors {
+                Some(errors) => ParsedAttribute::Erroneous(attribute, errors),
                 None => ParsedAttribute::Valid(attribute),
             },
-        );
+        ));
     }
 
     fn parse_key(&mut self) -> Result<IntermediateAttributeParsingResult<tree_sitter::Node<'a>>> {
