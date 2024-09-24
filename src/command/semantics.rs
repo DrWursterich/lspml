@@ -209,9 +209,9 @@ fn index_tag(tag: &SpmlTag, tokenizer: &mut Tokenizer) {
             })
         {
             tokenizer.add(
-                attribute.key_location.char as u32,
-                attribute.key_location.line as u32,
-                attribute.key_location.length as u32,
+                attribute.key.location.char as u32,
+                attribute.key.location.line as u32,
+                attribute.key.location.length as u32,
                 &SemanticTokenType::MACRO,
                 &vec![SemanticTokenModifier::DEPRECATED],
             );

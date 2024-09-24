@@ -178,7 +178,7 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                                 NodeMovingResult::Ok(node) => match node.kind() {
                                     #(
                                         stringify!(#plain_attribute_fields) => #plain_attribute_fields =
-                                            Some(parser.parse_plain_attribute()?.1),
+                                            parser.parse_plain_attribute(),
                                     )*
                                     #(
                                         stringify!(#spel_attribute_fields) => #spel_attribute_fields =
@@ -186,8 +186,7 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                                                 .strip_suffix("_attribute")
                                                 .and_then(|n| #definition.attributes.get_by_name(n))
                                                 .map(|d| parser.parse_spel_attribute(&d.r#type))
-                                                .unwrap()?
-                                                .1),
+                                                .unwrap()?),
                                     )*
                                     "self_closing_tag_end" => break,
                                     ">" => {

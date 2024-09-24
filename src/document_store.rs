@@ -23,7 +23,7 @@ impl Document {
         parser.set_language(&tree_sitter_spml::language())?;
         return match parser.parse(&text, None) {
             Some(tree) => Tree::new(tree, &text).map(|tree| Document { text, tree }),
-            None => return Result::Err(anyhow::anyhow!("failed to parse text: {}", text)),
+            None => Err(anyhow::anyhow!("failed to parse text: {}", text)),
         };
     }
 

@@ -78,7 +78,7 @@ fn hover_tag(tag: &SpmlTag, cursor: &Position) -> Result<Option<Hover>, LsError>
             ParsedAttribute::Erroneous(attribute, _) => attribute,
             ParsedAttribute::Unparsable(_, _) => continue,
         };
-        if attribute.key_location.contains(cursor) {
+        if attribute.key.location.contains(cursor) {
             return Ok(tag
                 .definition()
                 .attributes

@@ -1568,8 +1568,17 @@ pub(crate) trait AttributeValue {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub(crate) struct AttributeKey {
+    // TODO: THIS CAUSES A STACKOVERFLOW!
+    //       regardless of how much content the file has and how many Box
+    //       indirections i throw in the datastructures...
+    // pub(crate) value: String,
+    pub(crate) location: SingleLineLocation,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct PlainAttribute {
-    pub(crate) key_location: SingleLineLocation,
+    pub(crate) key: AttributeKey,
     pub(crate) value: Option<PlainAttributeValue>,
 }
 
@@ -1650,18 +1659,14 @@ pub(crate) enum ParsedTag<A: Tag> {
 }
 
 impl<R: Tag> ParsedTag<R> {
-    fn map<T>(&self, function: fn(&R) -> T) -> ParsedTag<T>
+    fn map<T>(self, function: fn(R) -> T) -> ParsedTag<T>
     where
         T: Tag,
     {
-        return match &self {
+        return match self {
             ParsedTag::Valid(tag) => ParsedTag::Valid(function(tag)),
-            ParsedTag::Erroneous(tag, errors) => {
-                ParsedTag::Erroneous(function(tag), errors.to_vec())
-            }
-            ParsedTag::Unparsable(text, location) => {
-                ParsedTag::Unparsable(text.clone(), location.clone())
-            }
+            ParsedTag::Erroneous(tag, errors) => ParsedTag::Erroneous(function(tag), errors),
+            ParsedTag::Unparsable(text, location) => ParsedTag::Unparsable(text, location),
         };
     }
 }
@@ -1685,26 +1690,26 @@ pub(crate) enum TagError {
 
 impl Attribute for PlainAttribute {
     fn start(&self) -> Position {
-        return self.key_location.start();
+        return self.key.location.start();
     }
 
     fn end(&self) -> Position {
         return match &self.value {
             Some(value) => value.closing_quote_location.end(),
-            None => self.key_location.end(),
+            None => self.key.location.end(),
         };
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct SpelAttribute {
-    pub(crate) key_location: SingleLineLocation,
+    pub(crate) key: AttributeKey,
     pub(crate) value: SpelAttributeValue,
 }
 
 impl Attribute for SpelAttribute {
     fn start(&self) -> Position {
-        return self.key_location.start();
+        return self.key.location.start();
     }
 
     fn end(&self) -> Position {
@@ -1899,7 +1904,7 @@ enum IntermediateAttributeParsingResult<R> {
 impl<'a, 'b> AttributeParser<'a, 'b> {
     fn plain(
         tree_parser: &'a mut TreeParser<'b>,
-    ) -> Result<(String, ParsedAttribute<PlainAttribute>)> {
+    ) -> Result<ParsedAttribute<PlainAttribute>> {
         let mut parser = AttributeParser::new(tree_parser);
         let result = parser.parse_plain();
         parser.walk_back();
@@ -1918,7 +1923,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
     fn spel(
         tree_parser: &'a mut TreeParser<'b>,
         r#type: &TagAttributeType,
-    ) -> Result<(String, ParsedAttribute<SpelAttribute>)> {
+    ) -> Result<ParsedAttribute<SpelAttribute>> {
         let mut parser = AttributeParser::new(tree_parser);
         let result = parser.parse_spel(r#type);
         parser.walk_back();
@@ -1941,34 +1946,30 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         }
     }
 
-    fn parse_plain(&mut self) -> Result<(String, ParsedAttribute<PlainAttribute>)> {
+    fn parse_plain(&mut self) -> Result<ParsedAttribute<PlainAttribute>> {
         let key_node = match self.parse_key()? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok((
-                    // TODO: this is ass
-                    "".to_string(),
-                    ParsedAttribute::Unparsable(message, location),
-                ));
+                return Ok(ParsedAttribute::Unparsable(message, location));
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
-        let key_location = match node_location(key_node) {
-            Location::SingleLine(location) => location,
+        let key = match node_location(key_node) {
+            Location::SingleLine(location) => AttributeKey {
+                // value: self.tree_parser.node_text(&key_node)?.to_string(),
+                location,
+            },
             location => {
-                return Ok((
-                    // TODO: this is ass
-                    "".to_string(),
+                return Ok(
                     ParsedAttribute::Unparsable(
                         "attribute key should be on a single line".to_string(),
                         location,
                     ),
-                ));
+                );
             }
         };
-        let key = self.tree_parser.node_text(&key_node)?.to_string();
         let equals_location = match self.parse_equals(&key_node)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok((key, ParsedAttribute::Unparsable(message, location)))
+                return Ok(ParsedAttribute::Unparsable(message, location))
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
@@ -1977,23 +1978,23 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 if let IntermediateAttributeParsingResult::Failed(message, location) =
                     self.parse_string(&key_node)?
                 {
-                    return Ok((key, ParsedAttribute::Unparsable(message, location)));
+                    return Ok(ParsedAttribute::Unparsable(message, location));
                 }
                 let opening_quote_location = match self.parse_opening_quote(&key_node)? {
                     IntermediateAttributeParsingResult::Failed(message, location) => {
-                        return Ok((key, ParsedAttribute::Unparsable(message, location)))
+                        return Ok(ParsedAttribute::Unparsable(message, location))
                     }
                     IntermediateAttributeParsingResult::Partial(e) => e,
                 };
                 let (value, movement) = match self.parse_string_content(&key_node)? {
                     IntermediateAttributeParsingResult::Failed(message, location) => {
-                        return Ok((key, ParsedAttribute::Unparsable(message, location)))
+                        return Ok(ParsedAttribute::Unparsable(message, location))
                     }
                     IntermediateAttributeParsingResult::Partial(e) => e,
                 };
                 let closing_quote_location = match self.parse_closing_quote(&key_node, movement)? {
                     IntermediateAttributeParsingResult::Failed(message, location) => {
-                        return Ok((key, ParsedAttribute::Unparsable(message, location)))
+                        return Ok(ParsedAttribute::Unparsable(message, location))
                     }
                     IntermediateAttributeParsingResult::Partial(e) => e,
                 };
@@ -2006,85 +2007,75 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
             }
             None => None,
         };
-        let attribute = PlainAttribute {
-            key_location,
-            value,
-        };
-        let parsed = match &self.errors {
-            Some(errors) => ParsedAttribute::Erroneous(attribute, errors.to_vec()),
-            None => ParsedAttribute::Valid(attribute),
-        };
-        return Ok((key, parsed));
+        let attribute = PlainAttribute { key, value };
+        return Ok(
+            match &self.errors {
+                Some(errors) => ParsedAttribute::Erroneous(attribute, errors.to_vec()),
+                None => ParsedAttribute::Valid(attribute),
+            },
+        );
     }
 
-    fn parse_spel(
-        &mut self,
-        r#type: &TagAttributeType,
-    ) -> Result<(String, ParsedAttribute<SpelAttribute>)> {
+    fn parse_spel(&mut self, r#type: &TagAttributeType) -> Result<ParsedAttribute<SpelAttribute>> {
         let key_node = match self.parse_key()? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok((
-                    // TODO: this is ass
-                    "".to_string(),
-                    ParsedAttribute::Unparsable(message, location),
-                ));
+                return Ok(ParsedAttribute::Unparsable(message, location));
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
-        let key_location = match node_location(key_node) {
-            Location::SingleLine(location) => location,
+        let key = match node_location(key_node) {
+            Location::SingleLine(location) => AttributeKey {
+                // value: self.tree_parser.node_text(&key_node)?.to_string(),
+                location,
+            },
             location => {
-                return Ok((
-                    // TODO: this is ass
-                    "".to_string(),
+                return Ok(
                     ParsedAttribute::Unparsable(
                         "attribute key should be on a single line".to_string(),
                         location,
                     ),
-                ));
+                );
             }
         };
-        let key = self.tree_parser.node_text(&key_node)?.to_string();
         let equals_location = match self.parse_equals(&key_node)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok((key, ParsedAttribute::Unparsable(message, location)))
+                return Ok(ParsedAttribute::Unparsable(message, location))
             }
             IntermediateAttributeParsingResult::Partial(Some(e)) => e,
             IntermediateAttributeParsingResult::Partial(None) => {
-                return Ok((
-                    key,
+                return Ok(
                     ParsedAttribute::Unparsable(
                         "missing \"=\"".to_string(),
                         node_location(self.parent_node),
                     ),
-                ))
+                )
             }
         };
         if let IntermediateAttributeParsingResult::Failed(message, location) =
             self.parse_string(&key_node)?
         {
-            return Ok((key, ParsedAttribute::Unparsable(message, location)));
+            return Ok(ParsedAttribute::Unparsable(message, location));
         }
         let opening_quote_location = match self.parse_opening_quote(&key_node)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok((key, ParsedAttribute::Unparsable(message, location)))
+                return Ok(ParsedAttribute::Unparsable(message, location))
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
         let (spel, movement) = match self.parse_spel_content(&key_node, r#type)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok((key, ParsedAttribute::Unparsable(message, location)))
+                return Ok(ParsedAttribute::Unparsable(message, location))
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
         let closing_quote_location = match self.parse_closing_quote(&key_node, movement)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok((key, ParsedAttribute::Unparsable(message, location)))
+                return Ok(ParsedAttribute::Unparsable(message, location))
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
         let attribute = SpelAttribute {
-            key_location,
+            key,
             value: SpelAttributeValue {
                 equals_location,
                 opening_quote_location,
@@ -2092,11 +2083,12 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 closing_quote_location,
             },
         };
-        let parsed = match &self.errors {
-            Some(errors) => ParsedAttribute::Erroneous(attribute, errors.to_vec()),
-            None => ParsedAttribute::Valid(attribute),
-        };
-        return Ok((key, parsed));
+        return Ok(
+            match &self.errors {
+                Some(errors) => ParsedAttribute::Erroneous(attribute, errors.to_vec()),
+                None => ParsedAttribute::Valid(attribute),
+            },
+        );
     }
 
     fn parse_key(&mut self) -> Result<IntermediateAttributeParsingResult<tree_sitter::Node<'a>>> {
@@ -2550,10 +2542,10 @@ impl<'a> TreeParser<'a> {
             }
             node = self.cursor.node();
             match node.kind() {
-                "import_attribute" => imports.push(self.parse_plain_attribute()?.1),
-                "contentType_attribute" => content_type = Some(self.parse_plain_attribute()?.1),
-                "language_attribute" => language = Some(self.parse_plain_attribute()?.1),
-                "pageEncoding_attribute" => page_encoding = Some(self.parse_plain_attribute()?.1),
+                "import_attribute" => imports.push(self.parse_plain_attribute()?),
+                "contentType_attribute" => content_type = Some(self.parse_plain_attribute()?),
+                "language_attribute" => language = Some(self.parse_plain_attribute()?),
+                "pageEncoding_attribute" => page_encoding = Some(self.parse_plain_attribute()?),
                 "header_close" => break,
                 kind => return Err(anyhow::anyhow!("unexpected {}", kind)),
             }
@@ -2634,15 +2626,15 @@ impl<'a> TreeParser<'a> {
                                     }
                                     "uri_attribute" => {
                                         origin =
-                                            Some(TagLibOrigin::Uri(self.parse_plain_attribute()?.1))
+                                            Some(TagLibOrigin::Uri(self.parse_plain_attribute()?))
                                     }
                                     "tagdir_attribute" => {
                                         origin = Some(TagLibOrigin::TagDir(
-                                            self.parse_plain_attribute()?.1,
+                                            self.parse_plain_attribute()?,
                                         ))
                                     }
                                     "prefix_attribute" => {
-                                        prefix = Some(self.parse_plain_attribute()?.1)
+                                        prefix = Some(self.parse_plain_attribute()?)
                                     }
                                     "header_close" => {
                                         if !node.is_missing() {
@@ -2716,411 +2708,245 @@ impl<'a> TreeParser<'a> {
                 "html_tag" | "html_option_tag" | "html_void_tag" | "script_tag" | "style_tag" => {
                     tags.push(self.parse_html().map(Node::Html)?);
                 }
-                "attribute_tag" => tags.push(
-                    SpAttribute::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpAttribute(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "argument_tag" => tags.push(
-                    SpArgument::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpArgument(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "barcode_tag" => tags.push(
-                    SpBarcode::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpBarcode(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "break_tag" => tags.push(
-                    SpBreak::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpBreak(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "calendarsheet_tag" => tags.push(
-                    SpCalendarsheet::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpCalendarsheet(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "checkbox_tag" => tags.push(
-                    SpCheckbox::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpCheckbox(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "code_tag" => tags.push(
-                    SpCode::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpCode(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "collection_tag" => tags.push(
-                    SpCollection::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpCollection(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "condition_tag" => tags.push(
-                    SpCondition::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpCondition(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "diff_tag" => tags.push(
-                    SpDiff::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpDiff(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "else_tag" => tags.push(
-                    SpElse::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpElse(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "elseIf_tag" => tags.push(
-                    SpElseIf::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpElseIf(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "error_tag" => tags.push(
-                    SpError::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpError(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "expire_tag" => tags.push(
-                    SpExpire::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpExpire(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "filter_tag" => tags.push(
-                    SpFilter::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpFilter(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "for_tag" => tags.push(
-                    SpFor::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpFor(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "form_tag" => tags.push(
-                    SpForm::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpForm(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "hidden_tag" => tags.push(
-                    SpHidden::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpHidden(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "if_tag" => tags.push(
-                    SpIf::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpIf(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "include_tag" => tags.push(
-                    SpInclude::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpInclude(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "io_tag" => tags.push(
-                    SpIo::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpIo(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "iterator_tag" => tags.push(
-                    SpIterator::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpIterator(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "json_tag" => tags.push(
-                    SpJson::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpJson(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "linkedinformation_tag" => tags.push(
-                    SpLinkedinformation::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpLinkedinformation(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "linktree_tag" => tags.push(
-                    SpLinktree::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpLinktree(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "livetree_tag" => tags.push(
-                    SpLivetree::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpLivetree(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "log_tag" => tags.push(
-                    SpLog::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpLog(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "login_tag" => tags.push(
-                    SpLogin::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpLogin(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "loop_tag" => tags.push(
-                    SpLoop::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpLoop(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "map_tag" => tags.push(
-                    SpMap::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpMap(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "option_tag" => tags.push(
-                    SpOption::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpOption(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "password_tag" => tags.push(
-                    SpPassword::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpPassword(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "print_tag" => tags.push(
-                    SpPrint::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpPrint(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "querytree_tag" => tags.push(
-                    SpQuerytree::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpQuerytree(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "radio_tag" => tags.push(
-                    SpRadio::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpRadio(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "range_tag" => tags.push(
-                    SpRange::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpRange(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "return_tag" => tags.push(
-                    SpReturn::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpReturn(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "sass_tag" => tags.push(
-                    SpSass::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpSass(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "scaleimage_tag" => tags.push(
-                    SpScaleimage::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpScaleimage(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "scope_tag" => tags.push(
-                    SpScope::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpScope(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "search_tag" => tags.push(
-                    SpSearch::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpSearch(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "select_tag" => tags.push(
-                    SpSelect::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpSelect(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "set_tag" => tags.push(
-                    SpSet::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpSet(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "sort_tag" => tags.push(
-                    SpSort::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpSort(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "subinformation_tag" => tags.push(
-                    SpSubinformation::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpSubinformation(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "tagbody_tag" => tags.push(
-                    SpTagbody::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpTagbody(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "text_tag" => tags.push(
-                    SpText::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpText(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "textarea_tag" => tags.push(
-                    SpTextarea::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpTextarea(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "textimage_tag" => tags.push(
-                    SpTextimage::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpTextimage(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "throw_tag" => tags.push(
-                    SpThrow::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpThrow(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "toggle_tag" => tags.push(
-                    SpToggle::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpToggle(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "upload_tag" => tags.push(
-                    SpUpload::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpUpload(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "url_tag" => tags.push(
-                    SpUrl::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpUrl(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "warning_tag" => tags.push(
-                    SpWarning::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpWarning(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "worklist_tag" => tags.push(
-                    SpWorklist::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpWorklist(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "zip_tag" => tags.push(
-                    SpZip::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SpZip(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_counter_tag" => tags.push(
-                    SptCounter::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptCounter(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_date_tag" => tags.push(
-                    SptDate::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptDate(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_diff_tag" => tags.push(
-                    SptDiff::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptDiff(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_email2img_tag" => tags.push(
-                    SptEmail2Img::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptEmail2Img(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_encryptemail_tag" => tags.push(
-                    SptEncryptemail::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptEncryptemail(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_escapeemail_tag" => tags.push(
-                    SptEscapeemail::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptEscapeemail(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_formsolutions_tag" => tags.push(
-                    SptFormsolutions::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptFormsolutions(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_id2url_tag" => tags.push(
-                    SptId2Url::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptId2Url(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_ilink_tag" => tags.push(
-                    SptIlink::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptIlink(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_imageeditor_tag" => tags.push(
-                    SptImageeditor::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptImageeditor(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_imp_tag" => tags.push(
-                    SptImp::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptImp(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_iterator_tag" => tags.push(
-                    SptIterator::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptIterator(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_link_tag" => tags.push(
-                    SptLink::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptLink(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_number_tag" => tags.push(
-                    SptNumber::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptNumber(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_personalization_tag" => tags.push(
-                    SptPersonalization::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptPersonalization(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_prehtml_tag" => tags.push(
-                    SptPrehtml::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptPrehtml(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_smarteditor_tag" => tags.push(
-                    SptSmarteditor::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptSmarteditor(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_spml_tag" => tags.push(
-                    SptSpml::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptSpml(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_text_tag" => tags.push(
-                    SptText::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptText(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_textarea_tag" => tags.push(
-                    SptTextarea::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptTextarea(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_timestamp_tag" => tags.push(
-                    SptTimestamp::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptTimestamp(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_tinymce_tag" => tags.push(
-                    SptTinymce::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptTinymce(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_updown_tag" => tags.push(
-                    SptUpdown::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptUpdown(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_upload_tag" => tags.push(
-                    SptUpload::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptUpload(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
-                "spt_worklist_tag" => tags.push(
-                    SptWorklist::parse(self)
-                        .map(|parsed| parsed.map(|tag| SpmlTag::SptWorklist(tag.clone())))
-                        .map(Node::Tag)?,
-                ),
+                "attribute_tag" => tags.push(Node::Tag(
+                    SpAttribute::parse(self)?.map(SpmlTag::SpAttribute),
+                )),
+                "argument_tag" => tags.push(Node::Tag(
+                    SpArgument::parse(self)?.map(SpmlTag::SpArgument),
+                )),
+                "barcode_tag" => tags.push(Node::Tag(
+                    SpBarcode::parse(self)?.map(SpmlTag::SpBarcode),
+                )),
+                "break_tag" => tags.push(Node::Tag(
+                    SpBreak::parse(self)?.map(SpmlTag::SpBreak),
+                )),
+                "calendarsheet_tag" => tags.push(Node::Tag(
+                    SpCalendarsheet::parse(self)?.map(SpmlTag::SpCalendarsheet),
+                )),
+                "checkbox_tag" => tags.push(Node::Tag(
+                    SpCheckbox::parse(self)?.map(SpmlTag::SpCheckbox),
+                )),
+                "code_tag" => tags.push(Node::Tag(
+                    SpCode::parse(self)?.map(SpmlTag::SpCode),
+                )),
+                "collection_tag" => tags.push(Node::Tag(
+                    SpCollection::parse(self)?.map(SpmlTag::SpCollection),
+                )),
+                "condition_tag" => tags.push(Node::Tag(
+                    SpCondition::parse(self)?.map(SpmlTag::SpCondition),
+                )),
+                "diff_tag" => tags.push(Node::Tag(
+                    SpDiff::parse(self)?.map(SpmlTag::SpDiff),
+                )),
+                "else_tag" => tags.push(Node::Tag(
+                    SpElse::parse(self)?.map(SpmlTag::SpElse),
+                )),
+                "elseIf_tag" => tags.push(Node::Tag(
+                    SpElseIf::parse(self)?.map(SpmlTag::SpElseIf),
+                )),
+                "error_tag" => tags.push(Node::Tag(
+                    SpError::parse(self)?.map(SpmlTag::SpError),
+                )),
+                "expire_tag" => tags.push(Node::Tag(
+                    SpExpire::parse(self)?.map(SpmlTag::SpExpire),
+                )),
+                "filter_tag" => tags.push(Node::Tag(
+                    SpFilter::parse(self)?.map(SpmlTag::SpFilter),
+                )),
+                "for_tag" => {
+                    tags.push(Node::Tag(SpFor::parse(self)?.map(SpmlTag::SpFor)))
+                }
+                "form_tag" => tags.push(Node::Tag(
+                    SpForm::parse(self)?.map(SpmlTag::SpForm),
+                )),
+                "hidden_tag" => tags.push(Node::Tag(
+                    SpHidden::parse(self)?.map(SpmlTag::SpHidden),
+                )),
+                "if_tag" => tags.push(Node::Tag(SpIf::parse(self)?.map(SpmlTag::SpIf))),
+                "include_tag" => tags.push(Node::Tag(
+                    SpInclude::parse(self)?.map(SpmlTag::SpInclude),
+                )),
+                "io_tag" => tags.push(Node::Tag(SpIo::parse(self)?.map(SpmlTag::SpIo))),
+                "iterator_tag" => tags.push(Node::Tag(
+                    SpIterator::parse(self)?.map(SpmlTag::SpIterator),
+                )),
+                "json_tag" => tags.push(Node::Tag(
+                    SpJson::parse(self)?.map(SpmlTag::SpJson),
+                )),
+                "linkedinformation_tag" => tags.push(Node::Tag(
+                    SpLinkedinformation::parse(self)?.map(SpmlTag::SpLinkedinformation),
+                )),
+                "linktree_tag" => tags.push(Node::Tag(
+                    SpLinktree::parse(self)?.map(SpmlTag::SpLinktree),
+                )),
+                "livetree_tag" => tags.push(Node::Tag(
+                    SpLivetree::parse(self)?.map(SpmlTag::SpLivetree),
+                )),
+                "log_tag" => {
+                    tags.push(Node::Tag(SpLog::parse(self)?.map(SpmlTag::SpLog)))
+                }
+                "login_tag" => tags.push(Node::Tag(
+                    SpLogin::parse(self)?.map(SpmlTag::SpLogin),
+                )),
+                "loop_tag" => tags.push(Node::Tag(
+                    SpLoop::parse(self)?.map(SpmlTag::SpLoop),
+                )),
+                "map_tag" => {
+                    tags.push(Node::Tag(SpMap::parse(self)?.map(SpmlTag::SpMap)))
+                }
+                "option_tag" => tags.push(Node::Tag(
+                    SpOption::parse(self)?.map(SpmlTag::SpOption),
+                )),
+                "password_tag" => tags.push(Node::Tag(
+                    SpPassword::parse(self)?.map(SpmlTag::SpPassword),
+                )),
+                "print_tag" => tags.push(Node::Tag(
+                    SpPrint::parse(self)?.map(SpmlTag::SpPrint),
+                )),
+                "querytree_tag" => tags.push(Node::Tag(
+                    SpQuerytree::parse(self)?.map(SpmlTag::SpQuerytree),
+                )),
+                "radio_tag" => tags.push(Node::Tag(
+                    SpRadio::parse(self)?.map(SpmlTag::SpRadio),
+                )),
+                "range_tag" => tags.push(Node::Tag(
+                    SpRange::parse(self)?.map(SpmlTag::SpRange),
+                )),
+                "return_tag" => tags.push(Node::Tag(
+                    SpReturn::parse(self)?.map(SpmlTag::SpReturn),
+                )),
+                "sass_tag" => tags.push(Node::Tag(
+                    SpSass::parse(self)?.map(SpmlTag::SpSass),
+                )),
+                "scaleimage_tag" => tags.push(Node::Tag(
+                    SpScaleimage::parse(self)?.map(SpmlTag::SpScaleimage),
+                )),
+                "scope_tag" => tags.push(Node::Tag(
+                    SpScope::parse(self)?.map(SpmlTag::SpScope),
+                )),
+                "search_tag" => tags.push(Node::Tag(
+                    SpSearch::parse(self)?.map(SpmlTag::SpSearch),
+                )),
+                "select_tag" => tags.push(Node::Tag(
+                    SpSelect::parse(self)?.map(SpmlTag::SpSelect),
+                )),
+                "set_tag" => {
+                    tags.push(Node::Tag(SpSet::parse(self)?.map(SpmlTag::SpSet)))
+                }
+                "sort_tag" => tags.push(Node::Tag(
+                    SpSort::parse(self)?.map(SpmlTag::SpSort),
+                )),
+                "subinformation_tag" => tags.push(Node::Tag(
+                    SpSubinformation::parse(self)?.map(SpmlTag::SpSubinformation),
+                )),
+                "tagbody_tag" => tags.push(Node::Tag(
+                    SpTagbody::parse(self)?.map(SpmlTag::SpTagbody),
+                )),
+                "text_tag" => tags.push(Node::Tag(
+                    SpText::parse(self)?.map(SpmlTag::SpText),
+                )),
+                "textarea_tag" => tags.push(Node::Tag(
+                    SpTextarea::parse(self)?.map(SpmlTag::SpTextarea),
+                )),
+                "textimage_tag" => tags.push(Node::Tag(
+                    SpTextimage::parse(self)?.map(SpmlTag::SpTextimage),
+                )),
+                "throw_tag" => tags.push(Node::Tag(
+                    SpThrow::parse(self)?.map(SpmlTag::SpThrow),
+                )),
+                "toggle_tag" => tags.push(Node::Tag(
+                    SpToggle::parse(self)?.map(SpmlTag::SpToggle),
+                )),
+                "upload_tag" => tags.push(Node::Tag(
+                    SpUpload::parse(self)?.map(SpmlTag::SpUpload),
+                )),
+                "url_tag" => {
+                    tags.push(Node::Tag(SpUrl::parse(self)?.map(SpmlTag::SpUrl)))
+                }
+                "warning_tag" => tags.push(Node::Tag(
+                    SpWarning::parse(self)?.map(SpmlTag::SpWarning),
+                )),
+                "worklist_tag" => tags.push(Node::Tag(
+                    SpWorklist::parse(self)?.map(SpmlTag::SpWorklist),
+                )),
+                "zip_tag" => {
+                    tags.push(Node::Tag(SpZip::parse(self)?.map(SpmlTag::SpZip)))
+                }
+                "spt_counter_tag" => tags.push(Node::Tag(
+                    SptCounter::parse(self)?.map(SpmlTag::SptCounter),
+                )),
+                "spt_date_tag" => tags.push(Node::Tag(
+                    SptDate::parse(self)?.map(SpmlTag::SptDate),
+                )),
+                "spt_diff_tag" => tags.push(Node::Tag(
+                    SptDiff::parse(self)?.map(SpmlTag::SptDiff),
+                )),
+                "spt_email2img_tag" => tags.push(Node::Tag(
+                    SptEmail2Img::parse(self)?.map(SpmlTag::SptEmail2Img),
+                )),
+                "spt_encryptemail_tag" => tags.push(Node::Tag(
+                    SptEncryptemail::parse(self)?.map(SpmlTag::SptEncryptemail),
+                )),
+                "spt_escapeemail_tag" => tags.push(Node::Tag(
+                    SptEscapeemail::parse(self)?.map(SpmlTag::SptEscapeemail),
+                )),
+                "spt_formsolutions_tag" => tags.push(Node::Tag(
+                    SptFormsolutions::parse(self)?.map(SpmlTag::SptFormsolutions),
+                )),
+                "spt_id2url_tag" => tags.push(Node::Tag(
+                    SptId2Url::parse(self)?.map(SpmlTag::SptId2Url),
+                )),
+                "spt_ilink_tag" => tags.push(Node::Tag(
+                    SptIlink::parse(self)?.map(SpmlTag::SptIlink),
+                )),
+                "spt_imageeditor_tag" => tags.push(Node::Tag(
+                    SptImageeditor::parse(self)?.map(SpmlTag::SptImageeditor),
+                )),
+                "spt_imp_tag" => tags.push(Node::Tag(
+                    SptImp::parse(self)?.map(SpmlTag::SptImp),
+                )),
+                "spt_iterator_tag" => tags.push(Node::Tag(
+                    SptIterator::parse(self)?.map(SpmlTag::SptIterator),
+                )),
+                "spt_link_tag" => tags.push(Node::Tag(
+                    SptLink::parse(self)?.map(SpmlTag::SptLink),
+                )),
+                "spt_number_tag" => tags.push(Node::Tag(
+                    SptNumber::parse(self)?.map(SpmlTag::SptNumber),
+                )),
+                "spt_personalization_tag" => tags.push(Node::Tag(
+                    SptPersonalization::parse(self)?.map(SpmlTag::SptPersonalization),
+                )),
+                "spt_prehtml_tag" => tags.push(Node::Tag(
+                    SptPrehtml::parse(self)?.map(SpmlTag::SptPrehtml),
+                )),
+                "spt_smarteditor_tag" => tags.push(Node::Tag(
+                    SptSmarteditor::parse(self)?.map(SpmlTag::SptSmarteditor),
+                )),
+                "spt_spml_tag" => tags.push(Node::Tag(
+                    SptSpml::parse(self)?.map(SpmlTag::SptSpml),
+                )),
+                "spt_text_tag" => tags.push(Node::Tag(
+                    SptText::parse(self)?.map(SpmlTag::SptText),
+                )),
+                "spt_textarea_tag" => tags.push(Node::Tag(
+                    SptTextarea::parse(self)?.map(SpmlTag::SptTextarea),
+                )),
+                "spt_timestamp_tag" => tags.push(Node::Tag(
+                    SptTimestamp::parse(self)?.map(SpmlTag::SptTimestamp),
+                )),
+                "spt_tinymce_tag" => tags.push(Node::Tag(
+                    SptTinymce::parse(self)?.map(SpmlTag::SptTinymce),
+                )),
+                "spt_updown_tag" => tags.push(Node::Tag(
+                    SptUpdown::parse(self)?.map(SpmlTag::SptUpdown),
+                )),
+                "spt_upload_tag" => tags.push(Node::Tag(
+                    SptUpload::parse(self)?.map(SpmlTag::SptUpload),
+                )),
+                "spt_worklist_tag" => tags.push(Node::Tag(
+                    SptWorklist::parse(self)?.map(SpmlTag::SptWorklist),
+                )),
                 kind if kind.ends_with("_tag_close") => break,
                 kind => log::debug!("encountered unexpected tree sitter node {}", kind),
             };
@@ -3152,7 +2978,7 @@ impl<'a> TreeParser<'a> {
             let node = self.cursor.node();
             match node.kind() {
                 // TODO: html attributes can contain spml tags
-                "dynamic_attribute" => attributes.push(self.parse_plain_attribute()?.1),
+                "dynamic_attribute" => attributes.push(self.parse_plain_attribute()?),
                 "self_closing_tag_end" => break,
                 ">" => {
                     if has_to_be_closed {
@@ -3230,14 +3056,14 @@ impl<'a> TreeParser<'a> {
         });
     }
 
-    fn parse_plain_attribute(&mut self) -> Result<(String, ParsedAttribute<PlainAttribute>)> {
+    fn parse_plain_attribute(&mut self) -> Result<ParsedAttribute<PlainAttribute>> {
         return AttributeParser::plain(self);
     }
 
     fn parse_spel_attribute(
         &mut self,
         r#type: &TagAttributeType,
-    ) -> Result<(String, ParsedAttribute<SpelAttribute>)> {
+    ) -> Result<ParsedAttribute<SpelAttribute>> {
         return AttributeParser::spel(self, r#type);
     }
 }
@@ -3332,9 +3158,9 @@ fn find_tag_at(nodes: &Vec<Node>, position: Position) -> Option<&Node> {
 mod tests {
     use crate::{
         parser::{
-            Header, Location, Node, PageHeader, ParsedAttribute, ParsedNode, ParsedTag,
-            PlainAttribute, PlainAttributeValue, SingleLineLocation, SpBarcode, SpelAttribute,
-            SpelAttributeValue, SpmlTag, TagLibImport, TagLibOrigin,
+            AttributeKey, Header, Location, Node, PageHeader, ParsedAttribute, ParsedNode,
+            ParsedTag, PlainAttribute, PlainAttributeValue, SingleLineLocation, SpBarcode,
+            SpelAttribute, SpelAttributeValue, SpmlTag, TagLibImport, TagLibOrigin,
         },
         spel::{
             self,
@@ -3359,7 +3185,10 @@ mod tests {
                 open_bracket: SingleLineLocation::new(0, 0, 3),
                 page: SingleLineLocation::new(4, 0, 4),
                 language: Some(ParsedAttribute::Valid(PlainAttribute {
-                    key_location: SingleLineLocation::new(9, 0, 8),
+                    key: AttributeKey {
+                        // value: "language".to_string(),
+                        location: SingleLineLocation::new(9, 0, 8),
+                    },
                     value: Some(PlainAttributeValue {
                         equals_location: SingleLineLocation::new(17, 0, 1),
                         opening_quote_location: SingleLineLocation::new(18, 0, 1),
@@ -3368,7 +3197,10 @@ mod tests {
                     }),
                 })),
                 page_encoding: Some(ParsedAttribute::Valid(PlainAttribute {
-                    key_location: SingleLineLocation::new(25, 0, 12),
+                    key: AttributeKey {
+                        // value: "pageEncoding".to_string(),
+                        location: SingleLineLocation::new(25, 0, 12),
+                    },
                     value: Some(PlainAttributeValue {
                         equals_location: SingleLineLocation::new(37, 0, 1),
                         opening_quote_location: SingleLineLocation::new(38, 0, 1),
@@ -3377,7 +3209,10 @@ mod tests {
                     }),
                 })),
                 content_type: Some(ParsedAttribute::Valid(PlainAttribute {
-                    key_location: SingleLineLocation::new(46, 0, 11),
+                    key: AttributeKey {
+                        // value: "contentType".to_string(),
+                        location: SingleLineLocation::new(46, 0, 11),
+                    },
                     value: Some(PlainAttributeValue {
                         equals_location: SingleLineLocation::new(57, 0, 1),
                         opening_quote_location: SingleLineLocation::new(58, 0, 1),
@@ -3393,7 +3228,10 @@ mod tests {
                     open_bracket: SingleLineLocation::new(2, 1, 3),
                     taglib: SingleLineLocation::new(6, 1, 6),
                     origin: TagLibOrigin::Uri(ParsedAttribute::Valid(PlainAttribute {
-                        key_location: SingleLineLocation::new(13, 1, 3),
+                        key: AttributeKey {
+                            // value: "uri".to_string(),
+                            location: SingleLineLocation::new(13, 1, 3),
+                        },
                         value: Some(PlainAttributeValue {
                             equals_location: SingleLineLocation::new(16, 1, 1),
                             opening_quote_location: SingleLineLocation::new(17, 1, 1),
@@ -3402,7 +3240,10 @@ mod tests {
                         }),
                     })),
                     prefix: ParsedAttribute::Valid(PlainAttribute {
-                        key_location: SingleLineLocation::new(56, 1, 6),
+                        key: AttributeKey {
+                            // value: "prefix".to_string(),
+                            location: SingleLineLocation::new(56, 1, 6),
+                        },
                         value: Some(PlainAttributeValue {
                             equals_location: SingleLineLocation::new(62, 1, 1),
                             opening_quote_location: SingleLineLocation::new(63, 1, 1),
@@ -3416,7 +3257,10 @@ mod tests {
                     open_bracket: SingleLineLocation::new(2, 2, 3),
                     taglib: SingleLineLocation::new(6, 2, 6),
                     origin: TagLibOrigin::TagDir(ParsedAttribute::Valid(PlainAttribute {
-                        key_location: SingleLineLocation::new(13, 2, 6),
+                        key: AttributeKey {
+                            // value: "tagdir".to_string(),
+                            location: SingleLineLocation::new(13, 2, 6),
+                        },
                         value: Some(PlainAttributeValue {
                             equals_location: SingleLineLocation::new(19, 2, 1),
                             opening_quote_location: SingleLineLocation::new(20, 2, 1),
@@ -3425,7 +3269,10 @@ mod tests {
                         }),
                     })),
                     prefix: ParsedAttribute::Valid(PlainAttribute {
-                        key_location: SingleLineLocation::new(40, 2, 6),
+                        key: AttributeKey {
+                            // value: "prefix".to_string(),
+                            location: SingleLineLocation::new(40, 2, 6),
+                        },
                         value: Some(PlainAttributeValue {
                             equals_location: SingleLineLocation::new(46, 2, 1),
                             opening_quote_location: SingleLineLocation::new(47, 2, 1),
@@ -3457,68 +3304,79 @@ mod tests {
             "%>\n",
             "<sp:barcode name=\"_testName\" text=\"some text\" scope=\"page\"/>\n",
         ));
-        let expected = vec![Node::Tag(ParsedTag::Valid(SpmlTag::SpBarcode(SpBarcode {
-            open_location: SingleLineLocation::new(0, 2, 11),
-            height_attribute: None,
-            locale_attribute: None,
-            name_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
-                key_location: SingleLineLocation::new(12, 2, 4),
-                value: SpelAttributeValue {
-                    equals_location: SingleLineLocation::new(16, 2, 1),
-                    opening_quote_location: SingleLineLocation::new(17, 2, 1),
-                    spel: SpelAst::Identifier(SpelResult::Valid(Identifier::Name(Word {
-                        fragments: vec![WordFragment::String(StringLiteral {
-                            content: "_testName".to_string(),
-                            location: spel::ast::Location::VariableLength {
-                                char: 0,
-                                line: 0,
-                                length: 9,
-                            },
-                        })],
-                    }))),
-                    closing_quote_location: SingleLineLocation::new(27, 2, 1),
-                },
-            })),
-            scope_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
-                key_location: SingleLineLocation::new(46, 2, 5),
-                value: SpelAttributeValue {
-                    equals_location: SingleLineLocation::new(51, 2, 1),
-                    opening_quote_location: SingleLineLocation::new(52, 2, 1),
-                    spel: SpelAst::String(SpelResult::Valid(Word {
-                        fragments: vec![WordFragment::String(StringLiteral {
-                            content: "page".to_string(),
-                            location: spel::ast::Location::VariableLength {
-                                char: 0,
-                                line: 0,
-                                length: 4,
-                            },
-                        })],
-                    })),
-                    closing_quote_location: SingleLineLocation::new(57, 2, 1),
-                },
-            })),
-            text_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
-                key_location: SingleLineLocation::new(29, 2, 4),
-                value: SpelAttributeValue {
-                    equals_location: SingleLineLocation::new(33, 2, 1),
-                    opening_quote_location: SingleLineLocation::new(34, 2, 1),
-                    spel: SpelAst::String(SpelResult::Valid(Word {
-                        fragments: vec![WordFragment::String(StringLiteral {
-                            content: "some text".to_string(),
-                            location: spel::ast::Location::VariableLength {
-                                char: 0,
-                                line: 0,
-                                length: 9,
-                            },
-                        })],
-                    })),
-                    closing_quote_location: SingleLineLocation::new(44, 2, 1),
-                },
-            })),
-            type_attribute: None,
-            body: None,
-            close_location: SingleLineLocation::new(58, 2, 2),
-        })))];
+        let expected = vec![Node::Tag(ParsedTag::Valid(SpmlTag::SpBarcode(
+            SpBarcode {
+                open_location: SingleLineLocation::new(0, 2, 11),
+                height_attribute: None,
+                locale_attribute: None,
+                name_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
+                    key: AttributeKey {
+                        // value: "name".to_string(),
+                        location: SingleLineLocation::new(12, 2, 4),
+                    },
+                    value: SpelAttributeValue {
+                        equals_location: SingleLineLocation::new(16, 2, 1),
+                        opening_quote_location: SingleLineLocation::new(17, 2, 1),
+                        spel: SpelAst::Identifier(SpelResult::Valid(Identifier::Name(Word {
+                            fragments: vec![WordFragment::String(StringLiteral {
+                                content: "_testName".to_string(),
+                                location: spel::ast::Location::VariableLength {
+                                    char: 0,
+                                    line: 0,
+                                    length: 9,
+                                },
+                            })],
+                        }))),
+                        closing_quote_location: SingleLineLocation::new(27, 2, 1),
+                    },
+                })),
+                scope_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
+                    key: AttributeKey {
+                        // value: "scope".to_string(),
+                        location: SingleLineLocation::new(46, 2, 5),
+                    },
+                    value: SpelAttributeValue {
+                        equals_location: SingleLineLocation::new(51, 2, 1),
+                        opening_quote_location: SingleLineLocation::new(52, 2, 1),
+                        spel: SpelAst::String(SpelResult::Valid(Word {
+                            fragments: vec![WordFragment::String(StringLiteral {
+                                content: "page".to_string(),
+                                location: spel::ast::Location::VariableLength {
+                                    char: 0,
+                                    line: 0,
+                                    length: 4,
+                                },
+                            })],
+                        })),
+                        closing_quote_location: SingleLineLocation::new(57, 2, 1),
+                    },
+                })),
+                text_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
+                    key: AttributeKey {
+                        // value: "text".to_string(),
+                        location: SingleLineLocation::new(29, 2, 4),
+                    },
+                    value: SpelAttributeValue {
+                        equals_location: SingleLineLocation::new(33, 2, 1),
+                        opening_quote_location: SingleLineLocation::new(34, 2, 1),
+                        spel: SpelAst::String(SpelResult::Valid(Word {
+                            fragments: vec![WordFragment::String(StringLiteral {
+                                content: "some text".to_string(),
+                                location: spel::ast::Location::VariableLength {
+                                    char: 0,
+                                    line: 0,
+                                    length: 9,
+                                },
+                            })],
+                        })),
+                        closing_quote_location: SingleLineLocation::new(44, 2, 1),
+                    },
+                })),
+                type_attribute: None,
+                body: None,
+                close_location: SingleLineLocation::new(58, 2, 2),
+            },
+        )))];
         let mut ts_parser = tree_sitter::Parser::new();
         ts_parser
             .set_language(&tree_sitter_spml::language())

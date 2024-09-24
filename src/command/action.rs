@@ -9,7 +9,7 @@ use lsp_types::{
 use crate::{
     capabilities::CodeActionImplementation,
     document_store,
-    parser::{Node, ParsedAttribute, ParsedTag, SpIf, SpelAttribute, SpmlTag},
+    parser::{Attribute, Node, ParsedAttribute, ParsedTag, SpIf, SpelAttribute, SpmlTag},
     spel::ast::{
         Argument, Comparable, ComparissonOperator, Condition, Function, SpelAst, SpelResult,
     },
@@ -173,17 +173,14 @@ fn construct_name_to_condition<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
         Some(ParsedAttribute::Erroneous(attribute, _)) => attribute,
         _ => return None,
     };
-    log::debug!("got name_attribute");
     let (operator, value_attribute) = match first_comparable_if_attribute(if_tag) {
-        Some((o, v)) => (o, v),
+        Some(e) => e,
         _ => return None,
     };
-    log::debug!("got operator and value_attribute");
     let name = match &name_attribute.value.spel {
         SpelAst::Object(SpelResult::Valid(o)) => o,
         _ => return None,
     };
-    log::debug!("got name");
     let value = match &value_attribute.value.spel {
         SpelAst::Comparable(SpelResult::Valid(c)) => c.to_string(),
         SpelAst::Condition(SpelResult::Valid(c)) => c.to_string(),
@@ -193,7 +190,6 @@ fn construct_name_to_condition<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
             return None;
         }
     };
-    log::debug!("got value");
     let new_condition = match operator {
         "isNull" if value == "true" => format!("isNull(${{{}}})", name),
         "isNull" if value == "false" => format!("!isNull(${{{}}})", name),
@@ -205,7 +201,6 @@ fn construct_name_to_condition<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
         "neq" => format!("${{{}}} != {}", name, value),
         _ => format!("${{{}}} == {}", name, value),
     };
-    log::debug!("got new_condition");
     return Some(CodeActionOrCommand::CodeAction(CodeAction {
         title: format!("transform \"name\" and \"{}\" to \"condition\"", operator),
         kind: Some(CodeActionImplementation::NameToCondition.to_kind()),
@@ -216,30 +211,17 @@ fn construct_name_to_condition<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
                     TextEdit {
                         range: Range {
                             start: Position {
-                                line: value_attribute.key_location.line as u32,
-                                character: value_attribute.key_location.char as u32 - 1,
+                                line: value_attribute.key.location.line as u32,
+                                character: value_attribute.key.location.char as u32 - 1,
                             },
-                            end: Position {
-                                line: value_attribute.value.closing_quote_location.line as u32,
-                                character: (value_attribute.value.closing_quote_location.char
-                                    + value_attribute.value.closing_quote_location.length)
-                                    as u32,
-                            },
+                            end: value_attribute.end(),
                         },
                         new_text: "".to_string(),
                     },
                     TextEdit {
                         range: Range {
-                            start: Position {
-                                line: name_attribute.key_location.line as u32,
-                                character: name_attribute.key_location.char as u32,
-                            },
-                            end: Position {
-                                line: name_attribute.value.closing_quote_location.line as u32,
-                                character: (name_attribute.value.closing_quote_location.char
-                                    + name_attribute.value.closing_quote_location.length)
-                                    as u32,
-                            },
+                            start: name_attribute.start(),
+                            end: name_attribute.end(),
                         },
                         new_text: format!("condition=\"{}\"", new_condition),
                     },
@@ -349,20 +331,8 @@ fn construct_condition_to_name<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
                         uri.clone(),
                         vec![TextEdit {
                             range: Range {
-                                start: Position {
-                                    line: condition_attribute.key_location.line as u32,
-                                    character: condition_attribute.key_location.char as u32,
-                                },
-                                end: Position {
-                                    line: condition_attribute.value.closing_quote_location.line
-                                        as u32,
-                                    character: (condition_attribute
-                                        .value
-                                        .closing_quote_location
-                                        .char
-                                        + condition_attribute.value.closing_quote_location.length)
-                                        as u32,
-                                },
+                                start: condition_attribute.start(),
+                                end: condition_attribute.end(),
                             },
                             new_text,
                         }],
@@ -382,23 +352,8 @@ fn construct_condition_to_name<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
                             uri.clone(),
                             vec![TextEdit {
                                 range: Range {
-                                    start: Position {
-                                        line: condition_attribute.key_location.line as u32,
-                                        character: condition_attribute.key_location.char as u32,
-                                    },
-                                    end: Position {
-                                        line: condition_attribute.value.closing_quote_location.line
-                                            as u32,
-                                        character: (condition_attribute
-                                            .value
-                                            .closing_quote_location
-                                            .char
-                                            + condition_attribute
-                                                .value
-                                                .closing_quote_location
-                                                .length)
-                                            as u32,
-                                    },
+                                    start: condition_attribute.start(),
+                                    end: condition_attribute.end(),
                                 },
                                 new_text: format!("name=\"{}\" isNull=\"{}\"", name, value),
                             }],
