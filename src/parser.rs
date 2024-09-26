@@ -1710,7 +1710,7 @@ impl Attribute for SpelAttribute {
     }
 
     fn end(&self) -> Position {
-        return self.value.closing_quote_location.start();
+        return self.value.closing_quote_location.end();
     }
 }
 
