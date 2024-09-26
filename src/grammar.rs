@@ -333,7 +333,6 @@ impl TagDefinition {
                     "unique",
                 ],
             ),
-            AttributeRule::ValueOneOf("publisher", &["current", "ignore", "all", "auto"]),
             AttributeRule::ValueOneOf("scope", &["page", "request"]),
             AttributeRule::ExactlyOneOfOrBodyWithEitherValue(
                 &["value", "object", "expression", "condition"],
@@ -343,7 +342,12 @@ impl TagDefinition {
             AttributeRule::ExactlyOneOfOrBodyWithEitherValue(
                 &["index", "value", "object"],
                 "action",
-                &["remove", "replace"],
+                &["remove"],
+            ),
+            AttributeRule::ExactlyOneOfOrBodyWithEitherValue(
+                &["value", "object"],
+                "action",
+                &["replace"],
             ),
             AttributeRule::ExactlyOneOfOrBodyWithValue(&["object", "query"], "action", "addAll"),
             AttributeRule::BodyOnlyWithEitherValue(
@@ -357,7 +361,7 @@ impl TagDefinition {
                     "replace",
                 ],
             ),
-            AttributeRule::RequiredWithValue("index", "action", "insert"),
+            AttributeRule::RequiredWithEitherValue("index", "action", &["insert", "replace"]),
             AttributeRule::OnlyWithEitherValue(
                 "value",
                 "action",
@@ -1654,9 +1658,11 @@ impl TagDefinition {
             ("min", TagAttributeType::Expression),
             ("name", TagAttributeType::Identifier),
             ("readonly", TagAttributeType::Condition),
+            ("skipmarks", TagAttributeType::String),
         rules &[
             AttributeRule::Required("name"),
             AttributeRule::ValueOneOf("layout", &["standard", "plain"]),
+            AttributeRule::ValueOneOf("skipmarks", &["true", "false"]),
         ]
     );
 
@@ -1795,7 +1801,7 @@ impl TagDefinition {
         rules &[
             AttributeRule::Required("name"),
             AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
-            AttributeRule::ValueOneOf("type", &["date", "number", "text"]),
+            AttributeRule::ValueOneOf("type", &["date", "email", "number", "text", "url"]),
             AttributeRule::OnlyWithEitherValue("format", "type", &["date", "number"]),
         ]
     );
