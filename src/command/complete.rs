@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, fs, iter::Iterator};
+use std::{fs, iter::Iterator};
 
 use anyhow::Result;
 use lsp_server::ErrorCode;
@@ -93,33 +93,43 @@ impl CompletionCollector<'_> {
                     ..Default::default()
                 });
             }
-            Some(Node::Error(ErrorNode { content, range })) => {
-                // TODO: this is very fragile!
-                match self.cut_text_up_to_cursor(content, range) {
-                    Some(error) if error.ends_with("</") => error
-                        .rsplit(">")
-                        .filter(|str| !str.ends_with("/"))
-                        .filter(|str| !str.ends_with("%"))
-                        .filter_map(|str| {
-                            str.rfind("<").map(|i| {
-                                str[i + 1..]
-                                    .chars()
-                                    .take_while(|c| !c.is_whitespace())
-                                    .collect::<String>()
-                            })
-                        })
-                        .filter(|str| !str.starts_with("/"))
-                        .filter(|str| !str.starts_with("!"))
-                        .enumerate()
-                        .map(|(i, tag)| CompletionItem {
-                            label: "</".to_string() + &tag + ">",
-                            kind: Some(CompletionItemKind::SNIPPET),
-                            insert_text: Some(tag.to_string() + ">"),
-                            preselect: Some(i == 0),
-                            ..Default::default()
-                        })
-                        .for_each(|item| self.completions.push(item)),
-                    _ => (),
+            Some(node @ Node::Error(ErrorNode { content, range })) => {
+                let mut node = node;
+                let mut closest_tag = None;
+                loop {
+                    let parent = self.document.tree.parent_of(&node);
+                    log::info!("in error content: '{}', node: '{:?}', parent: {:?}", content, node, parent);
+                    (node, closest_tag) = match parent {
+                        Some(Node::Tag(ParsedTag::Valid(tag))) => (node, Some(tag)),
+                        Some(node @ Node::Tag(ParsedTag::Erroneous(tag, errors))) => {
+                            let new_text = errors.iter().find_map(|error| match error {
+                                TagError::Missing(text, _) if text.starts_with(content) => {
+                                    Some(text)
+                                }
+                                _ => None,
+                            });
+                            if let Some(new_text) = new_text {
+                                return self.completions.push(CompletionItem {
+                                    label: new_text.to_string(),
+                                    kind: Some(CompletionItemKind::SNIPPET),
+                                    insert_text: Some(new_text.to_string()),
+                                    text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+                                        new_text: new_text.to_string(),
+                                        range: *range,
+                                    })),
+                                    ..Default::default()
+                                });
+                            }
+                            (node, Some(tag))
+                        }
+                        None => break,
+                        Some(node) => (node, closest_tag),
+                    };
+                }
+                if let Some(tag) = closest_tag {
+                    self.complete_attributes_of(tag);
+                } else {
+                    self.complete_top_level_tags();
                 }
             }
             _ => self.complete_top_level_tags(),
@@ -139,47 +149,6 @@ impl CompletionCollector<'_> {
     fn complete_tag<'a>(&mut self, tag: &TagDefinition) {
         self.completions
             .push(Self::tag_to_completion(tag, self.determine_tag_range()));
-    }
-
-    // fn complete_closing_tag(&mut self, last_opend_tag: Option<&Node>) {
-    //     if let Some(Node::Tag(tag)) = last_opend_tag {
-    //         // TODO: tag.name() should be a function! html tags do not have a name currently!
-    //         self.completions.push(CompletionItem {
-    //             label: "</sp:".to_string() + &tag.definition().name,
-    //             kind: Some(CompletionItemKind::SNIPPET),
-    //             insert_text: Some("sp:".to_string() + &tag.definition().name),
-    //             ..Default::default()
-    //         });
-    //     };
-    // }
-
-    fn cut_text_up_to_cursor<'a>(&self, text: &String, range: &Range) -> Option<String> {
-        // TODO: this needs to be tested!
-        return match self.cursor.cmp(&range.start) {
-            Ordering::Equal => Some("".to_string()),
-            Ordering::Less => None,
-            Ordering::Greater => match self.cursor.cmp(&range.end) {
-                Ordering::Equal => Some(text.to_string()),
-                Ordering::Less => {
-                    let expected_new_lines = (self.cursor.line - range.start.line) as usize;
-                    let mut position = 0;
-                    for (index, line) in text.splitn(expected_new_lines + 1, '\n').enumerate() {
-                        match index {
-                            0 => position = line.len(),
-                            n if n == expected_new_lines => {
-                                return Some(
-                                    text[0..position + 1 + self.cursor.character as usize]
-                                        .to_string(),
-                                );
-                            }
-                            _ => position += 1 + line.len(),
-                        }
-                    }
-                    return Some(text.to_string());
-                }
-                Ordering::Greater => None,
-            },
-        };
     }
 
     fn determine_tag_range(&self) -> Range {
