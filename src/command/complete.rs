@@ -93,15 +93,12 @@ impl CompletionCollector<'_> {
                     ..Default::default()
                 });
             }
-            Some(node @ Node::Error(ErrorNode { content, range })) => {
-                let mut node = node;
+            Some(mut node @ Node::Error(ErrorNode { content, range })) => {
                 let mut closest_tag = None;
                 loop {
-                    let parent = self.document.tree.parent_of(&node);
-                    log::info!("in error content: '{}', node: '{:?}', parent: {:?}", content, node, parent);
-                    (node, closest_tag) = match parent {
-                        Some(Node::Tag(ParsedTag::Valid(tag))) => (node, Some(tag)),
-                        Some(node @ Node::Tag(ParsedTag::Erroneous(tag, errors))) => {
+                    (node, closest_tag) = match self.document.tree.parent_of(&node) {
+                        Some(parent @ Node::Tag(ParsedTag::Valid(tag))) => (parent, Some(tag)),
+                        Some(parent @ Node::Tag(ParsedTag::Erroneous(tag, errors))) => {
                             let new_text = errors.iter().find_map(|error| match error {
                                 TagError::Missing(text, _) if text.starts_with(content) => {
                                     Some(text)
@@ -111,7 +108,7 @@ impl CompletionCollector<'_> {
                             if let Some(new_text) = new_text {
                                 return self.completions.push(CompletionItem {
                                     label: new_text.to_string(),
-                                    kind: Some(CompletionItemKind::SNIPPET),
+                                    kind: Some(CompletionItemKind::KEYWORD),
                                     insert_text: Some(new_text.to_string()),
                                     text_edit: Some(CompletionTextEdit::Edit(TextEdit {
                                         new_text: new_text.to_string(),
@@ -120,10 +117,10 @@ impl CompletionCollector<'_> {
                                     ..Default::default()
                                 });
                             }
-                            (node, Some(tag))
+                            (parent, Some(tag))
                         }
+                        Some(parent) => (parent, None),
                         None => break,
-                        Some(node) => (node, closest_tag),
                     };
                 }
                 if let Some(tag) = closest_tag {

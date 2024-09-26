@@ -2712,176 +2712,106 @@ impl<'a> TreeParser<'a> {
                 "attribute_tag" => tags.push(Node::Tag(
                     SpAttribute::parse(self)?.map(SpmlTag::SpAttribute),
                 )),
-                "argument_tag" => tags.push(Node::Tag(
-                    SpArgument::parse(self)?.map(SpmlTag::SpArgument),
-                )),
-                "barcode_tag" => tags.push(Node::Tag(
-                    SpBarcode::parse(self)?.map(SpmlTag::SpBarcode),
-                )),
-                "break_tag" => tags.push(Node::Tag(
-                    SpBreak::parse(self)?.map(SpmlTag::SpBreak),
-                )),
+                "argument_tag" => {
+                    tags.push(Node::Tag(SpArgument::parse(self)?.map(SpmlTag::SpArgument)))
+                }
+                "barcode_tag" => {
+                    tags.push(Node::Tag(SpBarcode::parse(self)?.map(SpmlTag::SpBarcode)))
+                }
+                "break_tag" => tags.push(Node::Tag(SpBreak::parse(self)?.map(SpmlTag::SpBreak))),
                 "calendarsheet_tag" => tags.push(Node::Tag(
                     SpCalendarsheet::parse(self)?.map(SpmlTag::SpCalendarsheet),
                 )),
-                "checkbox_tag" => tags.push(Node::Tag(
-                    SpCheckbox::parse(self)?.map(SpmlTag::SpCheckbox),
-                )),
-                "code_tag" => tags.push(Node::Tag(
-                    SpCode::parse(self)?.map(SpmlTag::SpCode),
-                )),
+                "checkbox_tag" => {
+                    tags.push(Node::Tag(SpCheckbox::parse(self)?.map(SpmlTag::SpCheckbox)))
+                }
+                "code_tag" => tags.push(Node::Tag(SpCode::parse(self)?.map(SpmlTag::SpCode))),
                 "collection_tag" => tags.push(Node::Tag(
                     SpCollection::parse(self)?.map(SpmlTag::SpCollection),
                 )),
                 "condition_tag" => tags.push(Node::Tag(
                     SpCondition::parse(self)?.map(SpmlTag::SpCondition),
                 )),
-                "diff_tag" => tags.push(Node::Tag(
-                    SpDiff::parse(self)?.map(SpmlTag::SpDiff),
-                )),
-                "else_tag" => tags.push(Node::Tag(
-                    SpElse::parse(self)?.map(SpmlTag::SpElse),
-                )),
-                "elseIf_tag" => tags.push(Node::Tag(
-                    SpElseIf::parse(self)?.map(SpmlTag::SpElseIf),
-                )),
-                "error_tag" => tags.push(Node::Tag(
-                    SpError::parse(self)?.map(SpmlTag::SpError),
-                )),
-                "expire_tag" => tags.push(Node::Tag(
-                    SpExpire::parse(self)?.map(SpmlTag::SpExpire),
-                )),
-                "filter_tag" => tags.push(Node::Tag(
-                    SpFilter::parse(self)?.map(SpmlTag::SpFilter),
-                )),
-                "for_tag" => {
-                    tags.push(Node::Tag(SpFor::parse(self)?.map(SpmlTag::SpFor)))
-                }
-                "form_tag" => tags.push(Node::Tag(
-                    SpForm::parse(self)?.map(SpmlTag::SpForm),
-                )),
-                "hidden_tag" => tags.push(Node::Tag(
-                    SpHidden::parse(self)?.map(SpmlTag::SpHidden),
-                )),
+                "diff_tag" => tags.push(Node::Tag(SpDiff::parse(self)?.map(SpmlTag::SpDiff))),
+                "else_tag" => tags.push(Node::Tag(SpElse::parse(self)?.map(SpmlTag::SpElse))),
+                "elseIf_tag" => tags.push(Node::Tag(SpElseIf::parse(self)?.map(SpmlTag::SpElseIf))),
+                "error_tag" => tags.push(Node::Tag(SpError::parse(self)?.map(SpmlTag::SpError))),
+                "expire_tag" => tags.push(Node::Tag(SpExpire::parse(self)?.map(SpmlTag::SpExpire))),
+                "filter_tag" => tags.push(Node::Tag(SpFilter::parse(self)?.map(SpmlTag::SpFilter))),
+                "for_tag" => tags.push(Node::Tag(SpFor::parse(self)?.map(SpmlTag::SpFor))),
+                "form_tag" => tags.push(Node::Tag(SpForm::parse(self)?.map(SpmlTag::SpForm))),
+                "hidden_tag" => tags.push(Node::Tag(SpHidden::parse(self)?.map(SpmlTag::SpHidden))),
                 "if_tag" => tags.push(Node::Tag(SpIf::parse(self)?.map(SpmlTag::SpIf))),
-                "include_tag" => tags.push(Node::Tag(
-                    SpInclude::parse(self)?.map(SpmlTag::SpInclude),
-                )),
+                "include_tag" => {
+                    tags.push(Node::Tag(SpInclude::parse(self)?.map(SpmlTag::SpInclude)))
+                }
                 "io_tag" => tags.push(Node::Tag(SpIo::parse(self)?.map(SpmlTag::SpIo))),
-                "iterator_tag" => tags.push(Node::Tag(
-                    SpIterator::parse(self)?.map(SpmlTag::SpIterator),
-                )),
-                "json_tag" => tags.push(Node::Tag(
-                    SpJson::parse(self)?.map(SpmlTag::SpJson),
-                )),
+                "iterator_tag" => {
+                    tags.push(Node::Tag(SpIterator::parse(self)?.map(SpmlTag::SpIterator)))
+                }
+                "json_tag" => tags.push(Node::Tag(SpJson::parse(self)?.map(SpmlTag::SpJson))),
                 "linkedinformation_tag" => tags.push(Node::Tag(
                     SpLinkedinformation::parse(self)?.map(SpmlTag::SpLinkedinformation),
                 )),
-                "linktree_tag" => tags.push(Node::Tag(
-                    SpLinktree::parse(self)?.map(SpmlTag::SpLinktree),
-                )),
-                "livetree_tag" => tags.push(Node::Tag(
-                    SpLivetree::parse(self)?.map(SpmlTag::SpLivetree),
-                )),
-                "log_tag" => {
-                    tags.push(Node::Tag(SpLog::parse(self)?.map(SpmlTag::SpLog)))
+                "linktree_tag" => {
+                    tags.push(Node::Tag(SpLinktree::parse(self)?.map(SpmlTag::SpLinktree)))
                 }
-                "login_tag" => tags.push(Node::Tag(
-                    SpLogin::parse(self)?.map(SpmlTag::SpLogin),
-                )),
-                "loop_tag" => tags.push(Node::Tag(
-                    SpLoop::parse(self)?.map(SpmlTag::SpLoop),
-                )),
-                "map_tag" => {
-                    tags.push(Node::Tag(SpMap::parse(self)?.map(SpmlTag::SpMap)))
+                "livetree_tag" => {
+                    tags.push(Node::Tag(SpLivetree::parse(self)?.map(SpmlTag::SpLivetree)))
                 }
-                "option_tag" => tags.push(Node::Tag(
-                    SpOption::parse(self)?.map(SpmlTag::SpOption),
-                )),
-                "password_tag" => tags.push(Node::Tag(
-                    SpPassword::parse(self)?.map(SpmlTag::SpPassword),
-                )),
-                "print_tag" => tags.push(Node::Tag(
-                    SpPrint::parse(self)?.map(SpmlTag::SpPrint),
-                )),
+                "log_tag" => tags.push(Node::Tag(SpLog::parse(self)?.map(SpmlTag::SpLog))),
+                "login_tag" => tags.push(Node::Tag(SpLogin::parse(self)?.map(SpmlTag::SpLogin))),
+                "loop_tag" => tags.push(Node::Tag(SpLoop::parse(self)?.map(SpmlTag::SpLoop))),
+                "map_tag" => tags.push(Node::Tag(SpMap::parse(self)?.map(SpmlTag::SpMap))),
+                "option_tag" => tags.push(Node::Tag(SpOption::parse(self)?.map(SpmlTag::SpOption))),
+                "password_tag" => {
+                    tags.push(Node::Tag(SpPassword::parse(self)?.map(SpmlTag::SpPassword)))
+                }
+                "print_tag" => tags.push(Node::Tag(SpPrint::parse(self)?.map(SpmlTag::SpPrint))),
                 "querytree_tag" => tags.push(Node::Tag(
                     SpQuerytree::parse(self)?.map(SpmlTag::SpQuerytree),
                 )),
-                "radio_tag" => tags.push(Node::Tag(
-                    SpRadio::parse(self)?.map(SpmlTag::SpRadio),
-                )),
-                "range_tag" => tags.push(Node::Tag(
-                    SpRange::parse(self)?.map(SpmlTag::SpRange),
-                )),
-                "return_tag" => tags.push(Node::Tag(
-                    SpReturn::parse(self)?.map(SpmlTag::SpReturn),
-                )),
-                "sass_tag" => tags.push(Node::Tag(
-                    SpSass::parse(self)?.map(SpmlTag::SpSass),
-                )),
+                "radio_tag" => tags.push(Node::Tag(SpRadio::parse(self)?.map(SpmlTag::SpRadio))),
+                "range_tag" => tags.push(Node::Tag(SpRange::parse(self)?.map(SpmlTag::SpRange))),
+                "return_tag" => tags.push(Node::Tag(SpReturn::parse(self)?.map(SpmlTag::SpReturn))),
+                "sass_tag" => tags.push(Node::Tag(SpSass::parse(self)?.map(SpmlTag::SpSass))),
                 "scaleimage_tag" => tags.push(Node::Tag(
                     SpScaleimage::parse(self)?.map(SpmlTag::SpScaleimage),
                 )),
-                "scope_tag" => tags.push(Node::Tag(
-                    SpScope::parse(self)?.map(SpmlTag::SpScope),
-                )),
-                "search_tag" => tags.push(Node::Tag(
-                    SpSearch::parse(self)?.map(SpmlTag::SpSearch),
-                )),
-                "select_tag" => tags.push(Node::Tag(
-                    SpSelect::parse(self)?.map(SpmlTag::SpSelect),
-                )),
-                "set_tag" => {
-                    tags.push(Node::Tag(SpSet::parse(self)?.map(SpmlTag::SpSet)))
-                }
-                "sort_tag" => tags.push(Node::Tag(
-                    SpSort::parse(self)?.map(SpmlTag::SpSort),
-                )),
+                "scope_tag" => tags.push(Node::Tag(SpScope::parse(self)?.map(SpmlTag::SpScope))),
+                "search_tag" => tags.push(Node::Tag(SpSearch::parse(self)?.map(SpmlTag::SpSearch))),
+                "select_tag" => tags.push(Node::Tag(SpSelect::parse(self)?.map(SpmlTag::SpSelect))),
+                "set_tag" => tags.push(Node::Tag(SpSet::parse(self)?.map(SpmlTag::SpSet))),
+                "sort_tag" => tags.push(Node::Tag(SpSort::parse(self)?.map(SpmlTag::SpSort))),
                 "subinformation_tag" => tags.push(Node::Tag(
                     SpSubinformation::parse(self)?.map(SpmlTag::SpSubinformation),
                 )),
-                "tagbody_tag" => tags.push(Node::Tag(
-                    SpTagbody::parse(self)?.map(SpmlTag::SpTagbody),
-                )),
-                "text_tag" => tags.push(Node::Tag(
-                    SpText::parse(self)?.map(SpmlTag::SpText),
-                )),
-                "textarea_tag" => tags.push(Node::Tag(
-                    SpTextarea::parse(self)?.map(SpmlTag::SpTextarea),
-                )),
+                "tagbody_tag" => {
+                    tags.push(Node::Tag(SpTagbody::parse(self)?.map(SpmlTag::SpTagbody)))
+                }
+                "text_tag" => tags.push(Node::Tag(SpText::parse(self)?.map(SpmlTag::SpText))),
+                "textarea_tag" => {
+                    tags.push(Node::Tag(SpTextarea::parse(self)?.map(SpmlTag::SpTextarea)))
+                }
                 "textimage_tag" => tags.push(Node::Tag(
                     SpTextimage::parse(self)?.map(SpmlTag::SpTextimage),
                 )),
-                "throw_tag" => tags.push(Node::Tag(
-                    SpThrow::parse(self)?.map(SpmlTag::SpThrow),
-                )),
-                "toggle_tag" => tags.push(Node::Tag(
-                    SpToggle::parse(self)?.map(SpmlTag::SpToggle),
-                )),
-                "upload_tag" => tags.push(Node::Tag(
-                    SpUpload::parse(self)?.map(SpmlTag::SpUpload),
-                )),
-                "url_tag" => {
-                    tags.push(Node::Tag(SpUrl::parse(self)?.map(SpmlTag::SpUrl)))
+                "throw_tag" => tags.push(Node::Tag(SpThrow::parse(self)?.map(SpmlTag::SpThrow))),
+                "toggle_tag" => tags.push(Node::Tag(SpToggle::parse(self)?.map(SpmlTag::SpToggle))),
+                "upload_tag" => tags.push(Node::Tag(SpUpload::parse(self)?.map(SpmlTag::SpUpload))),
+                "url_tag" => tags.push(Node::Tag(SpUrl::parse(self)?.map(SpmlTag::SpUrl))),
+                "warning_tag" => {
+                    tags.push(Node::Tag(SpWarning::parse(self)?.map(SpmlTag::SpWarning)))
                 }
-                "warning_tag" => tags.push(Node::Tag(
-                    SpWarning::parse(self)?.map(SpmlTag::SpWarning),
-                )),
-                "worklist_tag" => tags.push(Node::Tag(
-                    SpWorklist::parse(self)?.map(SpmlTag::SpWorklist),
-                )),
-                "zip_tag" => {
-                    tags.push(Node::Tag(SpZip::parse(self)?.map(SpmlTag::SpZip)))
+                "worklist_tag" => {
+                    tags.push(Node::Tag(SpWorklist::parse(self)?.map(SpmlTag::SpWorklist)))
                 }
-                "spt_counter_tag" => tags.push(Node::Tag(
-                    SptCounter::parse(self)?.map(SpmlTag::SptCounter),
-                )),
-                "spt_date_tag" => tags.push(Node::Tag(
-                    SptDate::parse(self)?.map(SpmlTag::SptDate),
-                )),
-                "spt_diff_tag" => tags.push(Node::Tag(
-                    SptDiff::parse(self)?.map(SpmlTag::SptDiff),
-                )),
+                "zip_tag" => tags.push(Node::Tag(SpZip::parse(self)?.map(SpmlTag::SpZip))),
+                "spt_counter_tag" => {
+                    tags.push(Node::Tag(SptCounter::parse(self)?.map(SpmlTag::SptCounter)))
+                }
+                "spt_date_tag" => tags.push(Node::Tag(SptDate::parse(self)?.map(SpmlTag::SptDate))),
+                "spt_diff_tag" => tags.push(Node::Tag(SptDiff::parse(self)?.map(SpmlTag::SptDiff))),
                 "spt_email2img_tag" => tags.push(Node::Tag(
                     SptEmail2Img::parse(self)?.map(SpmlTag::SptEmail2Img),
                 )),
@@ -2894,57 +2824,49 @@ impl<'a> TreeParser<'a> {
                 "spt_formsolutions_tag" => tags.push(Node::Tag(
                     SptFormsolutions::parse(self)?.map(SpmlTag::SptFormsolutions),
                 )),
-                "spt_id2url_tag" => tags.push(Node::Tag(
-                    SptId2Url::parse(self)?.map(SpmlTag::SptId2Url),
-                )),
-                "spt_ilink_tag" => tags.push(Node::Tag(
-                    SptIlink::parse(self)?.map(SpmlTag::SptIlink),
-                )),
+                "spt_id2url_tag" => {
+                    tags.push(Node::Tag(SptId2Url::parse(self)?.map(SpmlTag::SptId2Url)))
+                }
+                "spt_ilink_tag" => {
+                    tags.push(Node::Tag(SptIlink::parse(self)?.map(SpmlTag::SptIlink)))
+                }
                 "spt_imageeditor_tag" => tags.push(Node::Tag(
                     SptImageeditor::parse(self)?.map(SpmlTag::SptImageeditor),
                 )),
-                "spt_imp_tag" => tags.push(Node::Tag(
-                    SptImp::parse(self)?.map(SpmlTag::SptImp),
-                )),
+                "spt_imp_tag" => tags.push(Node::Tag(SptImp::parse(self)?.map(SpmlTag::SptImp))),
                 "spt_iterator_tag" => tags.push(Node::Tag(
                     SptIterator::parse(self)?.map(SpmlTag::SptIterator),
                 )),
-                "spt_link_tag" => tags.push(Node::Tag(
-                    SptLink::parse(self)?.map(SpmlTag::SptLink),
-                )),
-                "spt_number_tag" => tags.push(Node::Tag(
-                    SptNumber::parse(self)?.map(SpmlTag::SptNumber),
-                )),
+                "spt_link_tag" => tags.push(Node::Tag(SptLink::parse(self)?.map(SpmlTag::SptLink))),
+                "spt_number_tag" => {
+                    tags.push(Node::Tag(SptNumber::parse(self)?.map(SpmlTag::SptNumber)))
+                }
                 "spt_personalization_tag" => tags.push(Node::Tag(
                     SptPersonalization::parse(self)?.map(SpmlTag::SptPersonalization),
                 )),
-                "spt_prehtml_tag" => tags.push(Node::Tag(
-                    SptPrehtml::parse(self)?.map(SpmlTag::SptPrehtml),
-                )),
+                "spt_prehtml_tag" => {
+                    tags.push(Node::Tag(SptPrehtml::parse(self)?.map(SpmlTag::SptPrehtml)))
+                }
                 "spt_smarteditor_tag" => tags.push(Node::Tag(
                     SptSmarteditor::parse(self)?.map(SpmlTag::SptSmarteditor),
                 )),
-                "spt_spml_tag" => tags.push(Node::Tag(
-                    SptSpml::parse(self)?.map(SpmlTag::SptSpml),
-                )),
-                "spt_text_tag" => tags.push(Node::Tag(
-                    SptText::parse(self)?.map(SpmlTag::SptText),
-                )),
+                "spt_spml_tag" => tags.push(Node::Tag(SptSpml::parse(self)?.map(SpmlTag::SptSpml))),
+                "spt_text_tag" => tags.push(Node::Tag(SptText::parse(self)?.map(SpmlTag::SptText))),
                 "spt_textarea_tag" => tags.push(Node::Tag(
                     SptTextarea::parse(self)?.map(SpmlTag::SptTextarea),
                 )),
                 "spt_timestamp_tag" => tags.push(Node::Tag(
                     SptTimestamp::parse(self)?.map(SpmlTag::SptTimestamp),
                 )),
-                "spt_tinymce_tag" => tags.push(Node::Tag(
-                    SptTinymce::parse(self)?.map(SpmlTag::SptTinymce),
-                )),
-                "spt_updown_tag" => tags.push(Node::Tag(
-                    SptUpdown::parse(self)?.map(SpmlTag::SptUpdown),
-                )),
-                "spt_upload_tag" => tags.push(Node::Tag(
-                    SptUpload::parse(self)?.map(SpmlTag::SptUpload),
-                )),
+                "spt_tinymce_tag" => {
+                    tags.push(Node::Tag(SptTinymce::parse(self)?.map(SpmlTag::SptTinymce)))
+                }
+                "spt_updown_tag" => {
+                    tags.push(Node::Tag(SptUpdown::parse(self)?.map(SpmlTag::SptUpdown)))
+                }
+                "spt_upload_tag" => {
+                    tags.push(Node::Tag(SptUpload::parse(self)?.map(SpmlTag::SptUpload)))
+                }
                 "spt_worklist_tag" => tags.push(Node::Tag(
                     SptWorklist::parse(self)?.map(SpmlTag::SptWorklist),
                 )),
@@ -3139,6 +3061,41 @@ impl Tree {
             return current;
         }
     }
+
+    pub(crate) fn parent_of(&self, node: &Node) -> Option<&Node> {
+        let position = node.range().start;
+        let mut nodes = &self.nodes;
+        let mut current = None;
+        loop {
+            if let Some(node) = find_tag_at(nodes, position) {
+                if node.range().start != position {
+                    current = Some(node);
+                    match node {
+                        Node::Tag(tag) => {
+                            let tag = match tag {
+                                ParsedTag::Valid(tag) => tag,
+                                ParsedTag::Erroneous(tag, _) => tag,
+                                ParsedTag::Unparsable(_, _) => return current,
+                            };
+                            if let Some(body) = tag.body() {
+                                nodes = &body.nodes;
+                                continue;
+                            }
+                        }
+                        Node::Html(tag) => {
+                            // TODO: html attributes can contain spml tags
+                            if let Some(body) = tag.body() {
+                                nodes = &body.nodes;
+                                continue;
+                            }
+                        }
+                        _ => (),
+                    };
+                }
+            }
+            return current;
+        }
+    }
 }
 
 fn find_tag_at(nodes: &Vec<Node>, position: Position) -> Option<&Node> {
@@ -3305,79 +3262,77 @@ mod tests {
             "%>\n",
             "<sp:barcode name=\"_testName\" text=\"some text\" scope=\"page\"/>\n",
         ));
-        let expected = vec![Node::Tag(ParsedTag::Valid(SpmlTag::SpBarcode(
-            SpBarcode {
-                open_location: SingleLineLocation::new(0, 2, 11),
-                height_attribute: None,
-                locale_attribute: None,
-                name_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
-                    key: AttributeKey {
-                        value: "name".to_string(),
-                        location: SingleLineLocation::new(12, 2, 4),
-                    },
-                    value: SpelAttributeValue {
-                        equals_location: SingleLineLocation::new(16, 2, 1),
-                        opening_quote_location: SingleLineLocation::new(17, 2, 1),
-                        spel: SpelAst::Identifier(SpelResult::Valid(Identifier::Name(Word {
-                            fragments: vec![WordFragment::String(StringLiteral {
-                                content: "_testName".to_string(),
-                                location: spel::ast::Location::VariableLength {
-                                    char: 0,
-                                    line: 0,
-                                    length: 9,
-                                },
-                            })],
-                        }))),
-                        closing_quote_location: SingleLineLocation::new(27, 2, 1),
-                    },
-                })),
-                scope_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
-                    key: AttributeKey {
-                        value: "scope".to_string(),
-                        location: SingleLineLocation::new(46, 2, 5),
-                    },
-                    value: SpelAttributeValue {
-                        equals_location: SingleLineLocation::new(51, 2, 1),
-                        opening_quote_location: SingleLineLocation::new(52, 2, 1),
-                        spel: SpelAst::String(SpelResult::Valid(Word {
-                            fragments: vec![WordFragment::String(StringLiteral {
-                                content: "page".to_string(),
-                                location: spel::ast::Location::VariableLength {
-                                    char: 0,
-                                    line: 0,
-                                    length: 4,
-                                },
-                            })],
-                        })),
-                        closing_quote_location: SingleLineLocation::new(57, 2, 1),
-                    },
-                })),
-                text_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
-                    key: AttributeKey {
-                        value: "text".to_string(),
-                        location: SingleLineLocation::new(29, 2, 4),
-                    },
-                    value: SpelAttributeValue {
-                        equals_location: SingleLineLocation::new(33, 2, 1),
-                        opening_quote_location: SingleLineLocation::new(34, 2, 1),
-                        spel: SpelAst::String(SpelResult::Valid(Word {
-                            fragments: vec![WordFragment::String(StringLiteral {
-                                content: "some text".to_string(),
-                                location: spel::ast::Location::VariableLength {
-                                    char: 0,
-                                    line: 0,
-                                    length: 9,
-                                },
-                            })],
-                        })),
-                        closing_quote_location: SingleLineLocation::new(44, 2, 1),
-                    },
-                })),
-                type_attribute: None,
-                body: None,
-                close_location: SingleLineLocation::new(58, 2, 2),
-            },
-        )))];
+        let expected = vec![Node::Tag(ParsedTag::Valid(SpmlTag::SpBarcode(SpBarcode {
+            open_location: SingleLineLocation::new(0, 2, 11),
+            height_attribute: None,
+            locale_attribute: None,
+            name_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
+                key: AttributeKey {
+                    value: "name".to_string(),
+                    location: SingleLineLocation::new(12, 2, 4),
+                },
+                value: SpelAttributeValue {
+                    equals_location: SingleLineLocation::new(16, 2, 1),
+                    opening_quote_location: SingleLineLocation::new(17, 2, 1),
+                    spel: SpelAst::Identifier(SpelResult::Valid(Identifier::Name(Word {
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "_testName".to_string(),
+                            location: spel::ast::Location::VariableLength {
+                                char: 0,
+                                line: 0,
+                                length: 9,
+                            },
+                        })],
+                    }))),
+                    closing_quote_location: SingleLineLocation::new(27, 2, 1),
+                },
+            })),
+            scope_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
+                key: AttributeKey {
+                    value: "scope".to_string(),
+                    location: SingleLineLocation::new(46, 2, 5),
+                },
+                value: SpelAttributeValue {
+                    equals_location: SingleLineLocation::new(51, 2, 1),
+                    opening_quote_location: SingleLineLocation::new(52, 2, 1),
+                    spel: SpelAst::String(SpelResult::Valid(Word {
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "page".to_string(),
+                            location: spel::ast::Location::VariableLength {
+                                char: 0,
+                                line: 0,
+                                length: 4,
+                            },
+                        })],
+                    })),
+                    closing_quote_location: SingleLineLocation::new(57, 2, 1),
+                },
+            })),
+            text_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
+                key: AttributeKey {
+                    value: "text".to_string(),
+                    location: SingleLineLocation::new(29, 2, 4),
+                },
+                value: SpelAttributeValue {
+                    equals_location: SingleLineLocation::new(33, 2, 1),
+                    opening_quote_location: SingleLineLocation::new(34, 2, 1),
+                    spel: SpelAst::String(SpelResult::Valid(Word {
+                        fragments: vec![WordFragment::String(StringLiteral {
+                            content: "some text".to_string(),
+                            location: spel::ast::Location::VariableLength {
+                                char: 0,
+                                line: 0,
+                                length: 9,
+                            },
+                        })],
+                    })),
+                    closing_quote_location: SingleLineLocation::new(44, 2, 1),
+                },
+            })),
+            type_attribute: None,
+            body: None,
+            close_location: SingleLineLocation::new(58, 2, 2),
+        })))];
         let mut ts_parser = tree_sitter::Parser::new();
         ts_parser
             .set_language(&tree_sitter_spml::language())
