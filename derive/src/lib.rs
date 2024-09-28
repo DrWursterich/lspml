@@ -107,10 +107,12 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                                 NodeMovingResult::NonExistent | NodeMovingResult::Missing(_) => {
                                     return Err(anyhow::anyhow!("tag is empty"));
                                 },
-                                NodeMovingResult::Erroneous(node) => return Ok(ParsedTag::Unparsable(
-                                    parser.node_text(&node)?.to_string(),
-                                    node_location(node)),
-                                ),
+                                NodeMovingResult::Erroneous(node) => {
+                                    return Ok(ParsedTag::Unparsable(
+                                        parser.node_text(&node)?.to_string(),
+                                        node_location(node),
+                                    ));
+                                },
                                 NodeMovingResult::Superfluous(node) => {
                                     errors.push(TagError::Superfluous(
                                         parser.node_text(&node)?.to_string(),
@@ -135,24 +137,30 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         #(let mut #plain_attribute_fields = None;)*
                         #(let mut #spel_attribute_fields = None;)*
                         let mut body = None;
+                        let close_location;
                         loop {
-                            match parser.goto(&NodeMovement::NextSibling) {
+                            close_location = match parser.goto(&NodeMovement::NextSibling) {
                                 NodeMovingResult::NonExistent => return Ok(ParsedTag::Unparsable(
                                     format!("\"{}\" tag is unclosed", #definition.name),
-                                    node_location(parent_node)),
-                                ),
+                                    node_location(parent_node),
+                                )),
                                 NodeMovingResult::Missing(node) if node.kind() == ">" => {
-                                    return Ok(ParsedTag::Unparsable(
-                                        ">".to_string(),
-                                        node_location(parent_node)),
-                                    );
+                                    body = Some(parser.parse_tag_body()?);
+                                    match #name::parse_closing_tag(parser, &mut errors)? {
+                                        Ok(location) => location,
+                                        Err((text, location)) => return Ok(
+                                            ParsedTag::Unparsable(text, location),
+                                        ),
+                                    }
                                 },
                                 NodeMovingResult::Missing(node) if node.kind() == "self_closing_tag_end" => {
-                                    errors.push(TagError::Missing(
-                                        "/>".to_string(),
-                                        node_location(node),
-                                    ));
-                                    break;
+                                    let (first, last) =
+                                        missing_self_closing_tag_first_and_last_possible_location(
+                                            node,
+                                            parser,
+                                        )?;
+                                    errors.push(TagError::Missing("/>".to_string(), first));
+                                    last
                                 },
                                 NodeMovingResult::Missing(node) => {
                                     return Ok(ParsedTag::Unparsable(
@@ -161,13 +169,15 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                                             node.kind(),
                                             #definition.name
                                         ),
-                                        node_location(parent_node)),
-                                    );
+                                        node_location(parent_node),
+                                    ));
                                 },
-                                NodeMovingResult::Erroneous(node) => return Ok(ParsedTag::Unparsable(
-                                    parser.node_text(&node)?.to_string(),
-                                    node_location(node)),
-                                ),
+                                NodeMovingResult::Erroneous(node) => {
+                                    return Ok(ParsedTag::Unparsable(
+                                        parser.node_text(&node)?.to_string(),
+                                        node_location(node)
+                                    ));
+                                },
                                 NodeMovingResult::Superfluous(node) => {
                                     errors.push(TagError::Superfluous(
                                         parser.node_text(&node)?.to_string(),
@@ -176,52 +186,41 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                                     continue;
                                 },
                                 NodeMovingResult::Ok(node) => match node.kind() {
-                                    #(
-                                        stringify!(#plain_attribute_fields) => #plain_attribute_fields =
-                                            parser.parse_plain_attribute(),
-                                    )*
-                                    #(
-                                        stringify!(#spel_attribute_fields) => #spel_attribute_fields =
-                                            Some(stringify!(#spel_attribute_fields)
+                                    #(stringify!(#plain_attribute_fields) => {
+                                        #plain_attribute_fields = parser.parse_plain_attribute(),
+                                        continue;
+                                    },)*
+                                    #(stringify!(#spel_attribute_fields) => {
+                                        #spel_attribute_fields = Some(
+                                            stringify!(#spel_attribute_fields)
                                                 .strip_suffix("_attribute")
                                                 .and_then(|n| #definition.attributes.get_by_name(n))
                                                 .map(|d| parser.parse_spel_attribute(&d.r#type))
-                                                .unwrap()?),
-                                    )*
-                                    "self_closing_tag_end" => break,
+                                                .unwrap()?,
+                                        );
+                                        continue;
+                                    },)*
+                                    "self_closing_tag_end" => node_location(node),
                                     ">" => {
                                         body = Some(parser.parse_tag_body()?);
-                                        break;
+                                        match #name::parse_closing_tag(parser, &mut errors)? {
+                                            Ok(location) => location,
+                                            Err((text, location)) => return Ok(
+                                                ParsedTag::Unparsable(text, location),
+                                            ),
+                                        }
                                     },
-                                    _ => (),
+                                    _ => continue,
                                 },
                             };
+                            break;
                         }
-                        match parser.goto(&NodeMovement::Current) {
-                            NodeMovingResult::Missing(node) /*if node.kind().ends_with("_tag_close")*/ => {
-                                errors.push(TagError::Missing(
-                                    format!("</{}>", #definition.name),
-                                    node_location(node),
-                                ));
-                            },
-                            NodeMovingResult::Erroneous(node) => return Ok(ParsedTag::Unparsable(
-                                parser.node_text(&node)?.to_string(),
-                                node_location(node)),
-                            ),
-                            NodeMovingResult::Superfluous(node) => return Ok(ParsedTag::Unparsable(
-                                parser.node_text(&node)?.to_string(),
-                                node_location(node)),
-                            ),
-                            // NodeMovingResult::NonExistent cannot happen with NodeMovement::Current
-                            _ => (),
-                        }
-                        let node = parser.cursor.node();
-                        let close_location =  match node_location(node) {
+                        let close_location = match close_location {
                             Location::SingleLine(location) => location,
                             location => return Ok(ParsedTag::Unparsable(
                                 format!(
                                     "\"{}\" should be on a single line",
-                                    parser.node_text(&node)?,
+                                    parser.node_text(&parser.cursor.node())?,
                                 ),
                                 location,
                             ))
@@ -239,6 +238,42 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         });
                     }
 
+                    fn parse_closing_tag(
+                        parser: &mut TreeParser,
+                        errors: &mut Vec<TagError>,
+                    ) -> Result<Result<Location, (String, Location)>> {
+                        loop {
+                            return Ok(Ok(match parser.goto(&NodeMovement::Current) {
+                                NodeMovingResult::Missing(node) => {
+                                    let (first, last) =
+                                        missing_close_tags_first_and_last_possible_location(
+                                            node,
+                                            parser,
+                                        )?;
+                                    errors.push(TagError::Missing(
+                                        format!("</{}>", #definition.name),
+                                        first
+                                    ));
+                                    last
+                                },
+                                NodeMovingResult::Erroneous(node) => {
+                                    return Ok(Err((
+                                        parser.node_text(&node)?.to_string(),
+                                        node_location(node),
+                                    )));
+                                },
+                                NodeMovingResult::Superfluous(node) => {
+                                    errors.push(TagError::Superfluous(
+                                        parser.node_text(&node)?.to_string(),
+                                        node_location(node),
+                                    ));
+                                    continue;
+                                },
+                                NodeMovingResult::Ok(node) => node_location(node),
+                                _ => continue,
+                            }));
+                        }
+                    }
                 }
 
                 impl ParsableTag for #name {

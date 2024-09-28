@@ -2198,7 +2198,6 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                     ),
                     node_location(self.parent_node),
                 ),
-                // TODO: Missing may be recoverable
                 NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "missing attribute value for \"{}\"",
@@ -3028,25 +3027,65 @@ impl<'a> TreeParser<'a> {
             close_location = match node.kind() {
                 // TODO: html attributes can contain spml tags
                 "dynamic_attribute" => continue,
-                "self_closing_tag_end" => node,
+                "self_closing_tag_end" => {
+                    let mut movement = &NodeMovement::Current;
+                    let node;
+                    loop {
+                        node = match self.goto(movement) {
+                            NodeMovingResult::NonExistent => {
+                                return Err(anyhow::anyhow!("current node cannot be non-existent"));
+                            }
+                            NodeMovingResult::Missing(node) => {
+                                let (first, last) = missing_self_closing_tag_first_and_last_possible_location(node, self)?;
+                                errors.push(TagError::Missing(
+                                    "/>".to_string(),
+                                    first,
+                                ));
+                                last
+                            }
+                            NodeMovingResult::Erroneous(node) => {
+                                return Ok((
+                                    depth_counter.get(),
+                                    ParsedHtml::Unparsable(
+                                        format!("invalid html \"{}\"", self.node_text(&node)?),
+                                        node_location(node),
+                                    ),
+                                ));
+                            }
+                            NodeMovingResult::Superfluous(node) => {
+                                errors.push(TagError::Superfluous(
+                                    self.node_text(&node)?.to_string(),
+                                    node_location(node),
+                                ));
+                                movement = &NodeMovement::NextSibling;
+                                continue;
+                            }
+                            NodeMovingResult::Ok(node) => node_location(node),
+                        };
+                        break;
+                    }
+                    node
+                }
                 ">" => {
-                    let mut node = node;
+                    let mut location = node_location(node);
                     if has_to_be_closed {
                         body = Some(self.parse_tag_body()?);
                         let mut movement = &NodeMovement::Current;
                         loop {
-                            node = match self.goto(movement) {
+                            location = match self.goto(movement) {
                                 NodeMovingResult::NonExistent => {
                                     return Err(anyhow::anyhow!(
                                         "current node cannot be non-existent"
                                     ));
                                 }
                                 NodeMovingResult::Missing(node) => {
+                                    let location = node_location(node);
                                     errors.push(TagError::Missing(
                                         format!("</{}>", name),
-                                        node_location(node),
+                                        // tree-sitter puts missing nodes always at the very end!
+                                        location.clone(),
                                     ));
-                                    node
+                                    location
                                 }
                                 NodeMovingResult::Erroneous(node) => {
                                     return Ok((
@@ -3065,12 +3104,12 @@ impl<'a> TreeParser<'a> {
                                     movement = &NodeMovement::NextSibling;
                                     continue;
                                 }
-                                NodeMovingResult::Ok(node) => node,
+                                NodeMovingResult::Ok(node) => node_location(node),
                             };
                             break;
                         }
                     }
-                    node
+                    location
                 }
                 kind => {
                     return Err(anyhow::anyhow!(
@@ -3081,7 +3120,7 @@ impl<'a> TreeParser<'a> {
             };
             break;
         }
-        let close_location = match node_location(close_location) {
+        let close_location = match close_location {
             Location::SingleLine(location) => location,
             _ => {
                 return Err(anyhow::anyhow!(
@@ -3097,9 +3136,6 @@ impl<'a> TreeParser<'a> {
             body,
             close_location,
         };
-        if html.name.contains("asdf") {
-            log::info!("parsed {:?}, errors: {:?}", html.close_location, errors);
-        }
         return Ok((
             depth_counter.get(),
             match errors.is_empty() {
@@ -3169,6 +3205,13 @@ impl<'a> TreeParser<'a> {
     }
 }
 
+fn find_next_node(current: tree_sitter::Node<'_>) -> Option<tree_sitter::Node<'_>> {
+    return current
+        .next_sibling()
+        .filter(|node| !node.is_missing())
+        .or_else(|| current.parent().and_then(find_next_node));
+}
+
 fn node_location(node: tree_sitter::Node) -> Location {
     let start = node.start_position();
     let end = node.end_position();
@@ -3184,6 +3227,103 @@ fn node_location(node: tree_sitter::Node) -> Location {
         start.column,
         start.row,
         end.column - start.column,
+    ));
+}
+
+fn missing_self_closing_tag_first_and_last_possible_location(
+    node: tree_sitter::Node<'_>,
+    parser: &TreeParser,
+) -> Result<(Location, Location)> {
+    // tree-sitter puts missing "/>" nodes always at the first possible location. in order for
+    // completion to work we instead want it to include all following whitespace, so we search for
+    // the next node and place it in front of it. if this is the last node we have to manually
+    // split the documents text to find "trailing" whitespace, which is not included in any node.
+    // however, the error reported must still be on the first possible location such that the
+    // quick-fix action inserts it there.
+    let (char, line) = match find_next_node(node) {
+        Some(node) => {
+            let node_start = node.start_position();
+            (node_start.column, node_start.row)
+        }
+        None => {
+            let trailing_text = std::str::from_utf8(parser.text_bytes.split_at(node.end_byte()).1)?;
+            let mut trailing_lines = trailing_text.lines().peekable();
+            let mut lines = 0;
+            let mut chars = 0;
+            while let Some(line) = trailing_lines.next() {
+                lines += 1;
+                if trailing_lines.peek().is_none() {
+                    chars = line.len();
+                    break;
+                }
+            }
+            let node_end = node.end_position();
+            (
+                match lines {
+                    1 => node_end.column + chars,
+                    _ => chars,
+                },
+                node_end.row + lines - 1,
+            )
+        }
+    };
+    return Ok((
+        node_location(node),
+        Location::SingleLine(SingleLineLocation {
+            char,
+            line,
+            length: 0,
+        }),
+    ));
+}
+
+fn missing_close_tags_first_and_last_possible_location(
+    node: tree_sitter::Node<'_>,
+    parser: &TreeParser,
+) -> Result<(Location, Location)> {
+    // tree-sitter puts missing "<{tag}/>" nodes always after all its siblings possible location,
+    // this is ideal for completion.
+    // however, the error reported must be on the first possible location such that the quick-fix
+    // action inserts it there.
+    // TODO: this currently does not work!
+    //       the node it recieves is already at "the latest possible location".
+    //       maybe we should, upon finding ">", look ahead and if its last sibling is missing we
+    //       can pass ">" into here, which should produce the expected results.
+    //       but we will have to "lift" the nodes in what treesitter identifies as the body.
+    let (char, line) = match find_next_node(node) {
+        Some(node) => {
+            let node_start = node.start_position();
+            (node_start.column, node_start.row)
+        }
+        None => {
+            let trailing_text = std::str::from_utf8(parser.text_bytes.split_at(node.end_byte()).1)?;
+            let mut trailing_lines = trailing_text.lines().peekable();
+            let mut lines = 0;
+            let mut chars = 0;
+            while let Some(line) = trailing_lines.next() {
+                lines += 1;
+                if trailing_lines.peek().is_none() {
+                    chars = line.len();
+                    break;
+                }
+            }
+            let node_end = node.end_position();
+            (
+                match lines {
+                    1 => node_end.column + chars,
+                    _ => chars,
+                },
+                node_end.row + lines - 1,
+            )
+        }
+    };
+    return Ok((
+        Location::SingleLine(SingleLineLocation {
+            char,
+            line,
+            length: 0,
+        }),
+        node_location(node),
     ));
 }
 

@@ -62,7 +62,6 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
 }
 
 fn hover_tag(tag: &SpmlTag, cursor: &Position) -> Result<Option<Hover>, LsError> {
-    log::debug!("found to be in tag {}", tag.definition().name);
     if tag.open_location().contains(cursor) || tag.close_location().contains(cursor) {
         return Ok(tag.definition().documentation.map(|doc| Hover {
             contents: HoverContents::Markup(MarkupContent {
