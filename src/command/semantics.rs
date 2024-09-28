@@ -7,7 +7,7 @@ use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, Semanti
 use crate::{
     document_store,
     grammar::AttributeRule,
-    parser::{Node, ParsableTag, ParsedAttribute, ParsedTag, SpmlTag, Tree},
+    parser::{HtmlNode, Node, ParsableTag, ParsedAttribute, ParsedHtml, ParsedTag, SpmlTag, Tree},
     spel::ast::{
         Anchor, Argument, Comparable, Condition, Expression, Function, Identifier, Interpolation,
         Location, Null, Number, Object, Query, Regex, SignedNumber, SpelAst, SpelResult,
@@ -249,12 +249,20 @@ fn index_tag(tag: &SpmlTag, tokenizer: &mut Tokenizer) {
     }
 }
 
+fn index_html(html: &HtmlNode, tokenizer: &mut Tokenizer) {
+    // TODO: html attributes can contain spml tags
+    if let Some(body) = html.body() {
+        index_nodes(&body.nodes, tokenizer);
+    }
+}
+
 fn index_nodes(nodes: &Vec<Node>, tokenizer: &mut Tokenizer) {
     for node in nodes {
         match node {
             Node::Tag(ParsedTag::Valid(tag)) => index_tag(tag, tokenizer),
             Node::Tag(ParsedTag::Erroneous(tag, _)) => index_tag(tag, tokenizer),
-            Node::Html(_) => (), // TODO: html attributes can contain spml tags
+            Node::Html(ParsedHtml::Valid(html)) => index_html(html, tokenizer),
+            Node::Html(ParsedHtml::Erroneous(html, _)) => index_html(html, tokenizer),
             _ => (),
         };
     }

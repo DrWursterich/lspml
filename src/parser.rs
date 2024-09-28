@@ -46,6 +46,23 @@ pub(crate) struct Tree {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub(crate) enum ParsedHtml {
+    Valid(HtmlNode),
+    Erroneous(HtmlNode, Vec<TagError>),
+    Unparsable(String, Location),
+}
+
+impl DocumentNode for ParsedHtml {
+    fn range(&self) -> Range {
+        return match &self {
+            ParsedHtml::Valid(html) => html.range(),
+            ParsedHtml::Erroneous(html, _) => html.range(),
+            ParsedHtml::Unparsable(_, location) => location.range(),
+        };
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum ParsedNode<R, E> {
     Valid(R),
     Incomplete(E),
@@ -206,7 +223,7 @@ pub(crate) struct TagBody {
 #[derive(Clone, Debug, PartialEq, DocumentNode)]
 pub(crate) enum Node {
     Tag(ParsedTag<SpmlTag>),
-    Html(HtmlNode),
+    Html(ParsedHtml),
     Text(TextNode),
     Error(ErrorNode),
 }
@@ -2473,6 +2490,38 @@ impl<'a> TreeParser<'a> {
         return NodeMovingResult::Missing(node);
     }
 
+    fn goto_and_count_depth(
+        &mut self,
+        movement: &NodeMovement,
+        depth_counter: &mut DepthCounter,
+    ) -> NodeMovingResult<'a> {
+        match movement {
+            NodeMovement::NextSibling => {
+                if !self.cursor.goto_next_sibling() {
+                    return NodeMovingResult::NonExistent;
+                }
+            }
+            NodeMovement::FirstChild => {
+                if !self.cursor.goto_first_child() {
+                    return NodeMovingResult::NonExistent;
+                }
+                depth_counter.bump();
+            }
+            NodeMovement::Current => (),
+        }
+        let node = self.cursor.node();
+        if !node.is_missing() {
+            if !node.is_extra() {
+                if !node.is_error() {
+                    return NodeMovingResult::Ok(node);
+                }
+                return NodeMovingResult::Erroneous(node);
+            }
+            return NodeMovingResult::Superfluous(node);
+        }
+        return NodeMovingResult::Missing(node);
+    }
+
     fn node_text(&self, node: &tree_sitter::Node<'_>) -> Result<&str, Utf8Error> {
         return node.utf8_text(self.text_bytes);
     }
@@ -2707,7 +2756,11 @@ impl<'a> TreeParser<'a> {
                 }
                 "ERROR" => tags.push(self.parse_error().map(Node::Error)?),
                 "html_tag" | "html_option_tag" | "html_void_tag" | "script_tag" | "style_tag" => {
-                    tags.push(self.parse_html().map(Node::Html)?);
+                    let (depth, html) = self.parse_html_tag()?;
+                    for _ in 0..depth {
+                        self.cursor.goto_parent();
+                    }
+                    tags.push(Node::Html(html));
                 }
                 "attribute_tag" => tags.push(Node::Tag(
                     SpAttribute::parse(self)?.map(SpmlTag::SpAttribute),
@@ -2880,13 +2933,47 @@ impl<'a> TreeParser<'a> {
         return Ok(tags);
     }
 
-    // TODO: use self.goto()
-    fn parse_html(&mut self) -> Result<HtmlNode> {
-        if !self.cursor.goto_first_child() {
-            return Err(anyhow::anyhow!("html tag is empty"));
+    fn parse_html_tag(&mut self) -> Result<(u8, ParsedHtml)> {
+        let parent_node = self.cursor.node();
+        let mut depth_counter = DepthCounter::new();
+        let mut errors = Vec::new();
+        let mut movement = &NodeMovement::FirstChild;
+        let node;
+        loop {
+            node = match self.goto_and_count_depth(movement, &mut depth_counter) {
+                NodeMovingResult::NonExistent | NodeMovingResult::Missing(_) => {
+                    // return Err(anyhow::anyhow!("html tag is empty"));
+                    return Ok((
+                        depth_counter.get(),
+                        ParsedHtml::Unparsable(
+                            "missing html".to_string(),
+                            node_location(parent_node),
+                        ),
+                    ));
+                }
+                NodeMovingResult::Erroneous(node) => {
+                    return Ok((
+                        depth_counter.get(),
+                        ParsedHtml::Unparsable(
+                            format!("invalid html \"{}\"", self.node_text(&node)?),
+                            node_location(node),
+                        ),
+                    ));
+                }
+                NodeMovingResult::Superfluous(node) => {
+                    errors.push(TagError::Superfluous(
+                        self.node_text(&node)?.to_string(),
+                        node_location(node),
+                    ));
+                    movement = &NodeMovement::NextSibling;
+                    continue;
+                }
+                NodeMovingResult::Ok(node) => node,
+            };
+            break;
         }
-        let node = self.cursor.node();
-        let name = node.utf8_text(self.text_bytes)?.to_string();
+        let name = node.utf8_text(self.text_bytes)?;
+        let name = name.strip_prefix("<").unwrap_or(&name).to_string();
         let has_to_be_closed = node.kind() != "html_void_tag_open";
         let open_location = match node_location(node) {
             Location::SingleLine(location) => location,
@@ -2894,25 +2981,107 @@ impl<'a> TreeParser<'a> {
         };
         let mut attributes = Vec::new();
         let mut body = None;
+        let close_location;
         loop {
-            if !self.cursor.goto_next_sibling() {
-                return Err(anyhow::anyhow!("html tag is unclosed"));
-            }
-            let node = self.cursor.node();
-            match node.kind() {
+            let node =
+                match self.goto_and_count_depth(&NodeMovement::NextSibling, &mut depth_counter) {
+                    NodeMovingResult::NonExistent => {
+                        return Ok((
+                            depth_counter.get(),
+                            ParsedHtml::Unparsable(
+                                "html tag is unclosed".to_string(),
+                                node_location(parent_node),
+                            ),
+                        ));
+                    }
+                    NodeMovingResult::Missing(node) => {
+                        errors.push(TagError::Missing(
+                            self.node_text(&node)?.to_string(),
+                            node_location(node),
+                        ));
+                        node
+                    }
+                    NodeMovingResult::Erroneous(node) => {
+                        return Ok((
+                            depth_counter.get(),
+                            ParsedHtml::Unparsable(
+                                format!("invalid html \"{}\"", self.node_text(&node)?),
+                                node_location(node),
+                            ),
+                        ));
+                    }
+                    NodeMovingResult::Superfluous(node) => {
+                        errors.push(TagError::Superfluous(
+                            self.node_text(&node)?.to_string(),
+                            node_location(node),
+                        ));
+                        continue;
+                    }
+                    NodeMovingResult::Ok(node) => {
+                        if node.kind() == "dynamic_attribute" {
+                            attributes.push(AttributeParser::plain(self)?);
+                            continue;
+                        }
+                        node
+                    }
+                };
+            close_location = match node.kind() {
                 // TODO: html attributes can contain spml tags
-                "dynamic_attribute" => attributes.push(self.parse_plain_attribute()?),
-                "self_closing_tag_end" => break,
+                "dynamic_attribute" => continue,
+                "self_closing_tag_end" => node,
                 ">" => {
+                    let mut node = node;
                     if has_to_be_closed {
                         body = Some(self.parse_tag_body()?);
+                        let mut movement = &NodeMovement::Current;
+                        loop {
+                            node = match self.goto(movement) {
+                                NodeMovingResult::NonExistent => {
+                                    return Err(anyhow::anyhow!(
+                                        "current node cannot be non-existent"
+                                    ));
+                                }
+                                NodeMovingResult::Missing(node) => {
+                                    errors.push(TagError::Missing(
+                                        format!("</{}>", name),
+                                        node_location(node),
+                                    ));
+                                    node
+                                }
+                                NodeMovingResult::Erroneous(node) => {
+                                    return Ok((
+                                        depth_counter.get(),
+                                        ParsedHtml::Unparsable(
+                                            format!("invalid html \"{}\"", self.node_text(&node)?),
+                                            node_location(node),
+                                        ),
+                                    ));
+                                }
+                                NodeMovingResult::Superfluous(node) => {
+                                    errors.push(TagError::Superfluous(
+                                        self.node_text(&node)?.to_string(),
+                                        node_location(node),
+                                    ));
+                                    movement = &NodeMovement::NextSibling;
+                                    continue;
+                                }
+                                NodeMovingResult::Ok(node) => node,
+                            };
+                            break;
+                        }
                     }
-                    break;
+                    node
                 }
-                _ => (),
+                kind => {
+                    return Err(anyhow::anyhow!(
+                        "encountered unknown node \"{}\" inside of html tag",
+                        kind
+                    ))
+                }
             };
+            break;
         }
-        let close_location = match node_location(node) {
+        let close_location = match node_location(close_location) {
             Location::SingleLine(location) => location,
             _ => {
                 return Err(anyhow::anyhow!(
@@ -2921,14 +3090,23 @@ impl<'a> TreeParser<'a> {
                 ))
             }
         };
-        self.cursor.goto_parent();
-        return Ok(HtmlNode {
+        let html = HtmlNode {
             open_location,
             name,
             attributes,
             body,
             close_location,
-        });
+        };
+        if html.name.contains("asdf") {
+            log::info!("parsed {:?}, errors: {:?}", html.close_location, errors);
+        }
+        return Ok((
+            depth_counter.get(),
+            match errors.is_empty() {
+                true => ParsedHtml::Valid(html),
+                false => ParsedHtml::Erroneous(html, errors),
+            },
+        ));
     }
 
     fn parse_text(&mut self) -> Result<TextNode> {
@@ -3034,29 +3212,26 @@ impl Tree {
         let mut nodes = &self.nodes;
         let mut current = None;
         loop {
-            if let Some(node) = find_tag_at(nodes, position) {
+            if let Some(node) = find_node_at(nodes, position) {
                 current = Some(node);
-                match node {
-                    Node::Tag(tag) => {
-                        let tag = match tag {
-                            ParsedTag::Valid(tag) => tag,
-                            ParsedTag::Erroneous(tag, _) => tag,
-                            ParsedTag::Unparsable(_, _) => return current,
-                        };
-                        if let Some(body) = tag.body() {
-                            nodes = &body.nodes;
-                            continue;
-                        }
-                    }
-                    Node::Html(tag) => {
+                let body = match node {
+                    Node::Tag(tag) => match tag {
+                        ParsedTag::Valid(tag) => tag.body(),
+                        ParsedTag::Erroneous(tag, _) => tag.body(),
+                        ParsedTag::Unparsable(_, _) => &None,
+                    },
+                    Node::Html(tag) => match tag {
+                        ParsedHtml::Valid(tag) => tag.body(),
+                        ParsedHtml::Erroneous(tag, _) => tag.body(),
+                        ParsedHtml::Unparsable(_, _) => &None,
                         // TODO: html attributes can contain spml tags
-                        if let Some(body) = tag.body() {
-                            nodes = &body.nodes;
-                            continue;
-                        }
-                    }
-                    _ => (),
+                    },
+                    _ => &None,
                 };
+                if let Some(body) = body {
+                    nodes = &body.nodes;
+                    continue;
+                }
             }
             return current;
         }
@@ -3067,30 +3242,27 @@ impl Tree {
         let mut nodes = &self.nodes;
         let mut current = None;
         loop {
-            if let Some(node) = find_tag_at(nodes, position) {
+            if let Some(node) = find_node_at(nodes, position) {
                 if node.range().start != position {
                     current = Some(node);
-                    match node {
-                        Node::Tag(tag) => {
-                            let tag = match tag {
-                                ParsedTag::Valid(tag) => tag,
-                                ParsedTag::Erroneous(tag, _) => tag,
-                                ParsedTag::Unparsable(_, _) => return current,
-                            };
-                            if let Some(body) = tag.body() {
-                                nodes = &body.nodes;
-                                continue;
-                            }
-                        }
-                        Node::Html(tag) => {
+                    let body = match node {
+                        Node::Tag(tag) => match tag {
+                            ParsedTag::Valid(tag) => tag.body(),
+                            ParsedTag::Erroneous(tag, _) => tag.body(),
+                            ParsedTag::Unparsable(_, _) => return current,
+                        },
+                        Node::Html(tag) => match tag {
+                            ParsedHtml::Valid(tag) => tag.body(),
+                            ParsedHtml::Erroneous(tag, _) => tag.body(),
+                            ParsedHtml::Unparsable(_, _) => return current,
                             // TODO: html attributes can contain spml tags
-                            if let Some(body) = tag.body() {
-                                nodes = &body.nodes;
-                                continue;
-                            }
-                        }
-                        _ => (),
+                        },
+                        _ => &None,
                     };
+                    if let Some(body) = body {
+                        nodes = &body.nodes;
+                        continue;
+                    }
                 }
             }
             return current;
@@ -3098,7 +3270,7 @@ impl Tree {
     }
 }
 
-fn find_tag_at(nodes: &Vec<Node>, position: Position) -> Option<&Node> {
+fn find_node_at(nodes: &Vec<Node>, position: Position) -> Option<&Node> {
     for node in nodes {
         let range = node.range();
         if position > range.end {

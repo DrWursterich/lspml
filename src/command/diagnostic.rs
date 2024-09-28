@@ -14,8 +14,8 @@ use crate::{
     modules,
     parser::{
         AttributeError, DocumentNode, ErrorNode, Header, HtmlNode, Node, ParsableTag,
-        ParsedAttribute, ParsedLocation, ParsedNode, ParsedTag, RangedNode, SpelAttribute,
-        SpelAttributeValue, SpmlTag, TagError, Tree,
+        ParsedAttribute, ParsedHtml, ParsedLocation, ParsedNode, ParsedTag, RangedNode,
+        SpelAttribute, SpelAttributeValue, SpmlTag, TagError, Tree,
     },
     spel::{
         ast::{
@@ -227,7 +227,37 @@ impl DiagnosticCollector {
                         location.range(),
                     );
                 }
-                Node::Html(html) => self.validate_html(html)?,
+                Node::Html(ParsedHtml::Valid(html)) => self.validate_html(html)?,
+                Node::Html(ParsedHtml::Erroneous(html, errors)) => {
+                    for error in errors {
+                        match error {
+                            TagError::Superfluous(text, location) => {
+                                self.add_superfluous_diagnostic(text, location.range());
+                            }
+                            TagError::Missing(text, location) => {
+                                self.add_diagnostic_with_code(
+                                    format!("\"{}\" is missing", text),
+                                    DiagnosticSeverity::ERROR,
+                                    html.range(),
+                                    CodeActionImplementation::ADD_MISSING_CODE,
+                                    serde_json::to_value(TextEdit {
+                                        range: location.range(),
+                                        new_text: text.to_string(),
+                                    })
+                                    .ok(),
+                                );
+                            }
+                        }
+                    }
+                    self.validate_html(html)?;
+                },
+                Node::Html(ParsedHtml::Unparsable(message, location)) => {
+                    self.add_diagnostic(
+                        message.to_string(),
+                        DiagnosticSeverity::ERROR,
+                        location.range(),
+                    );
+                },
                 Node::Text(_) => (),
                 Node::Error(ErrorNode { content, range }) => {
                     self.add_diagnostic(
