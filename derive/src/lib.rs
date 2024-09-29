@@ -146,7 +146,7 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                                 )),
                                 NodeMovingResult::Missing(node) if node.kind() == ">" => {
                                     body = Some(parser.parse_tag_body()?);
-                                    match #name::parse_closing_tag(parser, &mut errors)? {
+                                    match #name::parse_closing_tag(parser, &mut errors, node)? {
                                         Ok(location) => location,
                                         Err((text, location)) => return Ok(
                                             ParsedTag::Unparsable(text, location),
@@ -154,13 +154,18 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                                     }
                                 },
                                 NodeMovingResult::Missing(node) if node.kind() == "self_closing_tag_end" => {
-                                    let (first, last) =
-                                        missing_self_closing_tag_first_and_last_possible_location(
-                                            node,
-                                            parser,
-                                        )?;
-                                    errors.push(TagError::Missing("/>".to_string(), first));
-                                    last
+                                    // tree-sitter puts missing "/>" nodes always at the first
+                                    // possible location. in order for completion to work we
+                                    // instead want it to include all following whitespace, so we
+                                    // search for the next node and place it in front of it. if
+                                    // this is the last node we have to manually split the
+                                    // documents text to find "trailing" whitespace, which is not
+                                    // included in any node.
+                                    // however, the error reported must still be on the first
+                                    // possible location such that the quick-fix action inserts it
+                                    // there.
+                                    errors.push(TagError::Missing("/>".to_string(), node_location(node)));
+                                    parser.move_missing_node_past_whitespaces(node)?
                                 },
                                 NodeMovingResult::Missing(node) => {
                                     return Ok(ParsedTag::Unparsable(
@@ -203,7 +208,7 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                                     "self_closing_tag_end" => node_location(node),
                                     ">" => {
                                         body = Some(parser.parse_tag_body()?);
-                                        match #name::parse_closing_tag(parser, &mut errors)? {
+                                        match #name::parse_closing_tag(parser, &mut errors, node)? {
                                             Ok(location) => location,
                                             Err((text, location)) => return Ok(
                                                 ParsedTag::Unparsable(text, location),
@@ -241,20 +246,25 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     fn parse_closing_tag(
                         parser: &mut TreeParser,
                         errors: &mut Vec<TagError>,
+                        body_open_node: tree_sitter::Node<'_>,
                     ) -> Result<Result<Location, (String, Location)>> {
                         loop {
                             return Ok(Ok(match parser.goto(&NodeMovement::Current) {
                                 NodeMovingResult::Missing(node) => {
-                                    let (first, last) =
-                                        missing_close_tags_first_and_last_possible_location(
-                                            node,
-                                            parser,
-                                        )?;
+                                    // tree-sitter puts missing "<{tag}/>" nodes always after all
+                                    // its siblings, which is ideal for completion.
+                                    // however, the error reported must be on the first possible
+                                    // location such that the quick-fix action inserts it there.
+                                    let start_position = body_open_node.start_position();
                                     errors.push(TagError::Missing(
                                         format!("</{}>", #definition.name),
-                                        first
+                                        Location::SingleLine(SingleLineLocation {
+                                            char: start_position.column + 1,
+                                            line: start_position.row,
+                                            length: 0,
+                                        }),
                                     ));
-                                    last
+                                    parser.move_missing_node_past_whitespaces(node)?
                                 },
                                 NodeMovingResult::Erroneous(node) => {
                                     return Ok(Err((

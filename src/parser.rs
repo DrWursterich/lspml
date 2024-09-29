@@ -3036,12 +3036,17 @@ impl<'a> TreeParser<'a> {
                                 return Err(anyhow::anyhow!("current node cannot be non-existent"));
                             }
                             NodeMovingResult::Missing(node) => {
-                                let (first, last) = missing_self_closing_tag_first_and_last_possible_location(node, self)?;
-                                errors.push(TagError::Missing(
-                                    "/>".to_string(),
-                                    first,
-                                ));
-                                last
+                                // tree-sitter puts missing "/>" nodes always at the first possible
+                                // location. in order for completion to work we instead want it to
+                                // include all following whitespace, so we search for the next node
+                                // and place it in front of it. if this is the last node we have to
+                                // manually split the documents text to find "trailing" whitespace,
+                                // which is not included in any node.
+                                // however, the error reported must still be on the first possible
+                                // location such that the quick-fix action inserts it there.
+                                errors
+                                    .push(TagError::Missing("/>".to_string(), node_location(node)));
+                                self.move_missing_node_past_whitespaces(node)?
                             }
                             NodeMovingResult::Erroneous(node) => {
                                 return Ok((
@@ -3203,6 +3208,42 @@ impl<'a> TreeParser<'a> {
     ) -> Result<ParsedAttribute<SpelAttribute>> {
         return AttributeParser::spel(self, r#type);
     }
+
+    fn move_missing_node_past_whitespaces(&self, node: tree_sitter::Node<'_>) -> Result<Location> {
+        let (char, line) = match find_next_node(node) {
+            Some(node) => {
+                let node_start = node.start_position();
+                (node_start.column, node_start.row)
+            }
+            None => {
+                let trailing_text =
+                    std::str::from_utf8(self.text_bytes.split_at(node.end_byte()).1)?;
+                let mut trailing_lines = trailing_text.lines().peekable();
+                let mut lines = 0;
+                let mut chars = 0;
+                while let Some(line) = trailing_lines.next() {
+                    lines += 1;
+                    if trailing_lines.peek().is_none() {
+                        chars = line.len();
+                        break;
+                    }
+                }
+                let node_end = node.end_position();
+                (
+                    match lines {
+                        1 => node_end.column + chars,
+                        _ => chars,
+                    },
+                    node_end.row + lines - 1,
+                )
+            }
+        };
+        return Ok(Location::SingleLine(SingleLineLocation {
+            char,
+            line,
+            length: 0,
+        }));
+    }
 }
 
 fn find_next_node(current: tree_sitter::Node<'_>) -> Option<tree_sitter::Node<'_>> {
@@ -3227,103 +3268,6 @@ fn node_location(node: tree_sitter::Node) -> Location {
         start.column,
         start.row,
         end.column - start.column,
-    ));
-}
-
-fn missing_self_closing_tag_first_and_last_possible_location(
-    node: tree_sitter::Node<'_>,
-    parser: &TreeParser,
-) -> Result<(Location, Location)> {
-    // tree-sitter puts missing "/>" nodes always at the first possible location. in order for
-    // completion to work we instead want it to include all following whitespace, so we search for
-    // the next node and place it in front of it. if this is the last node we have to manually
-    // split the documents text to find "trailing" whitespace, which is not included in any node.
-    // however, the error reported must still be on the first possible location such that the
-    // quick-fix action inserts it there.
-    let (char, line) = match find_next_node(node) {
-        Some(node) => {
-            let node_start = node.start_position();
-            (node_start.column, node_start.row)
-        }
-        None => {
-            let trailing_text = std::str::from_utf8(parser.text_bytes.split_at(node.end_byte()).1)?;
-            let mut trailing_lines = trailing_text.lines().peekable();
-            let mut lines = 0;
-            let mut chars = 0;
-            while let Some(line) = trailing_lines.next() {
-                lines += 1;
-                if trailing_lines.peek().is_none() {
-                    chars = line.len();
-                    break;
-                }
-            }
-            let node_end = node.end_position();
-            (
-                match lines {
-                    1 => node_end.column + chars,
-                    _ => chars,
-                },
-                node_end.row + lines - 1,
-            )
-        }
-    };
-    return Ok((
-        node_location(node),
-        Location::SingleLine(SingleLineLocation {
-            char,
-            line,
-            length: 0,
-        }),
-    ));
-}
-
-fn missing_close_tags_first_and_last_possible_location(
-    node: tree_sitter::Node<'_>,
-    parser: &TreeParser,
-) -> Result<(Location, Location)> {
-    // tree-sitter puts missing "<{tag}/>" nodes always after all its siblings possible location,
-    // this is ideal for completion.
-    // however, the error reported must be on the first possible location such that the quick-fix
-    // action inserts it there.
-    // TODO: this currently does not work!
-    //       the node it recieves is already at "the latest possible location".
-    //       maybe we should, upon finding ">", look ahead and if its last sibling is missing we
-    //       can pass ">" into here, which should produce the expected results.
-    //       but we will have to "lift" the nodes in what treesitter identifies as the body.
-    let (char, line) = match find_next_node(node) {
-        Some(node) => {
-            let node_start = node.start_position();
-            (node_start.column, node_start.row)
-        }
-        None => {
-            let trailing_text = std::str::from_utf8(parser.text_bytes.split_at(node.end_byte()).1)?;
-            let mut trailing_lines = trailing_text.lines().peekable();
-            let mut lines = 0;
-            let mut chars = 0;
-            while let Some(line) = trailing_lines.next() {
-                lines += 1;
-                if trailing_lines.peek().is_none() {
-                    chars = line.len();
-                    break;
-                }
-            }
-            let node_end = node.end_position();
-            (
-                match lines {
-                    1 => node_end.column + chars,
-                    _ => chars,
-                },
-                node_end.row + lines - 1,
-            )
-        }
-    };
-    return Ok((
-        Location::SingleLine(SingleLineLocation {
-            char,
-            line,
-            length: 0,
-        }),
-        node_location(node),
     ));
 }
 
