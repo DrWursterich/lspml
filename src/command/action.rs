@@ -9,7 +9,7 @@ use lsp_types::{
 use crate::{
     capabilities::CodeActionImplementation,
     document_store,
-    parser::{Attribute, Node, ParsedAttribute, ParsedTag, SpIf, SpelAttribute, SpmlTag},
+    parser::{Attribute, Node, ParsedAttribute, ParsedHtml, ParsedTag, SpIf, SpelAttribute, SpmlTag},
     spel::ast::{
         Argument, Comparable, ComparissonOperator, Condition, Function, SpelAst, SpelResult,
     },
@@ -113,8 +113,18 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
         }
     }
     let if_tag = match document.tree.node_at(params.range.start) {
-        Some(Node::Tag(ParsedTag::Erroneous(SpmlTag::SpIf(tag), _))) => tag,
         Some(Node::Tag(ParsedTag::Valid(SpmlTag::SpIf(tag)))) => tag,
+        Some(Node::Tag(ParsedTag::Erroneous(SpmlTag::SpIf(tag), _))) => tag,
+        Some(Node::Html(ParsedHtml::Valid(html))) => {
+            match document.tree.find_tag_in_attributes(html, params.range.start)  {
+                Some(ParsedTag::Valid(SpmlTag::SpIf(tag))) => tag,
+                Some(ParsedTag::Erroneous(SpmlTag::SpIf(tag), _)) => tag,
+                // TODO: find if in tag body
+                // Some(ParsedTag::Valid(tag)) => tag,
+                // Some(ParsedTag::Erroneous(tag, _)) => tag,
+                _ => return Ok(actions),
+            }
+        }
         _ => return Ok(actions),
     };
     if let Some(action) = construct_name_to_condition(&uri, &if_tag) {

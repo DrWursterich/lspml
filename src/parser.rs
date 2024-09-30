@@ -232,7 +232,7 @@ pub(crate) enum Node {
 pub(crate) struct HtmlNode {
     pub(crate) open_location: SingleLineLocation,
     pub(crate) name: String,
-    pub(crate) attributes: Vec<ParsedAttribute<PlainAttribute>>,
+    pub(crate) attributes: Vec<ParsedAttribute<HtmlAttribute>>,
     pub(crate) body: Option<TagBody>,
     pub(crate) close_location: SingleLineLocation,
 }
@@ -1593,37 +1593,67 @@ pub(crate) struct AttributeKey {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct PlainAttribute {
     pub(crate) key: AttributeKey,
-    pub(crate) value: Option<PlainAttributeValue>,
+    pub(crate) value: PlainAttributeValue,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct PlainAttributeValue {
     pub(crate) equals_location: SingleLineLocation,
     pub(crate) opening_quote_location: SingleLineLocation,
-    pub(crate) value: String,
+    pub(crate) content: String,
     pub(crate) closing_quote_location: SingleLineLocation,
 }
 
-// TODO:
-// PlainAttribute should be HtmlAttribute
-// PlainAttribute.value should not be an Option
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct HtmlAttribute {
+    pub(crate) key: AttributeKey,
+    pub(crate) value: Option<HtmlAttributeValue>,
+}
 
-// #[derive(Clone, Debug, PartialEq)]
-// pub(crate) struct HtmlAttributeValue {
-//     pub(crate) equals_location: Location,
-//     pub(crate) opening_quote_location: Location,
-//     pub(crate) fragments: HtmlAttributeValueFragments,
-//     pub(crate) closing_quote_location: Location,
-// }
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct HtmlAttributeValue {
+    pub(crate) equals_location: SingleLineLocation,
+    pub(crate) opening_quote_location: SingleLineLocation,
+    pub(crate) content: HtmlAttributeValueContent,
+    pub(crate) closing_quote_location: SingleLineLocation,
+}
 
-// #[derive(Clone, Debug, PartialEq)]
-// pub(crate) struct HtmlAttributeValueFragments(Vec<HtmlAttributeValueFragment>);
+impl Attribute for HtmlAttribute {
+    fn start(&self) -> Position {
+        return self.key.location.start();
+    }
 
-// #[derive(Clone, Debug, PartialEq)]
-// pub(crate) enum HtmlAttributeValueFragment {
-//     Plain(String),
-//     Tag(Tag),
-// }
+    fn end(&self) -> Position {
+        return match &self.value {
+            Some(value) => value.closing_quote_location.end(),
+            None => self.key.location.end(),
+        };
+    }
+}
+
+impl AttributeValue for HtmlAttributeValue {
+    fn opening_quote_location(&self) -> &SingleLineLocation {
+        return &self.opening_quote_location;
+    }
+
+    fn closing_quote_location(&self) -> &SingleLineLocation {
+        return &self.closing_quote_location;
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum HtmlAttributeValueContent {
+    Empty,
+    Plain(String),
+    Tag(ParsedTag<SpmlTag>),
+    Fragmented(Vec<HtmlAttributeValueFragment>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum HtmlAttributeValueFragment {
+    Plain(String),
+    Tag(ParsedTag<SpmlTag>),
+}
 
 impl AttributeValue for PlainAttributeValue {
     fn opening_quote_location(&self) -> &SingleLineLocation {
@@ -1708,10 +1738,7 @@ impl Attribute for PlainAttribute {
     }
 
     fn end(&self) -> Position {
-        return match &self.value {
-            Some(value) => value.closing_quote_location.end(),
-            None => self.key.location.end(),
-        };
+        return self.value.closing_quote_location.end();
     }
 }
 
@@ -1907,7 +1934,6 @@ struct AttributeParser<'a, 'b> {
     tree_parser: &'a mut TreeParser<'b>,
     parent_node: tree_sitter::Node<'b>,
     errors: Option<Vec<AttributeError>>,
-    depth: u8,
 }
 
 enum IntermediateAttributeParsingResult<R> {
@@ -1917,33 +1943,30 @@ enum IntermediateAttributeParsingResult<R> {
 
 impl<'a, 'b> AttributeParser<'a, 'b> {
     fn plain(tree_parser: &'a mut TreeParser<'b>) -> Result<ParsedAttribute<PlainAttribute>> {
+        let depth = tree_parser.cursor.depth();
         let parser = AttributeParser::new(tree_parser);
-        let (depth, result) = parser.parse_plain()?;
-        for _ in 0..depth {
-            tree_parser.cursor.goto_parent();
-        }
-        return Ok(result);
+        let result = parser.parse_plain();
+        walk_parser_back_to(tree_parser, depth);
+        return result;
     }
 
-    // fn html(tree_parser: &'a mut TreeParser<'b>) -> Result<ParsedAttribute<HtmlAttribute>> {
-    //     let mut parser = AttributeParser::new(tree_parser);
-    //     let (depth, result) = parser.parse_plain();
-    //     for _ in 0..depth {
-    //         tree_parser.cursor.goto_parent();
-    //     }
-    //     return result;
-    // }
+    fn html(tree_parser: &'a mut TreeParser<'b>) -> Result<ParsedAttribute<HtmlAttribute>> {
+        let depth = tree_parser.cursor.depth();
+        let parser = AttributeParser::new(tree_parser);
+        let result = parser.parse_html();
+        walk_parser_back_to(tree_parser, depth);
+        return result;
+    }
 
     fn spel(
         tree_parser: &'a mut TreeParser<'b>,
         r#type: &TagAttributeType,
     ) -> Result<ParsedAttribute<SpelAttribute>> {
+        let depth = tree_parser.cursor.depth();
         let parser = AttributeParser::new(tree_parser);
-        let (depth, result) = parser.parse_spel(r#type)?;
-        for _ in 0..depth {
-            tree_parser.cursor.goto_parent();
-        }
-        return Ok(result);
+        let result = parser.parse_spel(r#type);
+        walk_parser_back_to(tree_parser, depth);
+        return result;
     }
 
     fn new(tree_parser: &'a mut TreeParser<'b>) -> Self {
@@ -1952,14 +1975,13 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
             tree_parser,
             parent_node,
             errors: None,
-            depth: 0,
         };
     }
 
-    fn parse_plain(mut self) -> Result<(u8, ParsedAttribute<PlainAttribute>)> {
+    fn parse_plain(mut self) -> Result<ParsedAttribute<PlainAttribute>> {
         let key_node = match self.parse_key()? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok((self.depth, ParsedAttribute::Unparsable(message, location)));
+                return Ok(ParsedAttribute::Unparsable(message, location));
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
@@ -1969,18 +1991,82 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 location,
             },
             location => {
-                return Ok((
-                    self.depth,
-                    ParsedAttribute::Unparsable(
-                        "attribute key should be on a single line".to_string(),
-                        location,
-                    ),
+                return Ok(ParsedAttribute::Unparsable(
+                    "attribute key should be on a single line".to_string(),
+                    location,
                 ));
             }
         };
         let equals_location = match self.parse_equals(&key_node)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok((self.depth, ParsedAttribute::Unparsable(message, location)))
+                return Ok(ParsedAttribute::Unparsable(message, location))
+            }
+            IntermediateAttributeParsingResult::Partial(Some(e)) => e,
+            IntermediateAttributeParsingResult::Partial(None) => {
+                return Ok(ParsedAttribute::Unparsable(
+                    "missing \"=\"".to_string(),
+                    node_location(self.parent_node),
+                ))
+            }
+        };
+        if let IntermediateAttributeParsingResult::Failed(message, location) =
+            self.parse_string(&key_node)?
+        {
+            return Ok(ParsedAttribute::Unparsable(message, location));
+        }
+        let opening_quote_location = match self.parse_opening_quote(&key_node)? {
+            IntermediateAttributeParsingResult::Failed(message, location) => {
+                return Ok(ParsedAttribute::Unparsable(message, location))
+            }
+            IntermediateAttributeParsingResult::Partial(e) => e,
+        };
+        let (content, movement) = match self.parse_string_content(&key_node)? {
+            IntermediateAttributeParsingResult::Failed(message, location) => {
+                return Ok(ParsedAttribute::Unparsable(message, location))
+            }
+            IntermediateAttributeParsingResult::Partial(e) => e,
+        };
+        let closing_quote_location = match self.parse_closing_quote(&key_node, movement)? {
+            IntermediateAttributeParsingResult::Failed(message, location) => {
+                return Ok(ParsedAttribute::Unparsable(message, location))
+            }
+            IntermediateAttributeParsingResult::Partial(e) => e,
+        };
+        let value = PlainAttributeValue {
+            equals_location,
+            opening_quote_location,
+            content,
+            closing_quote_location,
+        };
+        let attribute = PlainAttribute { key, value };
+        return Ok(match self.errors {
+            Some(errors) => ParsedAttribute::Erroneous(attribute, errors),
+            None => ParsedAttribute::Valid(attribute),
+        });
+    }
+
+    fn parse_html(mut self) -> Result<ParsedAttribute<HtmlAttribute>> {
+        let key_node = match self.parse_key()? {
+            IntermediateAttributeParsingResult::Failed(message, location) => {
+                return Ok(ParsedAttribute::Unparsable(message, location));
+            }
+            IntermediateAttributeParsingResult::Partial(e) => e,
+        };
+        let key = match node_location(key_node) {
+            Location::SingleLine(location) => AttributeKey {
+                value: self.tree_parser.node_text(&key_node)?.to_string(),
+                location,
+            },
+            location => {
+                return Ok(ParsedAttribute::Unparsable(
+                    "attribute key should be on a single line".to_string(),
+                    location,
+                ));
+            }
+        };
+        let equals_location = match self.parse_equals(&key_node)? {
+            IntermediateAttributeParsingResult::Failed(message, location) => {
+                return Ok(ParsedAttribute::Unparsable(message, location))
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
@@ -1989,52 +2075,47 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 if let IntermediateAttributeParsingResult::Failed(message, location) =
                     self.parse_string(&key_node)?
                 {
-                    return Ok((self.depth, ParsedAttribute::Unparsable(message, location)));
+                    return Ok(ParsedAttribute::Unparsable(message, location));
                 }
                 let opening_quote_location = match self.parse_opening_quote(&key_node)? {
                     IntermediateAttributeParsingResult::Failed(message, location) => {
-                        return Ok((self.depth, ParsedAttribute::Unparsable(message, location)))
+                        return Ok(ParsedAttribute::Unparsable(message, location))
                     }
                     IntermediateAttributeParsingResult::Partial(e) => e,
                 };
-                let (value, movement) = match self.parse_string_content(&key_node)? {
+                let content = match self.parse_html_string_content(&key_node)? {
                     IntermediateAttributeParsingResult::Failed(message, location) => {
-                        return Ok((self.depth, ParsedAttribute::Unparsable(message, location)))
+                        return Ok(ParsedAttribute::Unparsable(message, location))
                     }
                     IntermediateAttributeParsingResult::Partial(e) => e,
                 };
-                let closing_quote_location = match self.parse_closing_quote(&key_node, movement)? {
-                    IntermediateAttributeParsingResult::Failed(message, location) => {
-                        return Ok((self.depth, ParsedAttribute::Unparsable(message, location)))
-                    }
-                    IntermediateAttributeParsingResult::Partial(e) => e,
-                };
-                Some(PlainAttributeValue {
+                let closing_quote_location =
+                    match self.parse_closing_quote(&key_node, NodeMovement::Current)? {
+                        IntermediateAttributeParsingResult::Failed(message, location) => {
+                            return Ok(ParsedAttribute::Unparsable(message, location))
+                        }
+                        IntermediateAttributeParsingResult::Partial(e) => e,
+                    };
+                Some(HtmlAttributeValue {
                     equals_location,
                     opening_quote_location,
-                    value,
+                    content,
                     closing_quote_location,
                 })
             }
             None => None,
         };
-        let attribute = PlainAttribute { key, value };
-        return Ok((
-            self.depth,
-            match self.errors {
-                Some(errors) => ParsedAttribute::Erroneous(attribute, errors),
-                None => ParsedAttribute::Valid(attribute),
-            },
-        ));
+        let attribute = HtmlAttribute { key, value };
+        return Ok(match self.errors {
+            Some(errors) => ParsedAttribute::Erroneous(attribute, errors),
+            None => ParsedAttribute::Valid(attribute),
+        });
     }
 
-    fn parse_spel(
-        mut self,
-        r#type: &TagAttributeType,
-    ) -> Result<(u8, ParsedAttribute<SpelAttribute>)> {
+    fn parse_spel(mut self, r#type: &TagAttributeType) -> Result<ParsedAttribute<SpelAttribute>> {
         let key_node = match self.parse_key()? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok((self.depth, ParsedAttribute::Unparsable(message, location)));
+                return Ok(ParsedAttribute::Unparsable(message, location));
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
@@ -2044,50 +2125,44 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 location,
             },
             location => {
-                return Ok((
-                    self.depth,
-                    ParsedAttribute::Unparsable(
-                        "attribute key should be on a single line".to_string(),
-                        location,
-                    ),
+                return Ok(ParsedAttribute::Unparsable(
+                    "attribute key should be on a single line".to_string(),
+                    location,
                 ));
             }
         };
         let equals_location = match self.parse_equals(&key_node)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok((self.depth, ParsedAttribute::Unparsable(message, location)))
+                return Ok(ParsedAttribute::Unparsable(message, location))
             }
             IntermediateAttributeParsingResult::Partial(Some(e)) => e,
             IntermediateAttributeParsingResult::Partial(None) => {
-                return Ok((
-                    self.depth,
-                    ParsedAttribute::Unparsable(
-                        "missing \"=\"".to_string(),
-                        node_location(self.parent_node),
-                    ),
+                return Ok(ParsedAttribute::Unparsable(
+                    "missing \"=\"".to_string(),
+                    node_location(self.parent_node),
                 ))
             }
         };
         if let IntermediateAttributeParsingResult::Failed(message, location) =
             self.parse_string(&key_node)?
         {
-            return Ok((self.depth, ParsedAttribute::Unparsable(message, location)));
+            return Ok(ParsedAttribute::Unparsable(message, location));
         }
         let opening_quote_location = match self.parse_opening_quote(&key_node)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok((self.depth, ParsedAttribute::Unparsable(message, location)))
+                return Ok(ParsedAttribute::Unparsable(message, location))
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
         let (spel, movement) = match self.parse_spel_content(&key_node, r#type)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok((self.depth, ParsedAttribute::Unparsable(message, location)))
+                return Ok(ParsedAttribute::Unparsable(message, location))
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
         let closing_quote_location = match self.parse_closing_quote(&key_node, movement)? {
             IntermediateAttributeParsingResult::Failed(message, location) => {
-                return Ok((self.depth, ParsedAttribute::Unparsable(message, location)))
+                return Ok(ParsedAttribute::Unparsable(message, location))
             }
             IntermediateAttributeParsingResult::Partial(e) => e,
         };
@@ -2100,19 +2175,16 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 closing_quote_location,
             },
         };
-        return Ok((
-            self.depth,
-            match self.errors {
-                Some(errors) => ParsedAttribute::Erroneous(attribute, errors),
-                None => ParsedAttribute::Valid(attribute),
-            },
-        ));
+        return Ok(match self.errors {
+            Some(errors) => ParsedAttribute::Erroneous(attribute, errors),
+            None => ParsedAttribute::Valid(attribute),
+        });
     }
 
     fn parse_key(&mut self) -> Result<IntermediateAttributeParsingResult<tree_sitter::Node<'a>>> {
         let mut movement = &NodeMovement::FirstChild;
         loop {
-            match self.goto(movement) {
+            match self.tree_parser.goto(movement) {
                 // probably cannot happen...
                 NodeMovingResult::NonExistent | NodeMovingResult::Missing(_) => {
                     return Ok(IntermediateAttributeParsingResult::Failed(
@@ -2149,7 +2221,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         key_node: &tree_sitter::Node<'a>,
     ) -> Result<IntermediateAttributeParsingResult<Option<SingleLineLocation>>> {
         loop {
-            return Ok(match self.goto(&NodeMovement::NextSibling) {
+            return Ok(match self.tree_parser.goto(&NodeMovement::NextSibling) {
                 NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Partial(None),
                 NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
                     format!(
@@ -2190,7 +2262,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         key_node: &tree_sitter::Node<'a>,
     ) -> Result<IntermediateAttributeParsingResult<()>> {
         loop {
-            return Ok(match self.goto(&NodeMovement::NextSibling) {
+            return Ok(match self.tree_parser.goto(&NodeMovement::NextSibling) {
                 NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "missing attribute value for \"{}\"",
@@ -2229,7 +2301,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         key_node: &tree_sitter::Node<'a>,
     ) -> Result<IntermediateAttributeParsingResult<SingleLineLocation>> {
         loop {
-            return Ok(match self.goto(&NodeMovement::FirstChild) {
+            return Ok(match self.tree_parser.goto(&NodeMovement::FirstChild) {
                 NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "attribute \"{}\" is missing a value",
@@ -2276,7 +2348,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         key_node: &tree_sitter::Node<'a>,
     ) -> Result<IntermediateAttributeParsingResult<(String, NodeMovement)>> {
         loop {
-            return Ok(match self.goto(&NodeMovement::NextSibling) {
+            return Ok(match self.tree_parser.goto(&NodeMovement::NextSibling) {
                 NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "\"{}\" attribute value string is unclosed",
@@ -2315,6 +2387,50 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                     self.tree_parser.node_text(&node)?.to_string(),
                     NodeMovement::NextSibling,
                 )),
+            });
+        }
+    }
+
+    fn parse_html_string_content(
+        &mut self,
+        key_node: &tree_sitter::Node<'a>,
+    ) -> Result<IntermediateAttributeParsingResult<HtmlAttributeValueContent>> {
+        loop {
+            return Ok(match self.tree_parser.goto(&NodeMovement::NextSibling) {
+                NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "\"{}\" html attribute value string is unclosed",
+                        self.tree_parser.node_text(&key_node)?
+                    ),
+                    node_location(self.parent_node),
+                ),
+                NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "\"{}\" html attribute value string has no content",
+                        self.tree_parser.node_text(&key_node)?
+                    ),
+                    node_location(self.parent_node),
+                ),
+                NodeMovingResult::Erroneous(node) => IntermediateAttributeParsingResult::Failed(
+                    format!(
+                        "expected \"\"\", found \"{}\"",
+                        self.tree_parser.node_text(&node)?
+                    ),
+                    node_location(node),
+                ),
+                NodeMovingResult::Superfluous(node) => {
+                    self.add_error(AttributeError::Superfluous(
+                        self.tree_parser.node_text(&node)?.to_string(),
+                        node_location(node),
+                    ));
+                    continue;
+                }
+                NodeMovingResult::Ok(node) if node.kind() == "\"" => {
+                    IntermediateAttributeParsingResult::Partial(HtmlAttributeValueContent::Empty)
+                }
+                NodeMovingResult::Ok(_) => IntermediateAttributeParsingResult::Partial(
+                    self.tree_parser.parse_html_attribute_value_content()?,
+                ),
             });
         }
     }
@@ -2393,17 +2509,17 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         movement: NodeMovement,
     ) -> Result<IntermediateAttributeParsingResult<SingleLineLocation>> {
         loop {
-            return Ok(match self.goto(&movement) {
+            return Ok(match self.tree_parser.goto(&movement) {
                 NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
                     format!(
-                        "\"{}\" attribute value string is unclosed",
+                        "\"{}\" closing attribute value string is unclosed",
                         self.tree_parser.node_text(&key_node)?
                     ),
                     node_location(self.parent_node),
                 ),
                 NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
                     format!(
-                        "\"{}\" attribute value string is unclosed",
+                        "\"{}\" closing attribute value string is unclosed",
                         self.tree_parser.node_text(&key_node)?
                     ),
                     node_location(self.parent_node),
@@ -2435,24 +2551,18 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         }
     }
 
-    // TODO: DepthCounter?
-    fn goto(&mut self, movement: &NodeMovement) -> NodeMovingResult<'a> {
-        let result = self.tree_parser.goto(movement);
-        match (movement, &result) {
-            (_, NodeMovingResult::NonExistent) => (),
-            (NodeMovement::FirstChild, _) => {
-                self.depth += 1;
-            }
-            _ => (),
-        }
-        return result;
-    }
-
     fn add_error(&mut self, error: AttributeError) {
         match &mut self.errors {
             None => self.errors = Some(vec![error]),
             Some(errors) => errors.push(error),
         }
+    }
+}
+
+fn walk_parser_back_to(parser: &mut TreeParser, depth: u32) {
+    let depth = parser.cursor.depth() - depth;
+    for _ in 0..depth {
+        parser.cursor.goto_parent();
     }
 }
 
@@ -2475,38 +2585,6 @@ impl<'a> TreeParser<'a> {
         };
         if !moved {
             return NodeMovingResult::NonExistent;
-        }
-        let node = self.cursor.node();
-        if !node.is_missing() {
-            if !node.is_extra() {
-                if !node.is_error() {
-                    return NodeMovingResult::Ok(node);
-                }
-                return NodeMovingResult::Erroneous(node);
-            }
-            return NodeMovingResult::Superfluous(node);
-        }
-        return NodeMovingResult::Missing(node);
-    }
-
-    fn goto_and_count_depth(
-        &mut self,
-        movement: &NodeMovement,
-        depth_counter: &mut DepthCounter,
-    ) -> NodeMovingResult<'a> {
-        match movement {
-            NodeMovement::NextSibling => {
-                if !self.cursor.goto_next_sibling() {
-                    return NodeMovingResult::NonExistent;
-                }
-            }
-            NodeMovement::FirstChild => {
-                if !self.cursor.goto_first_child() {
-                    return NodeMovingResult::NonExistent;
-                }
-                depth_counter.bump();
-            }
-            NodeMovement::Current => (),
         }
         let node = self.cursor.node();
         if !node.is_missing() {
@@ -2754,11 +2832,22 @@ impl<'a> TreeParser<'a> {
                     continue;
                 }
                 "ERROR" => tags.push(self.parse_error().map(Node::Error)?),
-                "html_tag" | "html_option_tag" | "html_void_tag" | "script_tag" | "style_tag" => {
-                    let (depth, html) = self.parse_html_tag()?;
-                    for _ in 0..depth {
-                        self.cursor.goto_parent();
-                    }
+                "html_tag" | "script_tag" | "style_tag" => {
+                    let depth = self.cursor.depth();
+                    let html = self.parse_html_tag()?;
+                    walk_parser_back_to(self, depth);
+                    tags.push(Node::Html(html));
+                }
+                "html_option_tag" => {
+                    let depth = self.cursor.depth();
+                    let html = self.parse_html_option_tag()?; // TODO: expectes /> or a body!
+                    walk_parser_back_to(self, depth);
+                    tags.push(Node::Html(html));
+                }
+                "html_void_tag" => {
+                    let depth = self.cursor.depth();
+                    let html = self.parse_html_void_tag()?; // TODO: expectes /> or a body!
+                    walk_parser_back_to(self, depth);
                     tags.push(Node::Html(html));
                 }
                 "attribute_tag" => tags.push(Node::Tag(
@@ -2932,31 +3021,300 @@ impl<'a> TreeParser<'a> {
         return Ok(tags);
     }
 
-    fn parse_html_tag(&mut self) -> Result<(u8, ParsedHtml)> {
+    fn parse_html_attribute_value_content(&mut self) -> Result<HtmlAttributeValueContent> {
+        let mut fragments: Vec<HtmlAttributeValueFragment> = Vec::new();
+        loop {
+            let node = self.cursor.node();
+            match node.kind() {
+                // TODO: these are probably possible though not yet supported by treesitter
+                // "comment" => (),
+                // "xml_entity" => (),
+                "string_content" => {
+                    fragments.push(
+                        self.parse_text()
+                            .map(|text| HtmlAttributeValueFragment::Plain(text.content))?,
+                    );
+                    continue;
+                }
+                // "ERROR" => fragments.push(self.parse_error().map(Node::Error)?),
+                "attribute_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpAttribute::parse(self)?.map(SpmlTag::SpAttribute),
+                )),
+                "argument_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpArgument::parse(self)?.map(SpmlTag::SpArgument),
+                )),
+                "barcode_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpBarcode::parse(self)?.map(SpmlTag::SpBarcode),
+                )),
+                "break_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpBreak::parse(self)?.map(SpmlTag::SpBreak),
+                )),
+                "calendarsheet_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpCalendarsheet::parse(self)?.map(SpmlTag::SpCalendarsheet),
+                )),
+                "checkbox_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpCheckbox::parse(self)?.map(SpmlTag::SpCheckbox),
+                )),
+                "code_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpCode::parse(self)?.map(SpmlTag::SpCode),
+                )),
+                "collection_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpCollection::parse(self)?.map(SpmlTag::SpCollection),
+                )),
+                "condition_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpCondition::parse(self)?.map(SpmlTag::SpCondition),
+                )),
+                "diff_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpDiff::parse(self)?.map(SpmlTag::SpDiff),
+                )),
+                "else_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpElse::parse(self)?.map(SpmlTag::SpElse),
+                )),
+                "elseIf_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpElseIf::parse(self)?.map(SpmlTag::SpElseIf),
+                )),
+                "error_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpError::parse(self)?.map(SpmlTag::SpError),
+                )),
+                "expire_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpExpire::parse(self)?.map(SpmlTag::SpExpire),
+                )),
+                "filter_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpFilter::parse(self)?.map(SpmlTag::SpFilter),
+                )),
+                "for_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpFor::parse(self)?.map(SpmlTag::SpFor),
+                )),
+                "form_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpForm::parse(self)?.map(SpmlTag::SpForm),
+                )),
+                "hidden_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpHidden::parse(self)?.map(SpmlTag::SpHidden),
+                )),
+                "if_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpIf::parse(self)?.map(SpmlTag::SpIf),
+                )),
+                "include_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpInclude::parse(self)?.map(SpmlTag::SpInclude),
+                )),
+                "io_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpIo::parse(self)?.map(SpmlTag::SpIo),
+                )),
+                "iterator_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpIterator::parse(self)?.map(SpmlTag::SpIterator),
+                )),
+                "json_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpJson::parse(self)?.map(SpmlTag::SpJson),
+                )),
+                "linkedinformation_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpLinkedinformation::parse(self)?.map(SpmlTag::SpLinkedinformation),
+                )),
+                "linktree_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpLinktree::parse(self)?.map(SpmlTag::SpLinktree),
+                )),
+                "livetree_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpLivetree::parse(self)?.map(SpmlTag::SpLivetree),
+                )),
+                "log_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpLog::parse(self)?.map(SpmlTag::SpLog),
+                )),
+                "login_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpLogin::parse(self)?.map(SpmlTag::SpLogin),
+                )),
+                "loop_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpLoop::parse(self)?.map(SpmlTag::SpLoop),
+                )),
+                "map_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpMap::parse(self)?.map(SpmlTag::SpMap),
+                )),
+                "option_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpOption::parse(self)?.map(SpmlTag::SpOption),
+                )),
+                "password_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpPassword::parse(self)?.map(SpmlTag::SpPassword),
+                )),
+                "print_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpPrint::parse(self)?.map(SpmlTag::SpPrint),
+                )),
+                "querytree_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpQuerytree::parse(self)?.map(SpmlTag::SpQuerytree),
+                )),
+                "radio_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpRadio::parse(self)?.map(SpmlTag::SpRadio),
+                )),
+                "range_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpRange::parse(self)?.map(SpmlTag::SpRange),
+                )),
+                "return_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpReturn::parse(self)?.map(SpmlTag::SpReturn),
+                )),
+                "sass_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpSass::parse(self)?.map(SpmlTag::SpSass),
+                )),
+                "scaleimage_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpScaleimage::parse(self)?.map(SpmlTag::SpScaleimage),
+                )),
+                "scope_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpScope::parse(self)?.map(SpmlTag::SpScope),
+                )),
+                "search_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpSearch::parse(self)?.map(SpmlTag::SpSearch),
+                )),
+                "select_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpSelect::parse(self)?.map(SpmlTag::SpSelect),
+                )),
+                "set_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpSet::parse(self)?.map(SpmlTag::SpSet),
+                )),
+                "sort_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpSort::parse(self)?.map(SpmlTag::SpSort),
+                )),
+                "subinformation_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpSubinformation::parse(self)?.map(SpmlTag::SpSubinformation),
+                )),
+                "tagbody_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpTagbody::parse(self)?.map(SpmlTag::SpTagbody),
+                )),
+                "text_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpText::parse(self)?.map(SpmlTag::SpText),
+                )),
+                "textarea_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpTextarea::parse(self)?.map(SpmlTag::SpTextarea),
+                )),
+                "textimage_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpTextimage::parse(self)?.map(SpmlTag::SpTextimage),
+                )),
+                "throw_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpThrow::parse(self)?.map(SpmlTag::SpThrow),
+                )),
+                "toggle_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpToggle::parse(self)?.map(SpmlTag::SpToggle),
+                )),
+                "upload_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpUpload::parse(self)?.map(SpmlTag::SpUpload),
+                )),
+                "url_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpUrl::parse(self)?.map(SpmlTag::SpUrl),
+                )),
+                "warning_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpWarning::parse(self)?.map(SpmlTag::SpWarning),
+                )),
+                "worklist_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpWorklist::parse(self)?.map(SpmlTag::SpWorklist),
+                )),
+                "zip_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SpZip::parse(self)?.map(SpmlTag::SpZip),
+                )),
+                "spt_counter_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptCounter::parse(self)?.map(SpmlTag::SptCounter),
+                )),
+                "spt_date_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptDate::parse(self)?.map(SpmlTag::SptDate),
+                )),
+                "spt_diff_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptDiff::parse(self)?.map(SpmlTag::SptDiff),
+                )),
+                "spt_email2img_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptEmail2Img::parse(self)?.map(SpmlTag::SptEmail2Img),
+                )),
+                "spt_encryptemail_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptEncryptemail::parse(self)?.map(SpmlTag::SptEncryptemail),
+                )),
+                "spt_escapeemail_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptEscapeemail::parse(self)?.map(SpmlTag::SptEscapeemail),
+                )),
+                "spt_formsolutions_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptFormsolutions::parse(self)?.map(SpmlTag::SptFormsolutions),
+                )),
+                "spt_id2url_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptId2Url::parse(self)?.map(SpmlTag::SptId2Url),
+                )),
+                "spt_ilink_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptIlink::parse(self)?.map(SpmlTag::SptIlink),
+                )),
+                "spt_imageeditor_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptImageeditor::parse(self)?.map(SpmlTag::SptImageeditor),
+                )),
+                "spt_imp_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptImp::parse(self)?.map(SpmlTag::SptImp),
+                )),
+                "spt_iterator_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptIterator::parse(self)?.map(SpmlTag::SptIterator),
+                )),
+                "spt_link_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptLink::parse(self)?.map(SpmlTag::SptLink),
+                )),
+                "spt_number_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptNumber::parse(self)?.map(SpmlTag::SptNumber),
+                )),
+                "spt_personalization_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptPersonalization::parse(self)?.map(SpmlTag::SptPersonalization),
+                )),
+                "spt_prehtml_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptPrehtml::parse(self)?.map(SpmlTag::SptPrehtml),
+                )),
+                "spt_smarteditor_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptSmarteditor::parse(self)?.map(SpmlTag::SptSmarteditor),
+                )),
+                "spt_spml_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptSpml::parse(self)?.map(SpmlTag::SptSpml),
+                )),
+                "spt_text_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptText::parse(self)?.map(SpmlTag::SptText),
+                )),
+                "spt_textarea_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptTextarea::parse(self)?.map(SpmlTag::SptTextarea),
+                )),
+                "spt_timestamp_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptTimestamp::parse(self)?.map(SpmlTag::SptTimestamp),
+                )),
+                "spt_tinymce_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptTinymce::parse(self)?.map(SpmlTag::SptTinymce),
+                )),
+                "spt_updown_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptUpdown::parse(self)?.map(SpmlTag::SptUpdown),
+                )),
+                "spt_upload_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptUpload::parse(self)?.map(SpmlTag::SptUpload),
+                )),
+                "spt_worklist_tag" => fragments.push(HtmlAttributeValueFragment::Tag(
+                    SptWorklist::parse(self)?.map(SpmlTag::SptWorklist),
+                )),
+                "\"" => break,
+                kind => log::debug!("encountered unexpected tree sitter node {}", kind),
+            };
+            if !self.cursor.goto_next_sibling() {
+                break;
+            }
+        }
+        return Ok(match fragments.len() {
+            0 => HtmlAttributeValueContent::Empty,
+            1 => match fragments[0].to_owned() {
+                HtmlAttributeValueFragment::Plain(text) => HtmlAttributeValueContent::Plain(text),
+                HtmlAttributeValueFragment::Tag(tag) => HtmlAttributeValueContent::Tag(tag),
+            },
+            _ => HtmlAttributeValueContent::Fragmented(fragments),
+        });
+    }
+
+    fn parse_html_tag(&mut self) -> Result<ParsedHtml> {
         let parent_node = self.cursor.node();
-        let mut depth_counter = DepthCounter::new();
         let mut errors = Vec::new();
         let mut movement = &NodeMovement::FirstChild;
         let node;
         loop {
-            node = match self.goto_and_count_depth(movement, &mut depth_counter) {
+            node = match self.goto(movement) {
                 NodeMovingResult::NonExistent | NodeMovingResult::Missing(_) => {
                     // return Err(anyhow::anyhow!("html tag is empty"));
-                    return Ok((
-                        depth_counter.get(),
-                        ParsedHtml::Unparsable(
-                            "missing html".to_string(),
-                            node_location(parent_node),
-                        ),
+                    return Ok(ParsedHtml::Unparsable(
+                        "missing html".to_string(),
+                        node_location(parent_node),
                     ));
                 }
                 NodeMovingResult::Erroneous(node) => {
-                    return Ok((
-                        depth_counter.get(),
-                        ParsedHtml::Unparsable(
-                            format!("invalid html \"{}\"", self.node_text(&node)?),
-                            node_location(node),
-                        ),
+                    return Ok(ParsedHtml::Unparsable(
+                        format!("invalid html \"{}\"", self.node_text(&node)?),
+                        node_location(node),
                     ));
                 }
                 NodeMovingResult::Superfluous(node) => {
@@ -2973,7 +3331,6 @@ impl<'a> TreeParser<'a> {
         }
         let name = node.utf8_text(self.text_bytes)?;
         let name = name.strip_prefix("<").unwrap_or(&name).to_string();
-        let has_to_be_closed = node.kind() != "html_void_tag_open";
         let open_location = match node_location(node) {
             Location::SingleLine(location) => location,
             _ => return Err(anyhow::anyhow!("\"<{}\" should be on a single line", name)),
@@ -2982,51 +3339,45 @@ impl<'a> TreeParser<'a> {
         let mut body = None;
         let close_location;
         loop {
-            let node =
-                match self.goto_and_count_depth(&NodeMovement::NextSibling, &mut depth_counter) {
-                    NodeMovingResult::NonExistent => {
-                        return Ok((
-                            depth_counter.get(),
-                            ParsedHtml::Unparsable(
-                                "html tag is unclosed".to_string(),
-                                node_location(parent_node),
-                            ),
-                        ));
-                    }
-                    NodeMovingResult::Missing(node) => {
-                        errors.push(TagError::Missing(
-                            self.node_text(&node)?.to_string(),
-                            node_location(node),
-                        ));
-                        node
-                    }
-                    NodeMovingResult::Erroneous(node) => {
-                        return Ok((
-                            depth_counter.get(),
-                            ParsedHtml::Unparsable(
-                                format!("invalid html \"{}\"", self.node_text(&node)?),
-                                node_location(node),
-                            ),
-                        ));
-                    }
-                    NodeMovingResult::Superfluous(node) => {
-                        errors.push(TagError::Superfluous(
-                            self.node_text(&node)?.to_string(),
-                            node_location(node),
-                        ));
+            let node = match self.goto(&NodeMovement::NextSibling) {
+                NodeMovingResult::NonExistent => {
+                    return Ok(ParsedHtml::Unparsable(
+                        "html tag is unclosed".to_string(),
+                        node_location(parent_node),
+                    ));
+                }
+                NodeMovingResult::Missing(node) => {
+                    errors.push(TagError::Missing(
+                        self.node_text(&node)?.to_string(),
+                        node_location(node),
+                    ));
+                    if node.kind() == "dynamic_attribute" {
                         continue;
                     }
-                    NodeMovingResult::Ok(node) => {
-                        if node.kind() == "dynamic_attribute" {
-                            attributes.push(AttributeParser::plain(self)?);
-                            continue;
-                        }
-                        node
+                    node
+                }
+                NodeMovingResult::Erroneous(node) => {
+                    return Ok(ParsedHtml::Unparsable(
+                        format!("invalid html \"{}\"", self.node_text(&node)?),
+                        node_location(node),
+                    ));
+                }
+                NodeMovingResult::Superfluous(node) => {
+                    errors.push(TagError::Superfluous(
+                        self.node_text(&node)?.to_string(),
+                        node_location(node),
+                    ));
+                    continue;
+                }
+                NodeMovingResult::Ok(node) => {
+                    if node.kind() == "dynamic_attribute" {
+                        attributes.push(AttributeParser::html(self)?);
+                        continue;
                     }
-                };
+                    node
+                }
+            };
             close_location = match node.kind() {
-                // TODO: html attributes can contain spml tags
-                "dynamic_attribute" => continue,
                 "self_closing_tag_end" => {
                     let mut movement = &NodeMovement::Current;
                     let node;
@@ -3049,12 +3400,9 @@ impl<'a> TreeParser<'a> {
                                 self.move_missing_node_past_whitespaces(node)?
                             }
                             NodeMovingResult::Erroneous(node) => {
-                                return Ok((
-                                    depth_counter.get(),
-                                    ParsedHtml::Unparsable(
-                                        format!("invalid html \"{}\"", self.node_text(&node)?),
-                                        node_location(node),
-                                    ),
+                                return Ok(ParsedHtml::Unparsable(
+                                    format!("invalid html \"{}\"", self.node_text(&node)?),
+                                    node_location(node),
                                 ));
                             }
                             NodeMovingResult::Superfluous(node) => {
@@ -3072,47 +3420,48 @@ impl<'a> TreeParser<'a> {
                     node
                 }
                 ">" => {
-                    let mut location = node_location(node);
-                    if has_to_be_closed {
-                        body = Some(self.parse_tag_body()?);
-                        let mut movement = &NodeMovement::Current;
-                        loop {
-                            location = match self.goto(movement) {
-                                NodeMovingResult::NonExistent => {
-                                    return Err(anyhow::anyhow!(
-                                        "current node cannot be non-existent"
-                                    ));
-                                }
-                                NodeMovingResult::Missing(node) => {
-                                    let location = node_location(node);
-                                    errors.push(TagError::Missing(
-                                        format!("</{}>", name),
-                                        // tree-sitter puts missing nodes always at the very end!
-                                        location.clone(),
-                                    ));
-                                    location
-                                }
-                                NodeMovingResult::Erroneous(node) => {
-                                    return Ok((
-                                        depth_counter.get(),
-                                        ParsedHtml::Unparsable(
-                                            format!("invalid html \"{}\"", self.node_text(&node)?),
-                                            node_location(node),
-                                        ),
-                                    ));
-                                }
-                                NodeMovingResult::Superfluous(node) => {
-                                    errors.push(TagError::Superfluous(
-                                        self.node_text(&node)?.to_string(),
-                                        node_location(node),
-                                    ));
-                                    movement = &NodeMovement::NextSibling;
-                                    continue;
-                                }
-                                NodeMovingResult::Ok(node) => node_location(node),
-                            };
-                            break;
+                    body = Some(match self.parse_tag_body()? {
+                        Some(body) => body,
+                        None => {
+                            return Ok(ParsedHtml::Unparsable(
+                                format!("html tag \"{}\" is unclosed", name),
+                                node_location(node),
+                            ))
                         }
+                    });
+                    let mut movement = &NodeMovement::Current;
+                    let location;
+                    loop {
+                        location = match self.goto(movement) {
+                            NodeMovingResult::NonExistent => {
+                                return Err(anyhow::anyhow!("current node cannot be non-existent"));
+                            }
+                            NodeMovingResult::Missing(node) => {
+                                let location = node_location(node);
+                                errors.push(TagError::Missing(
+                                    format!("</{}>", name),
+                                    // tree-sitter puts missing nodes always at the very end!
+                                    location.clone(),
+                                ));
+                                location
+                            }
+                            NodeMovingResult::Erroneous(node) => {
+                                return Ok(ParsedHtml::Unparsable(
+                                    format!("invalid html \"{}\"", self.node_text(&node)?),
+                                    node_location(node),
+                                ));
+                            }
+                            NodeMovingResult::Superfluous(node) => {
+                                errors.push(TagError::Superfluous(
+                                    self.node_text(&node)?.to_string(),
+                                    node_location(node),
+                                ));
+                                movement = &NodeMovement::NextSibling;
+                                continue;
+                            }
+                            NodeMovingResult::Ok(node) => node_location(node),
+                        };
+                        break;
                     }
                     location
                 }
@@ -3141,13 +3490,260 @@ impl<'a> TreeParser<'a> {
             body,
             close_location,
         };
-        return Ok((
-            depth_counter.get(),
-            match errors.is_empty() {
-                true => ParsedHtml::Valid(html),
-                false => ParsedHtml::Erroneous(html, errors),
-            },
-        ));
+        return Ok(match errors.is_empty() {
+            true => ParsedHtml::Valid(html),
+            false => ParsedHtml::Erroneous(html, errors),
+        });
+    }
+
+    fn parse_html_option_tag(&mut self) -> Result<ParsedHtml> {
+        let parent_node = self.cursor.node();
+        let mut errors = Vec::new();
+        let mut movement = &NodeMovement::FirstChild;
+        let node;
+        loop {
+            node = match self.goto(movement) {
+                NodeMovingResult::NonExistent | NodeMovingResult::Missing(_) => {
+                    return Ok(ParsedHtml::Unparsable(
+                        "missing html".to_string(),
+                        node_location(parent_node),
+                    ));
+                }
+                NodeMovingResult::Erroneous(node) => {
+                    return Ok(ParsedHtml::Unparsable(
+                        format!("invalid html \"{}\"", self.node_text(&node)?),
+                        node_location(node),
+                    ));
+                }
+                NodeMovingResult::Superfluous(node) => {
+                    errors.push(TagError::Superfluous(
+                        self.node_text(&node)?.to_string(),
+                        node_location(node),
+                    ));
+                    movement = &NodeMovement::NextSibling;
+                    continue;
+                }
+                NodeMovingResult::Ok(node) => node,
+            };
+            break;
+        }
+        let name = node.utf8_text(self.text_bytes)?;
+        let name = name.strip_prefix("<").unwrap_or(&name).to_string();
+        let open_location = match node_location(node) {
+            Location::SingleLine(location) => location,
+            _ => return Err(anyhow::anyhow!("\"<{}\" should be on a single line", name)),
+        };
+        let mut attributes = Vec::new();
+        loop {
+            match self.goto(&NodeMovement::NextSibling) {
+                NodeMovingResult::NonExistent => {
+                    return Ok(ParsedHtml::Unparsable(
+                        "html tag is unclosed".to_string(),
+                        node_location(parent_node),
+                    ));
+                }
+                NodeMovingResult::Missing(node) => {
+                    errors.push(TagError::Missing(
+                        self.node_text(&node)?.to_string(),
+                        node_location(node),
+                    ));
+                    if node.kind() == "dynamic_attribute" {
+                        continue;
+                    }
+                }
+                NodeMovingResult::Erroneous(node) => {
+                    return Ok(ParsedHtml::Unparsable(
+                        format!("invalid html \"{}\"", self.node_text(&node)?),
+                        node_location(node),
+                    ));
+                }
+                NodeMovingResult::Superfluous(node) => {
+                    errors.push(TagError::Superfluous(
+                        self.node_text(&node)?.to_string(),
+                        node_location(node),
+                    ));
+                    continue;
+                }
+                NodeMovingResult::Ok(node) => {
+                    if node.kind() == "dynamic_attribute" {
+                        attributes.push(AttributeParser::html(self)?);
+                        continue;
+                    }
+                }
+            }
+            break;
+        }
+        let node = self.cursor.node();
+        if node.kind() != ">" {
+            return Err(anyhow::anyhow!(
+                "expected to be at \">\" node, found \"{}\" instead",
+                node.kind(),
+            ));
+        }
+        let body = self.parse_tag_body()?;
+        let close_location = match body {
+            Some(_) => {
+                let mut movement = &NodeMovement::Current;
+                let close_location;
+                loop {
+                    close_location = match self.goto(movement) {
+                        NodeMovingResult::NonExistent => node_location(node),
+                        NodeMovingResult::Missing(node) => {
+                            // these should not be able to be missing, they're allowed to
+                            let location = node_location(node);
+                            errors
+                                .push(TagError::Missing(format!("</{}>", name), location.clone()));
+                            location
+                        }
+                        NodeMovingResult::Erroneous(node) => {
+                            return Ok(ParsedHtml::Unparsable(
+                                format!("invalid html \"{}\"", self.node_text(&node)?),
+                                node_location(node),
+                            ));
+                        }
+                        NodeMovingResult::Superfluous(node) => {
+                            errors.push(TagError::Superfluous(
+                                self.node_text(&node)?.to_string(),
+                                node_location(node),
+                            ));
+                            movement = &NodeMovement::NextSibling;
+                            continue;
+                        }
+                        NodeMovingResult::Ok(node) => node_location(node),
+                    };
+                    break;
+                }
+                close_location
+            }
+            None => node_location(node),
+        };
+        let close_location = match close_location {
+            Location::SingleLine(location) => location,
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "\"{}\" should be on a single line",
+                    node.utf8_text(self.text_bytes)?
+                ))
+            }
+        };
+        let html = HtmlNode {
+            open_location,
+            name,
+            attributes,
+            body,
+            close_location,
+        };
+        return Ok(match errors.is_empty() {
+            true => ParsedHtml::Valid(html),
+            false => ParsedHtml::Erroneous(html, errors),
+        });
+    }
+
+    fn parse_html_void_tag(&mut self) -> Result<ParsedHtml> {
+        let parent_node = self.cursor.node();
+        let mut errors = Vec::new();
+        let mut movement = &NodeMovement::FirstChild;
+        let node;
+        loop {
+            node = match self.goto(movement) {
+                NodeMovingResult::NonExistent | NodeMovingResult::Missing(_) => {
+                    return Ok(ParsedHtml::Unparsable(
+                        "missing html".to_string(),
+                        node_location(parent_node),
+                    ));
+                }
+                NodeMovingResult::Erroneous(node) => {
+                    return Ok(ParsedHtml::Unparsable(
+                        format!("invalid html \"{}\"", self.node_text(&node)?),
+                        node_location(node),
+                    ));
+                }
+                NodeMovingResult::Superfluous(node) => {
+                    errors.push(TagError::Superfluous(
+                        self.node_text(&node)?.to_string(),
+                        node_location(node),
+                    ));
+                    movement = &NodeMovement::NextSibling;
+                    continue;
+                }
+                NodeMovingResult::Ok(node) => node,
+            };
+            break;
+        }
+        let name = node.utf8_text(self.text_bytes)?;
+        let name = name.strip_prefix("<").unwrap_or(&name).to_string();
+        let open_location = match node_location(node) {
+            Location::SingleLine(location) => location,
+            _ => return Err(anyhow::anyhow!("\"<{}\" should be on a single line", name)),
+        };
+        let mut attributes = Vec::new();
+        loop {
+            match self.goto(&NodeMovement::NextSibling) {
+                NodeMovingResult::NonExistent => {
+                    return Ok(ParsedHtml::Unparsable(
+                        "html tag is unclosed".to_string(),
+                        node_location(parent_node),
+                    ));
+                }
+                NodeMovingResult::Missing(node) => {
+                    errors.push(TagError::Missing(
+                        self.node_text(&node)?.to_string(),
+                        node_location(node),
+                    ));
+                    if node.kind() == "dynamic_attribute" {
+                        continue;
+                    }
+                }
+                NodeMovingResult::Erroneous(node) => {
+                    return Ok(ParsedHtml::Unparsable(
+                        format!("invalid html \"{}\"", self.node_text(&node)?),
+                        node_location(node),
+                    ));
+                }
+                NodeMovingResult::Superfluous(node) => {
+                    errors.push(TagError::Superfluous(
+                        self.node_text(&node)?.to_string(),
+                        node_location(node),
+                    ));
+                    continue;
+                }
+                NodeMovingResult::Ok(node) => {
+                    if node.kind() == "dynamic_attribute" {
+                        attributes.push(AttributeParser::html(self)?);
+                        continue;
+                    }
+                }
+            }
+            break;
+        }
+        let node = self.cursor.node();
+        let kind = node.kind();
+        if kind != ">" && kind != "self_closing_tag_end" {
+            return Err(anyhow::anyhow!(
+                "expected to be at \">\" or \"/>\" node, found \"{}\" instead",
+                node.kind(),
+            ));
+        }
+        let close_location = match node_location(node) {
+            Location::SingleLine(location) => location,
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "\"{}\" should be on a single line",
+                    node.utf8_text(self.text_bytes)?
+                ))
+            }
+        };
+        let html = HtmlNode {
+            open_location,
+            name,
+            attributes,
+            body: None,
+            close_location,
+        };
+        return Ok(match errors.is_empty() {
+            true => ParsedHtml::Valid(html),
+            false => ParsedHtml::Erroneous(html, errors),
+        });
     }
 
     fn parse_text(&mut self) -> Result<TextNode> {
@@ -3182,20 +3778,21 @@ impl<'a> TreeParser<'a> {
         });
     }
 
-    fn parse_tag_body(&mut self) -> Result<TagBody> {
+    fn parse_tag_body(&mut self) -> Result<Option<TagBody>> {
         let node = self.cursor.node();
         let open_location = match node_location(node) {
             Location::SingleLine(location) => location,
             _ => return Err(anyhow::anyhow!("\"<\" should be on a single line")),
         };
         if !self.cursor.goto_next_sibling() {
-            return Err(anyhow::anyhow!("tag is unclosed"));
+            // return Err(anyhow::anyhow!("tag is unclosed"));
+            return Ok(None);
         }
         let nodes = self.parse_tags()?;
-        return Ok(TagBody {
+        return Ok(Some(TagBody {
             open_location,
             nodes,
-        });
+        }));
     }
 
     fn parse_plain_attribute(&mut self) -> Result<ParsedAttribute<PlainAttribute>> {
@@ -3292,7 +3889,7 @@ impl Tree {
         return Ok(Tree { header, nodes });
     }
 
-    pub(crate) fn node_at(&self, position: Position) -> Option<&Node> {
+    pub(crate) fn node_at<'a>(&'a self, position: Position) -> Option<&'a Node> {
         let mut nodes = &self.nodes;
         let mut current = None;
         loop {
@@ -3304,11 +3901,10 @@ impl Tree {
                         ParsedTag::Erroneous(tag, _) => tag.body(),
                         ParsedTag::Unparsable(_, _) => &None,
                     },
-                    Node::Html(tag) => match tag {
+                    Node::Html(html) => match html {
                         ParsedHtml::Valid(tag) => tag.body(),
                         ParsedHtml::Erroneous(tag, _) => tag.body(),
                         ParsedHtml::Unparsable(_, _) => &None,
-                        // TODO: html attributes can contain spml tags
                     },
                     _ => &None,
                 };
@@ -3319,6 +3915,63 @@ impl Tree {
             }
             return current;
         }
+    }
+
+    pub(crate) fn find_tag_in_attributes<'a>(
+        &self,
+        tag: &'a HtmlNode,
+        position: Position,
+    ) -> Option<&'a ParsedTag<SpmlTag>> {
+        for attribute in &tag.attributes {
+            let attribute = match attribute {
+                ParsedAttribute::Valid(ref attribute) => attribute,
+                ParsedAttribute::Erroneous(ref attribute, _) => attribute,
+                ParsedAttribute::Unparsable(_, _) => continue,
+            };
+            if let Some(value) = &attribute.value {
+                if position > value.closing_quote_location.start() {
+                    continue;
+                }
+                if position < value.opening_quote_location.end() {
+                    match &value.content {
+                        HtmlAttributeValueContent::Tag(tag) => {
+                            return Some(tag);
+                            // return match tag {
+                            //     ParsedTag::Valid(tag) => Some(tag),
+                            //     ParsedTag::Erroneous(tag, _) => Some(tag),
+                            //     ParsedTag::Unparsable(_, _) => None,
+                            // }
+                        }
+                        HtmlAttributeValueContent::Fragmented(fragments) => {
+                            for fragment in fragments {
+                                let parsed = match fragment {
+                                    HtmlAttributeValueFragment::Tag(parsed) => parsed,
+                                    _ => continue,
+                                };
+                                let tag = match parsed {
+                                    ParsedTag::Valid(tag) => Some(tag),
+                                    ParsedTag::Erroneous(tag, _) => Some(tag),
+                                    ParsedTag::Unparsable(_, _) => None,
+                                };
+                                if let Some(tag) = tag {
+                                    if position > tag.close_location().start() {
+                                        continue;
+                                    }
+                                    if position < tag.open_location().end() {
+                                        return Some(parsed);
+                                    }
+                                }
+                                continue;
+                            }
+                        }
+                        _ => break,
+                    }
+                }
+                break;
+            }
+            continue;
+        }
+        return None;
     }
 
     pub(crate) fn parent_of(&self, node: &Node) -> Option<&Node> {
@@ -3372,17 +4025,22 @@ fn find_node_at(nodes: &Vec<Node>, position: Position) -> Option<&Node> {
 mod tests {
     use crate::{
         parser::{
-            AttributeKey, Header, Location, Node, PageHeader, ParsedAttribute, ParsedNode,
-            ParsedTag, PlainAttribute, PlainAttributeValue, SingleLineLocation, SpBarcode,
-            SpelAttribute, SpelAttributeValue, SpmlTag, TagLibImport, TagLibOrigin,
+            AttributeKey, AttributeParser, Header, HtmlAttribute, HtmlAttributeValue,
+            HtmlAttributeValueContent, HtmlNode, Location, Node, NodeMovement, PageHeader,
+            ParsedAttribute, ParsedHtml, ParsedNode, ParsedTag, PlainAttribute,
+            PlainAttributeValue, SingleLineLocation, SpBarcode, SpPrint, SpelAttribute,
+            SpelAttributeValue, SpmlTag, TagLibImport, TagLibOrigin,
         },
         spel::{
             self,
-            ast::{Identifier, SpelAst, SpelResult, StringLiteral, Word, WordFragment},
+            ast::{Identifier, Object, SpelAst, SpelResult, StringLiteral, Word, WordFragment},
         },
     };
 
-    use super::{ErrorNode, IncompleteTagLibImport, ParsedLocation, RangedNode, TreeParser};
+    use super::{
+        ErrorNode, HtmlAttributeValueFragment, IncompleteTagLibImport, ParsedLocation, RangedNode,
+        TreeParser,
+    };
     use anyhow::{Error, Result};
     use lsp_types::{Position, Range};
 
@@ -3403,36 +4061,36 @@ mod tests {
                         value: "language".to_string(),
                         location: SingleLineLocation::new(9, 0, 8),
                     },
-                    value: Some(PlainAttributeValue {
+                    value: PlainAttributeValue {
                         equals_location: SingleLineLocation::new(17, 0, 1),
                         opening_quote_location: SingleLineLocation::new(18, 0, 1),
-                        value: "java".to_string(),
+                        content: "java".to_string(),
                         closing_quote_location: SingleLineLocation::new(23, 0, 1),
-                    }),
+                    },
                 })),
                 page_encoding: Some(ParsedAttribute::Valid(PlainAttribute {
                     key: AttributeKey {
                         value: "pageEncoding".to_string(),
                         location: SingleLineLocation::new(25, 0, 12),
                     },
-                    value: Some(PlainAttributeValue {
+                    value: PlainAttributeValue {
                         equals_location: SingleLineLocation::new(37, 0, 1),
                         opening_quote_location: SingleLineLocation::new(38, 0, 1),
-                        value: "UTF-8".to_string(),
+                        content: "UTF-8".to_string(),
                         closing_quote_location: SingleLineLocation::new(44, 0, 1),
-                    }),
+                    },
                 })),
                 content_type: Some(ParsedAttribute::Valid(PlainAttribute {
                     key: AttributeKey {
                         value: "contentType".to_string(),
                         location: SingleLineLocation::new(46, 0, 11),
                     },
-                    value: Some(PlainAttributeValue {
+                    value: PlainAttributeValue {
                         equals_location: SingleLineLocation::new(57, 0, 1),
                         opening_quote_location: SingleLineLocation::new(58, 0, 1),
-                        value: "text/html; charset=UTF-8".to_string(),
+                        content: "text/html; charset=UTF-8".to_string(),
                         closing_quote_location: SingleLineLocation::new(83, 0, 1),
-                    }),
+                    },
                 })),
                 imports: vec![],
                 close_bracket: SingleLineLocation::new(0, 1, 2),
@@ -3446,24 +4104,24 @@ mod tests {
                             value: "uri".to_string(),
                             location: SingleLineLocation::new(13, 1, 3),
                         },
-                        value: Some(PlainAttributeValue {
+                        value: PlainAttributeValue {
                             equals_location: SingleLineLocation::new(16, 1, 1),
                             opening_quote_location: SingleLineLocation::new(17, 1, 1),
-                            value: "http://www.sitepark.com/taglibs/core".to_string(),
+                            content: "http://www.sitepark.com/taglibs/core".to_string(),
                             closing_quote_location: SingleLineLocation::new(54, 1, 1),
-                        }),
+                        },
                     })),
                     prefix: ParsedAttribute::Valid(PlainAttribute {
                         key: AttributeKey {
                             value: "prefix".to_string(),
                             location: SingleLineLocation::new(56, 1, 6),
                         },
-                        value: Some(PlainAttributeValue {
+                        value: PlainAttributeValue {
                             equals_location: SingleLineLocation::new(62, 1, 1),
                             opening_quote_location: SingleLineLocation::new(63, 1, 1),
-                            value: "sp".to_string(),
+                            content: "sp".to_string(),
                             closing_quote_location: SingleLineLocation::new(66, 1, 1),
-                        }),
+                        },
                     }),
                     close_bracket: SingleLineLocation::new(0, 2, 2),
                 }),
@@ -3475,24 +4133,24 @@ mod tests {
                             value: "tagdir".to_string(),
                             location: SingleLineLocation::new(13, 2, 6),
                         },
-                        value: Some(PlainAttributeValue {
+                        value: PlainAttributeValue {
                             equals_location: SingleLineLocation::new(19, 2, 1),
                             opening_quote_location: SingleLineLocation::new(20, 2, 1),
-                            value: "/WEB-INF/tags/spt".to_string(),
+                            content: "/WEB-INF/tags/spt".to_string(),
                             closing_quote_location: SingleLineLocation::new(38, 2, 1),
-                        }),
+                        },
                     })),
                     prefix: ParsedAttribute::Valid(PlainAttribute {
                         key: AttributeKey {
                             value: "prefix".to_string(),
                             location: SingleLineLocation::new(40, 2, 6),
                         },
-                        value: Some(PlainAttributeValue {
+                        value: PlainAttributeValue {
                             equals_location: SingleLineLocation::new(46, 2, 1),
                             opening_quote_location: SingleLineLocation::new(47, 2, 1),
-                            value: "spt".to_string(),
+                            content: "spt".to_string(),
                             closing_quote_location: SingleLineLocation::new(51, 2, 1),
-                        }),
+                        },
                     }),
                     close_bracket: SingleLineLocation::new(0, 3, 2),
                 }),
@@ -3640,6 +4298,172 @@ mod tests {
             },
         };
         assert_eq!(range, Some(expected));
+        return Ok(());
+    }
+
+    #[test]
+    pub fn test_tag_in_html_attribute() -> Result<()> {
+        let document = String::from(concat!(
+            "<%@ page language=\"java\" pageEncoding=\"UTF-8\" contentType=\"text/html; charset=UTF-8\"\n",
+            "%>\n",
+            "<div class=\"<sp:print name=\"_class\"/> centered\">",
+        ));
+        let expected = ParsedAttribute::Valid(HtmlAttribute {
+            key: AttributeKey {
+                value: "class".to_string(),
+                location: SingleLineLocation::new(5, 2, 5),
+            },
+            value: Some(HtmlAttributeValue {
+                equals_location: SingleLineLocation::new(10, 2, 1),
+                opening_quote_location: SingleLineLocation::new(11, 2, 1),
+                content: HtmlAttributeValueContent::Fragmented(vec![
+                    HtmlAttributeValueFragment::Tag(ParsedTag::Valid(SpmlTag::SpPrint(SpPrint {
+                        open_location: SingleLineLocation::new(12, 2, 9),
+                        arg_attribute: None,
+                        condition_attribute: None,
+                        convert_attribute: None,
+                        cryptkey_attribute: None,
+                        dateformat_attribute: None,
+                        decimalformat_attribute: None,
+                        decoding_attribute: None,
+                        decrypt_attribute: None,
+                        default_attribute: None,
+                        encoding_attribute: None,
+                        encrypt_attribute: None,
+                        expression_attribute: None,
+                        locale_attribute: None,
+                        name_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
+                            key: AttributeKey {
+                                value: "name".to_string(),
+                                location: SingleLineLocation::new(22, 2, 4),
+                            },
+                            value: SpelAttributeValue {
+                                equals_location: SingleLineLocation::new(26, 2, 1),
+                                opening_quote_location: SingleLineLocation::new(27, 2, 1),
+                                spel: SpelAst::Object(SpelResult::Valid(Object::Name(Word {
+                                    fragments: vec![WordFragment::String(StringLiteral {
+                                        content: "_class".to_string(),
+                                        location: spel::ast::Location::VariableLength {
+                                            char: 0,
+                                            line: 0,
+                                            length: 6,
+                                        },
+                                    })],
+                                }))),
+                                closing_quote_location: SingleLineLocation::new(34, 2, 1),
+                            },
+                        })),
+                        text_attribute: None,
+                        body: None,
+                        close_location: SingleLineLocation::new(35, 2, 2),
+                    }))),
+                    HtmlAttributeValueFragment::Plain(" centered".to_string()),
+                ]),
+                closing_quote_location: SingleLineLocation::new(46, 2, 1),
+            }),
+        });
+        let mut ts_parser = tree_sitter::Parser::new();
+        ts_parser
+            .set_language(&tree_sitter_spml::language())
+            .map_err(Error::from)?;
+        let ts_tree = ts_parser
+            .parse(&document, None)
+            .ok_or_else(|| anyhow::anyhow!("treesitter parsing failed"))?;
+        let mut parser = TreeParser::new(ts_tree.walk(), &document);
+        let _header = parser.parse_header()?;
+        parser.goto(&NodeMovement::FirstChild);
+        parser.goto(&NodeMovement::NextSibling);
+        let html = AttributeParser::html(&mut parser)?;
+        assert_eq!(html, expected);
+        return Ok(());
+    }
+
+    #[test]
+    pub fn test_tag_in_html_option_attribute() -> Result<()> {
+        let document = String::from(concat!(
+            "<%@ page language=\"java\" pageEncoding=\"UTF-8\" contentType=\"text/html; charset=UTF-8\"\n",
+            "%>\n",
+            "<p class=\"<sp:print name=\"_class\"/> centered\">",
+        ));
+        let expected = ParsedHtml::Valid(HtmlNode {
+            open_location: SingleLineLocation::new(0, 2, 2),
+            name: "p".to_string(),
+            attributes: vec![ParsedAttribute::Valid(HtmlAttribute {
+                key: AttributeKey {
+                    value: "class".to_string(),
+                    location: SingleLineLocation::new(3, 2, 5),
+                },
+                value: Some(HtmlAttributeValue {
+                    equals_location: SingleLineLocation::new(8, 2, 1),
+                    opening_quote_location: SingleLineLocation::new(9, 2, 1),
+                    content: HtmlAttributeValueContent::Fragmented(vec![
+                        HtmlAttributeValueFragment::Tag(ParsedTag::Valid(SpmlTag::SpPrint(
+                            SpPrint {
+                                open_location: SingleLineLocation::new(10, 2, 9),
+                                arg_attribute: None,
+                                condition_attribute: None,
+                                convert_attribute: None,
+                                cryptkey_attribute: None,
+                                dateformat_attribute: None,
+                                decimalformat_attribute: None,
+                                decoding_attribute: None,
+                                decrypt_attribute: None,
+                                default_attribute: None,
+                                encoding_attribute: None,
+                                encrypt_attribute: None,
+                                expression_attribute: None,
+                                locale_attribute: None,
+                                name_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
+                                    key: AttributeKey {
+                                        value: "name".to_string(),
+                                        location: SingleLineLocation::new(20, 2, 4),
+                                    },
+                                    value: SpelAttributeValue {
+                                        equals_location: SingleLineLocation::new(24, 2, 1),
+                                        opening_quote_location: SingleLineLocation::new(25, 2, 1),
+                                        spel: SpelAst::Object(SpelResult::Valid(Object::Name(
+                                            Word {
+                                                fragments: vec![WordFragment::String(
+                                                    StringLiteral {
+                                                        content: "_class".to_string(),
+                                                        location:
+                                                            spel::ast::Location::VariableLength {
+                                                                char: 0,
+                                                                line: 0,
+                                                                length: 6,
+                                                            },
+                                                    },
+                                                )],
+                                            },
+                                        ))),
+                                        closing_quote_location: SingleLineLocation::new(32, 2, 1),
+                                    },
+                                })),
+                                text_attribute: None,
+                                body: None,
+                                close_location: SingleLineLocation::new(33, 2, 2),
+                            },
+                        ))),
+                        HtmlAttributeValueFragment::Plain(" centered".to_string()),
+                    ]),
+                    closing_quote_location: SingleLineLocation::new(44, 2, 1),
+                }),
+            })],
+            body: None,
+            close_location: SingleLineLocation::new(45, 2, 1),
+        });
+        let mut ts_parser = tree_sitter::Parser::new();
+        ts_parser
+            .set_language(&tree_sitter_spml::language())
+            .map_err(Error::from)?;
+        let ts_tree = ts_parser
+            .parse(&document, None)
+            .ok_or_else(|| anyhow::anyhow!("treesitter parsing failed"))?;
+        let mut parser = TreeParser::new(ts_tree.walk(), &document);
+        let _header = parser.parse_header()?;
+        log::info!("kind: {}", parser.cursor.node().kind());
+        let html = parser.parse_html_option_tag()?;
+        assert_eq!(html, expected);
         return Ok(());
     }
 }

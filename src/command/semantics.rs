@@ -7,7 +7,10 @@ use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, Semanti
 use crate::{
     document_store,
     grammar::AttributeRule,
-    parser::{HtmlNode, Node, ParsableTag, ParsedAttribute, ParsedHtml, ParsedTag, SpmlTag, Tree},
+    parser::{
+        HtmlAttributeValueContent, HtmlAttributeValueFragment, HtmlNode, Node, ParsableTag,
+        ParsedAttribute, ParsedHtml, ParsedTag, SpmlTag, Tree,
+    },
     spel::ast::{
         Anchor, Argument, Comparable, Condition, Expression, Function, Identifier, Interpolation,
         Location, Null, Number, Object, Query, Regex, SignedNumber, SpelAst, SpelResult,
@@ -250,7 +253,28 @@ fn index_tag(tag: &SpmlTag, tokenizer: &mut Tokenizer) {
 }
 
 fn index_html(html: &HtmlNode, tokenizer: &mut Tokenizer) {
-    // TODO: html attributes can contain spml tags
+    for attribute in &html.attributes {
+        let value = match attribute {
+            ParsedAttribute::Valid(attribute) => &attribute.value,
+            ParsedAttribute::Erroneous(attribute, _) => &attribute.value,
+            _ => continue,
+        };
+        let content = match value {
+            Some(value) => &value.content,
+            None => continue,
+        };
+        match content {
+            HtmlAttributeValueContent::Tag(tag) => index_parsed_spml_tag(tag, tokenizer),
+            HtmlAttributeValueContent::Fragmented(fragments) => {
+                for fragment in fragments {
+                    if let HtmlAttributeValueFragment::Tag(tag) = fragment {
+                        index_parsed_spml_tag(tag, tokenizer);
+                    }
+                }
+            }
+            _ => continue,
+        }
+    }
     if let Some(body) = html.body() {
         index_nodes(&body.nodes, tokenizer);
     }
@@ -259,13 +283,20 @@ fn index_html(html: &HtmlNode, tokenizer: &mut Tokenizer) {
 fn index_nodes(nodes: &Vec<Node>, tokenizer: &mut Tokenizer) {
     for node in nodes {
         match node {
-            Node::Tag(ParsedTag::Valid(tag)) => index_tag(tag, tokenizer),
-            Node::Tag(ParsedTag::Erroneous(tag, _)) => index_tag(tag, tokenizer),
+            Node::Tag(tag) => index_parsed_spml_tag(tag, tokenizer),
             Node::Html(ParsedHtml::Valid(html)) => index_html(html, tokenizer),
             Node::Html(ParsedHtml::Erroneous(html, _)) => index_html(html, tokenizer),
             _ => (),
         };
     }
+}
+
+fn index_parsed_spml_tag(tag: &ParsedTag<SpmlTag>, tokenizer: &mut Tokenizer) {
+    match tag {
+        ParsedTag::Valid(tag) => index_tag(tag, tokenizer),
+        ParsedTag::Erroneous(tag, _) => index_tag(tag, tokenizer),
+        _ => (),
+    };
 }
 
 fn index_identifier(identifier: &Identifier, token_collector: &mut SpelTokenCollector) {

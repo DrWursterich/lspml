@@ -8,7 +8,10 @@ use super::LsError;
 
 use crate::{
     document_store,
-    parser::{AttributeValue, Node, ParsableTag, ParsedAttribute, ParsedTag, SpmlTag},
+    parser::{
+        AttributeValue, HtmlAttributeValueContent, HtmlAttributeValueFragment, HtmlNode, Node,
+        ParsableTag, ParsedAttribute, ParsedHtml, ParsedTag, SpmlTag,
+    },
     spel::{
         self,
         ast::{self, Location, SpelAst, SpelResult},
@@ -34,29 +37,8 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
     return match document.tree.node_at(cursor) {
         Some(Node::Tag(ParsedTag::Valid(tag))) => hover_tag(tag, &cursor),
         Some(Node::Tag(ParsedTag::Erroneous(tag, _))) => hover_tag(tag, &cursor),
-        Some(Node::Html(_html)) => {
-            // TODO: html attributes can contain spml tags!
-            // for attribute in &html.attributes {
-            //     match attribute {
-            //         ParsedAttribute::Valid(PlainAttribute {
-            //             value: Some(FragmentedAttributeValue {
-            //                 fragments,
-            //                 ..
-            //             }),
-            //             ..
-            //         }) => {
-            //             for fragment in fragments {
-            //                 match fragment {
-            //                     AttributeValueFragment::Plain(_) => (),
-            //                     AttributeValueFragment::Spel(spel) => hover_tag(spel, &cursor),
-            //                 }
-            //             }
-            //         },
-            //         _ => (),
-            //     }
-            // }
-            Ok(None)
-        }
+        Some(Node::Html(ParsedHtml::Valid(html))) => hover_html(html, &cursor),
+        Some(Node::Html(ParsedHtml::Erroneous(html, _))) => hover_html(html, &cursor),
         _ => Ok(None),
     };
 }
@@ -128,6 +110,47 @@ fn hover_tag(tag: &SpmlTag, cursor: &Position) -> Result<Option<Hover>, LsError>
         }
     }
     return Ok(None);
+}
+
+fn hover_html(html: &HtmlNode, cursor: &Position) -> Result<Option<Hover>, LsError> {
+    for attribute in &html.attributes {
+        let attribute = match attribute {
+            ParsedAttribute::Valid(attribute) => attribute,
+            ParsedAttribute::Erroneous(attribute, _) => attribute,
+            ParsedAttribute::Unparsable(_, _) => continue,
+        };
+        if let Some(value) = &attribute.value {
+            if &value.closing_quote_location.start() < cursor {
+                continue;
+            }
+            if &value.opening_quote_location.end() > cursor {
+                break;
+            }
+            match &value.content {
+                HtmlAttributeValueContent::Tag(ParsedTag::Valid(tag)) => {
+                    return hover_tag(tag, &cursor)
+                }
+                HtmlAttributeValueContent::Tag(ParsedTag::Erroneous(tag, _)) => {
+                    return hover_tag(tag, &cursor)
+                }
+                HtmlAttributeValueContent::Fragmented(fragments) => {
+                    for fragment in fragments {
+                        return match fragment {
+                            HtmlAttributeValueFragment::Tag(ParsedTag::Valid(tag)) => {
+                                hover_tag(tag, &cursor)
+                            }
+                            HtmlAttributeValueFragment::Tag(ParsedTag::Erroneous(tag, _)) => {
+                                hover_tag(tag, &cursor)
+                            }
+                            _ => continue,
+                        };
+                    }
+                }
+                _ => continue,
+            }
+        }
+    }
+    Ok(None)
 }
 
 fn hover_identifier(

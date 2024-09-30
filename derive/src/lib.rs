@@ -145,7 +145,13 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                                     node_location(parent_node),
                                 )),
                                 NodeMovingResult::Missing(node) if node.kind() == ">" => {
-                                    body = Some(parser.parse_tag_body()?);
+                                    body = Some(match parser.parse_tag_body()? {
+                                        Some(body) => body,
+                                        None => return Ok(ParsedTag::Unparsable(
+                                            format!("\"{}\" tag is unclosed", #definition.name),
+                                            node_location(node),
+                                        )),
+                                    });
                                     match #name::parse_closing_tag(parser, &mut errors, node)? {
                                         Ok(location) => location,
                                         Err((text, location)) => return Ok(
@@ -207,7 +213,13 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                                     },)*
                                     "self_closing_tag_end" => node_location(node),
                                     ">" => {
-                                        body = Some(parser.parse_tag_body()?);
+                                        body = Some(match parser.parse_tag_body()? {
+                                            Some(body) => body,
+                                            None => return Ok(ParsedTag::Unparsable(
+                                                format!("\"{}\" tag is unclosed", #definition.name),
+                                                node_location(node),
+                                            )),
+                                        });
                                         match #name::parse_closing_tag(parser, &mut errors, node)? {
                                             Ok(location) => location,
                                             Err((text, location)) => return Ok(

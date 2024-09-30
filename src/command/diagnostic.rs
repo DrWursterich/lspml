@@ -13,9 +13,10 @@ use crate::{
     grammar::AttributeRule,
     modules,
     parser::{
-        AttributeError, DocumentNode, ErrorNode, Header, HtmlNode, Node, ParsableTag,
-        ParsedAttribute, ParsedHtml, ParsedLocation, ParsedNode, ParsedTag, RangedNode,
-        SpelAttribute, SpelAttributeValue, SpmlTag, TagError, Tree,
+        AttributeError, DocumentNode, ErrorNode, Header, HtmlAttributeValueContent,
+        HtmlAttributeValueFragment, HtmlNode, Node, ParsableTag, ParsedAttribute, ParsedHtml,
+        ParsedLocation, ParsedNode, ParsedTag, RangedNode, SpelAttribute, SpelAttributeValue,
+        SpmlTag, TagError, Tree,
     },
     spel::{
         ast::{
@@ -196,68 +197,8 @@ impl DiagnosticCollector {
     fn validate_nodes(&mut self, nodes: &Vec<Node>) -> Result<()> {
         for node in nodes {
             match node {
-                Node::Tag(ParsedTag::Valid(tag)) => self.validate_tag(tag)?,
-                Node::Tag(ParsedTag::Erroneous(tag, errors)) => {
-                    for error in errors {
-                        match error {
-                            TagError::Superfluous(text, location) => {
-                                self.add_superfluous_diagnostic(text, location.range());
-                            }
-                            TagError::Missing(text, location) => {
-                                self.add_diagnostic_with_code(
-                                    format!("\"{}\" is missing", text),
-                                    DiagnosticSeverity::ERROR,
-                                    node.range(),
-                                    CodeActionImplementation::ADD_MISSING_CODE,
-                                    serde_json::to_value(TextEdit {
-                                        range: location.range(),
-                                        new_text: text.to_string(),
-                                    })
-                                    .ok(),
-                                );
-                            }
-                        }
-                    }
-                    self.validate_tag(tag)?;
-                }
-                Node::Tag(ParsedTag::Unparsable(message, location)) => {
-                    self.add_diagnostic(
-                        message.to_string(),
-                        DiagnosticSeverity::ERROR,
-                        location.range(),
-                    );
-                }
-                Node::Html(ParsedHtml::Valid(html)) => self.validate_html(html)?,
-                Node::Html(ParsedHtml::Erroneous(html, errors)) => {
-                    for error in errors {
-                        match error {
-                            TagError::Superfluous(text, location) => {
-                                self.add_superfluous_diagnostic(text, location.range());
-                            }
-                            TagError::Missing(text, location) => {
-                                self.add_diagnostic_with_code(
-                                    format!("\"{}\" is missing", text),
-                                    DiagnosticSeverity::ERROR,
-                                    html.range(),
-                                    CodeActionImplementation::ADD_MISSING_CODE,
-                                    serde_json::to_value(TextEdit {
-                                        range: location.range(),
-                                        new_text: text.to_string(),
-                                    })
-                                    .ok(),
-                                );
-                            }
-                        }
-                    }
-                    self.validate_html(html)?;
-                },
-                Node::Html(ParsedHtml::Unparsable(message, location)) => {
-                    self.add_diagnostic(
-                        message.to_string(),
-                        DiagnosticSeverity::ERROR,
-                        location.range(),
-                    );
-                },
+                Node::Tag(tag) => self.validate_parsed_spml_tag(tag)?,
+                Node::Html(html) => self.validate_parsed_html(html)?,
                 Node::Text(_) => (),
                 Node::Error(ErrorNode { content, range }) => {
                     self.add_diagnostic(
@@ -268,6 +209,80 @@ impl DiagnosticCollector {
                 }
             }
         }
+        return Ok(());
+    }
+
+    fn validate_parsed_spml_tag(&mut self, tag: &ParsedTag<SpmlTag>) -> Result<()> {
+        match tag {
+            ParsedTag::Valid(tag) => self.validate_tag(tag)?,
+            ParsedTag::Erroneous(tag, errors) => {
+                for error in errors {
+                    match error {
+                        TagError::Superfluous(text, location) => {
+                            self.add_superfluous_diagnostic(text, location.range());
+                        }
+                        TagError::Missing(text, location) => {
+                            self.add_diagnostic_with_code(
+                                format!("\"{}\" is missing", text),
+                                DiagnosticSeverity::ERROR,
+                                tag.range(),
+                                CodeActionImplementation::ADD_MISSING_CODE,
+                                serde_json::to_value(TextEdit {
+                                    range: location.range(),
+                                    new_text: text.to_string(),
+                                })
+                                .ok(),
+                            );
+                        }
+                    }
+                }
+                self.validate_tag(tag)?;
+            }
+            ParsedTag::Unparsable(message, location) => {
+                self.add_diagnostic(
+                    message.to_string(),
+                    DiagnosticSeverity::ERROR,
+                    location.range(),
+                );
+            }
+        };
+        return Ok(());
+    }
+
+    fn validate_parsed_html(&mut self, tag: &ParsedHtml) -> Result<()> {
+        match tag {
+            ParsedHtml::Valid(html) => self.validate_html(html)?,
+            ParsedHtml::Erroneous(html, errors) => {
+                for error in errors {
+                    match error {
+                        TagError::Superfluous(text, location) => {
+                            self.add_superfluous_diagnostic(text, location.range());
+                        }
+                        TagError::Missing(text, location) => {
+                            self.add_diagnostic_with_code(
+                                format!("\"{}\" is missing", text),
+                                DiagnosticSeverity::ERROR,
+                                html.range(),
+                                CodeActionImplementation::ADD_MISSING_CODE,
+                                serde_json::to_value(TextEdit {
+                                    range: location.range(),
+                                    new_text: text.to_string(),
+                                })
+                                .ok(),
+                            );
+                        }
+                    }
+                }
+                self.validate_html(html)?;
+            }
+            ParsedHtml::Unparsable(message, location) => {
+                self.add_diagnostic(
+                    message.to_string(),
+                    DiagnosticSeverity::ERROR,
+                    location.range(),
+                );
+            }
+        };
         return Ok(());
     }
 
@@ -754,10 +769,25 @@ impl DiagnosticCollector {
     }
 
     fn validate_html(&mut self, html: &HtmlNode) -> Result<()> {
-        // TODO: html attributes can contain spml tags
         for attribute in &html.attributes {
             match attribute {
-                ParsedAttribute::Valid(_) => (),
+                ParsedAttribute::Valid(tag) => {
+                    if let Some(value) = &tag.value {
+                        match &value.content {
+                            HtmlAttributeValueContent::Tag(tag) => {
+                                self.validate_parsed_spml_tag(tag)?
+                            }
+                            HtmlAttributeValueContent::Fragmented(fragments) => {
+                                for fragment in fragments {
+                                    if let HtmlAttributeValueFragment::Tag(tag) = fragment {
+                                        self.validate_parsed_spml_tag(tag)?
+                                    }
+                                }
+                            }
+                            _ => (),
+                        }
+                    }
+                }
                 ParsedAttribute::Erroneous(_, errors) => {
                     for error in errors {
                         match error {
