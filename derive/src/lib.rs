@@ -33,7 +33,7 @@ pub fn tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
                     fn end(&self) -> Position {
                         return match self {
-                            #(#start,)*
+                            #(#end,)*
                         };
                     }
                 }
