@@ -378,30 +378,16 @@ fn construct_condition_to_name<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
 }
 
 fn parse_is_null(root: &Condition) -> Option<(String, String)> {
-    if let Some(argument) = is_null_argument(root) {
-        return Some((argument, "true".to_string()));
-    }
     match root {
+        Condition::Function(Function {
+            name, arguments, ..
+        }) if arguments.len() == 1 && name == "isNull" => match &arguments[0].argument {
+            Argument::Object(interpolation) => Some((interpolation.content.to_string(), "true".to_string())),
+            argument => Some((argument.to_string(), "true".to_string())),
+        },
         Condition::NegatedCondition { condition, .. } => {
             is_null_argument(condition).map(|argument| (argument, "false".to_string()))
         }
-        Condition::Comparisson {
-            left,
-            // TODO: negate opposite value if operator is unequal
-            operator: _operator @ /*(*/ ComparissonOperator::Equal, /*| ComparissonOperator::Unequal)*/
-            right,
-            ..
-        } => match &**left {
-            Comparable::Condition(condition) => {
-                is_null_argument(&*condition).map(|argument| (argument, right.to_string()))
-            }
-            _ => match &**right {
-                Comparable::Condition(condition) => {
-                    is_null_argument(&*condition).map(|argument| (argument, left.to_string()))
-                }
-                _ => None,
-            },
-        },
         _ => None,
     }
 }

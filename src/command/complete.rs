@@ -211,8 +211,6 @@ impl CompletionCollector<'_> {
             }
         }
         for (name, attribute) in &tag.spel_attributes() {
-            // TODO: might need to think of something else if treesitter does not understand
-            // `<tag attribute="` as Erroneous ...
             let attribute = match attribute {
                 ParsedAttribute::Valid(attribute) => attribute,
                 ParsedAttribute::Erroneous(attribute, _) => attribute,

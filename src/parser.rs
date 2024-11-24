@@ -436,7 +436,6 @@ pub(crate) enum SpmlTag {
     SptWorklist(SptWorklist),
 }
 
-// TODO: evaluate
 pub(crate) struct DepthCounter {
     value: u8,
 }

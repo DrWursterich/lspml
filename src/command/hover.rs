@@ -384,8 +384,30 @@ fn hover_regex(_regex: &ast::Regex, _cursor: &Position, _offset: &Point) -> Opti
     return None;
 }
 
-fn hover_text(_text: &ast::Word, _cursor: &Position, _offset: &Point) -> Option<String> {
-    // TODO
+fn hover_text(text: &ast::Word, cursor: &Position, offset: &Point) -> Option<String> {
+    match text.fragments.len() {
+        1 => match &text.fragments[0] {
+            ast::WordFragment::String(_) => {
+                // there are no doc comments in spml
+            }
+            ast::WordFragment::Interpolation(interpolation) => {
+                return hover_object(&interpolation.content, cursor, offset);
+            }
+        },
+        _ => {
+            for fragment in &text.fragments {
+                if let ast::WordFragment::Interpolation(interpolation) = fragment {
+                    if let Ordering::Less = compare_cursor_to_location(
+                        &interpolation.closing_bracket_location,
+                        cursor,
+                        offset,
+                    ) {
+                        return hover_object(&interpolation.content, cursor, offset);
+                    };
+                }
+            }
+        }
+    };
     return None;
 }
 

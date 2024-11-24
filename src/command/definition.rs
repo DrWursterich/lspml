@@ -8,9 +8,9 @@ use crate::{
     grammar::{TagAttributeType, TagAttributes},
     modules,
     parser::{
-        AttributeValue, HtmlAttributeValueContent, HtmlAttributeValueFragment,
-        HtmlNode, Node, ParsableTag, ParsedAttribute, ParsedHtml, ParsedTag, SpelAttribute,
-        SpelAttributeValue, SpmlTag,
+        AttributeValue, HtmlAttributeValueContent, HtmlAttributeValueFragment, HtmlNode, Node,
+        ParsableTag, ParsedAttribute, ParsedHtml, ParsedTag, SpelAttribute, SpelAttributeValue,
+        SpmlTag,
     },
     spel::ast::{
         Argument, Comparable, Condition, Expression, Function, Identifier, Location, Object, Query,
@@ -308,13 +308,15 @@ fn find_node_in_identifier(
     cursor: &Position,
     offset: &Point,
 ) -> Option<Variable> {
-    // TODO
     match identifier {
+        // TODO
+        // Identifier::FieldAccess { identifier, field, dot_location } => {
+        // }
         Identifier::Name(Word { fragments }) => {
             match fragments.len() {
                 1 => match &fragments[0] {
                     WordFragment::String(_) => {
-                        // there are no doc comments in spml
+                        // this IS the definition
                     }
                     WordFragment::Interpolation(interpolation) => {
                         return find_node_in_object(&interpolation.content, cursor, offset);
@@ -560,8 +562,30 @@ fn find_node_in_regex(_regex: &Regex, _cursor: &Position, _offset: &Point) -> Op
     return None;
 }
 
-fn find_node_in_text(_text: &Word, _cursor: &Position, _offset: &Point) -> Option<Variable> {
-    // TODO
+fn find_node_in_text(text: &Word, cursor: &Position, offset: &Point) -> Option<Variable> {
+    match text.fragments.len() {
+        1 => match &text.fragments[0] {
+            WordFragment::String(_) => {
+                // there are no doc comments in spml
+            }
+            WordFragment::Interpolation(interpolation) => {
+                return find_node_in_object(&interpolation.content, cursor, offset);
+            }
+        },
+        _ => {
+            for fragment in &text.fragments {
+                if let WordFragment::Interpolation(interpolation) = fragment {
+                    if let Ordering::Less = compare_cursor_to_location(
+                        &interpolation.closing_bracket_location,
+                        cursor,
+                        offset,
+                    ) {
+                        return find_node_in_object(&interpolation.content, cursor, offset);
+                    };
+                }
+            }
+        }
+    };
     return None;
 }
 
