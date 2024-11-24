@@ -8,7 +8,6 @@ A work-in-progress language server for the sitepark markup language (spml).
 - hover for documentation of
     - most tags
     - most attributes
-    - attribute enum values
     - global functions in spel attribute values
 - diagnostics on:
     - syntax errors
@@ -21,7 +20,7 @@ A work-in-progress language server for the sitepark markup language (spml).
         - incorrect argument counts for global functions
 - completion for:
     - tags
-    - `</`, closing the last unclosed tag
+    - the last unclosed tag
     - attributes
     - attribute values that either:
         - have a fixed set of possible values
