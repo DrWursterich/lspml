@@ -291,8 +291,17 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                                     ));
                                     continue;
                                 },
-                                NodeMovingResult::Ok(node) => node_location(node),
-                                _ => continue,
+                                NodeMovingResult::Ok(node) if node.kind().ends_with("_tag_close") => {
+                                    node_location(node)
+                                },
+                                NodeMovingResult::Ok(node) => {
+                                    return Ok(Err((
+                                        parser.node_text(&node)?.to_string(),
+                                        node_location(node),
+                                    )));
+                                },
+                                // cannot happen
+                                NodeMovingResult::NonExistent => continue,
                             }));
                         }
                     }
