@@ -46,10 +46,20 @@ impl CompletionCollector<'_> {
             Some(Node::Tag(ParsedTag::Valid(tag))) => self.search_completions_in_tag(tag),
             Some(Node::Tag(ParsedTag::Erroneous(tag, errors))) => {
                 for error in errors {
-                    if let TagError::Superfluous(_, location) = error {
-                        if location.contains(&self.cursor) {
+                    match error {
+                        TagError::Superfluous(_, location) if location.contains(&self.cursor) => {
                             return self.complete_attributes_of(tag);
                         }
+                        TagError::Missing(text, _) => {
+                            self.completions.push(CompletionItem {
+                                detail: None,
+                                documentation: None,
+                                insert_text: Some(text.to_string()),
+                                kind: Some(CompletionItemKind::SNIPPET),
+                                ..Default::default()
+                            });
+                        }
+                        err => log::debug!("unhandled tag error {:?} in {:?}", err, tag),
                     }
                 }
                 self.search_completions_in_tag(tag);
@@ -59,7 +69,7 @@ impl CompletionCollector<'_> {
                 // only case we could ever trigger this is by moving the cursor in front of an
                 // attribute - where it could be arguably okay to suggest "/>" - but that is not
                 // the intended usecase here.
-                // in order to change this we would have to instead check the closes node before
+                // in order to change this we would have to instead check the closest node before
                 // the cursor for missing operators (maybe even skipping text nodes?) in addition
                 // to what we're completing originally...
                 //
