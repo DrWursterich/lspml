@@ -5,7 +5,7 @@ use std::{cmp::Ordering, str::Utf8Error};
 use anyhow::Result;
 use lsp_types::{Position, Range};
 
-pub use derive::{DocumentNode, ParsableTag};
+pub use derive::{DocumentNode, ParsableTag, Tag};
 use phf::phf_map;
 
 use crate::{
@@ -24,7 +24,7 @@ static TAGS: phf::Map<
     "argument_tag" => |parser| Ok(SpArgument::parse(parser)?.map(SpmlTag::SpArgument)),
     "barcode_tag" => |parser| Ok(SpBarcode::parse(parser)?.map(SpmlTag::SpBarcode)),
     "break_tag" => |parser| Ok(SpBreak::parse(parser)?.map(SpmlTag::SpBreak)),
-    "calendarsheet_tag" => |parser| Ok( SpCalendarsheet::parse(parser)?.map(SpmlTag::SpCalendarsheet)),
+    "calendarsheet_tag" => |parser| Ok(SpCalendarsheet::parse(parser)?.map(SpmlTag::SpCalendarsheet)),
     "checkbox_tag" => |parser| Ok(SpCheckbox::parse(parser)?.map(SpmlTag::SpCheckbox)),
     "code_tag" => |parser| Ok(SpCode::parse(parser)?.map(SpmlTag::SpCode)),
     "collection_tag" => |parser| Ok(SpCollection::parse(parser)?.map(SpmlTag::SpCollection)),
@@ -351,7 +351,7 @@ pub(crate) struct ErrorNode {
     pub(crate) range: Range,
 }
 
-#[derive(Clone, Debug, PartialEq, DocumentNode, ParsableTag)]
+#[derive(Clone, Debug, PartialEq, Tag, DocumentNode, ParsableTag)]
 pub(crate) enum SpmlTag {
     SpArgument(SpArgument),
     SpAttribute(SpAttribute),
@@ -436,181 +436,6 @@ pub(crate) enum SpmlTag {
     SptWorklist(SptWorklist),
 }
 
-// TODO: ...
-impl Tag for SpmlTag {
-    fn start(&self) -> Position {
-        return match &self {
-            SpmlTag::SpArgument(tag) => tag.start(),
-            SpmlTag::SpAttribute(tag) => tag.start(),
-            SpmlTag::SpBarcode(tag) => tag.start(),
-            SpmlTag::SpBreak(tag) => tag.start(),
-            SpmlTag::SpCalendarsheet(tag) => tag.start(),
-            SpmlTag::SpCheckbox(tag) => tag.start(),
-            SpmlTag::SpCode(tag) => tag.start(),
-            SpmlTag::SpCollection(tag) => tag.start(),
-            SpmlTag::SpCondition(tag) => tag.start(),
-            SpmlTag::SpDiff(tag) => tag.start(),
-            SpmlTag::SpElse(tag) => tag.start(),
-            SpmlTag::SpElseIf(tag) => tag.start(),
-            SpmlTag::SpError(tag) => tag.start(),
-            SpmlTag::SpExpire(tag) => tag.start(),
-            SpmlTag::SpFilter(tag) => tag.start(),
-            SpmlTag::SpFor(tag) => tag.start(),
-            SpmlTag::SpForm(tag) => tag.start(),
-            SpmlTag::SpHidden(tag) => tag.start(),
-            SpmlTag::SpIf(tag) => tag.start(),
-            SpmlTag::SpInclude(tag) => tag.start(),
-            SpmlTag::SpIo(tag) => tag.start(),
-            SpmlTag::SpIterator(tag) => tag.start(),
-            SpmlTag::SpJson(tag) => tag.start(),
-            SpmlTag::SpLinkedinformation(tag) => tag.start(),
-            SpmlTag::SpLinktree(tag) => tag.start(),
-            SpmlTag::SpLivetree(tag) => tag.start(),
-            SpmlTag::SpLog(tag) => tag.start(),
-            SpmlTag::SpLogin(tag) => tag.start(),
-            SpmlTag::SpLoop(tag) => tag.start(),
-            SpmlTag::SpMap(tag) => tag.start(),
-            SpmlTag::SpOption(tag) => tag.start(),
-            SpmlTag::SpPassword(tag) => tag.start(),
-            SpmlTag::SpPrint(tag) => tag.start(),
-            SpmlTag::SpQuerytree(tag) => tag.start(),
-            SpmlTag::SpRadio(tag) => tag.start(),
-            SpmlTag::SpRange(tag) => tag.start(),
-            SpmlTag::SpReturn(tag) => tag.start(),
-            SpmlTag::SpSass(tag) => tag.start(),
-            SpmlTag::SpScaleimage(tag) => tag.start(),
-            SpmlTag::SpScope(tag) => tag.start(),
-            SpmlTag::SpSearch(tag) => tag.start(),
-            SpmlTag::SpSelect(tag) => tag.start(),
-            SpmlTag::SpSet(tag) => tag.start(),
-            SpmlTag::SpSort(tag) => tag.start(),
-            SpmlTag::SpSubinformation(tag) => tag.start(),
-            SpmlTag::SpTagbody(tag) => tag.start(),
-            SpmlTag::SpText(tag) => tag.start(),
-            SpmlTag::SpTextarea(tag) => tag.start(),
-            SpmlTag::SpTextimage(tag) => tag.start(),
-            SpmlTag::SpThrow(tag) => tag.start(),
-            SpmlTag::SpToggle(tag) => tag.start(),
-            SpmlTag::SpUpload(tag) => tag.start(),
-            SpmlTag::SpUrl(tag) => tag.start(),
-            SpmlTag::SpWarning(tag) => tag.start(),
-            SpmlTag::SpWorklist(tag) => tag.start(),
-            SpmlTag::SpZip(tag) => tag.start(),
-            SpmlTag::SptCounter(tag) => tag.start(),
-            SpmlTag::SptDate(tag) => tag.start(),
-            SpmlTag::SptDiff(tag) => tag.start(),
-            SpmlTag::SptEmail2Img(tag) => tag.start(),
-            SpmlTag::SptEncryptemail(tag) => tag.start(),
-            SpmlTag::SptEscapeemail(tag) => tag.start(),
-            SpmlTag::SptFormsolutions(tag) => tag.start(),
-            SpmlTag::SptId2Url(tag) => tag.start(),
-            SpmlTag::SptIlink(tag) => tag.start(),
-            SpmlTag::SptImageeditor(tag) => tag.start(),
-            SpmlTag::SptImp(tag) => tag.start(),
-            SpmlTag::SptIterator(tag) => tag.start(),
-            SpmlTag::SptLink(tag) => tag.start(),
-            SpmlTag::SptNumber(tag) => tag.start(),
-            SpmlTag::SptPersonalization(tag) => tag.start(),
-            SpmlTag::SptPrehtml(tag) => tag.start(),
-            SpmlTag::SptSmarteditor(tag) => tag.start(),
-            SpmlTag::SptSpml(tag) => tag.start(),
-            SpmlTag::SptText(tag) => tag.start(),
-            SpmlTag::SptTextarea(tag) => tag.start(),
-            SpmlTag::SptTimestamp(tag) => tag.start(),
-            SpmlTag::SptTinymce(tag) => tag.start(),
-            SpmlTag::SptUpdown(tag) => tag.start(),
-            SpmlTag::SptUpload(tag) => tag.start(),
-            SpmlTag::SptWorklist(tag) => tag.start(),
-        };
-    }
-
-    fn end(&self) -> Position {
-        return match &self {
-            SpmlTag::SpArgument(tag) => tag.end(),
-            SpmlTag::SpAttribute(tag) => tag.end(),
-            SpmlTag::SpBarcode(tag) => tag.end(),
-            SpmlTag::SpBreak(tag) => tag.end(),
-            SpmlTag::SpCalendarsheet(tag) => tag.end(),
-            SpmlTag::SpCheckbox(tag) => tag.end(),
-            SpmlTag::SpCode(tag) => tag.end(),
-            SpmlTag::SpCollection(tag) => tag.end(),
-            SpmlTag::SpCondition(tag) => tag.end(),
-            SpmlTag::SpDiff(tag) => tag.end(),
-            SpmlTag::SpElse(tag) => tag.end(),
-            SpmlTag::SpElseIf(tag) => tag.end(),
-            SpmlTag::SpError(tag) => tag.end(),
-            SpmlTag::SpExpire(tag) => tag.end(),
-            SpmlTag::SpFilter(tag) => tag.end(),
-            SpmlTag::SpFor(tag) => tag.end(),
-            SpmlTag::SpForm(tag) => tag.end(),
-            SpmlTag::SpHidden(tag) => tag.end(),
-            SpmlTag::SpIf(tag) => tag.end(),
-            SpmlTag::SpInclude(tag) => tag.end(),
-            SpmlTag::SpIo(tag) => tag.end(),
-            SpmlTag::SpIterator(tag) => tag.end(),
-            SpmlTag::SpJson(tag) => tag.end(),
-            SpmlTag::SpLinkedinformation(tag) => tag.end(),
-            SpmlTag::SpLinktree(tag) => tag.end(),
-            SpmlTag::SpLivetree(tag) => tag.end(),
-            SpmlTag::SpLog(tag) => tag.end(),
-            SpmlTag::SpLogin(tag) => tag.end(),
-            SpmlTag::SpLoop(tag) => tag.end(),
-            SpmlTag::SpMap(tag) => tag.end(),
-            SpmlTag::SpOption(tag) => tag.end(),
-            SpmlTag::SpPassword(tag) => tag.end(),
-            SpmlTag::SpPrint(tag) => tag.end(),
-            SpmlTag::SpQuerytree(tag) => tag.end(),
-            SpmlTag::SpRadio(tag) => tag.end(),
-            SpmlTag::SpRange(tag) => tag.end(),
-            SpmlTag::SpReturn(tag) => tag.end(),
-            SpmlTag::SpSass(tag) => tag.end(),
-            SpmlTag::SpScaleimage(tag) => tag.end(),
-            SpmlTag::SpScope(tag) => tag.end(),
-            SpmlTag::SpSearch(tag) => tag.end(),
-            SpmlTag::SpSelect(tag) => tag.end(),
-            SpmlTag::SpSet(tag) => tag.end(),
-            SpmlTag::SpSort(tag) => tag.end(),
-            SpmlTag::SpSubinformation(tag) => tag.end(),
-            SpmlTag::SpTagbody(tag) => tag.end(),
-            SpmlTag::SpText(tag) => tag.end(),
-            SpmlTag::SpTextarea(tag) => tag.end(),
-            SpmlTag::SpTextimage(tag) => tag.end(),
-            SpmlTag::SpThrow(tag) => tag.end(),
-            SpmlTag::SpToggle(tag) => tag.end(),
-            SpmlTag::SpUpload(tag) => tag.end(),
-            SpmlTag::SpUrl(tag) => tag.end(),
-            SpmlTag::SpWarning(tag) => tag.end(),
-            SpmlTag::SpWorklist(tag) => tag.end(),
-            SpmlTag::SpZip(tag) => tag.end(),
-            SpmlTag::SptCounter(tag) => tag.end(),
-            SpmlTag::SptDate(tag) => tag.end(),
-            SpmlTag::SptDiff(tag) => tag.end(),
-            SpmlTag::SptEmail2Img(tag) => tag.end(),
-            SpmlTag::SptEncryptemail(tag) => tag.end(),
-            SpmlTag::SptEscapeemail(tag) => tag.end(),
-            SpmlTag::SptFormsolutions(tag) => tag.end(),
-            SpmlTag::SptId2Url(tag) => tag.end(),
-            SpmlTag::SptIlink(tag) => tag.end(),
-            SpmlTag::SptImageeditor(tag) => tag.end(),
-            SpmlTag::SptImp(tag) => tag.end(),
-            SpmlTag::SptIterator(tag) => tag.end(),
-            SpmlTag::SptLink(tag) => tag.end(),
-            SpmlTag::SptNumber(tag) => tag.end(),
-            SpmlTag::SptPersonalization(tag) => tag.end(),
-            SpmlTag::SptPrehtml(tag) => tag.end(),
-            SpmlTag::SptSmarteditor(tag) => tag.end(),
-            SpmlTag::SptSpml(tag) => tag.end(),
-            SpmlTag::SptText(tag) => tag.end(),
-            SpmlTag::SptTextarea(tag) => tag.end(),
-            SpmlTag::SptTimestamp(tag) => tag.end(),
-            SpmlTag::SptTinymce(tag) => tag.end(),
-            SpmlTag::SptUpdown(tag) => tag.end(),
-            SpmlTag::SptUpload(tag) => tag.end(),
-            SpmlTag::SptWorklist(tag) => tag.end(),
-        };
-    }
-}
-
 // TODO: evaluate
 pub(crate) struct DepthCounter {
     value: u8,
@@ -631,12 +456,10 @@ impl DepthCounter {
 }
 
 macro_rules! tag_struct {
-    (#[$definition:expr] $name:ident { $( $param:ident ),* $(,)* }) => {
-        #[derive(Clone, Debug, PartialEq, DocumentNode, ParsableTag)]
-        #[tag_definition($definition)]
+    (#[$definition:expr] $name:ident {}) => {
+        #[derive(Clone, Debug, PartialEq, DocumentNode)]
         pub(crate) struct $name {
             pub(crate) open_location: SingleLineLocation,
-            $(pub(crate) $param: Option<ParsedAttribute<SpelAttribute>>,)*
             pub(crate) body: Option<TagBody>,
             pub(crate) close_location: SingleLineLocation,
         }
@@ -648,6 +471,513 @@ macro_rules! tag_struct {
 
             fn end(&self) -> Position {
                 return self.close_location.end();
+            }
+        }
+
+        impl $name {
+            fn try_parse(
+                parser: &mut TreeParser,
+                depth_counter: &mut DepthCounter,
+            ) -> Result<ParsedTag<Self>> {
+                let parent_node = parser.cursor.node();
+                let mut errors = Vec::new();
+                let mut movement = NodeMovement::FirstChild;
+                depth_counter.bump();
+                let open_location;
+                loop {
+                    open_location = match parser.goto(&movement) {
+                        NodeMovingResult::NonExistent | NodeMovingResult::Missing(_) => {
+                            return Err(anyhow::anyhow!("tag is empty"));
+                        },
+                        NodeMovingResult::Erroneous(node) => {
+                            return Ok(ParsedTag::Unparsable(
+                                parser.node_text(&node)?.to_string(),
+                                node_location(node),
+                            ));
+                        },
+                        NodeMovingResult::Superfluous(node) => {
+                            errors.push(TagError::Superfluous(
+                                parser.node_text(&node)?.to_string(),
+                                node_location(node),
+                            ));
+                            movement = NodeMovement::NextSibling;
+                            continue;
+                        },
+                        NodeMovingResult::Ok(node) => match node_location(node) {
+                            Location::SingleLine(location) => location,
+                            location => return Ok(ParsedTag::Unparsable(
+                                format!(
+                                    "\"{}\" should be on a single line",
+                                    parser.node_text(&node)?,
+                                ),
+                                location,
+                            ))
+                        },
+                    };
+                    break;
+                }
+                let mut body = None;
+                let close_location;
+                loop {
+                    close_location = match parser.goto(&NodeMovement::NextSibling) {
+                        NodeMovingResult::NonExistent => return Ok(ParsedTag::Unparsable(
+                            format!("\"{}\" tag is unclosed", $definition.name),
+                            node_location(parent_node),
+                        )),
+                        NodeMovingResult::Missing(node) if node.kind() == ">" => {
+                            body = Some(match parser.parse_tag_body()? {
+                                Some(body) => body,
+                                None => return Ok(ParsedTag::Unparsable(
+                                    format!("\"{}\" tag is unclosed", $definition.name),
+                                    node_location(node),
+                                )),
+                            });
+                            match $name::parse_closing_tag(parser, &mut errors, node)? {
+                                Ok(location) => location,
+                                Err((text, location)) => return Ok(
+                                    ParsedTag::Unparsable(text, location),
+                                ),
+                            }
+                        },
+                        NodeMovingResult::Missing(node) if node.kind() == "self_closing_tag_end" => {
+                            // tree-sitter puts missing "/>" nodes always at the first
+                            // possible location. in order for completion to work we
+                            // instead want it to include all following whitespace, so we
+                            // search for the next node and place it in front of it. if
+                            // this is the last node we have to manually split the
+                            // documents text to find "trailing" whitespace, which is not
+                            // included in any node.
+                            // however, the error reported must still be on the first
+                            // possible location such that the quick-fix action inserts it
+                            // there.
+                            errors.push(TagError::Missing("/>".to_string(), node_location(node)));
+                            parser.move_missing_node_past_whitespaces(node)?
+                        },
+                        NodeMovingResult::Missing(node) => {
+                            return Ok(ParsedTag::Unparsable(
+                                format!(
+                                    "\"{}\" is missing in \"{}\" tag",
+                                    node.kind(),
+                                    $definition.name
+                                ),
+                                node_location(parent_node),
+                            ));
+                        },
+                        NodeMovingResult::Erroneous(node) => {
+                            return Ok(ParsedTag::Unparsable(
+                                parser.node_text(&node)?.to_string(),
+                                node_location(node)
+                            ));
+                        },
+                        NodeMovingResult::Superfluous(node) => {
+                            errors.push(TagError::Superfluous(
+                                parser.node_text(&node)?.to_string(),
+                                node_location(node),
+                            ));
+                            continue;
+                        },
+                        NodeMovingResult::Ok(node) => match node.kind() {
+                            "self_closing_tag_end" => node_location(node),
+                            ">" => {
+                                body = Some(match parser.parse_tag_body()? {
+                                    Some(body) => body,
+                                    None => return Ok(ParsedTag::Unparsable(
+                                        format!("\"{}\" tag is unclosed", $definition.name),
+                                        node_location(node),
+                                    )),
+                                });
+                                match $name::parse_closing_tag(parser, &mut errors, node)? {
+                                    Ok(location) => location,
+                                    Err((text, location)) => return Ok(
+                                        ParsedTag::Unparsable(text, location),
+                                    ),
+                                }
+                            },
+                            _ => continue,
+                        },
+                    };
+                    break;
+                }
+                let close_location = match close_location {
+                    Location::SingleLine(location) => location,
+                    location => return Ok(ParsedTag::Unparsable(
+                        format!(
+                            "\"{}\" should be on a single line",
+                            parser.node_text(&parser.cursor.node())?,
+                        ),
+                        location,
+                    ))
+                };
+                let tag = Self {
+                    open_location,
+                    body,
+                    close_location,
+                };
+                return Ok(match errors.is_empty() {
+                    true => ParsedTag::Valid(tag),
+                    false => ParsedTag::Erroneous(tag, errors),
+                });
+            }
+
+            fn parse_closing_tag(
+                parser: &mut TreeParser,
+                errors: &mut Vec<TagError>,
+                body_open_node: tree_sitter::Node<'_>,
+            ) -> Result<Result<Location, (String, Location)>> {
+                loop {
+                    return Ok(Ok(match parser.goto(&NodeMovement::Current) {
+                        NodeMovingResult::Missing(node) => {
+                            // tree-sitter puts missing "<{tag}/>" nodes always after all
+                            // its siblings, which is ideal for completion.
+                            // however, the error reported must be on the first possible
+                            // location such that the quick-fix action inserts it there.
+                            let start_position = body_open_node.start_position();
+                            errors.push(TagError::Missing(
+                                format!("</{}>", $definition.name),
+                                Location::SingleLine(SingleLineLocation {
+                                    char: start_position.column + 1,
+                                    line: start_position.row,
+                                    length: 0,
+                                }),
+                            ));
+                            parser.move_missing_node_past_whitespaces(node)?
+                        },
+                        NodeMovingResult::Erroneous(node) => {
+                            return Ok(Err((
+                                parser.node_text(&node)?.to_string(),
+                                node_location(node),
+                            )));
+                        },
+                        NodeMovingResult::Superfluous(node) => {
+                            errors.push(TagError::Superfluous(
+                                parser.node_text(&node)?.to_string(),
+                                node_location(node),
+                            ));
+                            continue;
+                        },
+                        NodeMovingResult::Ok(node) if node.kind().ends_with("_tag_close") => {
+                            node_location(node)
+                        },
+                        NodeMovingResult::Ok(node) => {
+                            return Ok(Err((
+                                parser.node_text(&node)?.to_string(),
+                                node_location(node),
+                            )));
+                        },
+                        // cannot happen
+                        NodeMovingResult::NonExistent => continue,
+                    }));
+                }
+            }
+        }
+
+        impl ParsableTag for $name {
+            fn parse(parser: &mut TreeParser) -> Result<ParsedTag<Self>> {
+                let mut depth_counter = DepthCounter::new();
+                let result = $name::try_parse(parser, &mut depth_counter);
+                for _ in 0..depth_counter.get() {
+                    parser.cursor.goto_parent();
+                }
+                return result;
+            }
+
+            fn definition(&self) -> TagDefinition {
+                return $definition;
+            }
+
+            fn open_location(&self) -> &SingleLineLocation {
+                return &self.open_location;
+            }
+
+            fn close_location(&self) -> &SingleLineLocation {
+                return &self.close_location;
+            }
+
+            fn body(&self) -> &Option<TagBody> {
+                return &self.body;
+            }
+
+            fn spel_attributes(&self) -> Vec<(&str, &ParsedAttribute<SpelAttribute>)> {
+                return vec![];
+            }
+
+            fn spel_attribute(&self, _name: &str) -> Option<&ParsedAttribute<SpelAttribute>> {
+                return None;
+            }
+        }
+    };
+
+    (#[$definition:expr] $name:ident { $( $param:ident ),+ $(,)* }) => {
+        #[derive(Clone, Debug, PartialEq, DocumentNode)]
+        pub(crate) struct $name {
+            pub(crate) open_location: SingleLineLocation,
+            $(pub(crate) $param: Option<ParsedAttribute<SpelAttribute>>,)+
+            pub(crate) body: Option<TagBody>,
+            pub(crate) close_location: SingleLineLocation,
+        }
+
+        impl Tag for $name {
+            fn start(&self) -> Position {
+                return self.open_location.start();
+            }
+
+            fn end(&self) -> Position {
+                return self.close_location.end();
+            }
+        }
+
+        impl $name {
+            fn try_parse(
+                parser: &mut TreeParser,
+                depth_counter: &mut DepthCounter,
+            ) -> Result<ParsedTag<Self>> {
+                let parent_node = parser.cursor.node();
+                let mut errors = Vec::new();
+                let mut movement = NodeMovement::FirstChild;
+                depth_counter.bump();
+                let open_location;
+                loop {
+                    open_location = match parser.goto(&movement) {
+                        NodeMovingResult::NonExistent | NodeMovingResult::Missing(_) => {
+                            return Err(anyhow::anyhow!("tag is empty"));
+                        },
+                        NodeMovingResult::Erroneous(node) => {
+                            return Ok(ParsedTag::Unparsable(
+                                parser.node_text(&node)?.to_string(),
+                                node_location(node),
+                            ));
+                        },
+                        NodeMovingResult::Superfluous(node) => {
+                            errors.push(TagError::Superfluous(
+                                parser.node_text(&node)?.to_string(),
+                                node_location(node),
+                            ));
+                            movement = NodeMovement::NextSibling;
+                            continue;
+                        },
+                        NodeMovingResult::Ok(node) => match node_location(node) {
+                            Location::SingleLine(location) => location,
+                            location => return Ok(ParsedTag::Unparsable(
+                                format!(
+                                    "\"{}\" should be on a single line",
+                                    parser.node_text(&node)?,
+                                ),
+                                location,
+                            ))
+                        },
+                    };
+                    break;
+                }
+                $(let mut $param = None;)+
+                let mut body = None;
+                let close_location;
+                loop {
+                    close_location = match parser.goto(&NodeMovement::NextSibling) {
+                        NodeMovingResult::NonExistent => return Ok(ParsedTag::Unparsable(
+                            format!("\"{}\" tag is unclosed", $definition.name),
+                            node_location(parent_node),
+                        )),
+                        NodeMovingResult::Missing(node) if node.kind() == ">" => {
+                            body = Some(match parser.parse_tag_body()? {
+                                Some(body) => body,
+                                None => return Ok(ParsedTag::Unparsable(
+                                    format!("\"{}\" tag is unclosed", $definition.name),
+                                    node_location(node),
+                                )),
+                            });
+                            match $name::parse_closing_tag(parser, &mut errors, node)? {
+                                Ok(location) => location,
+                                Err((text, location)) => return Ok(
+                                    ParsedTag::Unparsable(text, location),
+                                ),
+                            }
+                        },
+                        NodeMovingResult::Missing(node) if node.kind() == "self_closing_tag_end" => {
+                            // tree-sitter puts missing "/>" nodes always at the first
+                            // possible location. in order for completion to work we
+                            // instead want it to include all following whitespace, so we
+                            // search for the next node and place it in front of it. if
+                            // this is the last node we have to manually split the
+                            // documents text to find "trailing" whitespace, which is not
+                            // included in any node.
+                            // however, the error reported must still be on the first
+                            // possible location such that the quick-fix action inserts it
+                            // there.
+                            errors.push(TagError::Missing("/>".to_string(), node_location(node)));
+                            parser.move_missing_node_past_whitespaces(node)?
+                        },
+                        NodeMovingResult::Missing(node) => {
+                            return Ok(ParsedTag::Unparsable(
+                                format!(
+                                    "\"{}\" is missing in \"{}\" tag",
+                                    node.kind(),
+                                    $definition.name
+                                ),
+                                node_location(parent_node),
+                            ));
+                        },
+                        NodeMovingResult::Erroneous(node) => {
+                            return Ok(ParsedTag::Unparsable(
+                                parser.node_text(&node)?.to_string(),
+                                node_location(node)
+                            ));
+                        },
+                        NodeMovingResult::Superfluous(node) => {
+                            errors.push(TagError::Superfluous(
+                                parser.node_text(&node)?.to_string(),
+                                node_location(node),
+                            ));
+                            continue;
+                        },
+                        NodeMovingResult::Ok(node) => match node.kind() {
+                            $(stringify!($param) => {
+                                $param = Some(
+                                    stringify!($param)
+                                        .strip_suffix("_attribute")
+                                        .and_then(|n| $definition.attributes.get_by_name(n))
+                                        .map(|d| parser.parse_spel_attribute(&d.r#type))
+                                        .unwrap()?,
+                                );
+                                continue;
+                            },)*
+                            "self_closing_tag_end" => node_location(node),
+                            ">" => {
+                                body = Some(match parser.parse_tag_body()? {
+                                    Some(body) => body,
+                                    None => return Ok(ParsedTag::Unparsable(
+                                        format!("\"{}\" tag is unclosed", $definition.name),
+                                        node_location(node),
+                                    )),
+                                });
+                                match $name::parse_closing_tag(parser, &mut errors, node)? {
+                                    Ok(location) => location,
+                                    Err((text, location)) => return Ok(
+                                        ParsedTag::Unparsable(text, location),
+                                    ),
+                                }
+                            },
+                            _ => continue,
+                        },
+                    };
+                    break;
+                }
+                let close_location = match close_location {
+                    Location::SingleLine(location) => location,
+                    location => return Ok(ParsedTag::Unparsable(
+                        format!(
+                            "\"{}\" should be on a single line",
+                            parser.node_text(&parser.cursor.node())?,
+                        ),
+                        location,
+                    ))
+                };
+                let tag = Self {
+                    open_location,
+                    $($param,)+
+                    body,
+                    close_location,
+                };
+                return Ok(match errors.is_empty() {
+                    true => ParsedTag::Valid(tag),
+                    false => ParsedTag::Erroneous(tag, errors),
+                });
+            }
+
+            fn parse_closing_tag(
+                parser: &mut TreeParser,
+                errors: &mut Vec<TagError>,
+                body_open_node: tree_sitter::Node<'_>,
+            ) -> Result<Result<Location, (String, Location)>> {
+                loop {
+                    return Ok(Ok(match parser.goto(&NodeMovement::Current) {
+                        NodeMovingResult::Missing(node) => {
+                            // tree-sitter puts missing "<{tag}/>" nodes always after all
+                            // its siblings, which is ideal for completion.
+                            // however, the error reported must be on the first possible
+                            // location such that the quick-fix action inserts it there.
+                            let start_position = body_open_node.start_position();
+                            errors.push(TagError::Missing(
+                                format!("</{}>", $definition.name),
+                                Location::SingleLine(SingleLineLocation {
+                                    char: start_position.column + 1,
+                                    line: start_position.row,
+                                    length: 0,
+                                }),
+                            ));
+                            parser.move_missing_node_past_whitespaces(node)?
+                        },
+                        NodeMovingResult::Erroneous(node) => {
+                            return Ok(Err((
+                                parser.node_text(&node)?.to_string(),
+                                node_location(node),
+                            )));
+                        },
+                        NodeMovingResult::Superfluous(node) => {
+                            errors.push(TagError::Superfluous(
+                                parser.node_text(&node)?.to_string(),
+                                node_location(node),
+                            ));
+                            continue;
+                        },
+                        NodeMovingResult::Ok(node) if node.kind().ends_with("_tag_close") => {
+                            node_location(node)
+                        },
+                        NodeMovingResult::Ok(node) => {
+                            return Ok(Err((
+                                parser.node_text(&node)?.to_string(),
+                                node_location(node),
+                            )));
+                        },
+                        // cannot happen
+                        NodeMovingResult::NonExistent => continue,
+                    }));
+                }
+            }
+        }
+
+        impl ParsableTag for $name {
+            fn parse(parser: &mut TreeParser) -> Result<ParsedTag<Self>> {
+                let mut depth_counter = DepthCounter::new();
+                let result = $name::try_parse(parser, &mut depth_counter);
+                for _ in 0..depth_counter.get() {
+                    parser.cursor.goto_parent();
+                }
+                return result;
+            }
+
+            fn definition(&self) -> TagDefinition {
+                return $definition;
+            }
+
+            fn open_location(&self) -> &SingleLineLocation {
+                return &self.open_location;
+            }
+
+            fn close_location(&self) -> &SingleLineLocation {
+                return &self.close_location;
+            }
+
+            fn body(&self) -> &Option<TagBody> {
+                return &self.body;
+            }
+
+            fn spel_attributes(&self) -> Vec<(&str, &ParsedAttribute<SpelAttribute>)> {
+                let mut attributes = Vec::new();
+                $(
+                    if let Some(attribute) = self.$param.as_ref() {
+                        attributes.push((stringify!($param), attribute));
+                    }
+                )+
+                return attributes;
+            }
+
+            fn spel_attribute(&self, name: &str) -> Option<&ParsedAttribute<SpelAttribute>> {
+                return match format!("{}_attribute", name).as_str() {
+                    $(
+                        stringify!($param) => self.$param.as_ref(),
+                    )+
+                    _ => None,
+                };
             }
         }
     };
