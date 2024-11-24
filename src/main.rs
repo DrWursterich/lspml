@@ -1,3 +1,5 @@
+#![feature(fn_traits)]
+
 use std::{error::Error, fs::File};
 
 use anyhow::Result;
@@ -130,7 +132,7 @@ fn changed(params: DidChangeTextDocumentParams) -> Result<()> {
     return match &params.content_changes.last() {
         Some(change) => document_store::Document::new(change.text.to_owned()).map(|document| {
             document_store::put(&uri, document);
-            log::debug!("updated {}", uri);
+            log::debug!("updated {:?}", uri);
         }),
         None => Ok(()),
     };
@@ -142,7 +144,7 @@ fn opened(params: DidOpenTextDocumentParams) -> Result<()> {
         Some(_) => Ok(()),
         None => document_store::Document::new(params.text_document.text).map(|document| {
             document_store::put(&uri, document);
-            log::debug!("opened {}", uri);
+            log::debug!("opened {:?}", uri);
             return ();
         }),
     };
@@ -152,11 +154,11 @@ fn saved(params: DidSaveTextDocumentParams) -> Result<()> {
     let uri = params.text_document.uri;
     return document_store::Document::from_uri(&uri).map(|document| {
         document_store::put(&uri, document);
-        log::debug!("saved {}", uri);
+        log::debug!("saved {:?}", uri);
     });
 }
 
 fn closed(_: DidCloseTextDocumentParams) -> Result<()> {
-    // could free the document... ?
+    // document_store::free(&uri); ?
     return Ok(());
 }

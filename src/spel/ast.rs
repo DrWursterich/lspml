@@ -576,13 +576,13 @@ impl Display for Location {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum SpelResult<AST> {
     Valid(AST),
     Invalid(SyntaxError),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum SpelAst {
     Comparable(SpelResult<Comparable>),
     Condition(SpelResult<Condition>),
