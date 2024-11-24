@@ -1,3 +1,5 @@
+#![feature(fn_traits)]
+
 use std::{error::Error, fs::File};
 
 use anyhow::Result;

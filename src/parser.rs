@@ -6,6 +6,7 @@ use anyhow::Result;
 use lsp_types::{Position, Range};
 
 pub use derive::{DocumentNode, ParsableTag};
+use phf::phf_map;
 
 use crate::{
     grammar::{TagAttributeType, TagDefinition},
@@ -13,6 +14,93 @@ use crate::{
         self,
         ast::{SpelAst, SpelResult},
     },
+};
+
+static TAGS: phf::Map<
+    &'static str,
+    fn(&mut TreeParser) -> Result<ParsedTag<SpmlTag>, anyhow::Error>,
+> = phf_map! {
+    "attribute_tag" => |parser| Ok(SpAttribute::parse(parser)?.map(SpmlTag::SpAttribute)),
+    "argument_tag" => |parser| Ok(SpArgument::parse(parser)?.map(SpmlTag::SpArgument)),
+    "barcode_tag" => |parser| Ok(SpBarcode::parse(parser)?.map(SpmlTag::SpBarcode)),
+    "break_tag" => |parser| Ok(SpBreak::parse(parser)?.map(SpmlTag::SpBreak)),
+    "calendarsheet_tag" => |parser| Ok( SpCalendarsheet::parse(parser)?.map(SpmlTag::SpCalendarsheet)),
+    "checkbox_tag" => |parser| Ok(SpCheckbox::parse(parser)?.map(SpmlTag::SpCheckbox)),
+    "code_tag" => |parser| Ok(SpCode::parse(parser)?.map(SpmlTag::SpCode)),
+    "collection_tag" => |parser| Ok(SpCollection::parse(parser)?.map(SpmlTag::SpCollection)),
+    "condition_tag" => |parser| Ok(SpCondition::parse(parser)?.map(SpmlTag::SpCondition)),
+    "diff_tag" => |parser| Ok(SpDiff::parse(parser)?.map(SpmlTag::SpDiff)),
+    "else_tag" => |parser| Ok(SpElse::parse(parser)?.map(SpmlTag::SpElse)),
+    "elseIf_tag" => |parser| Ok(SpElseIf::parse(parser)?.map(SpmlTag::SpElseIf)),
+    "error_tag" => |parser| Ok(SpError::parse(parser)?.map(SpmlTag::SpError)),
+    "expire_tag" => |parser| Ok(SpExpire::parse(parser)?.map(SpmlTag::SpExpire)),
+    "filter_tag" => |parser| Ok(SpFilter::parse(parser)?.map(SpmlTag::SpFilter)),
+    "for_tag" => |parser| Ok(SpFor::parse(parser)?.map(SpmlTag::SpFor)),
+    "form_tag" => |parser| Ok(SpForm::parse(parser)?.map(SpmlTag::SpForm)),
+    "hidden_tag" => |parser| Ok(SpHidden::parse(parser)?.map(SpmlTag::SpHidden)),
+    "if_tag" => |parser| Ok(SpIf::parse(parser)?.map(SpmlTag::SpIf)),
+    "include_tag" => |parser| Ok(SpInclude::parse(parser)?.map(SpmlTag::SpInclude)),
+    "io_tag" => |parser| Ok(SpIo::parse(parser)?.map(SpmlTag::SpIo)),
+    "iterator_tag" => |parser| Ok(SpIterator::parse(parser)?.map(SpmlTag::SpIterator)),
+    "json_tag" => |parser| Ok(SpJson::parse(parser)?.map(SpmlTag::SpJson)),
+    "linkedinformation_tag" => |parser| Ok(SpLinkedinformation::parse(parser)?.map(SpmlTag::SpLinkedinformation)),
+    "linktree_tag" => |parser| Ok(SpLinktree::parse(parser)?.map(SpmlTag::SpLinktree)),
+    "livetree_tag" => |parser| Ok(SpLivetree::parse(parser)?.map(SpmlTag::SpLivetree)),
+    "log_tag" => |parser| Ok(SpLog::parse(parser)?.map(SpmlTag::SpLog)),
+    "login_tag" => |parser| Ok(SpLogin::parse(parser)?.map(SpmlTag::SpLogin)),
+    "loop_tag" => |parser| Ok(SpLoop::parse(parser)?.map(SpmlTag::SpLoop)),
+    "map_tag" => |parser| Ok(SpMap::parse(parser)?.map(SpmlTag::SpMap)),
+    "option_tag" => |parser| Ok(SpOption::parse(parser)?.map(SpmlTag::SpOption)),
+    "password_tag" => |parser| Ok(SpPassword::parse(parser)?.map(SpmlTag::SpPassword)),
+    "print_tag" => |parser| Ok(SpPrint::parse(parser)?.map(SpmlTag::SpPrint)),
+    "querytree_tag" => |parser| Ok(SpQuerytree::parse(parser)?.map(SpmlTag::SpQuerytree)),
+    "radio_tag" => |parser| Ok(SpRadio::parse(parser)?.map(SpmlTag::SpRadio)),
+    "range_tag" => |parser| Ok(SpRange::parse(parser)?.map(SpmlTag::SpRange)),
+    "return_tag" => |parser| Ok(SpReturn::parse(parser)?.map(SpmlTag::SpReturn)),
+    "sass_tag" => |parser| Ok(SpSass::parse(parser)?.map(SpmlTag::SpSass)),
+    "scaleimage_tag" => |parser| Ok(SpScaleimage::parse(parser)?.map(SpmlTag::SpScaleimage)),
+    "scope_tag" => |parser| Ok(SpScope::parse(parser)?.map(SpmlTag::SpScope)),
+    "search_tag" => |parser| Ok(SpSearch::parse(parser)?.map(SpmlTag::SpSearch)),
+    "select_tag" => |parser| Ok(SpSelect::parse(parser)?.map(SpmlTag::SpSelect)),
+    "set_tag" => |parser| Ok(SpSet::parse(parser)?.map(SpmlTag::SpSet)),
+    "sort_tag" => |parser| Ok(SpSort::parse(parser)?.map(SpmlTag::SpSort)),
+    "subinformation_tag" => |parser| Ok(SpSubinformation::parse(parser)?.map(SpmlTag::SpSubinformation)),
+    "tagbody_tag" => |parser| Ok(SpTagbody::parse(parser)?.map(SpmlTag::SpTagbody)),
+    "text_tag" => |parser| Ok(SpText::parse(parser)?.map(SpmlTag::SpText)),
+    "textarea_tag" => |parser| Ok(SpTextarea::parse(parser)?.map(SpmlTag::SpTextarea)),
+    "textimage_tag" => |parser| Ok(SpTextimage::parse(parser)?.map(SpmlTag::SpTextimage)),
+    "throw_tag" => |parser| Ok(SpThrow::parse(parser)?.map(SpmlTag::SpThrow)),
+    "toggle_tag" => |parser| Ok(SpToggle::parse(parser)?.map(SpmlTag::SpToggle)),
+    "upload_tag" => |parser| Ok(SpUpload::parse(parser)?.map(SpmlTag::SpUpload)),
+    "url_tag" => |parser| Ok(SpUrl::parse(parser)?.map(SpmlTag::SpUrl)),
+    "warning_tag" => |parser| Ok(SpWarning::parse(parser)?.map(SpmlTag::SpWarning)),
+    "worklist_tag" => |parser| Ok(SpWorklist::parse(parser)?.map(SpmlTag::SpWorklist)),
+    "zip_tag" => |parser| Ok(SpZip::parse(parser)?.map(SpmlTag::SpZip)),
+    "spt_counter_tag" => |parser| Ok(SptCounter::parse(parser)?.map(SpmlTag::SptCounter)),
+    "spt_date_tag" => |parser| Ok(SptDate::parse(parser)?.map(SpmlTag::SptDate)),
+    "spt_diff_tag" => |parser| Ok(SptDiff::parse(parser)?.map(SpmlTag::SptDiff)),
+    "spt_email2img_tag" => |parser| Ok(SptEmail2Img::parse(parser)?.map(SpmlTag::SptEmail2Img)),
+    "spt_encryptemail_tag" => |parser| Ok(SptEncryptemail::parse(parser)?.map(SpmlTag::SptEncryptemail)),
+    "spt_escapeemail_tag" => |parser| Ok(SptEscapeemail::parse(parser)?.map(SpmlTag::SptEscapeemail)),
+    "spt_formsolutions_tag" => |parser| Ok(SptFormsolutions::parse(parser)?.map(SpmlTag::SptFormsolutions)),
+    "spt_id2url_tag" => |parser| Ok(SptId2Url::parse(parser)?.map(SpmlTag::SptId2Url)),
+    "spt_ilink_tag" => |parser| Ok(SptIlink::parse(parser)?.map(SpmlTag::SptIlink)),
+    "spt_imageeditor_tag" => |parser| Ok(SptImageeditor::parse(parser)?.map(SpmlTag::SptImageeditor)),
+    "spt_imp_tag" => |parser| Ok(SptImp::parse(parser)?.map(SpmlTag::SptImp)),
+    "spt_iterator_tag" => |parser| Ok(SptIterator::parse(parser)?.map(SpmlTag::SptIterator)),
+    "spt_link_tag" => |parser| Ok(SptLink::parse(parser)?.map(SpmlTag::SptLink)),
+    "spt_number_tag" => |parser| Ok(SptNumber::parse(parser)?.map(SpmlTag::SptNumber)),
+    "spt_personalization_tag" => |parser| Ok(SptPersonalization::parse(parser)?.map(SpmlTag::SptPersonalization)),
+    "spt_prehtml_tag" => |parser| Ok(SptPrehtml::parse(parser)?.map(SpmlTag::SptPrehtml)),
+    "spt_smarteditor_tag" => |parser| Ok(SptSmarteditor::parse(parser)?.map(SpmlTag::SptSmarteditor)),
+    "spt_spml_tag" => |parser| Ok(SptSpml::parse(parser)?.map(SpmlTag::SptSpml)),
+    "spt_text_tag" => |parser| Ok(SptText::parse(parser)?.map(SpmlTag::SptText)),
+    "spt_textarea_tag" => |parser| Ok(SptTextarea::parse(parser)?.map(SpmlTag::SptTextarea)),
+    "spt_timestamp_tag" => |parser| Ok(SptTimestamp::parse(parser)?.map(SpmlTag::SptTimestamp)),
+    "spt_tinymce_tag" => |parser| Ok(SptTinymce::parse(parser)?.map(SpmlTag::SptTinymce)),
+    "spt_updown_tag" => |parser| Ok(SptUpdown::parse(parser)?.map(SpmlTag::SptUpdown)),
+    "spt_upload_tag" => |parser| Ok(SptUpload::parse(parser)?.map(SpmlTag::SptUpload)),
+    "spt_worklist_tag" => |parser| Ok(SptWorklist::parse(parser)?.map(SpmlTag::SptWorklist)),
 };
 
 pub(crate) trait DocumentNode {
@@ -2850,169 +2938,14 @@ impl<'a> TreeParser<'a> {
                     walk_parser_back_to(self, depth);
                     tags.push(Node::Html(html));
                 }
-                "attribute_tag" => tags.push(Node::Tag(
-                    SpAttribute::parse(self)?.map(SpmlTag::SpAttribute),
-                )),
-                "argument_tag" => {
-                    tags.push(Node::Tag(SpArgument::parse(self)?.map(SpmlTag::SpArgument)))
-                }
-                "barcode_tag" => {
-                    tags.push(Node::Tag(SpBarcode::parse(self)?.map(SpmlTag::SpBarcode)))
-                }
-                "break_tag" => tags.push(Node::Tag(SpBreak::parse(self)?.map(SpmlTag::SpBreak))),
-                "calendarsheet_tag" => tags.push(Node::Tag(
-                    SpCalendarsheet::parse(self)?.map(SpmlTag::SpCalendarsheet),
-                )),
-                "checkbox_tag" => {
-                    tags.push(Node::Tag(SpCheckbox::parse(self)?.map(SpmlTag::SpCheckbox)))
-                }
-                "code_tag" => tags.push(Node::Tag(SpCode::parse(self)?.map(SpmlTag::SpCode))),
-                "collection_tag" => tags.push(Node::Tag(
-                    SpCollection::parse(self)?.map(SpmlTag::SpCollection),
-                )),
-                "condition_tag" => tags.push(Node::Tag(
-                    SpCondition::parse(self)?.map(SpmlTag::SpCondition),
-                )),
-                "diff_tag" => tags.push(Node::Tag(SpDiff::parse(self)?.map(SpmlTag::SpDiff))),
-                "else_tag" => tags.push(Node::Tag(SpElse::parse(self)?.map(SpmlTag::SpElse))),
-                "elseIf_tag" => tags.push(Node::Tag(SpElseIf::parse(self)?.map(SpmlTag::SpElseIf))),
-                "error_tag" => tags.push(Node::Tag(SpError::parse(self)?.map(SpmlTag::SpError))),
-                "expire_tag" => tags.push(Node::Tag(SpExpire::parse(self)?.map(SpmlTag::SpExpire))),
-                "filter_tag" => tags.push(Node::Tag(SpFilter::parse(self)?.map(SpmlTag::SpFilter))),
-                "for_tag" => tags.push(Node::Tag(SpFor::parse(self)?.map(SpmlTag::SpFor))),
-                "form_tag" => tags.push(Node::Tag(SpForm::parse(self)?.map(SpmlTag::SpForm))),
-                "hidden_tag" => tags.push(Node::Tag(SpHidden::parse(self)?.map(SpmlTag::SpHidden))),
-                "if_tag" => tags.push(Node::Tag(SpIf::parse(self)?.map(SpmlTag::SpIf))),
-                "include_tag" => {
-                    tags.push(Node::Tag(SpInclude::parse(self)?.map(SpmlTag::SpInclude)))
-                }
-                "io_tag" => tags.push(Node::Tag(SpIo::parse(self)?.map(SpmlTag::SpIo))),
-                "iterator_tag" => {
-                    tags.push(Node::Tag(SpIterator::parse(self)?.map(SpmlTag::SpIterator)))
-                }
-                "json_tag" => tags.push(Node::Tag(SpJson::parse(self)?.map(SpmlTag::SpJson))),
-                "linkedinformation_tag" => tags.push(Node::Tag(
-                    SpLinkedinformation::parse(self)?.map(SpmlTag::SpLinkedinformation),
-                )),
-                "linktree_tag" => {
-                    tags.push(Node::Tag(SpLinktree::parse(self)?.map(SpmlTag::SpLinktree)))
-                }
-                "livetree_tag" => {
-                    tags.push(Node::Tag(SpLivetree::parse(self)?.map(SpmlTag::SpLivetree)))
-                }
-                "log_tag" => tags.push(Node::Tag(SpLog::parse(self)?.map(SpmlTag::SpLog))),
-                "login_tag" => tags.push(Node::Tag(SpLogin::parse(self)?.map(SpmlTag::SpLogin))),
-                "loop_tag" => tags.push(Node::Tag(SpLoop::parse(self)?.map(SpmlTag::SpLoop))),
-                "map_tag" => tags.push(Node::Tag(SpMap::parse(self)?.map(SpmlTag::SpMap))),
-                "option_tag" => tags.push(Node::Tag(SpOption::parse(self)?.map(SpmlTag::SpOption))),
-                "password_tag" => {
-                    tags.push(Node::Tag(SpPassword::parse(self)?.map(SpmlTag::SpPassword)))
-                }
-                "print_tag" => tags.push(Node::Tag(SpPrint::parse(self)?.map(SpmlTag::SpPrint))),
-                "querytree_tag" => tags.push(Node::Tag(
-                    SpQuerytree::parse(self)?.map(SpmlTag::SpQuerytree),
-                )),
-                "radio_tag" => tags.push(Node::Tag(SpRadio::parse(self)?.map(SpmlTag::SpRadio))),
-                "range_tag" => tags.push(Node::Tag(SpRange::parse(self)?.map(SpmlTag::SpRange))),
-                "return_tag" => tags.push(Node::Tag(SpReturn::parse(self)?.map(SpmlTag::SpReturn))),
-                "sass_tag" => tags.push(Node::Tag(SpSass::parse(self)?.map(SpmlTag::SpSass))),
-                "scaleimage_tag" => tags.push(Node::Tag(
-                    SpScaleimage::parse(self)?.map(SpmlTag::SpScaleimage),
-                )),
-                "scope_tag" => tags.push(Node::Tag(SpScope::parse(self)?.map(SpmlTag::SpScope))),
-                "search_tag" => tags.push(Node::Tag(SpSearch::parse(self)?.map(SpmlTag::SpSearch))),
-                "select_tag" => tags.push(Node::Tag(SpSelect::parse(self)?.map(SpmlTag::SpSelect))),
-                "set_tag" => tags.push(Node::Tag(SpSet::parse(self)?.map(SpmlTag::SpSet))),
-                "sort_tag" => tags.push(Node::Tag(SpSort::parse(self)?.map(SpmlTag::SpSort))),
-                "subinformation_tag" => tags.push(Node::Tag(
-                    SpSubinformation::parse(self)?.map(SpmlTag::SpSubinformation),
-                )),
-                "tagbody_tag" => {
-                    tags.push(Node::Tag(SpTagbody::parse(self)?.map(SpmlTag::SpTagbody)))
-                }
-                "text_tag" => tags.push(Node::Tag(SpText::parse(self)?.map(SpmlTag::SpText))),
-                "textarea_tag" => {
-                    tags.push(Node::Tag(SpTextarea::parse(self)?.map(SpmlTag::SpTextarea)))
-                }
-                "textimage_tag" => tags.push(Node::Tag(
-                    SpTextimage::parse(self)?.map(SpmlTag::SpTextimage),
-                )),
-                "throw_tag" => tags.push(Node::Tag(SpThrow::parse(self)?.map(SpmlTag::SpThrow))),
-                "toggle_tag" => tags.push(Node::Tag(SpToggle::parse(self)?.map(SpmlTag::SpToggle))),
-                "upload_tag" => tags.push(Node::Tag(SpUpload::parse(self)?.map(SpmlTag::SpUpload))),
-                "url_tag" => tags.push(Node::Tag(SpUrl::parse(self)?.map(SpmlTag::SpUrl))),
-                "warning_tag" => {
-                    tags.push(Node::Tag(SpWarning::parse(self)?.map(SpmlTag::SpWarning)))
-                }
-                "worklist_tag" => {
-                    tags.push(Node::Tag(SpWorklist::parse(self)?.map(SpmlTag::SpWorklist)))
-                }
-                "zip_tag" => tags.push(Node::Tag(SpZip::parse(self)?.map(SpmlTag::SpZip))),
-                "spt_counter_tag" => {
-                    tags.push(Node::Tag(SptCounter::parse(self)?.map(SpmlTag::SptCounter)))
-                }
-                "spt_date_tag" => tags.push(Node::Tag(SptDate::parse(self)?.map(SpmlTag::SptDate))),
-                "spt_diff_tag" => tags.push(Node::Tag(SptDiff::parse(self)?.map(SpmlTag::SptDiff))),
-                "spt_email2img_tag" => tags.push(Node::Tag(
-                    SptEmail2Img::parse(self)?.map(SpmlTag::SptEmail2Img),
-                )),
-                "spt_encryptemail_tag" => tags.push(Node::Tag(
-                    SptEncryptemail::parse(self)?.map(SpmlTag::SptEncryptemail),
-                )),
-                "spt_escapeemail_tag" => tags.push(Node::Tag(
-                    SptEscapeemail::parse(self)?.map(SpmlTag::SptEscapeemail),
-                )),
-                "spt_formsolutions_tag" => tags.push(Node::Tag(
-                    SptFormsolutions::parse(self)?.map(SpmlTag::SptFormsolutions),
-                )),
-                "spt_id2url_tag" => {
-                    tags.push(Node::Tag(SptId2Url::parse(self)?.map(SpmlTag::SptId2Url)))
-                }
-                "spt_ilink_tag" => {
-                    tags.push(Node::Tag(SptIlink::parse(self)?.map(SpmlTag::SptIlink)))
-                }
-                "spt_imageeditor_tag" => tags.push(Node::Tag(
-                    SptImageeditor::parse(self)?.map(SpmlTag::SptImageeditor),
-                )),
-                "spt_imp_tag" => tags.push(Node::Tag(SptImp::parse(self)?.map(SpmlTag::SptImp))),
-                "spt_iterator_tag" => tags.push(Node::Tag(
-                    SptIterator::parse(self)?.map(SpmlTag::SptIterator),
-                )),
-                "spt_link_tag" => tags.push(Node::Tag(SptLink::parse(self)?.map(SpmlTag::SptLink))),
-                "spt_number_tag" => {
-                    tags.push(Node::Tag(SptNumber::parse(self)?.map(SpmlTag::SptNumber)))
-                }
-                "spt_personalization_tag" => tags.push(Node::Tag(
-                    SptPersonalization::parse(self)?.map(SpmlTag::SptPersonalization),
-                )),
-                "spt_prehtml_tag" => {
-                    tags.push(Node::Tag(SptPrehtml::parse(self)?.map(SpmlTag::SptPrehtml)))
-                }
-                "spt_smarteditor_tag" => tags.push(Node::Tag(
-                    SptSmarteditor::parse(self)?.map(SpmlTag::SptSmarteditor),
-                )),
-                "spt_spml_tag" => tags.push(Node::Tag(SptSpml::parse(self)?.map(SpmlTag::SptSpml))),
-                "spt_text_tag" => tags.push(Node::Tag(SptText::parse(self)?.map(SpmlTag::SptText))),
-                "spt_textarea_tag" => tags.push(Node::Tag(
-                    SptTextarea::parse(self)?.map(SpmlTag::SptTextarea),
-                )),
-                "spt_timestamp_tag" => tags.push(Node::Tag(
-                    SptTimestamp::parse(self)?.map(SpmlTag::SptTimestamp),
-                )),
-                "spt_tinymce_tag" => {
-                    tags.push(Node::Tag(SptTinymce::parse(self)?.map(SpmlTag::SptTinymce)))
-                }
-                "spt_updown_tag" => {
-                    tags.push(Node::Tag(SptUpdown::parse(self)?.map(SpmlTag::SptUpdown)))
-                }
-                "spt_upload_tag" => {
-                    tags.push(Node::Tag(SptUpload::parse(self)?.map(SpmlTag::SptUpload)))
-                }
-                "spt_worklist_tag" => tags.push(Node::Tag(
-                    SptWorklist::parse(self)?.map(SpmlTag::SptWorklist),
-                )),
                 kind if kind.ends_with("_tag_close") => break,
-                kind => log::debug!("encountered unexpected tree sitter node {}", kind),
+                kind => {
+                    if let Some(mut parse_fn) = TAGS.get(kind).take() {
+                        tags.push(Node::Tag(parse_fn.call_mut((self,))?));
+                    } else {
+                        log::debug!("encountered unexpected tree sitter node {}", kind);
+                    }
+                }
             };
             if !self.cursor.goto_next_sibling() {
                 break;
@@ -4043,6 +3976,53 @@ mod tests {
     };
     use anyhow::{Error, Result};
     use lsp_types::{Position, Range};
+
+    #[test]
+    fn test_no_stack_overflow_when_deeply_nested() -> Result<()> {
+        // apparently 12 levels of nesting is the maximum before a stack overflow
+        let document = String::from(concat!(
+            "<%@page language=\"java\" pageEncoding=\"UTF-8\" contentType=\"text/htm/>/>l; charset=UTF-8\"\n",
+            "%><%@ taglib uri=\"http://www.sitepark.com/taglibs/core\" prefix=\"sp\"\n",
+            "%><%@ taglib tagdir=\"/WEB-INF/tags/spt\" prefix=\"spt\"\n",
+            "%>\n",
+            "<sp:condition>\n",
+            "\t<sp:if name=\"_test\" neq=\"_test1\">\n",
+            "\t\t<sp:condition>\n",
+            "\t\t\t<sp:if name=\"_test\" neq=\"_test3\">\n",
+            "\t\t\t\t<sp:condition>\n",
+            "\t\t\t\t\t<sp:if name=\"_test\" neq=\"_test4\">\n",
+            "\t\t\t\t\t\t<sp:condition>\n",
+            "\t\t\t\t\t\t\t<sp:if name=\"_test\" neq=\"_test5\">\n",
+            "\t\t\t\t\t\t\t\t<sp:condition>\n",
+            "\t\t\t\t\t\t\t\t\t<sp:if name=\"_test\" neq=\"_test5\">\n",
+            "\t\t\t\t\t\t\t\t\t\t<sp:condition>\n",
+            "\t\t\t\t\t\t\t\t\t\t\t<sp:if name=\"_test\" neq=\"_test6\">\n",
+            "\t\t\t\t\t\t\t\t\t\t\t\t<sp:print value=\"success!\"\n",
+            "\t\t\t\t\t\t\t\t\t\t\t</sp:if>\n",
+            "\t\t\t\t\t\t\t\t\t\t</sp:condition>\n",
+            "\t\t\t\t\t\t\t\t\t</sp:if>\n",
+            "\t\t\t\t\t\t\t\t</sp:condition>\n",
+            "\t\t\t\t\t\t\t</sp:if>\n",
+            "\t\t\t\t\t\t</sp:condition>\n",
+            "\t\t\t\t\t</sp:if>\n",
+            "\t\t\t\t</sp:condition>\n",
+            "\t\t\t</sp:if>\n",
+            "\t\t</sp:condition>\n",
+            "\t</sp:if>\n",
+            "</sp:condition>\n",
+        ));
+        let mut ts_parser = tree_sitter::Parser::new();
+        ts_parser
+            .set_language(&tree_sitter_spml::language())
+            .map_err(Error::from)?;
+        let ts_tree = ts_parser
+            .parse(&document, None)
+            .ok_or_else(|| anyhow::anyhow!("treesitter parsing failed"))?;
+        let parser = &mut TreeParser::new(ts_tree.walk(), &document);
+        let _header = parser.parse_header()?;
+        let _tags = parser.parse_tags()?;
+        return Ok(());
+    }
 
     #[test]
     fn test_parse_header() -> Result<()> {

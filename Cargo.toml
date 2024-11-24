@@ -17,4 +17,5 @@ structured-logger = "1.0.3"
 tree-sitter = "0.23.0"
 tree-sitter-spml = { git = "https://github.com/DrWursterich/tree-sitter-spml.git" }
 derive = { path = "./derive" }
+phf = { version = "0.11.2", features = ["macros"] }
 
