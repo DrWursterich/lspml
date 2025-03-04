@@ -31,7 +31,7 @@ static TAGS: phf::Map<
     "condition_tag" => |parser| Ok(SpCondition::parse(parser)?.map(SpmlTag::SpCondition)),
     "diff_tag" => |parser| Ok(SpDiff::parse(parser)?.map(SpmlTag::SpDiff)),
     "else_tag" => |parser| Ok(SpElse::parse(parser)?.map(SpmlTag::SpElse)),
-    "elseIf_tag" => |parser| Ok(SpElseIf::parse(parser)?.map(SpmlTag::SpElseIf)),
+    "elseif_tag" => |parser| Ok(SpElseIf::parse(parser)?.map(SpmlTag::SpElseIf)),
     "error_tag" => |parser| Ok(SpError::parse(parser)?.map(SpmlTag::SpError)),
     "expire_tag" => |parser| Ok(SpExpire::parse(parser)?.map(SpmlTag::SpExpire)),
     "filter_tag" => |parser| Ok(SpFilter::parse(parser)?.map(SpmlTag::SpFilter)),
