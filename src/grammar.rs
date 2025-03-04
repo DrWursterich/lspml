@@ -225,7 +225,7 @@ impl TagDefinition {
             AttributeRule::Required("text"),
             AttributeRule::Required("type"),
             AttributeRule::ValueOneOf("type", &["qrcode"]),
-            AttributeRule::ValueOneOf("scope", &["page", "request"]),
+            AttributeRule::ValueOneOf("scope", &["page", "request", "session"]),
         ]
     );
 
@@ -257,7 +257,7 @@ impl TagDefinition {
             AttributeRule::Required("action"),
             AttributeRule::ValueOneOf("action", &["add", "clear", "new"]),
             AttributeRule::ValueOneOf("mode", &["allDays", "startDays", "firstDays"]),
-            AttributeRule::ValueOneOf("scope", &["page", "request"]),
+            AttributeRule::ValueOneOf("scope", &["page", "request", "session"]),
             AttributeRule::OnlyWithValue("from", "action", "new"),
             AttributeRule::OnlyWithValue("to", "action", "new"),
             AttributeRule::RequiredWithValue("from", "action", "new"),
@@ -333,7 +333,7 @@ impl TagDefinition {
                     "unique",
                 ],
             ),
-            AttributeRule::ValueOneOf("scope", &["page", "request"]),
+            AttributeRule::ValueOneOf("scope", &["page", "request", "session"]),
             AttributeRule::ExactlyOneOfOrBodyWithEitherValue(
                 &["value", "object", "expression", "condition"],
                 "action",
@@ -692,7 +692,7 @@ impl TagDefinition {
             ("overwrite", TagAttributeType::Condition),
             ("scope", TagAttributeType::String),
         rules &[
-            AttributeRule::ValueOneOf("scope", &["page", "request"]),
+            AttributeRule::ValueOneOf("scope", &["page", "request", "session"]),
             AttributeRule::ExactlyOrBody("object"),
             AttributeRule::OnlyWith("indent", "object"),
             AttributeRule::OnlyWith("overwrite", "object"),
@@ -844,7 +844,7 @@ impl TagDefinition {
                     "clear",
                 ],
             ),
-            AttributeRule::ValueOneOf("scope", &["page", "request"]),
+            AttributeRule::ValueOneOf("scope", &["page", "request", "session"]),
             AttributeRule::ExactlyOneOfOrBodyWithEitherValue(
                 &["value", "expression", "condition", "object"],
                 "action",
@@ -998,7 +998,7 @@ impl TagDefinition {
             AttributeRule::Required("name"),
             AttributeRule::Required("collection"),
             AttributeRule::Required("range"),
-            AttributeRule::ValueOneOf("scope", &["page", "request"]),
+            AttributeRule::ValueOneOf("scope", &["page", "request", "session"]),
         ]
     );
 
@@ -1058,7 +1058,7 @@ impl TagDefinition {
             AttributeRule::AtleastOneOf(&["height", "width"]),
             AttributeRule::Deprecated("scalesteps"),
             AttributeRule::ValueOneOf("padding", &["on", "off", "fit", "fit/no"]),
-            AttributeRule::ValueOneOf("scope", &["page", "request"]),
+            AttributeRule::ValueOneOf("scope", &["page", "request", "session"]),
         ]
     );
 
@@ -1071,7 +1071,7 @@ impl TagDefinition {
             ("scope", TagAttributeType::String),
         rules &[
             AttributeRule::Required("scope"),
-            AttributeRule::ValueOneOf("scope", &["page", "request"]),
+            AttributeRule::ValueOneOf("scope", &["page", "request", "session"]),
         ]
     );
 
@@ -1119,7 +1119,7 @@ impl TagDefinition {
             AttributeRule::ExactlyOneOfOrBody(&["value", "expression", "condition", "object"]),
             AttributeRule::OnlyWithEitherOrBody("default", &["object", "expression"]),
             AttributeRule::OnlyOneOf(&["overwrite", "insert"]),
-            AttributeRule::ValueOneOf("scope", &["page", "request"]),
+            AttributeRule::ValueOneOf("scope", &["page", "request", "session"]),
             AttributeRule::ValueOneOf("insert", &["replace", "append", "prepend"]),
             AttributeRule::ValueOneOf("contentType", &["json"]),
         ]
@@ -1256,7 +1256,7 @@ impl TagDefinition {
                     "northwest",
                 ],
             ),
-            AttributeRule::ValueOneOf("scope", &["page", "request"]),
+            AttributeRule::ValueOneOf("scope", &["page", "request", "session"]),
         ]
     );
 
