@@ -1015,7 +1015,7 @@ impl TagDefinition {
             ("object", TagAttributeType::Object),
             ("value", TagAttributeType::String),
         rules &[
-            AttributeRule::ExactlyOneOfOrBody(&["value", "expression", "condition", "object"]),
+            AttributeRule::OnlyOneOfOrBody(&["value", "expression", "condition", "object"]),
             AttributeRule::OnlyWithEitherOrBody("default", &["object", "expression"]),
         ]
     );
