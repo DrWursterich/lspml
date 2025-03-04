@@ -13,7 +13,7 @@ use crate::parser::Tree;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Document {
-    pub(crate) text: String,
+    pub(crate) text: Box<str>,
     pub(crate) tree: Tree,
 }
 
@@ -22,7 +22,10 @@ impl Document {
         let mut parser = Parser::new();
         parser.set_language(&tree_sitter_spml::language())?;
         return match parser.parse(&text, None) {
-            Some(tree) => Tree::new(tree, &text).map(|tree| Document { text, tree }),
+            Some(tree) => Tree::new(tree, &text).map(|tree| Document {
+                text: text.into(),
+                tree,
+            }),
             None => Err(anyhow::anyhow!("failed to parse text: {}", text)),
         };
     }
@@ -30,7 +33,7 @@ impl Document {
     pub(crate) fn from_uri(uri: &Uri) -> Result<Document> {
         return match Path::new(uri.path().as_str()) {
             path if path.exists() => fs::read_to_string(path.to_owned())
-                .map(|text| Document::new(text))
+                .map(Document::new)
                 .map_err(Error::from),
             path => Err(anyhow::anyhow!("file {:?} does not exist", path)),
         }?;
