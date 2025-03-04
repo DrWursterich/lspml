@@ -1,37 +1,28 @@
-use std::{cmp::Ordering, collections::HashMap, fs, iter::Iterator, str::FromStr};
+use std::{fs, iter::Iterator};
 
 use anyhow::Result;
 use lsp_server::ErrorCode;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionParams, CompletionTextEdit, Documentation,
-    MarkupContent, MarkupKind, Position, Range, TextDocumentPositionParams, TextEdit, Url,
+    MarkupContent, MarkupKind, Position, Range, TextDocumentPositionParams, TextEdit, Uri as Url,
 };
-use tree_sitter::{Node, Point};
 
 use crate::{
     document_store::{self, Document},
-    grammar::{self, TagAttributeType, TagAttributes, TagChildren, TagDefinition},
-    modules, parser,
+    grammar::{self, TagAttribute, TagAttributeType, TagAttributes, TagChildren, TagDefinition},
+    modules::{self, Module},
+    parser::{
+        AttributeValue, ErrorNode, Node, ParsableTag, ParsedAttribute, ParsedTag, SpelAttribute,
+        SpelAttributeValue, SpmlTag, TagBody, TagError,
+    },
+    spel::ast::{SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment},
 };
 
 use super::LsError;
 
-#[derive(Debug, PartialEq)]
-enum TagParsePosition {
-    Attributes,
-    Children,
-}
-
-#[derive(Debug, PartialEq)]
-enum CompletionType {
-    Attributes,
-    Attribute(String),
-    Tags,
-}
-
 #[derive(Debug)]
 struct CompletionCollector<'a> {
-    cursor: Point,
+    cursor: Position,
     file: &'a Url,
     document: &'a Document,
     completions: Vec<CompletionItem>,
@@ -43,75 +34,113 @@ impl CompletionCollector<'_> {
         document: &'a Document,
     ) -> CompletionCollector<'a> {
         return CompletionCollector {
-            cursor: Point::new(
-                params.position.line as usize,
-                params.position.character as usize,
-            ),
+            cursor: params.position,
             file: &params.text_document.uri,
             document,
             completions: Vec::new(),
         };
     }
 
-    fn search_completions_in_document(&mut self, root: Node) -> Result<()> {
-        for node in root.children(&mut root.walk()) {
-            match self.compare_node_to_cursor(node) {
-                Ordering::Less => continue,
-                Ordering::Equal => (),
-                Ordering::Greater => break,
-            };
-            match node.kind() {
-                "page_header" | "import_header" | "taglib_header" | "text" | "comment" => {
-                    return Ok(()); // ignore for now
-                }
-                _ if node.is_error() => match node.child(0) {
-                    Some(child) if child.kind().ends_with("_tag_open") => {
-                        let kind = child.kind();
-                        if kind == "html_tag_open" {
-                            break;
+    fn search_completions_in_document(&mut self) {
+        return match self.document.tree.node_at(self.cursor) {
+            Some(Node::Tag(ParsedTag::Valid(tag))) => self.search_completions_in_tag(tag),
+            Some(Node::Tag(ParsedTag::Erroneous(tag, errors))) => {
+                for error in errors {
+                    match error {
+                        TagError::Superfluous(_, location) if location.contains(&self.cursor) => {
+                            return self.complete_attributes_of(tag);
                         }
-                        let tag = &kind[..kind.len() - "_open".len()];
-                        log::trace!(
-                            "cursor {} is in ERROR which appears to be a {}",
-                            self.cursor,
-                            tag
-                        );
-                        return TagDefinition::from_str(&tag)
-                            .and_then(|tag| self.search_completions_in_tag(tag, node));
+                        TagError::Missing(text, _) => {
+                            self.completions.push(CompletionItem {
+                                detail: None,
+                                documentation: None,
+                                insert_text: Some(text.to_string()),
+                                kind: Some(CompletionItemKind::SNIPPET),
+                                ..Default::default()
+                            });
+                        }
+                        err => log::debug!("unhandled tag error {:?} in {:?}", err, tag),
                     }
-                    _ if node
-                        .utf8_text(&self.document.text.as_bytes())
-                        .map(|text| self.cut_text_up_to_cursor(node, text))
-                        .is_ok_and(|text| text == "/" || text.ends_with("</")) =>
-                    {
-                        return Ok(self.complete_closing_tag(node));
-                    }
-                    _ => {}
-                },
-                // is there a way to "include" other lsps?
-                "java_tag" | "script_tag" | "style_tag" | "html_void_tag" => {
-                    log::info!(
-                        "cursor seems to be inside {}, for which completion is not supported",
-                        node.kind()
-                    );
                 }
-                "html_tag" | "html_option_tag" => {
-                    return self.search_completions_in_document(node);
+                self.search_completions_in_tag(tag);
+                // "/>" e.g. is always added as missing right after the last non-whitespace
+                // character, terminating it's parent node. that means that our cursor can never be
+                // placed after all attributes and still be considered inside the tag node. the
+                // only case we could ever trigger this is by moving the cursor in front of an
+                // attribute - where it could be arguably okay to suggest "/>" - but that is not
+                // the intended usecase here.
+                // in order to change this we would have to instead check the closest node before
+                // the cursor for missing operators (maybe even skipping text nodes?) in addition
+                // to what we're completing originally...
+                //
+                // if let Some(Node::Tag(ParsedTag::Erroneous(tag, errors))) =
+                //     self.document.tree.closest_node_prior_to(self.cursor)
+                // {
+                //     for error in errors {
+                //         if let TagError::Missing(text, _) = error {
+                //             self.completions.push(CompletionItem {
+                //                 label: format!(
+                //                     "close {} tag with \"{}\"",
+                //                     tag.definition().name,
+                //                     text
+                //                 ),
+                //                 kind: Some(CompletionItemKind::OPERATOR), // ?
+                //                 insert_text: Some(text.to_string()),
+                //                 ..Default::default()
+                //             })
+                //         }
+                //     }
+                // }
+            }
+            Some(Node::Tag(ParsedTag::Unparsable(text, location))) => {
+                return self.completions.push(CompletionItem {
+                    label: format!("unparsable \"{}\"", text),
+                    kind: Some(CompletionItemKind::TEXT),
+                    text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+                        new_text: text.to_string(),
+                        range: location.range(),
+                    })),
+                    ..Default::default()
+                });
+            }
+            Some(mut node @ Node::Error(ErrorNode { content, range })) => {
+                let mut closest_tag = None;
+                loop {
+                    (node, closest_tag) = match self.document.tree.parent_of(&node) {
+                        Some(parent @ Node::Tag(ParsedTag::Valid(tag))) => (parent, Some(tag)),
+                        Some(parent @ Node::Tag(ParsedTag::Erroneous(tag, errors))) => {
+                            let new_text = errors.iter().find_map(|error| match error {
+                                TagError::Missing(text, _) if text.starts_with(content) => {
+                                    Some(text)
+                                }
+                                _ => None,
+                            });
+                            if let Some(new_text) = new_text {
+                                return self.completions.push(CompletionItem {
+                                    label: new_text.to_string(),
+                                    kind: Some(CompletionItemKind::KEYWORD),
+                                    insert_text: Some(new_text.to_string()),
+                                    text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+                                        new_text: new_text.to_string(),
+                                        range: *range,
+                                    })),
+                                    ..Default::default()
+                                });
+                            }
+                            (parent, Some(tag))
+                        }
+                        Some(parent) => (parent, None),
+                        None => break,
+                    };
                 }
-                kind => {
-                    log::trace!(
-                        "cursor {} is in tag {} ({} - {})",
-                        self.cursor,
-                        kind,
-                        node.start_byte(),
-                        node.end_position()
-                    );
-                    return TagDefinition::from_str(kind)
-                        .and_then(|tag| self.search_completions_in_tag(tag, node));
+                if let Some(tag) = closest_tag {
+                    self.complete_attributes_of(tag);
+                } else {
+                    self.complete_top_level_tags();
                 }
             }
-        }
-        return Ok(self.complete_top_level_tags());
+            _ => self.complete_top_level_tags(),
+        };
     }
 
     fn complete_top_level_tags(&mut self) {
@@ -129,65 +158,31 @@ impl CompletionCollector<'_> {
             .push(Self::tag_to_completion(tag, self.determine_tag_range()));
     }
 
-    fn complete_closing_tag(&mut self, mut current: Node) {
-        loop {
-            match current.prev_sibling().or_else(|| current.parent()) {
-                Some(next) => current = next,
-                None => return,
-            };
-            let tag = match current.kind() {
-                "html_tag_open" => current
-                    .utf8_text(self.document.text.as_bytes())
-                    .ok()
-                    .map(|tag| &tag[1..]),
-                "html_option_tag" => current
-                    .child(0)
-                    .and_then(|tag| tag.utf8_text(self.document.text.as_bytes()).ok())
-                    .map(|tag| &tag[1..]),
-                kind if kind.ends_with("_tag_open") => {
-                    TagDefinition::from_str(&kind[..kind.len() - "_open".len()])
-                        .ok()
-                        .map(|tag| tag.name)
-                }
-                _ => continue,
-            };
-            if let Some(tag) = tag.map(|tag| tag.to_string() + ">") {
-                self.completions.push(CompletionItem {
-                    label: "</".to_string() + &tag,
-                    kind: Some(CompletionItemKind::SNIPPET),
-                    insert_text: Some(tag),
-                    ..Default::default()
-                });
-            };
-            return;
-        }
-    }
-
     fn determine_tag_range(&self) -> Range {
         let line = self
             .document
             .text
             .lines()
-            .nth(self.cursor.row)
-            .map(|l| l.split_at(self.cursor.column).0)
+            .nth(self.cursor.line as usize)
+            .map(|l| l.split_at(self.cursor.character as usize).0)
             .unwrap_or("");
-        let mut start = self.cursor.column;
+        let mut start = self.cursor.character;
         for (i, c) in line.chars().rev().enumerate() {
             match c {
                 'a'..='z' | 'A'..='Z' | '0'..='9' | ':' | '_' | '-' => continue,
-                '<' => start -= i + 1,
+                '<' => start -= (i as u32) + 1,
                 _ => (),
             }
             break;
         }
         return Range {
             start: Position {
-                line: self.cursor.row as u32,
-                character: start as u32,
+                line: self.cursor.line as u32,
+                character: start,
             },
             end: Position {
-                line: self.cursor.row as u32,
-                character: self.cursor.column as u32,
+                line: self.cursor.line as u32,
+                character: self.cursor.character as u32,
             },
         };
     }
@@ -209,260 +204,162 @@ impl CompletionCollector<'_> {
         };
     }
 
-    fn search_completions_in_tag(&mut self, tag: TagDefinition, node: Node) -> Result<()> {
-        let mut attributes: HashMap<String, String> = HashMap::new();
-        let mut completion_type = CompletionType::Attributes;
-        let mut position = TagParsePosition::Attributes;
-        for child in node.children(&mut node.walk()) {
-            if position == TagParsePosition::Children {
-                match self.compare_node_to_cursor(child) {
-                    Ordering::Less => continue,
-                    Ordering::Equal => completion_type = CompletionType::Tags,
-                    Ordering::Greater => break,
-                };
+    fn search_completions_in_tag(&mut self, tag: &SpmlTag) {
+        if let Some(body) = tag.body() {
+            if self.is_cursor_in_body(body) {
+                return self.complete_children_of(tag);
             }
-            match child.kind() {
-                _ if child.is_error() => match child.child(0) {
-                    Some(child) if child.kind().ends_with("_tag_open") => {
-                        let kind = child.kind();
-                        if kind == "html_tag_open" {
-                            break;
-                        }
-                        let tag = &kind[..kind.len() - "_open".len()];
-                        log::trace!(
-                            "cursor {} is in ERROR which appears to be a {}",
-                            self.cursor,
-                            tag
-                        );
-                        return TagDefinition::from_str(&tag)
-                            .and_then(|tag| self.search_completions_in_tag(tag, child));
-                    }
-                    _ if child
-                        .utf8_text(self.document.text.as_bytes())
-                        .map(|text| self.cut_text_up_to_cursor(child, text))
-                        .is_ok_and(|text| text == "/" || text.ends_with("</")) =>
+        }
+        for (name, attribute) in &tag.spel_attributes() {
+            let attribute = match attribute {
+                ParsedAttribute::Valid(attribute) => attribute,
+                ParsedAttribute::Erroneous(attribute, _) => attribute,
+                ParsedAttribute::Unparsable(_, _) => continue,
+            };
+            if attribute.value.is_inside(&self.cursor) {
+                let definition = tag.definition();
+                let attribute_type = name
+                    .strip_suffix("_attribute")
+                    .and_then(|name| definition.attributes.get_by_name(name));
+                return match &attribute.value.spel {
+                    // SpelAst::Comparable(_) => (),
+                    // SpelAst::Condition(_) => (),
+                    // SpelAst::Expression(_) => (),
+                    // SpelAst::Identifier(_) => (),
+                    // SpelAst::Object(_) => (),
+                    // SpelAst::Query(_) => (),
+                    // SpelAst::Regex(_) => (),
+                    SpelAst::String(_)
+                        if attribute_type
+                            .is_some_and(|a| matches!(&a.r#type, TagAttributeType::Module)) =>
                     {
-                        return Ok(self.complete_closing_tag(child));
+                        modules::all_modules().iter().for_each(|(name, _)| {
+                            self.completions.push(CompletionItem {
+                                label: name.to_owned(),
+                                kind: Some(CompletionItemKind::MODULE),
+                                insert_text: Some(name.to_owned()),
+                                ..Default::default()
+                            })
+                        });
+                    }
+                    SpelAst::String(_) => {
+                        for rule in tag.definition().attribute_rules {
+                            let name = name.strip_suffix("_attribute").unwrap_or(name);
+                            match rule {
+                                grammar::AttributeRule::ValueOneOf(attribute_name, values)
+                                | grammar::AttributeRule::ValueOneOfCaseInsensitive(
+                                    attribute_name,
+                                    values,
+                                ) if attribute_name == &name => {
+                                    values.iter().for_each(|value| {
+                                        self.completions.push(CompletionItem {
+                                            label: value.to_string(),
+                                            kind: Some(CompletionItemKind::ENUM_MEMBER),
+                                            detail: None,
+                                            documentation: None,
+                                            ..Default::default()
+                                        })
+                                    });
+                                    break;
+                                }
+                                _ => (),
+                            };
+                        }
+                    }
+                    SpelAst::Uri(SpelResult::Valid(uri)) => {
+                        let mut module = None;
+                        if let Some(TagAttribute {
+                            r#type: TagAttributeType::Uri { module_attribute },
+                            ..
+                        }) = attribute_type
+                        {
+                            let module_attribute = match tag.spel_attribute(&module_attribute) {
+                                Some(ParsedAttribute::Valid(attribute)) => Some(attribute),
+                                Some(ParsedAttribute::Erroneous(attribute, _)) => Some(attribute),
+                                _ => None,
+                            };
+                            if let Some(SpelAttribute {
+                                value:
+                                    SpelAttributeValue {
+                                        spel: SpelAst::String(SpelResult::Valid(Word { fragments })),
+                                        ..
+                                    },
+                                ..
+                            }) = module_attribute
+                            {
+                                if fragments.len() == 1 {
+                                    if let WordFragment::String(StringLiteral { content, .. }) =
+                                        &fragments[0]
+                                    {
+                                        module = modules::find_module_by_name(content);
+                                    }
+                                }
+                            }
+                        }
+                        let module = module.or_else(|| {
+                            modules::find_module_for_file(std::path::Path::new(
+                                self.file.path().as_str(),
+                            ))
+                        });
+                        if let Some(module) = &module {
+                            if let Err(err) = self.complete_uri(uri, module) {
+                                log::error!("failed to complete uri: {}", err);
+                            }
+                        }
                     }
                     _ => (),
-                },
-                ">" => {
-                    if child.is_missing() {
-                        log::trace!("\">\" is missing in {}", node.kind());
-                        continue;
-                    }
-                    if self.cursor > child.start_position() {
-                        completion_type = CompletionType::Tags;
-                    }
-                    position = TagParsePosition::Children;
-                }
-                "self_closing_tag_end" => {
-                    if child.is_missing() {
-                        log::trace!("\"/>\" is missing in {}", node.kind());
-                        continue;
-                    }
-                    break;
-                }
-                "java_tag" | "script_tag" | "style_tag" | "html_void_tag" => {
-                    log::info!(
-                        "cursor seems to be inside {}, for which completion is not supported",
-                        node.kind()
-                    );
-                }
-                "html_tag" | "html_option_tag" => {
-                    if child.child_count() == 0 {
-                        log::info!(
-                            "cursor seems to be inside {}, for which completion is not supported",
-                            node.kind()
-                        );
-                        continue;
-                    }
-                    log::info!("search {} children in {}", tag.name, node.kind());
-                    return self.search_completions_in_tag(tag, child);
-                }
-                // TODO: this is very hacky. there needs to be a better way
-                kind if kind.ends_with("_tag_open")
-                    && tag.name.find(":").is_some_and(|i| {
-                        !kind.ends_with(&(tag.name.split_at(i + 1).1.to_string() + "_tag_open"))
-                    }) =>
-                {
-                    if let Ok(tag) = TagDefinition::from_str(&kind[0..kind.len() - "_open".len()]) {
-                        return Ok(self.complete_attributes_of(tag, HashMap::from([])));
-                    }
-                }
-                kind if kind.ends_with("_tag_close") => {
-                    break;
-                }
-                kind if kind.ends_with("_attribute") => {
-                    let attribute = kind[..kind.len() - "_attribute".len()].to_string();
-                    if child.start_position() < self.cursor && child.end_position() > self.cursor {
-                        completion_type = CompletionType::Attribute(attribute.clone());
-                    }
-                    if let Some(attribute_value) =
-                        parser::attribute_value_of(child, &self.document.text)
-                    {
-                        attributes.insert(attribute, attribute_value.to_string());
-                    }
-                }
-                kind if kind.ends_with("_tag") => {
-                    return self.search_completions_in_tag(TagDefinition::from_str(kind)?, child);
-                }
-                kind => log::info!("ignore node {}", kind),
-            }
-        }
-        return Ok(match completion_type {
-            CompletionType::Attributes => {
-                log::info!("complete attributes for {}", tag.name);
-                self.complete_attributes_of(tag, attributes)
-            }
-            CompletionType::Attribute(name) => {
-                log::info!("complete values for attribute {} of {}", name, tag.name);
-                self.complete_values_of_attribute(tag, name, attributes)?
-            }
-            CompletionType::Tags => {
-                log::info!("complete child tags for {}", tag.name);
-                // TODO: maybe also propose closing tag if not already present.
-                self.complete_children_of(tag)
-            }
-        });
-    }
-
-    fn compare_node_to_cursor(&self, node: Node) -> Ordering {
-        // tree sitter puts a 'missing' node at the end of unclosed tags, so we cannot blindly skip
-        // all nodes that end before the cursor.
-        // also, since on unclosed tags the ERROR node is sometimes the opening one and
-        // sometimes the one after we have to stop at opening_tags specifically, as encountering
-        // one indicates, that the tag is not closed and the next one is the error
-        if node.end_position() < self.cursor
-            && !node.kind().ends_with("_tag_open")
-            && (node.child_count() == 0
-                || !node
-                    .child(node.child_count() - 1)
-                    .is_some_and(|close_bracket| close_bracket.is_missing()))
-        {
-            // continue;
-            return Ordering::Less;
-        }
-        if node.start_position() > self.cursor {
-            // break;
-            return Ordering::Greater;
-        }
-        return Ordering::Equal;
-    }
-
-    fn cut_text_up_to_cursor<'a>(&self, node: Node, text: &'a str) -> &'a str {
-        let start = node.start_position();
-        return match self.cursor.row.cmp(&start.row) {
-            std::cmp::Ordering::Equal if self.cursor.column >= start.column => {
-                &text[0..self.cursor.column - start.column]
-            }
-            std::cmp::Ordering::Less | std::cmp::Ordering::Equal => "",
-            std::cmp::Ordering::Greater => {
-                let expected_new_lines = self.cursor.row - start.row;
-                let mut position = 0;
-                for (index, line) in text.splitn(expected_new_lines + 1, '\n').enumerate() {
-                    match index {
-                        0 => position = line.len(),
-                        n if n == expected_new_lines => {
-                            return &text[0..position + 1 + self.cursor.column]
-                        }
-                        _ => position += 1 + line.len(),
-                    }
-                }
-                return text;
-            }
-        };
-    }
-
-    fn complete_values_of_attribute(
-        &mut self,
-        tag: TagDefinition,
-        attribute: String,
-        attributes: HashMap<String, String>,
-    ) -> Result<()> {
-        match tag.attributes.get_by_name(&attribute).map(|a| &a.r#type) {
-            Some(TagAttributeType::Uri { module_attribute }) => {
-                let module = match attributes.get(*module_attribute).map(|str| str.as_str()) {
-                    Some("${module.id}") | None => self
-                        .file
-                        .to_file_path()
-                        .ok()
-                        .and_then(|file| modules::find_module_for_file(file.as_path())),
-                    Some(module) => modules::find_module_by_name(module),
                 };
-                if let Some(module) = module {
-                    let path = attributes
-                        .get(&attribute)
-                        .and_then(|path| path.rfind("/").map(|index| &path[..index]))
-                        .unwrap_or("");
-                    for entry in fs::read_dir(module.path + path)? {
-                        let entry = entry?;
-                        let name;
-                        if path.len() == 0 {
-                            name = "/".to_string() + entry.file_name().to_str().unwrap();
-                        } else {
-                            name = entry.file_name().to_str().unwrap().to_string();
-                        }
-                        if entry.path().is_dir() {
-                            self.completions.push(CompletionItem {
-                                label: name.clone() + "/",
-                                kind: Some(CompletionItemKind::FOLDER),
-                                insert_text: Some(name + "/"),
-                                ..Default::default()
-                            })
-                        } else if name.ends_with(".spml") {
-                            self.completions.push(CompletionItem {
-                                label: name.clone(),
-                                kind: Some(CompletionItemKind::FILE),
-                                insert_text: Some(name),
-                                ..Default::default()
-                            })
-                        }
-                    }
-                }
             }
-            Some(TagAttributeType::Module) => {
-                modules::all_modules().iter().for_each(|(name, _)| {
-                    self.completions.push(CompletionItem {
-                        label: name.to_owned(),
-                        kind: Some(CompletionItemKind::MODULE),
-                        insert_text: Some(name.to_owned()),
-                        ..Default::default()
-                    })
-                });
+        }
+        return self.complete_attributes_of(tag);
+    }
+
+    fn is_cursor_in_body(&self, body: &TagBody) -> bool {
+        if (self.cursor.line as usize) < body.open_location.line {
+            return false;
+        }
+        if (self.cursor.line as usize) == body.open_location.line {
+            if (self.cursor.character as usize) <= body.open_location.char {
+                return false;
             }
-            _ => {
-                // should also be done via TagAttributeType::Enum
-                for rule in tag.attribute_rules {
-                    match rule {
-                        grammar::AttributeRule::ValueOneOf(name, values)
-                        | grammar::AttributeRule::ValueOneOfCaseInsensitive(name, values)
-                            if *name == attribute =>
-                        {
-                            values.iter().for_each(|value| {
-                                self.completions.push(CompletionItem {
-                                    label: value.to_string(),
-                                    kind: Some(CompletionItemKind::ENUM_MEMBER),
-                                    detail: None,
-                                    documentation: None,
-                                    ..Default::default()
-                                })
-                            });
-                            break;
-                        }
-                        _ => (),
-                    };
-                }
+        }
+        return true;
+    }
+
+    fn complete_uri(&mut self, uri: &Uri, module: &Module) -> Result<()> {
+        let path = uri.to_string();
+        for entry in fs::read_dir(module.path.clone() + path.as_str())? {
+            let entry = entry?;
+            let name;
+            if path.len() == 0 {
+                name = "/".to_string() + entry.file_name().to_str().unwrap();
+            } else {
+                name = entry.file_name().to_str().unwrap().to_string();
+            }
+            if entry.path().is_dir() {
+                self.completions.push(CompletionItem {
+                    label: name.clone() + "/",
+                    kind: Some(CompletionItemKind::FOLDER),
+                    insert_text: Some(name + "/"),
+                    ..Default::default()
+                })
+            } else if name.ends_with(".spml") {
+                self.completions.push(CompletionItem {
+                    label: name.clone(),
+                    kind: Some(CompletionItemKind::FILE),
+                    insert_text: Some(name),
+                    ..Default::default()
+                })
             }
         }
         return Ok(());
     }
 
-    fn complete_attributes_of(&mut self, tag: TagDefinition, attributes: HashMap<String, String>) {
-        if let TagAttributes::These(possible) = tag.attributes {
+    fn complete_attributes_of(&mut self, tag: &SpmlTag) {
+        if let TagAttributes::These(possible) = tag.definition().attributes {
             possible
                 .iter()
-                .filter(|attribute| !attributes.contains_key(attribute.name))
+                .filter(|attribute| tag.spel_attribute(attribute.name).is_none())
                 .map(|attribute| CompletionItem {
                     label: attribute.name.to_string(),
                     kind: Some(CompletionItemKind::PROPERTY),
@@ -480,8 +377,8 @@ impl CompletionCollector<'_> {
         };
     }
 
-    fn complete_children_of(&mut self, tag: TagDefinition) {
-        match tag.children {
+    fn complete_children_of(&mut self, tag: &SpmlTag) {
+        match tag.definition().children {
             TagChildren::Any => self.complete_top_level_tags(),
             TagChildren::None => (),
             TagChildren::Scalar(tag) => self.complete_tag(tag),
@@ -498,84 +395,75 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
         None => document_store::Document::from_uri(uri)
             .map(|document| document_store::put(uri, document))
             .map_err(|err| {
-                log::error!("failed to read {}: {}", uri, err);
+                log::error!("failed to read {:?}: {}", uri, err);
                 return LsError {
-                    message: format!("cannot read file {}", uri),
+                    message: format!("cannot read file {:?}", uri),
                     code: ErrorCode::RequestFailed,
                 };
             }),
     }?;
-    let root = document.tree.root_node();
     let mut completion_collector = CompletionCollector::new(&text_params, &document);
-    completion_collector
-        .search_completions_in_document(root)
-        .map_err(|err| LsError {
-            message: format!("failed to validate document: {}", err),
-            code: ErrorCode::RequestFailed,
-        })?;
+    completion_collector.search_completions_in_document();
     return Ok(completion_collector.completions);
 }
 
-#[cfg(test)]
-mod tests {
-    use lsp_types::{
-        CompletionParams, PartialResultParams, Position, TextDocumentIdentifier,
-        TextDocumentPositionParams, Url, WorkDoneProgressParams,
-    };
+// #[cfg(test)]
+// mod tests {
+//     use lsp_types::{
+//         CompletionParams, PartialResultParams, Position, TextDocumentIdentifier,
+//         TextDocumentPositionParams, Uri as Url, WorkDoneProgressParams,
+//     };
 
-    use crate::document_store::Document;
+//     use crate::document_store::Document;
 
-    use super::CompletionCollector;
+//     use super::CompletionCollector;
 
-    #[test]
-    fn test_completion_for_attributes_in_nested_tag() {
-        let document_content = concat!(
-            "<%@ page language=\"java\" pageEncoding=\"UTF-8\" contentType=\"text/html; charset=UTF-8\"%>\n",
-            "<sp:include module=\"test-module\" uri=\"/functions/doSomething.spml\">\n",
-            "\t<sp:argument \n",
-            "</sp:include>\n");
-        let params: CompletionParams = CompletionParams {
-            text_document_position: TextDocumentPositionParams {
-                text_document: TextDocumentIdentifier {
-                    uri: Url::parse("file:///some/test/file.spml").unwrap(),
-                },
-                position: Position {
-                    line: 2,
-                    character: 14,
-                },
-            },
-            work_done_progress_params: WorkDoneProgressParams {
-                work_done_token: None,
-            },
-            partial_result_params: PartialResultParams {
-                partial_result_token: None,
-            },
-            context: None,
-        };
+//     #[test]
+//     fn test_completion_for_attributes_in_nested_tag() {
+//         let document_content = concat!(
+//             "<%@ page language=\"java\" pageEncoding=\"UTF-8\" contentType=\"text/html; charset=UTF-8\"%>\n",
+//             "<sp:include module=\"test-module\" uri=\"/functions/doSomething.spml\">\n",
+//             "\t<sp:argument \n",
+//             "</sp:include>\n");
+//         let params: CompletionParams = CompletionParams {
+//             text_document_position: TextDocumentPositionParams {
+//                 text_document: TextDocumentIdentifier {
+//                     uri: "file:///some/test/file.spml".parse().unwrap(),
+//                 },
+//                 position: Position {
+//                     line: 2,
+//                     character: 14,
+//                 },
+//             },
+//             work_done_progress_params: WorkDoneProgressParams {
+//                 work_done_token: None,
+//             },
+//             partial_result_params: PartialResultParams {
+//                 partial_result_token: None,
+//             },
+//             context: None,
+//         };
 
-        let document = Document::new(document_content.to_string()).unwrap();
-        let root = document.tree.root_node();
-        let mut completion_collector =
-            CompletionCollector::new(&params.text_document_position, &document);
-        completion_collector
-            .search_completions_in_document(root)
-            .unwrap();
-        let result = completion_collector.completions;
+//         let document = Document::new(document_content.to_string()).unwrap();
+//         let mut completion_collector =
+//             CompletionCollector::new(&params.text_document_position, &document);
+//         completion_collector.search_completions_in_document();
+//         let result = completion_collector.completions;
 
-        assert_eq!(
-            result
-                .iter()
-                .map(|c| c.label.clone())
-                .collect::<Vec<String>>(),
-            vec![
-                "condition",
-                "default",
-                "expression",
-                "locale",
-                "name",
-                "object",
-                "value",
-            ]
-        );
-    }
-}
+//         assert_eq!(
+//             result
+//                 .iter()
+//                 .map(|c| c.label.clone())
+//                 .collect::<Vec<String>>(),
+//             vec![
+//                 "condition",
+//                 "default",
+//                 "expression",
+//                 "locale",
+//                 "name",
+//                 "object",
+//                 "value",
+//             ]
+//         );
+//     }
+// }

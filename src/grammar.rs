@@ -172,7 +172,7 @@ macro_rules! tag_definition {
 }
 
 impl TagDefinition {
-    const SP_ARGUMENT: TagDefinition = tag_definition!(
+    pub(crate) const SP_ARGUMENT: TagDefinition = tag_definition!(
         type "sp",
         name "argument",
         deprecated false,
@@ -192,7 +192,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_ATTRIBUTE: TagDefinition = tag_definition!(
+    pub(crate) const SP_ATTRIBUTE: TagDefinition = tag_definition!(
         type "sp",
         name "attribute",
         deprecated false,
@@ -208,7 +208,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_BARCODE: TagDefinition = tag_definition!(
+    pub(crate) const SP_BARCODE: TagDefinition = tag_definition!(
         type "sp",
         name "barcode",
         deprecated false,
@@ -229,15 +229,15 @@ impl TagDefinition {
         ]
     );
 
-    const SP_BREAK: TagDefinition = tag_definition!(
+    pub(crate) const SP_BREAK: TagDefinition = tag_definition!(
         type "sp",
         name "break",
         deprecated false,
-        children TagChildren::Any,
+        children TagChildren::None,
         rules &[]
     );
 
-    const SP_CALENDARSHEET: TagDefinition = tag_definition!(
+    pub(crate) const SP_CALENDARSHEET: TagDefinition = tag_definition!(
         type "sp",
         name "calendarsheet",
         deprecated false,
@@ -269,7 +269,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_CHECKBOX: TagDefinition = tag_definition!(
+    pub(crate) const SP_CHECKBOX: TagDefinition = tag_definition!(
         type "sp",
         name "checkbox",
         deprecated false,
@@ -288,7 +288,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_CODE: TagDefinition = tag_definition!(
+    pub(crate) const SP_CODE: TagDefinition = tag_definition!(
         type "sp",
         name "code",
         deprecated false,
@@ -296,7 +296,7 @@ impl TagDefinition {
         rules &[]
     );
 
-    const SP_COLLECTION: TagDefinition = tag_definition!(
+    pub(crate) const SP_COLLECTION: TagDefinition = tag_definition!(
         type "sp",
         name "collection",
         deprecated false,
@@ -395,7 +395,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_CONDITION: TagDefinition = tag_definition!(
+    pub(crate) const SP_CONDITION: TagDefinition = tag_definition!(
         type "sp",
         name "condition",
         deprecated false,
@@ -407,7 +407,7 @@ impl TagDefinition {
         rules &[]
     );
 
-    const SP_DIFF: TagDefinition = tag_definition!(
+    pub(crate) const SP_DIFF: TagDefinition = tag_definition!(
         type "sp",
         name "diff",
         deprecated false,
@@ -426,7 +426,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_ELSE: TagDefinition = tag_definition!(
+    pub(crate) const SP_ELSE: TagDefinition = tag_definition!(
         type "sp",
         name "else",
         deprecated false,
@@ -434,7 +434,7 @@ impl TagDefinition {
         rules &[]
     );
 
-    const SP_ELSEIF: TagDefinition = tag_definition!(
+    pub(crate) const SP_ELSEIF: TagDefinition = tag_definition!(
         type "sp",
         name "elseif",
         deprecated false,
@@ -473,7 +473,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_ERROR: TagDefinition = tag_definition!(
+    pub(crate) const SP_ERROR: TagDefinition = tag_definition!(
         type "sp",
         name "error",
         deprecated false,
@@ -483,7 +483,7 @@ impl TagDefinition {
         rules &[AttributeRule::Required("code")]
     );
 
-    const SP_EXPIRE: TagDefinition = tag_definition!(
+    pub(crate) const SP_EXPIRE: TagDefinition = tag_definition!(
         type "sp",
         name "expire",
         deprecated false,
@@ -493,7 +493,7 @@ impl TagDefinition {
         rules &[AttributeRule::Required("date")]
     );
 
-    const SP_FILTER: TagDefinition = tag_definition!(
+    pub(crate) const SP_FILTER: TagDefinition = tag_definition!(
         type "sp",
         name "filter",
         deprecated false,
@@ -524,7 +524,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_FOR: TagDefinition = tag_definition!(
+    pub(crate) const SP_FOR: TagDefinition = tag_definition!(
         type "sp",
         name "for",
         deprecated false,
@@ -543,7 +543,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_FORM: TagDefinition = tag_definition!(
+    pub(crate) const SP_FORM: TagDefinition = tag_definition!(
         type "sp",
         name "form",
         deprecated false,
@@ -572,7 +572,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_HIDDEN: TagDefinition = tag_definition!(
+    pub(crate) const SP_HIDDEN: TagDefinition = tag_definition!(
         type "sp",
         name "hidden",
         deprecated false,
@@ -589,7 +589,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_IF: TagDefinition = tag_definition!(
+    pub(crate) const SP_IF: TagDefinition = tag_definition!(
         type "sp",
         name "if",
         deprecated false,
@@ -628,7 +628,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_INCLUDE: TagDefinition = tag_definition!(
+    pub(crate) const SP_INCLUDE: TagDefinition = tag_definition!(
         type "sp",
         name "include",
         deprecated false,
@@ -652,7 +652,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_IO: TagDefinition = tag_definition!(
+    pub(crate) const SP_IO: TagDefinition = tag_definition!(
         type "sp",
         name "io",
         deprecated false,
@@ -666,7 +666,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_ITERATOR: TagDefinition = tag_definition!(
+    pub(crate) const SP_ITERATOR: TagDefinition = tag_definition!(
         type "sp",
         name "iterator",
         deprecated false,
@@ -679,7 +679,7 @@ impl TagDefinition {
         rules &[AttributeRule::Required("collection")]
     );
 
-    const SP_JSON: TagDefinition = tag_definition!(
+    pub(crate) const SP_JSON: TagDefinition = tag_definition!(
         type "sp",
         name "json",
         deprecated false,
@@ -699,7 +699,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_LINKEDINFORMATION: TagDefinition = tag_definition!(
+    pub(crate) const SP_LINKEDINFORMATION: TagDefinition = tag_definition!(
         type "sp",
         name "linkedInformation",
         deprecated false,
@@ -707,7 +707,7 @@ impl TagDefinition {
         rules &[]
     );
 
-    const SP_LINKTREE: TagDefinition = tag_definition!(
+    pub(crate) const SP_LINKTREE: TagDefinition = tag_definition!(
         type "sp",
         name "linktree",
         deprecated false,
@@ -731,7 +731,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_LIVETREE: TagDefinition = tag_definition!(
+    pub(crate) const SP_LIVETREE: TagDefinition = tag_definition!(
         type "sp",
         name "livetree",
         deprecated false,
@@ -760,7 +760,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_LOG: TagDefinition = tag_definition!(
+    pub(crate) const SP_LOG: TagDefinition = tag_definition!(
         type "sp",
         name "log",
         deprecated false,
@@ -776,7 +776,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_LOGIN: TagDefinition = tag_definition!(
+    pub(crate) const SP_LOGIN: TagDefinition = tag_definition!(
         type "sp",
         name "login",
         deprecated false,
@@ -795,7 +795,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_LOOP: TagDefinition = tag_definition!(
+    pub(crate) const SP_LOOP: TagDefinition = tag_definition!(
         type "sp",
         name "loop",
         deprecated false,
@@ -812,7 +812,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_MAP: TagDefinition = tag_definition!(
+    pub(crate) const SP_MAP: TagDefinition = tag_definition!(
         type "sp",
         name "map",
         deprecated false,
@@ -877,7 +877,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_OPTION: TagDefinition = tag_definition!(
+    pub(crate) const SP_OPTION: TagDefinition = tag_definition!(
         type "sp",
         name "option",
         deprecated false,
@@ -920,7 +920,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_PASSWORD: TagDefinition = tag_definition!(
+    pub(crate) const SP_PASSWORD: TagDefinition = tag_definition!(
         type "sp",
         name "password",
         deprecated false,
@@ -928,7 +928,7 @@ impl TagDefinition {
         rules &[]
     );
 
-    const SP_PRINT: TagDefinition = tag_definition!(
+    pub(crate) const SP_PRINT: TagDefinition = tag_definition!(
         type "sp",
         name "print",
         deprecated false,
@@ -960,7 +960,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_QUERYTREE: TagDefinition = tag_definition!(
+    pub(crate) const SP_QUERYTREE: TagDefinition = tag_definition!(
         type "sp",
         name "querytree",
         deprecated false,
@@ -968,7 +968,7 @@ impl TagDefinition {
         rules &[]
     );
 
-    const SP_RADIO: TagDefinition = tag_definition!(
+    pub(crate) const SP_RADIO: TagDefinition = tag_definition!(
         type "sp",
         name "radio",
         deprecated false,
@@ -984,7 +984,7 @@ impl TagDefinition {
         rules &[AttributeRule::Required("name")]
     );
 
-    const SP_RANGE: TagDefinition = tag_definition!(
+    pub(crate) const SP_RANGE: TagDefinition = tag_definition!(
         type "sp",
         name "range",
         deprecated false,
@@ -1002,7 +1002,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_RETURN: TagDefinition = tag_definition!(
+    pub(crate) const SP_RETURN: TagDefinition = tag_definition!(
         type "sp",
         name "return",
         deprecated false,
@@ -1020,7 +1020,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_SASS: TagDefinition = tag_definition!(
+    pub(crate) const SP_SASS: TagDefinition = tag_definition!(
         type "sp",
         name "sass",
         deprecated false,
@@ -1036,7 +1036,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_SCALEIMAGE: TagDefinition = tag_definition!(
+    pub(crate) const SP_SCALEIMAGE: TagDefinition = tag_definition!(
         type "sp",
         name "scaleimage",
         deprecated false,
@@ -1062,7 +1062,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_SCOPE: TagDefinition = tag_definition!(
+    pub(crate) const SP_SCOPE: TagDefinition = tag_definition!(
         type "sp",
         name "scope",
         deprecated false,
@@ -1075,7 +1075,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_SEARCH: TagDefinition = tag_definition!(
+    pub(crate) const SP_SEARCH: TagDefinition = tag_definition!(
         type "sp",
         name "search",
         deprecated false,
@@ -1083,7 +1083,7 @@ impl TagDefinition {
         rules &[]
     );
 
-    const SP_SELECT: TagDefinition = tag_definition!(
+    pub(crate) const SP_SELECT: TagDefinition = tag_definition!(
         type "sp",
         name "select",
         deprecated false,
@@ -1097,7 +1097,7 @@ impl TagDefinition {
         rules &[AttributeRule::Required("name")]
     );
 
-    const SP_SET: TagDefinition = tag_definition!(
+    pub(crate) const SP_SET: TagDefinition = tag_definition!(
         type "sp",
         name "set",
         deprecated false,
@@ -1125,7 +1125,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_SORT: TagDefinition = tag_definition!(
+    pub(crate) const SP_SORT: TagDefinition = tag_definition!(
         type "sp",
         name "sort",
         deprecated false,
@@ -1145,7 +1145,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_SUBINFORMATION: TagDefinition = tag_definition!(
+    pub(crate) const SP_SUBINFORMATION: TagDefinition = tag_definition!(
         type "sp",
         name "subinformation",
         deprecated false,
@@ -1159,7 +1159,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_TAGBODY: TagDefinition = tag_definition!(
+    pub(crate) const SP_TAGBODY: TagDefinition = tag_definition!(
         type "sp",
         name "tagbody",
         deprecated false,
@@ -1167,7 +1167,7 @@ impl TagDefinition {
         rules &[]
     );
 
-    const SP_TEXT: TagDefinition = tag_definition!(
+    pub(crate) const SP_TEXT: TagDefinition = tag_definition!(
         type "sp",
         name "text",
         deprecated false,
@@ -1190,7 +1190,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_TEXTAREA: TagDefinition = tag_definition!(
+    pub(crate) const SP_TEXTAREA: TagDefinition = tag_definition!(
         type "sp",
         name "textarea",
         deprecated false,
@@ -1209,7 +1209,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_TEXTIMAGE: TagDefinition = tag_definition!(
+    pub(crate) const SP_TEXTIMAGE: TagDefinition = tag_definition!(
         type "sp",
         name "textimage",
         deprecated false,
@@ -1260,7 +1260,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_THROW: TagDefinition = tag_definition!(
+    pub(crate) const SP_THROW: TagDefinition = tag_definition!(
         type "sp",
         name "throw",
         deprecated false,
@@ -1268,7 +1268,7 @@ impl TagDefinition {
         rules &[]
     );
 
-    const SP_TOGGLE: TagDefinition = tag_definition!(
+    pub(crate) const SP_TOGGLE: TagDefinition = tag_definition!(
         type "sp",
         name "toggle",
         deprecated false,
@@ -1289,7 +1289,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_UPLOAD: TagDefinition = tag_definition!(
+    pub(crate) const SP_UPLOAD: TagDefinition = tag_definition!(
         type "sp",
         name "upload",
         deprecated false,
@@ -1300,7 +1300,7 @@ impl TagDefinition {
         rules &[AttributeRule::Required("name")]
     );
 
-    const SP_URL: TagDefinition = tag_definition!(
+    pub(crate) const SP_URL: TagDefinition = tag_definition!(
         type "sp",
         name "url",
         deprecated false,
@@ -1332,7 +1332,7 @@ impl TagDefinition {
         ]
     );
 
-    const SP_WARNING: TagDefinition = tag_definition!(
+    pub(crate) const SP_WARNING: TagDefinition = tag_definition!(
         type "sp",
         name "warning",
         deprecated false,
@@ -1342,7 +1342,7 @@ impl TagDefinition {
         rules &[AttributeRule::Required("code")]
     );
 
-    const SP_WORKLIST: TagDefinition = tag_definition!(
+    pub(crate) const SP_WORKLIST: TagDefinition = tag_definition!(
         type "sp",
         name "worklist",
         deprecated true,
@@ -1355,7 +1355,7 @@ impl TagDefinition {
         rules &[AttributeRule::Required("name")]
     );
 
-    const SP_ZIP: TagDefinition = tag_definition!(
+    pub(crate) const SP_ZIP: TagDefinition = tag_definition!(
         type "sp",
         name "zip",
         deprecated false,
@@ -1365,7 +1365,7 @@ impl TagDefinition {
 
     // SPTTAGS:
 
-    const SPT_COUNTER: TagDefinition = tag_definition!(
+    pub(crate) const SPT_COUNTER: TagDefinition = tag_definition!(
         type "spt",
         name "counter",
         deprecated true,
@@ -1384,7 +1384,7 @@ impl TagDefinition {
         ]
     );
 
-    const SPT_DATE: TagDefinition = tag_definition!(
+    pub(crate) const SPT_DATE: TagDefinition = tag_definition!(
         type "spt",
         name "date",
         deprecated false,
@@ -1407,7 +1407,7 @@ impl TagDefinition {
         ]
     );
 
-    const SPT_DIFF: TagDefinition = tag_definition!(
+    pub(crate) const SPT_DIFF: TagDefinition = tag_definition!(
         type "spt",
         name "diff",
         deprecated false,
@@ -1423,7 +1423,7 @@ impl TagDefinition {
         ]
     );
 
-    const SPT_EMAIL2IMG: TagDefinition = tag_definition!(
+    pub(crate) const SPT_EMAIL2IMG: TagDefinition = tag_definition!(
         type "spt",
         name "email2img",
         deprecated true,
@@ -1459,7 +1459,7 @@ impl TagDefinition {
         ]
     );
 
-    const SPT_ENCRYPTEMAIL: TagDefinition = tag_definition!(
+    pub(crate) const SPT_ENCRYPTEMAIL: TagDefinition = tag_definition!(
         type "spt",
         name "encryptemail",
         deprecated false,
@@ -1477,7 +1477,7 @@ impl TagDefinition {
         ]
     );
 
-    const SPT_ESCAPEEMAIL: TagDefinition = tag_definition!(
+    pub(crate) const SPT_ESCAPEEMAIL: TagDefinition = tag_definition!(
         type "spt",
         name "escapeemail",
         deprecated true,
@@ -1503,7 +1503,7 @@ impl TagDefinition {
         ]
     );
 
-    const SPT_FORMSOLUTIONS: TagDefinition = tag_definition!(
+    pub(crate) const SPT_FORMSOLUTIONS: TagDefinition = tag_definition!(
         type "spt",
         name "formsolutions",
         deprecated false,
@@ -1514,7 +1514,7 @@ impl TagDefinition {
         rules &[AttributeRule::Required("name")]
     );
 
-    const SPT_ID2URL: TagDefinition = tag_definition!(
+    pub(crate) const SPT_ID2URL: TagDefinition = tag_definition!(
         type "spt",
         name "id2url",
         deprecated false,
@@ -1534,7 +1534,7 @@ impl TagDefinition {
         ]
     );
 
-    const SPT_ILINK: TagDefinition = tag_definition!(
+    pub(crate) const SPT_ILINK: TagDefinition = tag_definition!(
         type "spt",
         name "ilink",
         deprecated false,
@@ -1547,7 +1547,7 @@ impl TagDefinition {
         rules &[AttributeRule::ValueOneOf("action", &["edit", "list"])]
     );
 
-    const SPT_IMAGEEDITOR: TagDefinition = tag_definition!(
+    pub(crate) const SPT_IMAGEEDITOR: TagDefinition = tag_definition!(
         type "spt",
         name "imageeditor",
         deprecated false,
@@ -1562,7 +1562,7 @@ impl TagDefinition {
         rules &[]
     );
 
-    const SPT_IMP: TagDefinition = tag_definition!(
+    pub(crate) const SPT_IMP: TagDefinition = tag_definition!(
         type "spt",
         name "imp",
         deprecated false,
@@ -1643,7 +1643,7 @@ impl TagDefinition {
         ]
     );
 
-    const SPT_ITERATOR: TagDefinition = tag_definition!(
+    pub(crate) const SPT_ITERATOR: TagDefinition = tag_definition!(
         type "spt",
         name "iterator",
         deprecated false,
@@ -1666,7 +1666,7 @@ impl TagDefinition {
         ]
     );
 
-    const SPT_LINK: TagDefinition = tag_definition!(
+    pub(crate) const SPT_LINK: TagDefinition = tag_definition!(
         type "spt",
         name "link",
         deprecated false,
@@ -1707,7 +1707,7 @@ impl TagDefinition {
         ]
     );
 
-    const SPT_NUMBER: TagDefinition = tag_definition!(
+    pub(crate) const SPT_NUMBER: TagDefinition = tag_definition!(
         type "spt",
         name "number",
         deprecated false,
@@ -1727,7 +1727,7 @@ impl TagDefinition {
         ]
     );
 
-    const SPT_PERSONALIZATION: TagDefinition = tag_definition!(
+    pub(crate) const SPT_PERSONALIZATION: TagDefinition = tag_definition!(
         type "spt",
         name "personalization",
         deprecated false,
@@ -1740,7 +1740,7 @@ impl TagDefinition {
         rules &[AttributeRule::ValueOneOf("mode", &["php"])]
     );
 
-    const SPT_PREHTML: TagDefinition = tag_definition!(
+    pub(crate) const SPT_PREHTML: TagDefinition = tag_definition!(
         type "spt",
         name "prehtml",
         deprecated false,
@@ -1754,7 +1754,7 @@ impl TagDefinition {
         ]
     );
 
-    const SPT_SMARTEDITOR: TagDefinition = tag_definition!(
+    pub(crate) const SPT_SMARTEDITOR: TagDefinition = tag_definition!(
         type "spt",
         name "smarteditor",
         deprecated true,
@@ -1770,7 +1770,7 @@ impl TagDefinition {
         rules &[AttributeRule::Required("name")]
     );
 
-    const SPT_SPML: TagDefinition = tag_definition!(
+    pub(crate) const SPT_SPML: TagDefinition = tag_definition!(
         type "spt",
         name "spml",
         deprecated false,
@@ -1780,7 +1780,7 @@ impl TagDefinition {
         rules &[AttributeRule::ValueOneOf("api", &["log4j", "jdom", "mail"])]
     );
 
-    const SPT_TEXT: TagDefinition = tag_definition!(
+    pub(crate) const SPT_TEXT: TagDefinition = tag_definition!(
         type "spt",
         name "text",
         deprecated false,
@@ -1806,7 +1806,7 @@ impl TagDefinition {
         ]
     );
 
-    const SPT_TEXTAREA: TagDefinition = tag_definition!(
+    pub(crate) const SPT_TEXTAREA: TagDefinition = tag_definition!(
         type "spt",
         name "textarea",
         deprecated false,
@@ -1830,7 +1830,7 @@ impl TagDefinition {
         ]
     );
 
-    const SPT_TIMESTAMP: TagDefinition = tag_definition!(
+    pub(crate) const SPT_TIMESTAMP: TagDefinition = tag_definition!(
         type "spt",
         name "timestamp",
         deprecated false,
@@ -1840,7 +1840,7 @@ impl TagDefinition {
         rules &[AttributeRule::Required("connect")]
     );
 
-    const SPT_TINYMCE: TagDefinition = tag_definition!(
+    pub(crate) const SPT_TINYMCE: TagDefinition = tag_definition!(
         type "spt",
         name "tinymce",
         deprecated false,
@@ -1868,7 +1868,7 @@ impl TagDefinition {
         ]
     );
 
-    const SPT_UPDOWN: TagDefinition = tag_definition!(
+    pub(crate) const SPT_UPDOWN: TagDefinition = tag_definition!(
         type "spt",
         name "updown",
         deprecated false,
@@ -1882,7 +1882,7 @@ impl TagDefinition {
         rules &[AttributeRule::Required("name")]
     );
 
-    const SPT_UPLOAD: TagDefinition = tag_definition!(
+    pub(crate) const SPT_UPLOAD: TagDefinition = tag_definition!(
         type "spt",
         name "upload",
         deprecated false,
@@ -1894,7 +1894,7 @@ impl TagDefinition {
         rules &[AttributeRule::Required("name")]
     );
 
-    const SPT_WORKLIST: TagDefinition = tag_definition!(
+    pub(crate) const SPT_WORKLIST: TagDefinition = tag_definition!(
         type "spt",
         name "worklist",
         deprecated true,

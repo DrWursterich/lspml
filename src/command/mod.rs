@@ -66,7 +66,13 @@ pub(crate) fn definition(request: Request) -> Result<Message> {
                 Ok(definition) => Response {
                     id: request.id,
                     result: definition
-                        .and_then(|d| serde_json::to_value(GotoDefinitionResponse::Scalar(d)).ok())
+                        .and_then(|d| {
+                            serde_json::to_value(match d.len() {
+                                1 => GotoDefinitionResponse::Scalar(d[0].clone()),
+                                _ => GotoDefinitionResponse::Array(d),
+                            })
+                            .ok()
+                        })
                         .or_else(|| Some(serde_json::value::Value::Null)),
                     error: None,
                 },
