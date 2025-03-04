@@ -7,6 +7,11 @@ pub(crate) struct Function {
 }
 
 impl Function {
+    pub(crate) const CEIL: Function = Function::new(
+        "ceil",
+        ArgumentNumber::Exactly(1),
+        "Rundet eine Zahl zum nächsten Integer auf",
+    );
     pub(crate) const COALESCE: Function = Function::new(
         "coalesce",
         ArgumentNumber::AtLeast(1),
@@ -39,6 +44,11 @@ impl Function {
         "evalText",
         ArgumentNumber::Exactly(1),
         "Evaluiert den Text und liefert das Ergebnis zurück.",
+    );
+    pub(crate) const FLOOR: Function = Function::new(
+        "floor",
+        ArgumentNumber::Exactly(1),
+        "Rundet eine Zahl zum nächsten Integer ab",
     );
     pub(crate) const IS_EMAIL: Function = Function::new(
         "isEmail",
@@ -74,6 +84,11 @@ impl Function {
     );
     pub(crate) const RANDOM_UUID: Function =
         Function::new("randomUUID", ArgumentNumber::None, "Erzeugt eine UUID");
+    pub(crate) const ROUND: Function = Function::new(
+        "floor",
+        ArgumentNumber::Exactly(1),
+        "Rundet eine Zahl zum nächsten Integer",
+    );
     pub(crate) const TRANSLATABLE: Function = Function::new(
         "translatable",
         ArgumentNumber::Exactly(1),
@@ -98,18 +113,21 @@ impl FromStr for Function {
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         return match string {
+            "ceil" => Ok(Function::CEIL),
             "coalesce" => Ok(Function::COALESCE),
             "collection" => Ok(Function::COLLECTION),
             "color" => Ok(Function::COLOR),
             "evalCondition" => Ok(Function::EVAL_CONDITION),
             "evalExpression" => Ok(Function::EVAL_EXPRESSION),
             "evalText" => Ok(Function::EVAL_TEXT),
+            "floor" => Ok(Function::FLOOR),
             "isEmail" => Ok(Function::IS_EMAIL),
             "isList" => Ok(Function::IS_LIST),
             "isMap" => Ok(Function::IS_MAP),
             "isNull" => Ok(Function::IS_NULL),
             "isNumber" => Ok(Function::IS_NUMBER),
             "randomUUID" => Ok(Function::RANDOM_UUID),
+            "round" => Ok(Function::ROUND),
             "translatable" => Ok(Function::TRANSLATABLE),
             name => Err(anyhow::anyhow!("unknown function \"{}\"", name)),
         };
