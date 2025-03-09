@@ -42,13 +42,18 @@ fn print_text(diagnostics: HashMap<PathBuf, Vec<Diagnostic>>) -> Result<()> {
             .to_string();
         println!("{}", file.underline());
         for diagnostic in values {
-            let severity = format!("{}{}{}", "[".blue(), match diagnostic.severity {
-                Severity::Hint => "HINT".green(),
-                // Severity::Information => "INFO".blue(),
-                Severity::Warning => "WARNING".yellow(),
-                Severity::Error => "ERROR".red(),
-                Severity::Critical => "CRITICAL".red(),
-            }, "]".blue());
+            let severity = format!(
+                "{}{}{}",
+                "[".blue(),
+                match diagnostic.severity {
+                    Severity::Hint => "HINT".green(),
+                    // Severity::Information => "INFO".blue(),
+                    Severity::Warning => "WARNING".yellow(),
+                    Severity::Error => "ERROR".red(),
+                    Severity::Critical => "CRITICAL".red(),
+                },
+                "]".blue()
+            );
             println!(
                 "{:<10} {} ({}) on line {}",
                 severity.bold(),
