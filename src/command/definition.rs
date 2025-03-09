@@ -1,5 +1,5 @@
 use lsp_server::ErrorCode;
-use lsp_types::{GotoDefinitionParams, Position, Range, Uri as Url};
+use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse, Position, Range, Uri as Url};
 use std::{cmp::Ordering, iter, path::Path};
 use tree_sitter::Point;
 
@@ -102,7 +102,7 @@ impl DefinitionsFinder<'_> {
                             if let WordFragment::String(StringLiteral { content, location }) =
                                 &fragments[0]
                             {
-                                if *content == self.variable {
+                                if &**content == self.variable {
                                     let start = Position {
                                         line: opening_quote_location.line as u32
                                             + location.line() as u32,
@@ -142,7 +142,7 @@ impl DefinitionsFinder<'_> {
 
 pub(crate) fn definition(
     params: GotoDefinitionParams,
-) -> Result<Option<Vec<lsp_types::Location>>, LsError> {
+) -> Result<Option<GotoDefinitionResponse>, LsError> {
     let text_params = params.text_document_position_params;
     let file = &text_params.text_document.uri;
     let document = match document_store::get(file) {
@@ -238,23 +238,23 @@ pub(crate) fn definition(
                     .map(|module| module.path + &uri.to_string())
                     .filter(|file| Path::new(&file).exists())
                     .and_then(|file| format!("file://{}", &file).parse().ok())
-                    .map(|uri| {
-                        vec![lsp_types::Location {
-                            range: Range {
-                                ..Default::default()
-                            },
-                            uri,
-                        }]
-                    }));
+                    .map(|uri| lsp_types::Location {
+                        range: Range {
+                            ..Default::default()
+                        },
+                        uri,
+                    })
+                    .map(GotoDefinitionResponse::Scalar));
             }
             SpelAst::Uri(SpelResult::Valid(uri)) => find_node_in_uri(uri, &cursor, &offset),
             _ => None,
         };
         if let Some(node) = node {
-            let definitions = DefinitionsFinder::find(cursor, &document, file, node);
+            let mut definitions = DefinitionsFinder::find(cursor, &document, file, node);
             return match definitions.len() {
                 0 => Ok(None),
-                _ => Ok(Some(definitions)),
+                1 => Ok(Some(GotoDefinitionResponse::Scalar(definitions.remove(0)))),
+                _ => Ok(Some(GotoDefinitionResponse::Array(definitions))),
             };
         }
     }

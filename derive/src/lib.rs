@@ -57,7 +57,7 @@ pub fn document_node(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
                 .iter()
                 .filter(|field| {
                     get_type(&field.ty)
-                        .and_then(|r#type| get_type_name(r#type))
+                        .and_then(get_type_name)
                         .is_some_and(|name| name == "Range")
                 })
                 .collect();
@@ -75,9 +75,10 @@ pub fn document_node(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
                 _ => quote! {
                     impl DocumentNode for #name {
                         fn range(&self) -> Range {
-                            let start = self.open_location().start();
-                            let end = self.close_location().end();
-                            return Range { start, end };
+                            return Range {
+                                start: self.open_location().start(),
+                                end: self.close_location().end(),
+                            };
                         }
                     }
                 },

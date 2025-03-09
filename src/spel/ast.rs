@@ -1,4 +1,4 @@
-use std::fmt::Formatter;
+use std::{fmt::Formatter, sync::Arc};
 
 use core::{
     cmp::Ordering,
@@ -70,7 +70,7 @@ impl Display for Object {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Function {
-    pub(crate) name: String,
+    pub(crate) name: Arc<str>,
     pub(crate) arguments: Vec<FunctionArgument>,
     pub(crate) name_location: Location,
     pub(crate) opening_bracket_location: Location,
@@ -193,7 +193,7 @@ impl Display for Interpolation {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct StringLiteral {
-    pub(crate) content: String,
+    pub(crate) content: Arc<str>,
     pub(crate) location: Location,
 }
 
@@ -276,7 +276,7 @@ impl Display for Expression {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Number {
-    pub(crate) content: String,
+    pub(crate) content: Arc<str>,
     pub(crate) location: Location,
 }
 
@@ -697,6 +697,8 @@ pub(crate) struct Regex {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use crate::spel::ast::{Interpolation, Location, Object, StringLiteral, Word, WordFragment};
 
     #[test]
@@ -707,7 +709,7 @@ mod tests {
                 Word {
                     fragments: vec![
                         WordFragment::String(StringLiteral {
-                            content: "hello-".to_string(),
+                            content: Arc::from("hello-"),
                             location: Location::VariableLength {
                                 line: 0,
                                 char: 3,
@@ -717,7 +719,7 @@ mod tests {
                         WordFragment::Interpolation(Interpolation {
                             content: Object::Name(Word {
                                 fragments: vec![WordFragment::String(StringLiteral {
-                                    content: "nice".to_string(),
+                                    content: Arc::from("nice"),
                                     location: Location::VariableLength {
                                         line: 0,
                                         char: 11,
@@ -735,7 +737,7 @@ mod tests {
                             }
                         }),
                         WordFragment::String(StringLiteral {
-                            content: "-world".to_string(),
+                            content: Arc::from("-world"),
                             location: Location::VariableLength {
                                 line: 0,
                                 char: 16,
@@ -755,7 +757,7 @@ mod tests {
             format!(
                 "{}",
                 Object::String(StringLiteral {
-                    content: "'some  string'".to_string(),
+                    content: Arc::from("'some  string'"),
                     location: Location::VariableLength {
                         line: 0,
                         char: 0,

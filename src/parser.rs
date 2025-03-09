@@ -137,7 +137,7 @@ pub(crate) struct Tree {
 pub(crate) enum ParsedHtml {
     Valid(HtmlNode),
     Erroneous(HtmlNode, Vec<TagError>),
-    Unparsable(String, Location),
+    Unparsable(Box<str>, Location),
 }
 
 impl DocumentNode for ParsedHtml {
@@ -304,8 +304,8 @@ impl TagLibOrigin {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TagBody {
-    pub(crate) open_location: SingleLineLocation,
-    pub(crate) nodes: Vec<Node>,
+    pub open_location: SingleLineLocation,
+    pub nodes: Vec<Node>,
 }
 
 #[derive(Clone, Debug, PartialEq, DocumentNode)]
@@ -319,7 +319,7 @@ pub(crate) enum Node {
 #[derive(Clone, Debug, PartialEq, DocumentNode)]
 pub(crate) struct HtmlNode {
     pub(crate) open_location: SingleLineLocation,
-    pub(crate) name: String,
+    pub(crate) name: Box<str>,
     pub(crate) attributes: Vec<ParsedAttribute<HtmlAttribute>>,
     pub(crate) body: Option<TagBody>,
     pub(crate) close_location: SingleLineLocation,
@@ -341,13 +341,13 @@ impl HtmlNode {
 
 #[derive(Clone, Debug, PartialEq, DocumentNode)]
 pub(crate) struct TextNode {
-    pub(crate) content: String,
+    pub(crate) content: Box<str>,
     pub(crate) range: Range,
 }
 
 #[derive(Clone, Debug, PartialEq, DocumentNode)]
 pub(crate) struct ErrorNode {
-    pub(crate) content: String,
+    pub(crate) content: Box<str>,
     pub(crate) range: Range,
 }
 
@@ -490,13 +490,13 @@ macro_rules! tag_struct {
                         },
                         NodeMovingResult::Erroneous(node) => {
                             return Ok(ParsedTag::Unparsable(
-                                parser.node_text(&node)?.to_string(),
+                                parser.node_text(&node)?.into(),
                                 node_location(node),
                             ));
                         },
                         NodeMovingResult::Superfluous(node) => {
                             errors.push(TagError::Superfluous(
-                                parser.node_text(&node)?.to_string(),
+                                parser.node_text(&node)?.into(),
                                 node_location(node),
                             ));
                             movement = NodeMovement::NextSibling;
@@ -508,7 +508,7 @@ macro_rules! tag_struct {
                                 format!(
                                     "\"{}\" should be on a single line",
                                     parser.node_text(&node)?,
-                                ),
+                                ).into(),
                                 location,
                             ))
                         },
@@ -520,14 +520,14 @@ macro_rules! tag_struct {
                 loop {
                     close_location = match parser.goto(&NodeMovement::NextSibling) {
                         NodeMovingResult::NonExistent => return Ok(ParsedTag::Unparsable(
-                            format!("\"{}\" tag is unclosed", $definition.name),
+                            format!("\"{}\" tag is unclosed", $definition.name).into(),
                             node_location(parent_node),
                         )),
                         NodeMovingResult::Missing(node) if node.kind() == ">" => {
                             body = Some(match parser.parse_tag_body()? {
                                 Some(body) => body,
                                 None => return Ok(ParsedTag::Unparsable(
-                                    format!("\"{}\" tag is unclosed", $definition.name),
+                                    format!("\"{}\" tag is unclosed", $definition.name).into(),
                                     node_location(node),
                                 )),
                             });
@@ -549,7 +549,7 @@ macro_rules! tag_struct {
                             // however, the error reported must still be on the first
                             // possible location such that the quick-fix action inserts it
                             // there.
-                            errors.push(TagError::Missing("/>".to_string(), node_location(node)));
+                            errors.push(TagError::Missing("/>".into(), node_location(node)));
                             parser.move_missing_node_past_whitespaces(node)?
                         },
                         NodeMovingResult::Missing(node) => {
@@ -558,19 +558,19 @@ macro_rules! tag_struct {
                                     "\"{}\" is missing in \"{}\" tag",
                                     node.kind(),
                                     $definition.name
-                                ),
+                                ).into(),
                                 node_location(parent_node),
                             ));
                         },
                         NodeMovingResult::Erroneous(node) => {
                             return Ok(ParsedTag::Unparsable(
-                                parser.node_text(&node)?.to_string(),
+                                parser.node_text(&node)?.into(),
                                 node_location(node)
                             ));
                         },
                         NodeMovingResult::Superfluous(node) => {
                             errors.push(TagError::Superfluous(
-                                parser.node_text(&node)?.to_string(),
+                                parser.node_text(&node)?.into(),
                                 node_location(node),
                             ));
                             continue;
@@ -581,7 +581,7 @@ macro_rules! tag_struct {
                                 body = Some(match parser.parse_tag_body()? {
                                     Some(body) => body,
                                     None => return Ok(ParsedTag::Unparsable(
-                                        format!("\"{}\" tag is unclosed", $definition.name),
+                                        format!("\"{}\" tag is unclosed", $definition.name).into(),
                                         node_location(node),
                                     )),
                                 });
@@ -603,7 +603,7 @@ macro_rules! tag_struct {
                         format!(
                             "\"{}\" should be on a single line",
                             parser.node_text(&parser.cursor.node())?,
-                        ),
+                        ).into(),
                         location,
                     ))
                 };
@@ -622,7 +622,7 @@ macro_rules! tag_struct {
                 parser: &mut TreeParser,
                 errors: &mut Vec<TagError>,
                 body_open_node: tree_sitter::Node<'_>,
-            ) -> Result<Result<Location, (String, Location)>> {
+            ) -> Result<Result<Location, (Box<str>, Location)>> {
                 loop {
                     return Ok(Ok(match parser.goto(&NodeMovement::Current) {
                         NodeMovingResult::Missing(node) => {
@@ -632,7 +632,7 @@ macro_rules! tag_struct {
                             // location such that the quick-fix action inserts it there.
                             let start_position = body_open_node.start_position();
                             errors.push(TagError::Missing(
-                                format!("</{}>", $definition.name),
+                                format!("</{}>", $definition.name).into(),
                                 Location::SingleLine(SingleLineLocation {
                                     char: start_position.column + 1,
                                     line: start_position.row,
@@ -643,13 +643,13 @@ macro_rules! tag_struct {
                         },
                         NodeMovingResult::Erroneous(node) => {
                             return Ok(Err((
-                                parser.node_text(&node)?.to_string(),
+                                parser.node_text(&node)?.into(),
                                 node_location(node),
                             )));
                         },
                         NodeMovingResult::Superfluous(node) => {
                             errors.push(TagError::Superfluous(
-                                parser.node_text(&node)?.to_string(),
+                                parser.node_text(&node)?.into(),
                                 node_location(node),
                             ));
                             continue;
@@ -659,7 +659,7 @@ macro_rules! tag_struct {
                         },
                         NodeMovingResult::Ok(node) => {
                             return Ok(Err((
-                                parser.node_text(&node)?.to_string(),
+                                parser.node_text(&node)?.into(),
                                 node_location(node),
                             )));
                         },
@@ -742,13 +742,13 @@ macro_rules! tag_struct {
                         },
                         NodeMovingResult::Erroneous(node) => {
                             return Ok(ParsedTag::Unparsable(
-                                parser.node_text(&node)?.to_string(),
+                                parser.node_text(&node)?.into(),
                                 node_location(node),
                             ));
                         },
                         NodeMovingResult::Superfluous(node) => {
                             errors.push(TagError::Superfluous(
-                                parser.node_text(&node)?.to_string(),
+                                parser.node_text(&node)?.into(),
                                 node_location(node),
                             ));
                             movement = NodeMovement::NextSibling;
@@ -760,7 +760,7 @@ macro_rules! tag_struct {
                                 format!(
                                     "\"{}\" should be on a single line",
                                     parser.node_text(&node)?,
-                                ),
+                                ).into(),
                                 location,
                             ))
                         },
@@ -773,14 +773,14 @@ macro_rules! tag_struct {
                 loop {
                     close_location = match parser.goto(&NodeMovement::NextSibling) {
                         NodeMovingResult::NonExistent => return Ok(ParsedTag::Unparsable(
-                            format!("\"{}\" tag is unclosed", $definition.name),
+                            format!("\"{}\" tag is unclosed", $definition.name).into(),
                             node_location(parent_node),
                         )),
                         NodeMovingResult::Missing(node) if node.kind() == ">" => {
                             body = Some(match parser.parse_tag_body()? {
                                 Some(body) => body,
                                 None => return Ok(ParsedTag::Unparsable(
-                                    format!("\"{}\" tag is unclosed", $definition.name),
+                                    format!("\"{}\" tag is unclosed", $definition.name).into(),
                                     node_location(node),
                                 )),
                             });
@@ -802,7 +802,7 @@ macro_rules! tag_struct {
                             // however, the error reported must still be on the first
                             // possible location such that the quick-fix action inserts it
                             // there.
-                            errors.push(TagError::Missing("/>".to_string(), node_location(node)));
+                            errors.push(TagError::Missing("/>".into(), node_location(node)));
                             parser.move_missing_node_past_whitespaces(node)?
                         },
                         NodeMovingResult::Missing(node) => {
@@ -811,19 +811,19 @@ macro_rules! tag_struct {
                                     "\"{}\" is missing in \"{}\" tag",
                                     node.kind(),
                                     $definition.name
-                                ),
+                                ).into(),
                                 node_location(parent_node),
                             ));
                         },
                         NodeMovingResult::Erroneous(node) => {
                             return Ok(ParsedTag::Unparsable(
-                                parser.node_text(&node)?.to_string(),
+                                parser.node_text(&node)?.into(),
                                 node_location(node)
                             ));
                         },
                         NodeMovingResult::Superfluous(node) => {
                             errors.push(TagError::Superfluous(
-                                parser.node_text(&node)?.to_string(),
+                                parser.node_text(&node)?.into(),
                                 node_location(node),
                             ));
                             continue;
@@ -844,7 +844,7 @@ macro_rules! tag_struct {
                                 body = Some(match parser.parse_tag_body()? {
                                     Some(body) => body,
                                     None => return Ok(ParsedTag::Unparsable(
-                                        format!("\"{}\" tag is unclosed", $definition.name),
+                                        format!("\"{}\" tag is unclosed", $definition.name).into(),
                                         node_location(node),
                                     )),
                                 });
@@ -866,7 +866,7 @@ macro_rules! tag_struct {
                         format!(
                             "\"{}\" should be on a single line",
                             parser.node_text(&parser.cursor.node())?,
-                        ),
+                        ).into(),
                         location,
                     ))
                 };
@@ -886,7 +886,7 @@ macro_rules! tag_struct {
                 parser: &mut TreeParser,
                 errors: &mut Vec<TagError>,
                 body_open_node: tree_sitter::Node<'_>,
-            ) -> Result<Result<Location, (String, Location)>> {
+            ) -> Result<Result<Location, (Box<str>, Location)>> {
                 loop {
                     return Ok(Ok(match parser.goto(&NodeMovement::Current) {
                         NodeMovingResult::Missing(node) => {
@@ -896,7 +896,7 @@ macro_rules! tag_struct {
                             // location such that the quick-fix action inserts it there.
                             let start_position = body_open_node.start_position();
                             errors.push(TagError::Missing(
-                                format!("</{}>", $definition.name),
+                                format!("</{}>", $definition.name).into(),
                                 Location::SingleLine(SingleLineLocation {
                                     char: start_position.column + 1,
                                     line: start_position.row,
@@ -907,13 +907,13 @@ macro_rules! tag_struct {
                         },
                         NodeMovingResult::Erroneous(node) => {
                             return Ok(Err((
-                                parser.node_text(&node)?.to_string(),
+                                parser.node_text(&node)?.into(),
                                 node_location(node),
                             )));
                         },
                         NodeMovingResult::Superfluous(node) => {
                             errors.push(TagError::Superfluous(
-                                parser.node_text(&node)?.to_string(),
+                                parser.node_text(&node)?.into(),
                                 node_location(node),
                             ));
                             continue;
@@ -923,7 +923,7 @@ macro_rules! tag_struct {
                         },
                         NodeMovingResult::Ok(node) => {
                             return Ok(Err((
-                                parser.node_text(&node)?.to_string(),
+                                parser.node_text(&node)?.into(),
                                 node_location(node),
                             )));
                         },
@@ -2003,7 +2003,7 @@ pub(crate) trait AttributeValue {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AttributeKey {
-    pub(crate) value: String,
+    pub(crate) value: Box<str>,
     pub(crate) location: SingleLineLocation,
 }
 
@@ -2017,7 +2017,7 @@ pub(crate) struct PlainAttribute {
 pub(crate) struct PlainAttributeValue {
     pub(crate) equals_location: SingleLineLocation,
     pub(crate) opening_quote_location: SingleLineLocation,
-    pub(crate) content: String,
+    pub(crate) content: Box<str>,
     pub(crate) closing_quote_location: SingleLineLocation,
 }
 
@@ -2061,14 +2061,14 @@ impl AttributeValue for HtmlAttributeValue {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum HtmlAttributeValueContent {
     Empty,
-    Plain(String),
+    Plain(Box<str>),
     Tag(ParsedTag<SpmlTag>),
     Fragmented(Vec<HtmlAttributeValueFragment>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum HtmlAttributeValueFragment {
-    Plain(String),
+    Plain(Box<str>),
     Tag(ParsedTag<SpmlTag>),
 }
 
@@ -2086,11 +2086,11 @@ impl AttributeValue for PlainAttributeValue {
 pub(crate) enum ParsedAttribute<A: Attribute> {
     Valid(A),
     Erroneous(A, Vec<AttributeError>),
-    Unparsable(String, Location),
+    Unparsable(Box<str>, Location),
 }
 
 impl<R: Attribute> ParsedAttribute<R> {
-    fn start(&self) -> Position {
+    pub(crate) fn start(&self) -> Position {
         return match &self {
             ParsedAttribute::Valid(attribute) => attribute.start(),
             ParsedAttribute::Erroneous(attribute, _) => attribute.start(),
@@ -2098,25 +2098,32 @@ impl<R: Attribute> ParsedAttribute<R> {
         };
     }
 
-    fn end(&self) -> Position {
+    pub(crate) fn end(&self) -> Position {
         return match &self {
             ParsedAttribute::Valid(attribute) => attribute.end(),
             ParsedAttribute::Erroneous(attribute, _) => attribute.end(),
             ParsedAttribute::Unparsable(_, location) => location.end(),
         };
     }
+
+    pub(crate) fn range(&self) -> Range {
+        return Range {
+            start: self.start(),
+            end: self.end(),
+        };
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum AttributeError {
-    Superfluous(String, Location),
+    Superfluous(Box<str>, Location),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum ParsedTag<A: Tag> {
     Valid(A),
     Erroneous(A, Vec<TagError>),
-    Unparsable(String, Location),
+    Unparsable(Box<str>, Location),
 }
 
 impl<R: Tag> ParsedTag<R> {
@@ -2145,8 +2152,8 @@ impl<T: Tag> DocumentNode for ParsedTag<T> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum TagError {
-    Superfluous(String, Location),
-    Missing(String, Location),
+    Superfluous(Box<str>, Location),
+    Missing(Box<str>, Location),
 }
 
 impl Attribute for PlainAttribute {
@@ -2354,7 +2361,7 @@ struct AttributeParser<'a, 'b> {
 }
 
 enum IntermediateAttributeParsingResult<R> {
-    Failed(String, Location),
+    Failed(Box<str>, Location),
     Partial(R),
 }
 
@@ -2404,12 +2411,12 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         };
         let key = match node_location(key_node) {
             Location::SingleLine(location) => AttributeKey {
-                value: self.tree_parser.node_text(&key_node)?.to_string(),
+                value: self.tree_parser.node_text(&key_node)?.into(),
                 location,
             },
             location => {
                 return Ok(ParsedAttribute::Unparsable(
-                    "attribute key should be on a single line".to_string(),
+                    "attribute key should be on a single line".into(),
                     location,
                 ));
             }
@@ -2421,7 +2428,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
             IntermediateAttributeParsingResult::Partial(Some(e)) => e,
             IntermediateAttributeParsingResult::Partial(None) => {
                 return Ok(ParsedAttribute::Unparsable(
-                    "missing \"=\"".to_string(),
+                    "missing \"=\"".into(),
                     node_location(self.parent_node),
                 ))
             }
@@ -2471,12 +2478,12 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         };
         let key = match node_location(key_node) {
             Location::SingleLine(location) => AttributeKey {
-                value: self.tree_parser.node_text(&key_node)?.to_string(),
+                value: self.tree_parser.node_text(&key_node)?.into(),
                 location,
             },
             location => {
                 return Ok(ParsedAttribute::Unparsable(
-                    "attribute key should be on a single line".to_string(),
+                    "attribute key should be on a single line".into(),
                     location,
                 ));
             }
@@ -2538,12 +2545,12 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         };
         let key = match node_location(key_node) {
             Location::SingleLine(location) => AttributeKey {
-                value: self.tree_parser.node_text(&key_node)?.to_string(),
+                value: self.tree_parser.node_text(&key_node)?.into(),
                 location,
             },
             location => {
                 return Ok(ParsedAttribute::Unparsable(
-                    "attribute key should be on a single line".to_string(),
+                    "attribute key should be on a single line".into(),
                     location,
                 ));
             }
@@ -2555,7 +2562,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
             IntermediateAttributeParsingResult::Partial(Some(e)) => e,
             IntermediateAttributeParsingResult::Partial(None) => {
                 return Ok(ParsedAttribute::Unparsable(
-                    "missing \"=\"".to_string(),
+                    "missing \"=\"".into(),
                     node_location(self.parent_node),
                 ))
             }
@@ -2605,7 +2612,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 // probably cannot happen...
                 NodeMovingResult::NonExistent | NodeMovingResult::Missing(_) => {
                     return Ok(IntermediateAttributeParsingResult::Failed(
-                        "missing attribute".to_string(),
+                        "missing attribute".into(),
                         node_location(self.parent_node),
                     ));
                 }
@@ -2614,13 +2621,14 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                         format!(
                             "invalid attribute \"{}\"",
                             self.tree_parser.node_text(&node)?
-                        ),
+                        )
+                        .into(),
                         node_location(node),
                     ));
                 }
                 NodeMovingResult::Superfluous(node) => {
                     self.add_error(AttributeError::Superfluous(
-                        self.tree_parser.node_text(&node)?.to_string(),
+                        self.tree_parser.node_text(&node)?.into(),
                         node_location(node),
                     ));
                     movement = &NodeMovement::NextSibling;
@@ -2644,19 +2652,21 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                     format!(
                         "missing \"=\" after attribute name \"{}\"",
                         self.tree_parser.node_text(key_node)?
-                    ),
+                    )
+                    .into(),
                     node_location(self.parent_node),
                 ),
                 NodeMovingResult::Erroneous(node) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "expected \"=\", found \"{}\"",
                         self.tree_parser.node_text(&node)?
-                    ),
+                    )
+                    .into(),
                     node_location(node),
                 ),
                 NodeMovingResult::Superfluous(node) => {
                     self.add_error(AttributeError::Superfluous(
-                        self.tree_parser.node_text(&node)?.to_string(),
+                        self.tree_parser.node_text(&node)?.into(),
                         node_location(node),
                     ));
                     continue;
@@ -2666,7 +2676,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                         IntermediateAttributeParsingResult::Partial(Some(location))
                     }
                     location => IntermediateAttributeParsingResult::Failed(
-                        "\"=\" should be on a single line".to_string(),
+                        "\"=\" should be on a single line".into(),
                         location,
                     ),
                 },
@@ -2684,26 +2694,29 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                     format!(
                         "missing attribute value for \"{}\"",
                         self.tree_parser.node_text(&key_node)?
-                    ),
+                    )
+                    .into(),
                     node_location(self.parent_node),
                 ),
                 NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "missing attribute value for \"{}\"",
                         self.tree_parser.node_text(&key_node)?
-                    ),
+                    )
+                    .into(),
                     node_location(self.parent_node),
                 ),
                 NodeMovingResult::Erroneous(node) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "expected attribute value, found \"{}\"",
                         self.tree_parser.node_text(&node)?
-                    ),
+                    )
+                    .into(),
                     node_location(node),
                 ),
                 NodeMovingResult::Superfluous(node) => {
                     self.add_error(AttributeError::Superfluous(
-                        self.tree_parser.node_text(&node)?.to_string(),
+                        self.tree_parser.node_text(&node)?.into(),
                         node_location(node),
                     ));
                     continue;
@@ -2723,26 +2736,29 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                     format!(
                         "attribute \"{}\" is missing a value",
                         self.tree_parser.node_text(&key_node)?
-                    ),
+                    )
+                    .into(),
                     node_location(self.parent_node),
                 ),
                 NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "missing \"\"\" after attribute name \"{}=\"",
                         self.tree_parser.node_text(&key_node)?
-                    ),
+                    )
+                    .into(),
                     node_location(self.parent_node),
                 ),
                 NodeMovingResult::Erroneous(node) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "expected \"\"\", found \"{}\"",
                         self.tree_parser.node_text(&node)?
-                    ),
+                    )
+                    .into(),
                     node_location(node),
                 ),
                 NodeMovingResult::Superfluous(node) => {
                     self.add_error(AttributeError::Superfluous(
-                        self.tree_parser.node_text(&node)?.to_string(),
+                        self.tree_parser.node_text(&node)?.into(),
                         node_location(node),
                     ));
                     continue;
@@ -2752,7 +2768,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                         IntermediateAttributeParsingResult::Partial(location)
                     }
                     location => IntermediateAttributeParsingResult::Failed(
-                        "\"\"\" should be on a single line".to_string(),
+                        "\"\"\" should be on a single line".into(),
                         location,
                     ),
                 },
@@ -2763,45 +2779,45 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
     fn parse_string_content(
         &mut self,
         key_node: &tree_sitter::Node<'a>,
-    ) -> Result<IntermediateAttributeParsingResult<(String, NodeMovement)>> {
+    ) -> Result<IntermediateAttributeParsingResult<(Box<str>, NodeMovement)>> {
         loop {
             return Ok(match self.tree_parser.goto(&NodeMovement::NextSibling) {
                 NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "\"{}\" attribute value string is unclosed",
                         self.tree_parser.node_text(&key_node)?
-                    ),
+                    )
+                    .into(),
                     node_location(self.parent_node),
                 ),
                 NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "\"{}\" attribute value string is unclosed",
                         self.tree_parser.node_text(&key_node)?
-                    ),
+                    )
+                    .into(),
                     node_location(self.parent_node),
                 ),
                 NodeMovingResult::Erroneous(node) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "expected \"\"\", found \"{}\"",
                         self.tree_parser.node_text(&node)?
-                    ),
+                    )
+                    .into(),
                     node_location(node),
                 ),
                 NodeMovingResult::Superfluous(node) => {
                     self.add_error(AttributeError::Superfluous(
-                        self.tree_parser.node_text(&node)?.to_string(),
+                        self.tree_parser.node_text(&node)?.into(),
                         node_location(node),
                     ));
                     continue;
                 }
                 NodeMovingResult::Ok(node) if node.kind() == "\"" => {
-                    IntermediateAttributeParsingResult::Partial((
-                        "".to_string(),
-                        NodeMovement::Current,
-                    ))
+                    IntermediateAttributeParsingResult::Partial(("".into(), NodeMovement::Current))
                 }
                 NodeMovingResult::Ok(node) => IntermediateAttributeParsingResult::Partial((
-                    self.tree_parser.node_text(&node)?.to_string(),
+                    self.tree_parser.node_text(&node)?.into(),
                     NodeMovement::NextSibling,
                 )),
             });
@@ -2818,26 +2834,29 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                     format!(
                         "\"{}\" html attribute value string is unclosed",
                         self.tree_parser.node_text(&key_node)?
-                    ),
+                    )
+                    .into(),
                     node_location(self.parent_node),
                 ),
                 NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "\"{}\" html attribute value string has no content",
                         self.tree_parser.node_text(&key_node)?
-                    ),
+                    )
+                    .into(),
                     node_location(self.parent_node),
                 ),
                 NodeMovingResult::Erroneous(node) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "expected \"\"\", found \"{}\"",
                         self.tree_parser.node_text(&node)?
-                    ),
+                    )
+                    .into(),
                     node_location(node),
                 ),
                 NodeMovingResult::Superfluous(node) => {
                     self.add_error(AttributeError::Superfluous(
-                        self.tree_parser.node_text(&node)?.to_string(),
+                        self.tree_parser.node_text(&node)?.into(),
                         node_location(node),
                     ));
                     continue;
@@ -2931,26 +2950,29 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                     format!(
                         "\"{}\" closing attribute value string is unclosed",
                         self.tree_parser.node_text(&key_node)?
-                    ),
+                    )
+                    .into(),
                     node_location(self.parent_node),
                 ),
                 NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "\"{}\" closing attribute value string is unclosed",
                         self.tree_parser.node_text(&key_node)?
-                    ),
+                    )
+                    .into(),
                     node_location(self.parent_node),
                 ),
                 NodeMovingResult::Erroneous(node) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "expected \"\"\", found \"{}\"",
                         self.tree_parser.node_text(&node)?
-                    ),
+                    )
+                    .into(),
                     node_location(node),
                 ),
                 NodeMovingResult::Superfluous(node) => {
                     self.add_error(AttributeError::Superfluous(
-                        self.tree_parser.node_text(&node)?.to_string(),
+                        self.tree_parser.node_text(&node)?.into(),
                         node_location(node),
                     ));
                     continue;
@@ -2960,7 +2982,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                         IntermediateAttributeParsingResult::Partial(location)
                     }
                     location => IntermediateAttributeParsingResult::Failed(
-                        "\"\"\" should be on a single line".to_string(),
+                        "\"\"\" should be on a single line".into(),
                         location,
                     ),
                 },
@@ -3022,7 +3044,8 @@ impl<'a> TreeParser<'a> {
 
     pub(crate) fn parse_header(&mut self) -> Result<Header> {
         let root = self.cursor.node();
-        if root.kind() != "document" {
+        let kind = root.kind();
+        if kind != "document" && kind != "ERROR" {
             return Err(anyhow::anyhow!(
                 "missplaced cursor. the header should be the first thing that a TreeParser parses"
             ));
@@ -3333,19 +3356,19 @@ impl<'a> TreeParser<'a> {
                 NodeMovingResult::NonExistent | NodeMovingResult::Missing(_) => {
                     // return Err(anyhow::anyhow!("html tag is empty"));
                     return Ok(ParsedHtml::Unparsable(
-                        "missing html".to_string(),
+                        "missing html".into(),
                         node_location(parent_node),
                     ));
                 }
                 NodeMovingResult::Erroneous(node) => {
                     return Ok(ParsedHtml::Unparsable(
-                        format!("invalid html \"{}\"", self.node_text(&node)?),
+                        format!("invalid html \"{}\"", self.node_text(&node)?).into(),
                         node_location(node),
                     ));
                 }
                 NodeMovingResult::Superfluous(node) => {
                     errors.push(TagError::Superfluous(
-                        self.node_text(&node)?.to_string(),
+                        self.node_text(&node)?.into(),
                         node_location(node),
                     ));
                     movement = &NodeMovement::NextSibling;
@@ -3356,7 +3379,7 @@ impl<'a> TreeParser<'a> {
             break;
         }
         let name = node.utf8_text(self.text_bytes)?;
-        let name = name.strip_prefix("<").unwrap_or(&name).to_string();
+        let name = name.strip_prefix("<").unwrap_or(&name).into();
         let open_location = match node_location(node) {
             Location::SingleLine(location) => location,
             _ => return Err(anyhow::anyhow!("\"<{}\" should be on a single line", name)),
@@ -3368,13 +3391,13 @@ impl<'a> TreeParser<'a> {
             let node = match self.goto(&NodeMovement::NextSibling) {
                 NodeMovingResult::NonExistent => {
                     return Ok(ParsedHtml::Unparsable(
-                        "html tag is unclosed".to_string(),
+                        "html tag is unclosed".into(),
                         node_location(parent_node),
                     ));
                 }
                 NodeMovingResult::Missing(node) => {
                     errors.push(TagError::Missing(
-                        self.node_text(&node)?.to_string(),
+                        self.node_text(&node)?.into(),
                         node_location(node),
                     ));
                     if node.kind() == "dynamic_attribute" {
@@ -3384,13 +3407,13 @@ impl<'a> TreeParser<'a> {
                 }
                 NodeMovingResult::Erroneous(node) => {
                     return Ok(ParsedHtml::Unparsable(
-                        format!("invalid html \"{}\"", self.node_text(&node)?),
+                        format!("invalid html \"{}\"", self.node_text(&node)?).into(),
                         node_location(node),
                     ));
                 }
                 NodeMovingResult::Superfluous(node) => {
                     errors.push(TagError::Superfluous(
-                        self.node_text(&node)?.to_string(),
+                        self.node_text(&node)?.into(),
                         node_location(node),
                     ));
                     continue;
@@ -3421,19 +3444,18 @@ impl<'a> TreeParser<'a> {
                                 // which is not included in any node.
                                 // however, the error reported must still be on the first possible
                                 // location such that the quick-fix action inserts it there.
-                                errors
-                                    .push(TagError::Missing("/>".to_string(), node_location(node)));
+                                errors.push(TagError::Missing("/>".into(), node_location(node)));
                                 self.move_missing_node_past_whitespaces(node)?
                             }
                             NodeMovingResult::Erroneous(node) => {
                                 return Ok(ParsedHtml::Unparsable(
-                                    format!("invalid html \"{}\"", self.node_text(&node)?),
+                                    format!("invalid html \"{}\"", self.node_text(&node)?).into(),
                                     node_location(node),
                                 ));
                             }
                             NodeMovingResult::Superfluous(node) => {
                                 errors.push(TagError::Superfluous(
-                                    self.node_text(&node)?.to_string(),
+                                    self.node_text(&node)?.into(),
                                     node_location(node),
                                 ));
                                 movement = &NodeMovement::NextSibling;
@@ -3450,7 +3472,7 @@ impl<'a> TreeParser<'a> {
                         Some(body) => body,
                         None => {
                             return Ok(ParsedHtml::Unparsable(
-                                format!("html tag \"{}\" is unclosed", name),
+                                format!("html tag \"{}\" is unclosed", name).into(),
                                 node_location(node),
                             ))
                         }
@@ -3465,7 +3487,7 @@ impl<'a> TreeParser<'a> {
                             NodeMovingResult::Missing(node) => {
                                 let location = node_location(node);
                                 errors.push(TagError::Missing(
-                                    format!("</{}>", name),
+                                    format!("</{}>", name).into(),
                                     // tree-sitter puts missing nodes always at the very end!
                                     location.clone(),
                                 ));
@@ -3473,13 +3495,13 @@ impl<'a> TreeParser<'a> {
                             }
                             NodeMovingResult::Erroneous(node) => {
                                 return Ok(ParsedHtml::Unparsable(
-                                    format!("invalid html \"{}\"", self.node_text(&node)?),
+                                    format!("invalid html \"{}\"", self.node_text(&node)?).into(),
                                     node_location(node),
                                 ));
                             }
                             NodeMovingResult::Superfluous(node) => {
                                 errors.push(TagError::Superfluous(
-                                    self.node_text(&node)?.to_string(),
+                                    self.node_text(&node)?.into(),
                                     node_location(node),
                                 ));
                                 movement = &NodeMovement::NextSibling;
@@ -3531,19 +3553,19 @@ impl<'a> TreeParser<'a> {
             node = match self.goto(movement) {
                 NodeMovingResult::NonExistent | NodeMovingResult::Missing(_) => {
                     return Ok(ParsedHtml::Unparsable(
-                        "missing html".to_string(),
+                        "missing html".into(),
                         node_location(parent_node),
                     ));
                 }
                 NodeMovingResult::Erroneous(node) => {
                     return Ok(ParsedHtml::Unparsable(
-                        format!("invalid html \"{}\"", self.node_text(&node)?),
+                        format!("invalid html \"{}\"", self.node_text(&node)?).into(),
                         node_location(node),
                     ));
                 }
                 NodeMovingResult::Superfluous(node) => {
                     errors.push(TagError::Superfluous(
-                        self.node_text(&node)?.to_string(),
+                        self.node_text(&node)?.into(),
                         node_location(node),
                     ));
                     movement = &NodeMovement::NextSibling;
@@ -3554,7 +3576,7 @@ impl<'a> TreeParser<'a> {
             break;
         }
         let name = node.utf8_text(self.text_bytes)?;
-        let name = name.strip_prefix("<").unwrap_or(&name).to_string();
+        let name = name.strip_prefix("<").unwrap_or(&name).into();
         let open_location = match node_location(node) {
             Location::SingleLine(location) => location,
             _ => return Err(anyhow::anyhow!("\"<{}\" should be on a single line", name)),
@@ -3564,13 +3586,13 @@ impl<'a> TreeParser<'a> {
             match self.goto(&NodeMovement::NextSibling) {
                 NodeMovingResult::NonExistent => {
                     return Ok(ParsedHtml::Unparsable(
-                        "html tag is unclosed".to_string(),
+                        "html tag is unclosed".into(),
                         node_location(parent_node),
                     ));
                 }
                 NodeMovingResult::Missing(node) => {
                     errors.push(TagError::Missing(
-                        self.node_text(&node)?.to_string(),
+                        self.node_text(&node)?.into(),
                         node_location(node),
                     ));
                     if node.kind() == "dynamic_attribute" {
@@ -3579,13 +3601,13 @@ impl<'a> TreeParser<'a> {
                 }
                 NodeMovingResult::Erroneous(node) => {
                     return Ok(ParsedHtml::Unparsable(
-                        format!("invalid html \"{}\"", self.node_text(&node)?),
+                        format!("invalid html \"{}\"", self.node_text(&node)?).into(),
                         node_location(node),
                     ));
                 }
                 NodeMovingResult::Superfluous(node) => {
                     errors.push(TagError::Superfluous(
-                        self.node_text(&node)?.to_string(),
+                        self.node_text(&node)?.into(),
                         node_location(node),
                     ));
                     continue;
@@ -3617,19 +3639,21 @@ impl<'a> TreeParser<'a> {
                         NodeMovingResult::Missing(node) => {
                             // these should not be able to be missing, they're allowed to
                             let location = node_location(node);
-                            errors
-                                .push(TagError::Missing(format!("</{}>", name), location.clone()));
+                            errors.push(TagError::Missing(
+                                format!("</{}>", name).into(),
+                                location.clone(),
+                            ));
                             location
                         }
                         NodeMovingResult::Erroneous(node) => {
                             return Ok(ParsedHtml::Unparsable(
-                                format!("invalid html \"{}\"", self.node_text(&node)?),
+                                format!("invalid html \"{}\"", self.node_text(&node)?).into(),
                                 node_location(node),
                             ));
                         }
                         NodeMovingResult::Superfluous(node) => {
                             errors.push(TagError::Superfluous(
-                                self.node_text(&node)?.to_string(),
+                                self.node_text(&node)?.into(),
                                 node_location(node),
                             ));
                             movement = &NodeMovement::NextSibling;
@@ -3674,19 +3698,19 @@ impl<'a> TreeParser<'a> {
             node = match self.goto(movement) {
                 NodeMovingResult::NonExistent | NodeMovingResult::Missing(_) => {
                     return Ok(ParsedHtml::Unparsable(
-                        "missing html".to_string(),
+                        "missing html".into(),
                         node_location(parent_node),
                     ));
                 }
                 NodeMovingResult::Erroneous(node) => {
                     return Ok(ParsedHtml::Unparsable(
-                        format!("invalid html \"{}\"", self.node_text(&node)?),
+                        format!("invalid html \"{}\"", self.node_text(&node)?).into(),
                         node_location(node),
                     ));
                 }
                 NodeMovingResult::Superfluous(node) => {
                     errors.push(TagError::Superfluous(
-                        self.node_text(&node)?.to_string(),
+                        self.node_text(&node)?.into(),
                         node_location(node),
                     ));
                     movement = &NodeMovement::NextSibling;
@@ -3697,7 +3721,7 @@ impl<'a> TreeParser<'a> {
             break;
         }
         let name = node.utf8_text(self.text_bytes)?;
-        let name = name.strip_prefix("<").unwrap_or(&name).to_string();
+        let name = name.strip_prefix("<").unwrap_or(&name).into();
         let open_location = match node_location(node) {
             Location::SingleLine(location) => location,
             _ => return Err(anyhow::anyhow!("\"<{}\" should be on a single line", name)),
@@ -3707,13 +3731,13 @@ impl<'a> TreeParser<'a> {
             match self.goto(&NodeMovement::NextSibling) {
                 NodeMovingResult::NonExistent => {
                     return Ok(ParsedHtml::Unparsable(
-                        "html tag is unclosed".to_string(),
+                        "html tag is unclosed".into(),
                         node_location(parent_node),
                     ));
                 }
                 NodeMovingResult::Missing(node) => {
                     errors.push(TagError::Missing(
-                        self.node_text(&node)?.to_string(),
+                        self.node_text(&node)?.into(),
                         node_location(node),
                     ));
                     if node.kind() == "dynamic_attribute" {
@@ -3722,13 +3746,13 @@ impl<'a> TreeParser<'a> {
                 }
                 NodeMovingResult::Erroneous(node) => {
                     return Ok(ParsedHtml::Unparsable(
-                        format!("invalid html \"{}\"", self.node_text(&node)?),
+                        format!("invalid html \"{}\"", self.node_text(&node)?).into(),
                         node_location(node),
                     ));
                 }
                 NodeMovingResult::Superfluous(node) => {
                     errors.push(TagError::Superfluous(
-                        self.node_text(&node)?.to_string(),
+                        self.node_text(&node)?.into(),
                         node_location(node),
                     ));
                     continue;
@@ -3788,7 +3812,7 @@ impl<'a> TreeParser<'a> {
         }
         let end = node.end_position();
         return Ok(TextNode {
-            content,
+            content: content.into(),
             range: range_from_points(start, end),
         });
     }
@@ -3797,7 +3821,7 @@ impl<'a> TreeParser<'a> {
         let node = self.cursor.node();
         let start = node.start_position();
         let end = node.end_position();
-        let content = node.utf8_text(self.text_bytes)?.to_string();
+        let content = node.utf8_text(self.text_bytes)?.into();
         return Ok(ErrorNode {
             content,
             range: range_from_points(start, end),
@@ -4049,6 +4073,8 @@ fn find_node_at(nodes: &Vec<Node>, position: Position) -> Option<&Node> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use crate::{
         parser::{
             AttributeKey, AttributeParser, Header, HtmlAttribute, HtmlAttributeValue,
@@ -4131,37 +4157,37 @@ mod tests {
                 page: SingleLineLocation::new(4, 0, 4),
                 language: Some(ParsedAttribute::Valid(PlainAttribute {
                     key: AttributeKey {
-                        value: "language".to_string(),
+                        value: "language".into(),
                         location: SingleLineLocation::new(9, 0, 8),
                     },
                     value: PlainAttributeValue {
                         equals_location: SingleLineLocation::new(17, 0, 1),
                         opening_quote_location: SingleLineLocation::new(18, 0, 1),
-                        content: "java".to_string(),
+                        content: "java".into(),
                         closing_quote_location: SingleLineLocation::new(23, 0, 1),
                     },
                 })),
                 page_encoding: Some(ParsedAttribute::Valid(PlainAttribute {
                     key: AttributeKey {
-                        value: "pageEncoding".to_string(),
+                        value: "pageEncoding".into(),
                         location: SingleLineLocation::new(25, 0, 12),
                     },
                     value: PlainAttributeValue {
                         equals_location: SingleLineLocation::new(37, 0, 1),
                         opening_quote_location: SingleLineLocation::new(38, 0, 1),
-                        content: "UTF-8".to_string(),
+                        content: "UTF-8".into(),
                         closing_quote_location: SingleLineLocation::new(44, 0, 1),
                     },
                 })),
                 content_type: Some(ParsedAttribute::Valid(PlainAttribute {
                     key: AttributeKey {
-                        value: "contentType".to_string(),
+                        value: "contentType".into(),
                         location: SingleLineLocation::new(46, 0, 11),
                     },
                     value: PlainAttributeValue {
                         equals_location: SingleLineLocation::new(57, 0, 1),
                         opening_quote_location: SingleLineLocation::new(58, 0, 1),
-                        content: "text/html; charset=UTF-8".to_string(),
+                        content: "text/html; charset=UTF-8".into(),
                         closing_quote_location: SingleLineLocation::new(83, 0, 1),
                     },
                 })),
@@ -4174,25 +4200,25 @@ mod tests {
                     taglib: SingleLineLocation::new(6, 1, 6),
                     origin: TagLibOrigin::Uri(ParsedAttribute::Valid(PlainAttribute {
                         key: AttributeKey {
-                            value: "uri".to_string(),
+                            value: "uri".into(),
                             location: SingleLineLocation::new(13, 1, 3),
                         },
                         value: PlainAttributeValue {
                             equals_location: SingleLineLocation::new(16, 1, 1),
                             opening_quote_location: SingleLineLocation::new(17, 1, 1),
-                            content: "http://www.sitepark.com/taglibs/core".to_string(),
+                            content: "http://www.sitepark.com/taglibs/core".into(),
                             closing_quote_location: SingleLineLocation::new(54, 1, 1),
                         },
                     })),
                     prefix: ParsedAttribute::Valid(PlainAttribute {
                         key: AttributeKey {
-                            value: "prefix".to_string(),
+                            value: "prefix".into(),
                             location: SingleLineLocation::new(56, 1, 6),
                         },
                         value: PlainAttributeValue {
                             equals_location: SingleLineLocation::new(62, 1, 1),
                             opening_quote_location: SingleLineLocation::new(63, 1, 1),
-                            content: "sp".to_string(),
+                            content: "sp".into(),
                             closing_quote_location: SingleLineLocation::new(66, 1, 1),
                         },
                     }),
@@ -4203,25 +4229,25 @@ mod tests {
                     taglib: SingleLineLocation::new(6, 2, 6),
                     origin: TagLibOrigin::TagDir(ParsedAttribute::Valid(PlainAttribute {
                         key: AttributeKey {
-                            value: "tagdir".to_string(),
+                            value: "tagdir".into(),
                             location: SingleLineLocation::new(13, 2, 6),
                         },
                         value: PlainAttributeValue {
                             equals_location: SingleLineLocation::new(19, 2, 1),
                             opening_quote_location: SingleLineLocation::new(20, 2, 1),
-                            content: "/WEB-INF/tags/spt".to_string(),
+                            content: "/WEB-INF/tags/spt".into(),
                             closing_quote_location: SingleLineLocation::new(38, 2, 1),
                         },
                     })),
                     prefix: ParsedAttribute::Valid(PlainAttribute {
                         key: AttributeKey {
-                            value: "prefix".to_string(),
+                            value: "prefix".into(),
                             location: SingleLineLocation::new(40, 2, 6),
                         },
                         value: PlainAttributeValue {
                             equals_location: SingleLineLocation::new(46, 2, 1),
                             opening_quote_location: SingleLineLocation::new(47, 2, 1),
-                            content: "spt".to_string(),
+                            content: "spt".into(),
                             closing_quote_location: SingleLineLocation::new(51, 2, 1),
                         },
                     }),
@@ -4255,7 +4281,7 @@ mod tests {
             locale_attribute: None,
             name_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
                 key: AttributeKey {
-                    value: "name".to_string(),
+                    value: "name".into(),
                     location: SingleLineLocation::new(12, 2, 4),
                 },
                 value: SpelAttributeValue {
@@ -4263,7 +4289,7 @@ mod tests {
                     opening_quote_location: SingleLineLocation::new(17, 2, 1),
                     spel: SpelAst::Identifier(SpelResult::Valid(Identifier::Name(Word {
                         fragments: vec![WordFragment::String(StringLiteral {
-                            content: "_testName".to_string(),
+                            content: Arc::from("_testName"),
                             location: spel::ast::Location::VariableLength {
                                 char: 0,
                                 line: 0,
@@ -4276,7 +4302,7 @@ mod tests {
             })),
             scope_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
                 key: AttributeKey {
-                    value: "scope".to_string(),
+                    value: "scope".into(),
                     location: SingleLineLocation::new(46, 2, 5),
                 },
                 value: SpelAttributeValue {
@@ -4284,7 +4310,7 @@ mod tests {
                     opening_quote_location: SingleLineLocation::new(52, 2, 1),
                     spel: SpelAst::String(SpelResult::Valid(Word {
                         fragments: vec![WordFragment::String(StringLiteral {
-                            content: "page".to_string(),
+                            content: Arc::from("page"),
                             location: spel::ast::Location::VariableLength {
                                 char: 0,
                                 line: 0,
@@ -4297,7 +4323,7 @@ mod tests {
             })),
             text_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
                 key: AttributeKey {
-                    value: "text".to_string(),
+                    value: "text".into(),
                     location: SingleLineLocation::new(29, 2, 4),
                 },
                 value: SpelAttributeValue {
@@ -4305,7 +4331,7 @@ mod tests {
                     opening_quote_location: SingleLineLocation::new(34, 2, 1),
                     spel: SpelAst::String(SpelResult::Valid(Word {
                         fragments: vec![WordFragment::String(StringLiteral {
-                            content: "some text".to_string(),
+                            content: Arc::from("some text"),
                             location: spel::ast::Location::VariableLength {
                                 char: 0,
                                 line: 0,
@@ -4346,7 +4372,7 @@ mod tests {
             close_bracket: ParsedLocation::Missing,
             errors: vec![ErrorNode {
                 content: "tagli uri=\"http://www.sitepark.com/taglibs/core\" prefix=\"sp\"\n%><%@"
-                    .to_string(),
+                    .into(),
                 range: Range {
                     start: Position {
                         line: 2,
@@ -4383,7 +4409,7 @@ mod tests {
         ));
         let expected = ParsedAttribute::Valid(HtmlAttribute {
             key: AttributeKey {
-                value: "class".to_string(),
+                value: "class".into(),
                 location: SingleLineLocation::new(5, 2, 5),
             },
             value: Some(HtmlAttributeValue {
@@ -4407,7 +4433,7 @@ mod tests {
                         locale_attribute: None,
                         name_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
                             key: AttributeKey {
-                                value: "name".to_string(),
+                                value: "name".into(),
                                 location: SingleLineLocation::new(22, 2, 4),
                             },
                             value: SpelAttributeValue {
@@ -4415,7 +4441,7 @@ mod tests {
                                 opening_quote_location: SingleLineLocation::new(27, 2, 1),
                                 spel: SpelAst::Object(SpelResult::Valid(Object::Name(Word {
                                     fragments: vec![WordFragment::String(StringLiteral {
-                                        content: "_class".to_string(),
+                                        content: Arc::from("_class"),
                                         location: spel::ast::Location::VariableLength {
                                             char: 0,
                                             line: 0,
@@ -4430,7 +4456,7 @@ mod tests {
                         body: None,
                         close_location: SingleLineLocation::new(35, 2, 2),
                     }))),
-                    HtmlAttributeValueFragment::Plain(" centered".to_string()),
+                    HtmlAttributeValueFragment::Plain(" centered".into()),
                 ]),
                 closing_quote_location: SingleLineLocation::new(46, 2, 1),
             }),
@@ -4460,10 +4486,10 @@ mod tests {
         ));
         let expected = ParsedHtml::Valid(HtmlNode {
             open_location: SingleLineLocation::new(0, 2, 2),
-            name: "p".to_string(),
+            name: "p".into(),
             attributes: vec![ParsedAttribute::Valid(HtmlAttribute {
                 key: AttributeKey {
-                    value: "class".to_string(),
+                    value: "class".into(),
                     location: SingleLineLocation::new(3, 2, 5),
                 },
                 value: Some(HtmlAttributeValue {
@@ -4488,7 +4514,7 @@ mod tests {
                                 locale_attribute: None,
                                 name_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
                                     key: AttributeKey {
-                                        value: "name".to_string(),
+                                        value: "name".into(),
                                         location: SingleLineLocation::new(20, 2, 4),
                                     },
                                     value: SpelAttributeValue {
@@ -4498,7 +4524,7 @@ mod tests {
                                             Word {
                                                 fragments: vec![WordFragment::String(
                                                     StringLiteral {
-                                                        content: "_class".to_string(),
+                                                        content: "_class".into(),
                                                         location:
                                                             spel::ast::Location::VariableLength {
                                                                 char: 0,
@@ -4517,7 +4543,7 @@ mod tests {
                                 close_location: SingleLineLocation::new(33, 2, 2),
                             },
                         ))),
-                        HtmlAttributeValueFragment::Plain(" centered".to_string()),
+                        HtmlAttributeValueFragment::Plain(" centered".into()),
                     ]),
                     closing_quote_location: SingleLineLocation::new(44, 2, 1),
                 }),

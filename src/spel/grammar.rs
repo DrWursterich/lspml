@@ -1,9 +1,9 @@
-use std::{borrow::Cow, str::FromStr};
+use std::str::FromStr;
 
 pub(crate) struct Function {
-    pub(crate) name: Cow<'static, str>,
+    pub(crate) name: &'static str,
     pub(crate) argument_number: ArgumentNumber,
-    pub(crate) documentation: Cow<'static, str>,
+    pub(crate) documentation: &'static str,
 }
 
 impl Function {
@@ -101,9 +101,9 @@ impl Function {
         documentation: &'static str,
     ) -> Self {
         return Function {
-            name: Cow::Borrowed(name),
+            name,
             argument_number,
-            documentation: Cow::Borrowed(documentation),
+            documentation,
         };
     }
 }

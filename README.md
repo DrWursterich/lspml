@@ -42,10 +42,35 @@ A work-in-progress language server for the sitepark markup language (spml).
     - split `<sp:if>` `condition` into `name` and `eq`/`gt`/`isNull`/...
     - join `<sp:if>` `name` and `eq`/`gt`/`isNull`/... into `condition`
 
+### static code analisis
+
+this project also contains the `analyze` command to invoke its diagnostic statically.
+
+```
+#$ lspml analyze --directory src/main/webapp/ --module-file module_mappings.json
+src/main/webapp/templates/sectionTypes/bad.spml
+[CRITICAL] missing required attribute "name" (MISSING_VALUE) on line 10
+[ERROR]    included file "/functions/missing.spml" does not exist (MISSING_FILE) on line 24
+[WARNING]  attribute "object" is useless without attribute "action" containing one of these values: [put, putNotEmpty, putAll, merge] (SUPERFLUOUS_VALUE) on line 12
+
+src/main/webapp/templates/sectionTypes/veryBad.spml
+[CRITICAL] missing atleast one header. Try generating one with the "refactor.generate_default_headers" code-action (MISSING_HEADER) on line 1
+[CRITICAL] syntax error: unexpected "/" (SYNTAX_ERROR) on line 2
+[CRITICAL] syntax error: unexpected ":" (SYNTAX_ERROR) on line 2
+```
+
+When using the `gitlab` format for [code-quality](https://docs.gitlab.com/ci/testing/code_quality) `lspml analyze` has to be executed from the projects root directory such that the relative paths in the json output align. It may also be usefull to add `--ignore UNKNOWN_MODULE` to skip validation of dependencies.
+
+__disclaimer__: this functionallity will probably become a separate project/binary when it leaves the experimental state!
+
 ## commandline
 
 ```
-Usage: lspml [OPTIONS]
+Usage: lspml [OPTIONS] [COMMAND]
+
+Commands:
+  analyze
+  help     Print this message or the help of the given subcommand(s)
 
 Options:
       --log-file <LOG_FILE>

@@ -2,14 +2,13 @@ use anyhow::{Error, Result};
 use lsp_server::{ErrorCode, Message, Request, RequestId, Response, ResponseError};
 use lsp_types::{
     CompletionResponse, DocumentDiagnosticReport, FullDocumentDiagnosticReport,
-    GotoDefinitionResponse, RelatedFullDocumentDiagnosticReport, SemanticTokens,
-    SemanticTokensResult,
+    RelatedFullDocumentDiagnosticReport, SemanticTokens, SemanticTokensResult,
 };
 use std::fmt;
 mod action;
 mod complete;
 mod definition;
-mod diagnostic;
+pub mod diagnostic;
 mod highlight;
 mod hover;
 mod semantics;
@@ -66,14 +65,8 @@ pub(crate) fn definition(request: Request) -> Result<Message> {
                 Ok(definition) => Response {
                     id: request.id,
                     result: definition
-                        .and_then(|d| {
-                            serde_json::to_value(match d.len() {
-                                1 => GotoDefinitionResponse::Scalar(d[0].clone()),
-                                _ => GotoDefinitionResponse::Array(d),
-                            })
-                            .ok()
-                        })
-                        .or_else(|| Some(serde_json::value::Value::Null)),
+                        .and_then(|d| serde_json::to_value(d).ok())
+                        .or(Some(serde_json::value::Value::Null)),
                     error: None,
                 },
                 Err(err) => err.to_response(request.id),
@@ -94,7 +87,7 @@ pub(crate) fn diagnostic(request: Request) -> Result<Message> {
                             related_documents: None,
                             full_document_diagnostic_report: FullDocumentDiagnosticReport {
                                 result_id: None,
-                                items: diagnostic,
+                                items: diagnostic.into_iter().map(|d| d.to_lsp_type()).collect(),
                             },
                         },
                     ))

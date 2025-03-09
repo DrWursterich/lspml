@@ -37,7 +37,7 @@ impl SyntaxFix {
                         start: position,
                         end: position,
                     },
-                    new_text: text.to_string(),
+                    new_text: text.clone(),
                 }
             }
             SyntaxFix::Delete(location) => {
@@ -71,7 +71,7 @@ impl SyntaxFix {
                             character: start + location.len() as u32,
                         },
                     },
-                    new_text: text.to_string(),
+                    new_text: text.clone(),
                 }
             }
         };
@@ -80,7 +80,7 @@ impl SyntaxFix {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct SyntaxError {
-    pub(crate) message: String,
+    pub(crate) message: Box<str>,
     pub(crate) proposed_fixes: Vec<SyntaxFix>,
 }
 
@@ -93,14 +93,26 @@ impl Display for SyntaxError {
 macro_rules! syntax_error {
     ($msg:literal $(,)?) => {
         SyntaxError {
-            message: $msg.to_string(),
-            proposed_fixes: Vec::new(),
+            message: $msg.into(),
+            proposed_fixes: vec![],
         }
     };
-    ($fmt:expr, $($arg:tt)*) => {
+    ($fmt:expr, $($arg:tt)* $(,)?) => {
         SyntaxError {
-            message: format!($fmt, $($arg)*),
-            proposed_fixes: Vec::new(),
+            message: format!($fmt, $($arg)*).into(),
+            proposed_fixes: vec![],
+        }
+    };
+    (msg: $msg:literal, fix: [$($fix:expr),+ $(,)?] $(,)?) => {
+        SyntaxError {
+            message: $msg.into(),
+            proposed_fixes: vec![$($fix)*],
+        }
+    };
+    (fmt: ($fmt:expr, $($arg:tt)*), fix: [$($fix:expr),+ $(,)?] $(,)?) => {
+        SyntaxError {
+            message: format!($fmt, $($arg)*).into(),
+            proposed_fixes: vec![$($fix)*],
         }
     };
 }
@@ -166,7 +178,7 @@ impl Parser {
                     let length = string.len() as u16;
                     if length > 0 {
                         fragments.push(WordFragment::String(StringLiteral {
-                            content: string,
+                            content: string.into(),
                             location: Location::VariableLength {
                                 char: start,
                                 line: 0,
@@ -188,7 +200,7 @@ impl Parser {
         let length = string.len() as u16;
         if length > 0 || fragments.len() == 0 {
             fragments.push(WordFragment::String(StringLiteral {
-                content: string,
+                content: string.into(),
                 location: Location::VariableLength {
                     char: start,
                     line: 0,
@@ -380,21 +392,21 @@ impl Parser {
                     Object::Name(Word { fragments }) if fragments.len() == 1 => {
                         match &fragments[0] {
                             WordFragment::String(StringLiteral { content, location })
-                                if content == "null" =>
+                                if &**content == "null" =>
                             {
                                 Ok(UndecidedExpressionContent::Null(Null {
                                     location: location.clone(),
                                 }))
                             }
                             WordFragment::String(StringLiteral { content, location })
-                                if content == "true" =>
+                                if &**content == "true" =>
                             {
                                 Ok(UndecidedExpressionContent::Condition(Condition::True {
                                     location: location.clone(),
                                 }))
                             }
                             WordFragment::String(StringLiteral { content, location })
-                                if content == "false" =>
+                                if &**content == "false" =>
                             {
                                 Ok(UndecidedExpressionContent::Condition(Condition::False {
                                     location: location.clone(),
@@ -405,15 +417,12 @@ impl Parser {
                             }
                             WordFragment::String(StringLiteral { content, location }) => {
                                 let new_string = format!("${{{}}}", content);
-                                Err(SyntaxError {
-                                    message: format!(
+                                Err(syntax_error! {
+                                    fmt: (
                                         "objects in expressions have to be interpolated. try `{}`",
-                                        new_string
-                                    ),
-                                    proposed_fixes: vec![SyntaxFix::Replace(
-                                        location.to_owned(),
                                         new_string,
-                                    )],
+                                    ),
+                                    fix: [SyntaxFix::Replace(location.to_owned(), new_string)],
                                 })
                             }
                         }
@@ -441,12 +450,12 @@ impl Parser {
                                 ..
                             }) => closing_bracket_location.char() + closing_bracket_location.len(),
                         } - char;
-                        Err(SyntaxError {
-                            message: format!(
+                        Err(syntax_error! {
+                            fmt: (
                                 "objects in expressions have to be interpolated. try `{}`",
                                 new_string
                             ),
-                            proposed_fixes: vec![SyntaxFix::Replace(
+                            fix: [SyntaxFix::Replace(
                                 Location::VariableLength { char, line, length },
                                 new_string,
                             )],
@@ -627,9 +636,9 @@ impl Parser {
         self.scanner.skip_whitespace();
         let left = self.parse_expression()?;
         if !self.scanner.take(&':') {
-            return Err(SyntaxError {
-                message: "incomplete ternary; missing `:`. try adding it".to_string(),
-                proposed_fixes: vec![SyntaxFix::Insert(
+            return Err(syntax_error! {
+                msg: "incomplete ternary; missing `:`. try adding it",
+                fix: [SyntaxFix::Insert(
                     Position {
                         line: 0,
                         character: self.scanner.cursor as u32,
@@ -669,9 +678,9 @@ impl Parser {
         let content = self.resolve_undecided_expression_content(content)?;
         self.scanner.skip_whitespace();
         if !self.scanner.take(&')') {
-            return Err(SyntaxError {
-                message: "unclosed bracket. try adding it".to_string(),
-                proposed_fixes: vec![SyntaxFix::Insert(
+            return Err(syntax_error! {
+                msg: "unclosed bracket. try adding it",
+                fix: [SyntaxFix::Insert(
                     Position {
                         line: 0,
                         character: self.scanner.cursor as u32,
@@ -740,7 +749,7 @@ impl Parser {
                     Object::Name(Word { fragments }) if fragments.len() == 1 => {
                         match &fragments[0] {
                             WordFragment::String(StringLiteral { content, location }) => {
-                                match content.as_str() {
+                                match &**content {
                                     "true" => Comparable::Condition(Condition::True {
                                         location: location.clone(),
                                     }),
@@ -752,12 +761,12 @@ impl Parser {
                                     }),
                                     name => {
                                         let new_string = format!("${{{}}}", name);
-                                        return Err(SyntaxError {
-                                            message: format!(
+                                        return Err(syntax_error! {
+                                            fmt: (
                                                 "objects in comparissons have to be interpolated. try `{}`",
-                                                new_string
+                                                new_string,
                                             ),
-                                            proposed_fixes: vec![SyntaxFix::Replace(
+                                            fix: [SyntaxFix::Replace(
                                                 location.to_owned(),
                                                 new_string,
                                             )],
@@ -782,12 +791,12 @@ impl Parser {
                     object => {
                         // this should not be possible
                         let new_string = format!("${{{}}}", object);
-                        return Err(SyntaxError {
-                            message: format!(
+                        return Err(syntax_error! {
+                            fmt: (
                                 "objects in comparissons have to be interpolated. try `{}`",
-                                new_string
+                                new_string,
                             ),
-                            proposed_fixes: vec![SyntaxFix::Replace(
+                            fix: [SyntaxFix::Replace(
                                 Location::VariableLength {
                                     char: start,
                                     line: 0,
@@ -814,12 +823,12 @@ impl Parser {
                     Comparable::Function(function) => Condition::Function(function),
                     Comparable::Null(Null { location }) => {
                         let new_string = "false".to_string();
-                        return Err(SyntaxError {
-                            message: format!(
+                        return Err(syntax_error! {
+                            fmt: (
                                 "`null` is not a valid condition. did you mean `{}`?",
-                                new_string
+                                new_string,
                             ),
-                            proposed_fixes: vec![SyntaxFix::Replace(location, new_string)],
+                            fix: [SyntaxFix::Replace(location, new_string)],
                         });
                     }
                     // Comparable::Expression(_) => todo!(),
@@ -851,12 +860,12 @@ impl Parser {
                     ('<', false) => ComparissonOperator::LessThan,
                     ('<', true) => ComparissonOperator::LessThanOrEqual,
                     (char, _) => {
-                        return Err(SyntaxError {
-                            message: format!(
+                        return Err(syntax_error! {
+                            fmt: (
                                 "`{}` is not a valid comparisson operator. did you mean `{}=`?",
-                                char, char
+                                char, char,
                             ),
-                            proposed_fixes: vec![SyntaxFix::Insert(
+                            fix: [SyntaxFix::Insert(
                                 Position {
                                     line: 0,
                                     character: self.scanner.cursor as u32,
@@ -905,12 +914,12 @@ impl Parser {
                 };
                 self.scanner.pop();
                 if !self.scanner.take(first) {
-                    return Err(SyntaxError {
-                        message: format!(
+                    return Err(syntax_error! {
+                        fmt: (
                             "`{}` is not a valid condition operator. did you mean `{}{}`?",
-                            first, first, first
+                            first, first, first,
                         ),
-                        proposed_fixes: vec![SyntaxFix::Insert(
+                        fix: [SyntaxFix::Insert(
                             Position {
                                 line: 0,
                                 character: self.scanner.cursor as u32,
@@ -977,9 +986,9 @@ impl Parser {
                 }
             }
             Some(char) => Err(syntax_error!("unexpected char \"{}\"", char)),
-            None => Err(SyntaxError {
-                message: "unclosed bracket. try adding it".to_string(),
-                proposed_fixes: vec![SyntaxFix::Insert(
+            None => Err(syntax_error! {
+                msg: "unclosed bracket. try adding it",
+                fix: [SyntaxFix::Insert(
                     Position {
                         line: 0,
                         character: self.scanner.cursor as u32,
@@ -1001,10 +1010,9 @@ impl Parser {
             Condition::NegatedCondition {
                 exclamation_mark_location: second,
                 ..
-            } => Err(SyntaxError {
-                message: "doubly negated conditions are not supported. try removing the negations"
-                    .to_string(),
-                proposed_fixes: vec![SyntaxFix::Delete(Location::VariableLength {
+            } => Err(syntax_error! {
+                msg: "doubly negated conditions are not supported. try removing the negations",
+                fix: [SyntaxFix::Delete(Location::VariableLength {
                     char: exclamation_mark_location.char(),
                     line: 0,
                     length: second.char() + second.len() - exclamation_mark_location.char(),
@@ -1038,7 +1046,7 @@ impl Parser {
                 }
                 _ => {
                     return Ok(Number {
-                        content: result,
+                        content: result.into(),
                         location: Location::VariableLength {
                             char: start,
                             line: 0,
@@ -1176,12 +1184,12 @@ impl Parser {
                             result.push('u');
                         }
                         Some(char) => {
-                            return Err(SyntaxError {
-                                message: format!(
+                            return Err(syntax_error! {
+                                fmt: (
                                     "invalid escape sequence `\\{}`. did you mean `\\\\`?",
-                                    char
+                                    char,
                                 ),
-                                proposed_fixes: vec![SyntaxFix::Insert(
+                                fix: [SyntaxFix::Insert(
                                     Position {
                                         line: 0,
                                         character: self.scanner.cursor as u32,
@@ -1191,9 +1199,9 @@ impl Parser {
                             });
                         }
                         None => {
-                            return Err(SyntaxError {
-                                message: "missing qoute. try adding adding it".to_string(),
-                                proposed_fixes: vec![SyntaxFix::Insert(
+                            return Err(syntax_error! {
+                                msg: "missing qoute. try adding adding it",
+                                fix: [SyntaxFix::Insert(
                                     Position {
                                         line: 0,
                                         character: self.scanner.cursor as u32,
@@ -1207,7 +1215,7 @@ impl Parser {
                 Some('\'') => {
                     self.scanner.pop();
                     return Ok(StringLiteral {
-                        content: result.clone(),
+                        content: result.as_str().into(),
                         location: Location::VariableLength {
                             char: start,
                             line: 0,
@@ -1222,9 +1230,9 @@ impl Parser {
                 }
                 Some(char) => return Err(syntax_error!("invalid character \"{}\"", char)),
                 None => {
-                    return Err(SyntaxError {
-                        message: "missing qoute. try adding adding it".to_string(),
-                        proposed_fixes: vec![SyntaxFix::Insert(
+                    return Err(syntax_error! {
+                        msg: "missing qoute. try adding adding it",
+                        fix: [SyntaxFix::Insert(
                             Position {
                                 line: 0,
                                 character: self.scanner.cursor as u32,
@@ -1258,9 +1266,9 @@ impl Parser {
                 },
             }),
             Some(char) => Err(syntax_error!("unexpected char \"{}\"", char)),
-            None => Err(SyntaxError {
-                message: "unclosed interpolation. try adding the missing bracket".to_string(),
-                proposed_fixes: vec![SyntaxFix::Insert(
+            None => Err(syntax_error! {
+                msg: "unclosed interpolation. try adding the missing bracket",
+                fix: [SyntaxFix::Insert(
                     Position {
                         line: 0,
                         character: self.scanner.cursor as u32,
@@ -1274,10 +1282,9 @@ impl Parser {
     fn parse_interpolated_anchor(&mut self) -> Result<Anchor, SyntaxError> {
         let start = self.scanner.cursor as u16;
         if !self.scanner.take_str(&"!{") {
-            return Err(SyntaxError {
-                message: "expected `{` after `!` for an interpolated anchor. try adding it"
-                    .to_string(),
-                proposed_fixes: vec![SyntaxFix::Insert(
+            return Err(syntax_error! {
+                msg: "expected `{` after `!` for an interpolated anchor. try adding it",
+                fix: [SyntaxFix::Insert(
                     Position {
                         line: 0,
                         character: self.scanner.cursor as u32 + 1,
@@ -1302,10 +1309,9 @@ impl Parser {
                 },
             }),
             Some(char) => Err(syntax_error!("unexpected char \"{}\"", char)),
-            None => Err(SyntaxError {
-                message: "unclosed anchor interpolation. try adding the missing bracket"
-                    .to_string(),
-                proposed_fixes: vec![SyntaxFix::Insert(
+            None => Err(syntax_error! {
+                msg: "unclosed anchor interpolation. try adding the missing bracket",
+                fix: [SyntaxFix::Insert(
                     Position {
                         line: 0,
                         character: self.scanner.cursor as u32,
@@ -1324,7 +1330,7 @@ impl Parser {
                 let start = self.scanner.cursor as u16;
                 let arguments = self.parse_function_arguments()?;
                 return Ok(Object::Function(Function {
-                    name: content.to_string(),
+                    name: content.clone(),
                     arguments,
                     name_location: location.clone(),
                     opening_bracket_location: Location::SingleCharacter {
@@ -1352,10 +1358,9 @@ impl Parser {
                     let expression = self.parse_expression()?;
                     self.scanner.skip_whitespace();
                     if !self.scanner.take(&']') {
-                        return Err(SyntaxError {
-                            message: "unclosed array access. try adding the missing bracket"
-                                .to_string(),
-                            proposed_fixes: vec![SyntaxFix::Insert(
+                        return Err(syntax_error! {
+                            msg: "unclosed array access. try adding the missing bracket",
+                            fix: [SyntaxFix::Insert(
                                 Position {
                                     line: 0,
                                     character: self.scanner.cursor as u32,
@@ -1397,7 +1402,7 @@ impl Parser {
                                 object: Box::new(object),
                                 dot_location,
                                 function: Function {
-                                    name: content.to_string(),
+                                    name: content.clone(),
                                     arguments,
                                     name_location: location.clone(),
                                     opening_bracket_location: Location::SingleCharacter {
@@ -1447,7 +1452,7 @@ impl Parser {
                     let length = string.len() as u16;
                     if length > 0 {
                         fragments.push(WordFragment::String(StringLiteral {
-                            content: string,
+                            content: string.into(),
                             location: Location::VariableLength {
                                 char: start,
                                 line: 0,
@@ -1465,7 +1470,7 @@ impl Parser {
         let length = string.len() as u16;
         if length > 0 {
             fragments.push(WordFragment::String(StringLiteral {
-                content: string,
+                content: string.into(),
                 location: Location::VariableLength {
                     char: start,
                     line: 0,
@@ -1520,21 +1525,21 @@ impl Parser {
                     Object::Name(Word { fragments }) if fragments.len() == 1 => {
                         match &fragments[0] {
                             WordFragment::String(StringLiteral { content, location })
-                                if content == "false" =>
+                                if &**content == "false" =>
                             {
                                 Ok(Argument::False {
                                     location: location.clone(),
                                 })
                             }
                             WordFragment::String(StringLiteral { content, location })
-                                if content == "true" =>
+                                if &**content == "true" =>
                             {
                                 Ok(Argument::True {
                                     location: location.clone(),
                                 })
                             }
                             WordFragment::String(StringLiteral { content, location })
-                                if content == "null" =>
+                                if &**content == "null" =>
                             {
                                 Ok(Argument::Null(Null {
                                     location: location.clone(),
@@ -1542,15 +1547,12 @@ impl Parser {
                             }
                             WordFragment::String(StringLiteral { content, location }) => {
                                 let new_string = format!("${{{}}}", content);
-                                Err(SyntaxError {
-                                    message: format!(
+                                Err(syntax_error! {
+                                    fmt: (
                                         "objects in arguments have to be interpolated. try `{}`",
                                         new_string,
                                     ),
-                                    proposed_fixes: vec![SyntaxFix::Replace(
-                                        location.to_owned(),
-                                        new_string,
-                                    )],
+                                    fix: [SyntaxFix::Replace(location.to_owned(), new_string)],
                                 })
                             }
                             WordFragment::Interpolation(interpolation) => {
@@ -1567,25 +1569,24 @@ impl Parser {
                         ))
                     }
                 },
-                None => Err(SyntaxError {
-                    message: "unclosed function arguments. try adding the missing bracket"
-                        .to_string(),
-                    proposed_fixes: match arguments
+                None => Err(syntax_error! {
+                    msg: "unclosed function arguments. try adding the missing bracket",
+                    fix: [match arguments
                         .last()
                         .and_then(|arg| arg.comma_location.as_ref())
                     {
-                        Some(comma_location) => vec![SyntaxFix::Replace(
+                        Some(comma_location) => SyntaxFix::Replace(
                             comma_location.to_owned(),
                             ")".to_string(),
-                        )],
-                        None => vec![SyntaxFix::Insert(
+                        ),
+                        None => SyntaxFix::Insert(
                             Position {
                                 character: self.scanner.cursor as u32,
                                 line: 0,
                             },
                             ")".to_string(),
-                        )],
-                    },
+                        ),
+                    }],
                 }),
             }?;
             self.scanner.skip_whitespace();
@@ -1609,10 +1610,9 @@ impl Parser {
                 }
                 Some(char) => return Err(syntax_error!("unexpected char \"{}\"", char)),
                 None => {
-                    return Err(SyntaxError {
-                        message: "unclosed function arguments. try adding the missing bracket"
-                            .to_string(),
-                        proposed_fixes: vec![SyntaxFix::Insert(
+                    return Err(syntax_error! {
+                        msg: "unclosed function arguments. try adding the missing bracket",
+                        fix: [SyntaxFix::Insert(
                             Position {
                                 character: self.scanner.cursor as u32,
                                 line: 0,
@@ -1627,9 +1627,9 @@ impl Parser {
 
     fn trailing_characters_error(&self) -> SyntaxError {
         let root_end = self.scanner.subtract_whitespace() as u16 + 1;
-        return SyntaxError {
-            message: format!("trailing \"{}\". try removing it", self.scanner.rest()),
-            proposed_fixes: vec![SyntaxFix::Delete(Location::VariableLength {
+        return syntax_error! {
+            fmt: ("trailing \"{}\". try removing it", self.scanner.rest()),
+            fix: [SyntaxFix::Delete(Location::VariableLength {
                 char: root_end,
                 line: 0,
                 length: self.scanner.characters.len() as u16 - root_end,
@@ -1653,7 +1653,7 @@ mod tests {
             parse_object("'test'"),
             ObjectAst {
                 root: Object::String(StringLiteral {
-                    content: "test".to_string(),
+                    content: "test".into(),
                     location: Location::VariableLength {
                         char: 0,
                         line: 0,
@@ -1670,7 +1670,7 @@ mod tests {
             parse_object("\t'test'   "),
             ObjectAst {
                 root: Object::String(StringLiteral {
-                    content: "test".to_string(),
+                    content: "test".into(),
                     location: Location::VariableLength {
                         char: 1,
                         line: 0,
@@ -1687,7 +1687,7 @@ mod tests {
             parse_object("'tes\\\'t'"),
             ObjectAst {
                 root: Object::String(StringLiteral {
-                    content: "tes\\\'t".to_string(),
+                    content: "tes\\\'t".into(),
                     location: Location::VariableLength {
                         char: 0,
                         line: 0,
@@ -1722,7 +1722,7 @@ mod tests {
                 root: Object::Name(Word {
                     fragments: vec![
                         WordFragment::String(StringLiteral {
-                            content: "null".to_string(),
+                            content: "null".into(),
                             location: Location::VariableLength {
                                 char: 0,
                                 line: 0,
@@ -1731,7 +1731,7 @@ mod tests {
                         }),
                         WordFragment::Interpolation(Interpolation {
                             content: Object::String(StringLiteral {
-                                content: "notNull".to_string(),
+                                content: "notNull".into(),
                                 location: Location::VariableLength {
                                     char: 6,
                                     line: 0,
@@ -1759,7 +1759,7 @@ mod tests {
             parse_expression("null()"),
             ExpressionAst {
                 root: Expression::Function(Function {
-                    name: "null".to_string(),
+                    name: "null".into(),
                     arguments: vec![],
                     name_location: Location::VariableLength {
                         char: 0,
@@ -1781,7 +1781,7 @@ mod tests {
                 root: Object::Anchor(Anchor {
                     name: Word {
                         fragments: vec![WordFragment::String(StringLiteral {
-                            content: "home".to_string(),
+                            content: "home".into(),
                             location: Location::VariableLength {
                                 char: 2,
                                 line: 0,
@@ -1806,7 +1806,7 @@ mod tests {
                         content: Object::Anchor(Anchor {
                             name: Word {
                                 fragments: vec![WordFragment::String(StringLiteral {
-                                    content: "home".to_string(),
+                                    content: "home".into(),
                                     location: Location::VariableLength {
                                         char: 4,
                                         line: 0,
@@ -1840,7 +1840,7 @@ mod tests {
                     name: Word {
                         fragments: vec![
                             WordFragment::String(StringLiteral {
-                                content: "home-".to_string(),
+                                content: "home-".into(),
                                 location: Location::VariableLength {
                                     char: 2,
                                     line: 0,
@@ -1850,7 +1850,7 @@ mod tests {
                             WordFragment::Interpolation(Interpolation {
                                 content: Object::Name(Word {
                                     fragments: vec![WordFragment::String(StringLiteral {
-                                        content: "_object".to_string(),
+                                        content: "_object".into(),
                                         location: Location::VariableLength {
                                             char: 9,
                                             line: 0,
@@ -1868,7 +1868,7 @@ mod tests {
                                 },
                             }),
                             WordFragment::String(StringLiteral {
-                                content: "-content".to_string(),
+                                content: "-content".into(),
                                 location: Location::VariableLength {
                                     char: 17,
                                     line: 0,
@@ -1890,7 +1890,7 @@ mod tests {
             parse_object("'hello, ${world}'"),
             ObjectAst {
                 root: Object::String(StringLiteral {
-                    content: "hello, ${world}".to_string(),
+                    content: "hello, ${world}".into(),
                     location: Location::VariableLength {
                         char: 0,
                         line: 0,
@@ -1907,7 +1907,7 @@ mod tests {
             parse_object("flush()"),
             ObjectAst {
                 root: Object::Function(Function {
-                    name: "flush".to_string(),
+                    name: "flush".into(),
                     name_location: Location::VariableLength {
                         char: 0,
                         line: 0,
@@ -1927,7 +1927,7 @@ mod tests {
             parse_object("is_string('test')"),
             ObjectAst {
                 root: Object::Function(Function {
-                    name: "is_string".to_string(),
+                    name: "is_string".into(),
                     name_location: Location::VariableLength {
                         char: 0,
                         line: 0,
@@ -1935,7 +1935,7 @@ mod tests {
                     },
                     arguments: vec![FunctionArgument {
                         argument: Argument::String(StringLiteral {
-                            content: "test".to_string(),
+                            content: "test".into(),
                             location: Location::VariableLength {
                                 char: 10,
                                 line: 0,
@@ -1957,7 +1957,7 @@ mod tests {
             parse_object("\tis_string (\t'test'  , 'test2' ) "),
             ObjectAst {
                 root: Object::Function(Function {
-                    name: "is_string".to_string(),
+                    name: "is_string".into(),
                     name_location: Location::VariableLength {
                         char: 1,
                         line: 0,
@@ -1966,7 +1966,7 @@ mod tests {
                     arguments: vec![
                         FunctionArgument {
                             argument: Argument::String(StringLiteral {
-                                content: "test".to_string(),
+                                content: "test".into(),
                                 location: Location::VariableLength {
                                     char: 13,
                                     line: 0,
@@ -1977,7 +1977,7 @@ mod tests {
                         },
                         FunctionArgument {
                             argument: Argument::String(StringLiteral {
-                                content: "test2".to_string(),
+                                content: "test2".into(),
                                 location: Location::VariableLength {
                                     char: 23,
                                     line: 0,
@@ -2000,7 +2000,7 @@ mod tests {
             parse_object("is_string(concat('hello', 'world'))"),
             ObjectAst {
                 root: Object::Function(Function {
-                    name: "is_string".to_string(),
+                    name: "is_string".into(),
                     name_location: Location::VariableLength {
                         char: 0,
                         line: 0,
@@ -2008,7 +2008,7 @@ mod tests {
                     },
                     arguments: vec![FunctionArgument {
                         argument: Argument::Function(Function {
-                            name: "concat".to_string(),
+                            name: "concat".into(),
                             name_location: Location::VariableLength {
                                 char: 10,
                                 line: 0,
@@ -2017,7 +2017,7 @@ mod tests {
                             arguments: vec![
                                 FunctionArgument {
                                     argument: Argument::String(StringLiteral {
-                                        content: "hello".to_string(),
+                                        content: "hello".into(),
                                         location: Location::VariableLength {
                                             char: 17,
                                             line: 0,
@@ -2031,7 +2031,7 @@ mod tests {
                                 },
                                 FunctionArgument {
                                     argument: Argument::String(StringLiteral {
-                                        content: "world".to_string(),
+                                        content: "world".into(),
                                         location: Location::VariableLength {
                                             char: 26,
                                             line: 0,
@@ -2067,7 +2067,7 @@ mod tests {
                 root: Object::FieldAccess {
                     object: Box::new(Object::Name(Word {
                         fragments: vec![WordFragment::String(StringLiteral {
-                            content: "_string".to_string(),
+                            content: "_string".into(),
                             location: Location::VariableLength {
                                 char: 0,
                                 line: 0,
@@ -2077,7 +2077,7 @@ mod tests {
                     })),
                     field: Word {
                         fragments: vec![WordFragment::String(StringLiteral {
-                            content: "length".to_string(),
+                            content: "length".into(),
                             location: Location::VariableLength {
                                 char: 8,
                                 line: 0,
@@ -2110,7 +2110,7 @@ mod tests {
                 root: Object::MethodAccess {
                     object: Box::new(Object::Name(Word {
                         fragments: vec![WordFragment::String(StringLiteral {
-                            content: "_string".to_string(),
+                            content: "_string".into(),
                             location: Location::VariableLength {
                                 char: 0,
                                 line: 0,
@@ -2119,7 +2119,7 @@ mod tests {
                         })]
                     })),
                     function: Function {
-                        name: "length".to_string(),
+                        name: "length".into(),
                         name_location: Location::VariableLength {
                             char: 8,
                             line: 0,
@@ -2143,7 +2143,7 @@ mod tests {
                 root: Object::ArrayAccess {
                     object: Box::new(Object::Name(Word {
                         fragments: vec![WordFragment::String(StringLiteral {
-                            content: "_strings".to_string(),
+                            content: "_strings".into(),
                             location: Location::VariableLength {
                                 char: 0,
                                 line: 0,
@@ -2152,7 +2152,7 @@ mod tests {
                         })]
                     })),
                     index: Expression::Number(Number {
-                        content: "0".to_string(),
+                        content: "0".into(),
                         location: Location::VariableLength {
                             char: 9,
                             line: 0,
@@ -2174,7 +2174,7 @@ mod tests {
                 root: Object::ArrayAccess {
                     object: Box::new(Object::Name(Word {
                         fragments: vec![WordFragment::String(StringLiteral {
-                            content: "_strings".to_string(),
+                            content: "_strings".into(),
                             location: Location::VariableLength {
                                 char: 0,
                                 line: 0,
@@ -2184,7 +2184,7 @@ mod tests {
                     })),
                     index: Expression::SignedExpression {
                         expression: Box::new(Expression::Number(Number {
-                            content: "1".to_string(),
+                            content: "1".into(),
                             location: Location::VariableLength {
                                 char: 10,
                                 line: 0,
@@ -2207,7 +2207,7 @@ mod tests {
             parse_expression("123"),
             ExpressionAst {
                 root: Expression::Number(Number {
-                    content: "123".to_string(),
+                    content: "123".into(),
                     location: Location::VariableLength {
                         char: 0,
                         line: 0,
@@ -2225,7 +2225,7 @@ mod tests {
             ExpressionAst {
                 root: Expression::SignedExpression {
                     expression: Box::new(Expression::Number(Number {
-                        content: "13.5e-2".to_string(),
+                        content: "13.5e-2".into(),
                         location: Location::VariableLength {
                             char: 1,
                             line: 0,
@@ -2248,7 +2248,7 @@ mod tests {
                     expression: Box::new(Expression::BracketedExpression {
                         expression: Box::new(Expression::SignedExpression {
                             expression: Box::new(Expression::Number(Number {
-                                content: "6E+2".to_string(),
+                                content: "6E+2".into(),
                                 location: Location::VariableLength {
                                     char: 5,
                                     line: 0,
@@ -2275,7 +2275,7 @@ mod tests {
             ExpressionAst {
                 root: Expression::BinaryOperation {
                     left: Box::new(Expression::Number(Number {
-                        content: "6".to_string(),
+                        content: "6".into(),
                         location: Location::VariableLength {
                             char: 0,
                             line: 0,
@@ -2284,7 +2284,7 @@ mod tests {
                     })),
                     operator: ExpressionOperator::Addition,
                     right: Box::new(Expression::Number(Number {
-                        content: "9".to_string(),
+                        content: "9".into(),
                         location: Location::VariableLength {
                             char: 4,
                             line: 0,
@@ -2316,7 +2316,7 @@ mod tests {
                 root: Expression::BinaryOperation {
                     left: Box::new(Expression::BinaryOperation {
                         left: Box::new(Expression::Number(Number {
-                            content: "1".to_string(),
+                            content: "1".into(),
                             location: Location::VariableLength {
                                 char: 0,
                                 line: 0,
@@ -2325,7 +2325,7 @@ mod tests {
                         })),
                         operator: ExpressionOperator::Addition,
                         right: Box::new(Expression::Number(Number {
-                            content: "2".to_string(),
+                            content: "2".into(),
                             location: Location::VariableLength {
                                 char: 4,
                                 line: 0,
@@ -2337,7 +2337,7 @@ mod tests {
                     operator: ExpressionOperator::Addition,
                     right: Box::new(Expression::SignedExpression {
                         expression: Box::new(Expression::Number(Number {
-                            content: "3".to_string(),
+                            content: "3".into(),
                             location: Location::VariableLength {
                                 char: 9,
                                 line: 0,
@@ -2360,7 +2360,7 @@ mod tests {
             ExpressionAst {
                 root: Expression::BinaryOperation {
                     left: Box::new(Expression::Number(Number {
-                        content: "6".to_string(),
+                        content: "6".into(),
                         location: Location::VariableLength {
                             char: 0,
                             line: 0,
@@ -2370,7 +2370,7 @@ mod tests {
                     operator: ExpressionOperator::Addition,
                     right: Box::new(Expression::BinaryOperation {
                         left: Box::new(Expression::Number(Number {
-                            content: "10".to_string(),
+                            content: "10".into(),
                             location: Location::VariableLength {
                                 char: 4,
                                 line: 0,
@@ -2379,7 +2379,7 @@ mod tests {
                         })),
                         operator: ExpressionOperator::Division,
                         right: Box::new(Expression::Number(Number {
-                            content: "2".to_string(),
+                            content: "2".into(),
                             location: Location::VariableLength {
                                 char: 9,
                                 line: 0,
@@ -2401,7 +2401,7 @@ mod tests {
             ExpressionAst {
                 root: Expression::BinaryOperation {
                     left: Box::new(Expression::Number(Number {
-                        content: "1".to_string(),
+                        content: "1".into(),
                         location: Location::VariableLength {
                             char: 0,
                             line: 0,
@@ -2413,7 +2413,7 @@ mod tests {
                         left: Box::new(Expression::BinaryOperation {
                             left: Box::new(Expression::BinaryOperation {
                                 left: Box::new(Expression::Number(Number {
-                                    content: "2".to_string(),
+                                    content: "2".into(),
                                     location: Location::VariableLength {
                                         char: 4,
                                         line: 0,
@@ -2422,7 +2422,7 @@ mod tests {
                                 })),
                                 operator: ExpressionOperator::Division,
                                 right: Box::new(Expression::Number(Number {
-                                    content: "3".to_string(),
+                                    content: "3".into(),
                                     location: Location::VariableLength {
                                         char: 8,
                                         line: 0,
@@ -2434,7 +2434,7 @@ mod tests {
                             operator: ExpressionOperator::Multiplication,
                             right: Box::new(Expression::BinaryOperation {
                                 left: Box::new(Expression::Number(Number {
-                                    content: "4".to_string(),
+                                    content: "4".into(),
                                     location: Location::VariableLength {
                                         char: 12,
                                         line: 0,
@@ -2443,7 +2443,7 @@ mod tests {
                                 })),
                                 operator: ExpressionOperator::Power,
                                 right: Box::new(Expression::Number(Number {
-                                    content: "5".to_string(),
+                                    content: "5".into(),
                                     location: Location::VariableLength {
                                         char: 16,
                                         line: 0,
@@ -2456,7 +2456,7 @@ mod tests {
                         }),
                         operator: ExpressionOperator::Modulo,
                         right: Box::new(Expression::Number(Number {
-                            content: "6".to_string(),
+                            content: "6".into(),
                             location: Location::VariableLength {
                                 char: 20,
                                 line: 0,
@@ -2485,7 +2485,7 @@ mod tests {
                         }
                     }),
                     left: Box::new(Expression::Number(Number {
-                        content: "1".to_string(),
+                        content: "1".into(),
                         location: Location::VariableLength {
                             char: 7,
                             line: 0,
@@ -2493,7 +2493,7 @@ mod tests {
                         }
                     })),
                     right: Box::new(Expression::Number(Number {
-                        content: "2".to_string(),
+                        content: "2".into(),
                         location: Location::VariableLength {
                             char: 11,
                             line: 0,
@@ -2646,7 +2646,7 @@ mod tests {
                         closing_bracket_location: Location::SingleCharacter { char: 6, line: 0 },
                         content: Object::Name(Word {
                             fragments: vec![WordFragment::String(StringLiteral {
-                                content: "test".to_string(),
+                                content: "test".into(),
                                 location: Location::VariableLength {
                                     char: 2,
                                     line: 0,
@@ -2675,7 +2675,7 @@ mod tests {
             parse_condition("isNull(${_test})"),
             ConditionAst {
                 root: Condition::Function(Function {
-                    name: "isNull".to_string(),
+                    name: "isNull".into(),
                     name_location: Location::VariableLength {
                         char: 0,
                         line: 0,
@@ -2685,7 +2685,7 @@ mod tests {
                         argument: Argument::Object(Interpolation {
                             content: Object::Name(Word {
                                 fragments: vec![WordFragment::String(StringLiteral {
-                                    content: "_test".to_string(),
+                                    content: "_test".into(),
                                     location: Location::VariableLength {
                                         char: 9,
                                         line: 0,
@@ -2718,7 +2718,7 @@ mod tests {
             ConditionAst {
                 root: Condition::Comparisson {
                     left: Box::new(Comparable::Expression(Expression::Number(Number {
-                        content: "3".to_string(),
+                        content: "3".into(),
                         location: Location::VariableLength {
                             char: 0,
                             line: 0,
@@ -2727,7 +2727,7 @@ mod tests {
                     }))),
                     operator: ComparissonOperator::GreaterThanOrEqual,
                     right: Box::new(Comparable::Expression(Expression::Number(Number {
-                        content: "4".to_string(),
+                        content: "4".into(),
                         location: Location::VariableLength {
                             char: 5,
                             line: 0,
@@ -2748,7 +2748,7 @@ mod tests {
                 root: Condition::BinaryOperation {
                     left: Box::new(Condition::Comparisson {
                         left: Box::new(Comparable::Expression(Expression::Number(Number {
-                            content: "3".to_string(),
+                            content: "3".into(),
                             location: Location::VariableLength {
                                 char: 0,
                                 line: 0,
@@ -2757,7 +2757,7 @@ mod tests {
                         }))),
                         operator: ComparissonOperator::Unequal,
                         right: Box::new(Comparable::Expression(Expression::Number(Number {
-                            content: "4".to_string(),
+                            content: "4".into(),
                             location: Location::VariableLength {
                                 char: 5,
                                 line: 0,

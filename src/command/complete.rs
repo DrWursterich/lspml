@@ -110,7 +110,7 @@ impl CompletionCollector<'_> {
                         Some(parent @ Node::Tag(ParsedTag::Valid(tag))) => (parent, Some(tag)),
                         Some(parent @ Node::Tag(ParsedTag::Erroneous(tag, errors))) => {
                             let new_text = errors.iter().find_map(|error| match error {
-                                TagError::Missing(text, _) if text.starts_with(content) => {
+                                TagError::Missing(text, _) if text.starts_with(&**content) => {
                                     Some(text)
                                 }
                                 _ => None,

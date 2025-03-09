@@ -1,9 +1,17 @@
-use std::{path::Path, str::FromStr};
+use std::{
+    cmp::Ordering,
+    collections::HashMap,
+    fs,
+    hash::{DefaultHasher, Hash, Hasher},
+    path::{Path, PathBuf},
+    str::FromStr,
+    sync::Arc,
+};
 
 use anyhow::Result;
 use lsp_server::ErrorCode;
 use lsp_types::{
-    Diagnostic, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticParams, NumberOrString,
+    CodeDescription, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticParams, NumberOrString,
     Position, Range, TextEdit, Uri as Url,
 };
 
@@ -31,6 +39,230 @@ use crate::{
 
 use super::LsError;
 
+#[derive(Debug, Eq, PartialEq, Clone, Default)]
+pub struct Diagnostic {
+    pub range: Range,
+    pub severity: Severity,
+    pub code: Option<NumberOrString>,
+    pub code_description: Option<CodeDescription>,
+    pub message: String,
+    pub tags: Option<Vec<DiagnosticTag>>,
+    pub data: Option<serde_json::Value>,
+    pub fingerprint: Option<String>,
+    pub r#type: Type,
+}
+
+impl Diagnostic {
+    pub fn to_lsp_type(self) -> lsp_types::Diagnostic {
+        return lsp_types::Diagnostic {
+            range: self.range,
+            severity: Some(match self.severity {
+                Severity::Hint => DiagnosticSeverity::HINT,
+                // Severity::Information => DiagnosticSeverity::INFORMATION,
+                Severity::Warning => DiagnosticSeverity::WARNING,
+                Severity::Error => DiagnosticSeverity::ERROR,
+                Severity::Critical => DiagnosticSeverity::ERROR,
+            }),
+            code: self.code,
+            code_description: None,
+            source: Some(String::from("lspml")),
+            message: self.message,
+            related_information: None,
+            tags: self.tags,
+            data: self.data,
+        };
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Default)]
+pub enum Severity {
+    Critical,
+    Error,
+    #[default]
+    Warning,
+    // Information,
+    Hint,
+}
+
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Default)]
+pub enum Type {
+    MissingHeader,
+    InvalidHeader,
+    MissingValue,
+    ConflictingValues,
+    SuperfluousValue,
+    InvalidLiteral,
+    InvalidFunction,
+    #[default]
+    SyntaxError,
+    Deprecation,
+    MissingFile,
+    UnknownModule,
+}
+
+impl clap::ValueEnum for Type {
+    fn value_variants<'a>() -> &'a [Self] {
+        static VARIANTS: [Type; 11] = [
+            Type::MissingHeader,
+            Type::InvalidHeader,
+            Type::MissingValue,
+            Type::ConflictingValues,
+            Type::SuperfluousValue,
+            Type::SyntaxError,
+            Type::Deprecation,
+            Type::InvalidLiteral,
+            Type::InvalidFunction,
+            Type::MissingFile,
+            Type::UnknownModule,
+        ];
+        return &VARIANTS;
+    }
+
+    fn to_possible_value(&self) -> Option<clap::builder::PossibleValue> {
+        return Some(clap::builder::PossibleValue::new(match self {
+            Type::MissingHeader => "MISSING_HEADER",
+            Type::InvalidHeader => "INVALID_HEADER",
+            Type::MissingValue => "MISSING_VALUE",
+            Type::ConflictingValues => "CONFLICTING_VALUE",
+            Type::SuperfluousValue => "SUPERFLUOUS_VALUE",
+            Type::SyntaxError => "SYNTAX_ERROR",
+            Type::Deprecation => "DEPRECATION",
+            Type::InvalidLiteral => "INVALID_LITERAL",
+            Type::InvalidFunction => "INVALID_FUNCTION",
+            Type::MissingFile => "MISSING_FILE",
+            Type::UnknownModule => "UNKNOWN_MODULE",
+        }));
+    }
+}
+
+impl ToString for Type {
+    fn to_string(&self) -> String {
+        return String::from(match self {
+            Type::MissingHeader => "MISSING_HEADER",
+            Type::InvalidHeader => "INVALID_HEADER",
+            Type::MissingValue => "MISSING_VALUE",
+            Type::ConflictingValues => "CONFLICTING_VALUE",
+            Type::SuperfluousValue => "SUPERFLUOUS_VALUE",
+            Type::SyntaxError => "SYNTAX_ERROR",
+            Type::Deprecation => "DEPRECATION",
+            Type::InvalidLiteral => "INVALID_LITERAL",
+            Type::InvalidFunction => "INVALID_FUNCTION",
+            Type::MissingFile => "MISSING_FILE",
+            Type::UnknownModule => "UNKNOWN_MODULE",
+        });
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Default)]
+pub struct DiagnosticBuilder {
+    range: Range,
+    severity: Severity,
+    code: Option<NumberOrString>,
+    code_description: Option<CodeDescription>,
+    message: String,
+    tags: Option<Vec<DiagnosticTag>>,
+    data: Option<serde_json::Value>,
+    fingerprint: Option<String>,
+    r#type: Type,
+}
+
+impl DiagnosticBuilder {
+    pub fn new(message: impl ToString, range: Range, r#type: Type, severity: Severity) -> Self {
+        let message: String = message.to_string();
+        let mut hasher = DefaultHasher::new();
+        message.hash(&mut hasher);
+        let fingerprint = Some(hasher.finish().to_string());
+        return DiagnosticBuilder {
+            range,
+            severity,
+            message,
+            r#type,
+            fingerprint,
+            ..Default::default()
+        };
+    }
+
+    pub fn new_invalid_header(message: impl ToString, range: Range) -> Self {
+        return Self::new(message, range, Type::InvalidHeader, Severity::Critical);
+    }
+
+    pub fn new_missing_value(message: impl ToString, range: Range) -> Self {
+        return Self::new(message, range, Type::MissingValue, Severity::Critical);
+    }
+
+    pub fn new_conflicting_values(message: impl ToString, range: Range) -> Self {
+        return Self::new(message, range, Type::ConflictingValues, Severity::Error);
+    }
+
+    pub fn new_superfluous_value(message: impl ToString, range: Range) -> Self {
+        return Self::new(message, range, Type::SuperfluousValue, Severity::Warning)
+            .with_tag(DiagnosticTag::UNNECESSARY)
+            .with_code(CodeActionImplementation::REMOVE_SUPERFLUOUS_CODE);
+    }
+
+    pub fn new_syntax_error(message: impl ToString, range: Range) -> Self {
+        return Self::new(message, range, Type::SyntaxError, Severity::Critical);
+    }
+
+    pub fn new_invalid_literal(message: impl ToString, range: Range) -> Self {
+        return Self::new(message, range, Type::InvalidLiteral, Severity::Critical);
+    }
+
+    pub fn new_invalid_function(message: impl ToString, range: Range) -> Self {
+        return Self::new(message, range, Type::InvalidFunction, Severity::Critical);
+    }
+
+    pub fn new_deprecation(message: impl ToString, range: Range) -> Self {
+        return Self::new(message, range, Type::Deprecation, Severity::Warning)
+            .with_tag(DiagnosticTag::DEPRECATED);
+    }
+
+    pub fn new_missing_file(message: impl ToString, range: Range) -> Self {
+        return Self::new(message, range, Type::MissingFile, Severity::Error);
+    }
+
+    pub fn new_unknown_module(message: impl ToString, range: Range) -> Self {
+        return Self::new(message, range, Type::UnknownModule, Severity::Hint);
+    }
+
+    pub fn with_code(mut self, code: NumberOrString) -> Self {
+        self.code = Some(code);
+        return self;
+    }
+
+    pub fn with_tag(mut self, tag: DiagnosticTag) -> Self {
+        match self.tags {
+            Some(ref mut tags) => tags.push(tag),
+            None => self.tags = Some(vec![tag]),
+        }
+        return self;
+    }
+
+    pub fn with_data(mut self, data: serde_json::Value) -> Self {
+        self.data = Some(data);
+        return self;
+    }
+
+    // pub fn with_fingerprint(mut self, fingerprint: impl Into<String>) -> Self {
+    //     self.fingerprint = Some(fingerprint.into());
+    //     return self;
+    // }
+
+    pub fn build(self) -> Diagnostic {
+        return Diagnostic {
+            range: self.range,
+            severity: self.severity,
+            code: self.code,
+            code_description: self.code_description,
+            message: self.message,
+            tags: self.tags,
+            data: self.data,
+            fingerprint: self.fingerprint,
+            r#type: self.r#type,
+        };
+    }
+}
+
 pub(crate) struct DiagnosticCollector {
     pub(crate) file: Url,
     pub(crate) diagnostics: Vec<Diagnostic>,
@@ -56,18 +288,17 @@ impl DiagnosticCollector {
                 line: 0,
                 character: 0,
             };
-            self.add_diagnostic_with_code(
-                format!(
-                    "missing atleast one header. Try generating one with the \"{}\" code-action",
-                    CodeActionImplementation::GenerateDefaultHeaders
-                ),
-                DiagnosticSeverity::ERROR,
-                Range {
-                    start: document_start,
-                    end: document_start,
-                },
-                CodeActionImplementation::GENERATE_DEFAULT_HEADER_CODE,
-                None,
+            self.add(
+                DiagnosticBuilder::new(
+                    format!(
+                        "missing atleast one header. Try generating one with the \"{}\" code-action",
+                        CodeActionImplementation::GenerateDefaultHeaders
+                    ),
+                    Range::new(document_start, document_start),
+                    Type::MissingHeader,
+                    Severity::Critical,
+                )
+                .with_code(CodeActionImplementation::GENERATE_DEFAULT_HEADER_CODE),
             );
         }
         for header in &header.java_headers {
@@ -77,42 +308,48 @@ impl DiagnosticCollector {
                     if let Some(range) = header.range() {
                         match &header.open_bracket {
                             ParsedLocation::Valid(_) => (),
-                            ParsedLocation::Erroneous(location) => self.add_diagnostic(
-                                "invalid java header opening bracket. should be '<%@'".to_string(),
-                                DiagnosticSeverity::ERROR,
-                                location.range(),
-                            ),
-                            ParsedLocation::Missing => self.add_diagnostic(
-                                "invalid java header: missing '<%@'".to_string(),
-                                DiagnosticSeverity::ERROR,
-                                range,
-                            ),
+                            ParsedLocation::Erroneous(location) => {
+                                self.add(DiagnosticBuilder::new_invalid_header(
+                                    "invalid java header opening bracket. should be '<%@'",
+                                    location.range(),
+                                ))
+                            }
+                            ParsedLocation::Missing => {
+                                self.add(DiagnosticBuilder::new_invalid_header(
+                                    "invalid java header: missing '<%@'",
+                                    range,
+                                ))
+                            }
                         };
                         match &header.page {
                             ParsedLocation::Valid(_) => (),
-                            ParsedLocation::Erroneous(location) => self.add_diagnostic(
-                                "invalid java header 'page'".to_string(),
-                                DiagnosticSeverity::ERROR,
-                                location.range(),
-                            ),
-                            ParsedLocation::Missing => self.add_diagnostic(
-                                "invalid java header: missing 'page'".to_string(),
-                                DiagnosticSeverity::ERROR,
-                                range,
-                            ),
+                            ParsedLocation::Erroneous(location) => {
+                                self.add(DiagnosticBuilder::new_invalid_header(
+                                    "invalid java header 'page'",
+                                    location.range(),
+                                ))
+                            }
+                            ParsedLocation::Missing => {
+                                self.add(DiagnosticBuilder::new_invalid_header(
+                                    "invalid java header: missing 'page'",
+                                    range,
+                                ))
+                            }
                         };
                         match &header.close_bracket {
                             ParsedLocation::Valid(_) => (),
-                            ParsedLocation::Erroneous(location) => self.add_diagnostic(
-                                "invalid java header closing bracket. should be '%>'".to_string(),
-                                DiagnosticSeverity::ERROR,
-                                location.range(),
-                            ),
-                            ParsedLocation::Missing => self.add_diagnostic(
-                                "java header is unclosed".to_string(),
-                                DiagnosticSeverity::ERROR,
-                                range,
-                            ),
+                            ParsedLocation::Erroneous(location) => {
+                                self.add(DiagnosticBuilder::new_invalid_header(
+                                    "invalid java header closing bracket. should be '%>'",
+                                    location.range(),
+                                ))
+                            }
+                            ParsedLocation::Missing => {
+                                self.add(DiagnosticBuilder::new_invalid_header(
+                                    "java header is unclosed",
+                                    range,
+                                ))
+                            }
                         }
                     }
                 }
@@ -125,67 +362,68 @@ impl DiagnosticCollector {
                     if let Some(range) = header.range() {
                         match &header.open_bracket {
                             ParsedLocation::Valid(_) => (),
-                            ParsedLocation::Erroneous(location) => self.add_diagnostic(
-                                "invalid taglib header opening bracket. should be '<%@'"
-                                    .to_string(),
-                                DiagnosticSeverity::ERROR,
-                                location.range(),
-                            ),
-                            ParsedLocation::Missing => self.add_diagnostic(
-                                "invalid taglib header: missing '<%@'".to_string(),
-                                DiagnosticSeverity::ERROR,
-                                range,
-                            ),
+                            ParsedLocation::Erroneous(location) => {
+                                self.add(DiagnosticBuilder::new_invalid_header(
+                                    "invalid taglib header opening bracket. should be '<%@'",
+                                    location.range(),
+                                ))
+                            }
+                            ParsedLocation::Missing => {
+                                self.add(DiagnosticBuilder::new_invalid_header(
+                                    "invalid taglib header: missing '<%@'",
+                                    range,
+                                ))
+                            }
                         };
                         match &header.taglib {
                             ParsedLocation::Valid(_) => (),
-                            ParsedLocation::Erroneous(location) => self.add_diagnostic(
-                                "invalid taglib header 'taglib'".to_string(),
-                                DiagnosticSeverity::ERROR,
-                                location.range(),
-                            ),
-                            ParsedLocation::Missing => self.add_diagnostic(
-                                "invalid taglib header: missing 'taglib'".to_string(),
-                                DiagnosticSeverity::ERROR,
-                                range,
-                            ),
+                            ParsedLocation::Erroneous(location) => {
+                                self.add(DiagnosticBuilder::new_invalid_header(
+                                    "invalid taglib header 'taglib'",
+                                    location.range(),
+                                ))
+                            }
+                            ParsedLocation::Missing => {
+                                self.add(DiagnosticBuilder::new_invalid_header(
+                                    "invalid taglib header: missing 'taglib'",
+                                    range,
+                                ))
+                            }
                         };
                         match &header.origin {
                             Some(_) => (),
-                            None => self.add_diagnostic(
-                                "invalid taglib header: missing 'uri' or 'tagdir' attribute"
-                                    .to_string(),
-                                DiagnosticSeverity::ERROR,
+                            None => self.add(DiagnosticBuilder::new_invalid_header(
+                                "invalid taglib header: missing 'uri' or 'tagdir' attribute",
                                 range,
-                            ),
+                            )),
                         };
                         match &header.prefix {
                             Some(_) => (),
-                            None => self.add_diagnostic(
-                                "invalid taglib header: missing 'prefix' attribute".to_string(),
-                                DiagnosticSeverity::ERROR,
+                            None => self.add(DiagnosticBuilder::new_invalid_header(
+                                "invalid taglib header: missing 'prefix' attribute",
                                 range,
-                            ),
+                            )),
                         };
                         match &header.close_bracket {
                             ParsedLocation::Valid(_) => (),
-                            ParsedLocation::Erroneous(location) => self.add_diagnostic(
-                                "invalid taglib header closing bracket. should be '%>'".to_string(),
-                                DiagnosticSeverity::ERROR,
-                                location.range(),
-                            ),
-                            ParsedLocation::Missing => self.add_diagnostic(
-                                "taglib header is unclosed".to_string(),
-                                DiagnosticSeverity::ERROR,
-                                range,
-                            ),
+                            ParsedLocation::Erroneous(location) => {
+                                self.add(DiagnosticBuilder::new_invalid_header(
+                                    "invalid taglib header closing bracket. should be '%>'",
+                                    location.range(),
+                                ))
+                            }
+                            ParsedLocation::Missing => {
+                                self.add(DiagnosticBuilder::new_invalid_header(
+                                    "taglib header is unclosed",
+                                    range,
+                                ))
+                            }
                         }
                         for error in &header.errors {
-                            self.add_diagnostic(
+                            self.add(DiagnosticBuilder::new_invalid_header(
                                 format!("syntax error: unexpected \"{}\"", error.content),
-                                DiagnosticSeverity::ERROR,
                                 error.range,
-                            )
+                            ))
                         }
                     }
                 }
@@ -201,11 +439,10 @@ impl DiagnosticCollector {
                 Node::Html(html) => self.validate_parsed_html(html)?,
                 Node::Text(_) => (),
                 Node::Error(ErrorNode { content, range }) => {
-                    self.add_diagnostic(
+                    self.add(DiagnosticBuilder::new_syntax_error(
                         format!("syntax error: unexpected \"{}\"", content),
-                        DiagnosticSeverity::ERROR,
                         *range,
-                    );
+                    ));
                 }
             }
         }
@@ -219,19 +456,23 @@ impl DiagnosticCollector {
                 for error in errors {
                     match error {
                         TagError::Superfluous(text, location) => {
-                            self.add_superfluous_diagnostic(text, location.range());
+                            self.add(
+                                DiagnosticBuilder::new_syntax_error(text, location.range())
+                                    .with_tag(DiagnosticTag::UNNECESSARY)
+                                    .with_code(CodeActionImplementation::REMOVE_SUPERFLUOUS_CODE),
+                            );
                         }
                         TagError::Missing(text, location) => {
-                            self.add_diagnostic_with_code(
-                                format!("\"{}\" is missing", text),
-                                DiagnosticSeverity::ERROR,
-                                tag.range(),
-                                CodeActionImplementation::ADD_MISSING_CODE,
-                                serde_json::to_value(TextEdit {
+                            self.add(
+                                DiagnosticBuilder::new_missing_value(
+                                    format!("\"{}\" is missing", text),
+                                    tag.range(),
+                                )
+                                .with_code(CodeActionImplementation::ADD_MISSING_CODE)
+                                .with_data(serde_json::to_value(TextEdit {
                                     range: location.range(),
                                     new_text: text.to_string(),
-                                })
-                                .ok(),
+                                })?),
                             );
                         }
                     }
@@ -239,11 +480,10 @@ impl DiagnosticCollector {
                 self.validate_tag(tag)?;
             }
             ParsedTag::Unparsable(message, location) => {
-                self.add_diagnostic(
-                    message.to_string(),
-                    DiagnosticSeverity::ERROR,
+                self.add(DiagnosticBuilder::new_syntax_error(
+                    message,
                     location.range(),
-                );
+                ));
             }
         };
         return Ok(());
@@ -256,19 +496,23 @@ impl DiagnosticCollector {
                 for error in errors {
                     match error {
                         TagError::Superfluous(text, location) => {
-                            self.add_superfluous_diagnostic(text, location.range());
+                            self.add(
+                                DiagnosticBuilder::new_syntax_error(text, location.range())
+                                    .with_tag(DiagnosticTag::UNNECESSARY)
+                                    .with_code(CodeActionImplementation::REMOVE_SUPERFLUOUS_CODE),
+                            );
                         }
                         TagError::Missing(text, location) => {
-                            self.add_diagnostic_with_code(
-                                format!("\"{}\" is missing", text),
-                                DiagnosticSeverity::ERROR,
-                                html.range(),
-                                CodeActionImplementation::ADD_MISSING_CODE,
-                                serde_json::to_value(TextEdit {
+                            self.add(
+                                DiagnosticBuilder::new_missing_value(
+                                    format!("\"{}\" is missing", text),
+                                    html.range(),
+                                )
+                                .with_code(CodeActionImplementation::ADD_MISSING_CODE)
+                                .with_data(serde_json::to_value(TextEdit {
                                     range: location.range(),
                                     new_text: text.to_string(),
-                                })
-                                .ok(),
+                                })?),
                             );
                         }
                     }
@@ -276,11 +520,10 @@ impl DiagnosticCollector {
                 self.validate_html(html)?;
             }
             ParsedHtml::Unparsable(message, location) => {
-                self.add_diagnostic(
-                    message.to_string(),
-                    DiagnosticSeverity::ERROR,
+                self.add(DiagnosticBuilder::new_syntax_error(
+                    message,
                     location.range(),
-                );
+                ));
             }
         };
         return Ok(());
@@ -288,12 +531,10 @@ impl DiagnosticCollector {
 
     fn validate_tag(&mut self, tag: &SpmlTag) -> Result<()> {
         if tag.definition().deprecated {
-            self.add_diagnostic_with_tag(
+            self.add(DiagnosticBuilder::new_deprecation(
                 format!("{} tag is deprecated", tag.definition().name),
-                DiagnosticSeverity::INFORMATION,
                 tag.range(),
-                DiagnosticTag::DEPRECATED,
-            );
+            ));
         }
         for (_, attribute) in tag.spel_attributes() {
             let attribute = match attribute {
@@ -302,18 +543,23 @@ impl DiagnosticCollector {
                     for error in errors {
                         match error {
                             AttributeError::Superfluous(text, location) => {
-                                self.add_superfluous_diagnostic(text, location.range());
+                                self.add(
+                                    DiagnosticBuilder::new_syntax_error(text, location.range())
+                                        .with_tag(DiagnosticTag::UNNECESSARY)
+                                        .with_code(
+                                            CodeActionImplementation::REMOVE_SUPERFLUOUS_CODE,
+                                        ),
+                                );
                             }
                         }
                     }
                     attribute
                 }
                 ParsedAttribute::Unparsable(message, location) => {
-                    self.add_diagnostic(
-                        message.to_string(),
-                        DiagnosticSeverity::ERROR,
+                    self.add(DiagnosticBuilder::new_syntax_error(
+                        message,
                         location.range(),
-                    );
+                    ));
                     continue;
                 }
             };
@@ -322,23 +568,24 @@ impl DiagnosticCollector {
         for rule in tag.definition().attribute_rules {
             match rule {
                 AttributeRule::Deprecated(name) if tag.spel_attribute(*name).is_some() => {
-                    self.add_diagnostic_with_tag(
-                        format!("attribute {} is deprecated", name),
-                        DiagnosticSeverity::INFORMATION,
-                        tag.range(),
-                        DiagnosticTag::DEPRECATED,
+                    self.add(
+                        DiagnosticBuilder::new_deprecation(
+                            format!("attribute \"{}\" is deprecated", name),
+                            tag.range(),
+                        ),
                     );
                 }
                 AttributeRule::AtleastOneOf(names)
                     if !names.iter().any(|name| tag.spel_attribute(*name).is_some()) =>
                 {
-                    self.add_diagnostic(
-                        format!(
-                            "requires atleast one of these attributes: {}",
-                            names.join(", ")
+                    self.add(
+                        DiagnosticBuilder::new_missing_value(
+                            format!(
+                                "requires atleast one of these attributes: {}",
+                                names.join(", ")
+                            ),
+                            tag.range(),
                         ),
-                        DiagnosticSeverity::ERROR,
-                        tag.range(),
                     );
                 }
                 AttributeRule::ExactlyOneOf(names) => {
@@ -348,19 +595,21 @@ impl DiagnosticCollector {
                         .filter(|name| tag.spel_attribute(*name).is_some())
                         .collect();
                     match present.len() {
-                        0 => self.add_diagnostic(
-                            format!("requires one of these attributes: {}", names.join(", ")),
-                            DiagnosticSeverity::ERROR,
-                            tag.range(),
+                        0 => self.add(
+                            DiagnosticBuilder::new_missing_value(
+                                format!("requires one of these attributes: {}", names.join(", ")),
+                                tag.range(),
+                            ),
                         ),
                         1 => {}
-                        _ => self.add_diagnostic(
-                            format!(
-                                "requires only one of these attributes: {}",
-                                present.join(", ")
+                        _ => self.add(
+                            DiagnosticBuilder::new_conflicting_values(
+                                format!(
+                                    "requires only one of these attributes: {}",
+                                    present.join(", ")
+                                ),
+                                tag.range(),
                             ),
-                            DiagnosticSeverity::ERROR,
-                            tag.range(),
                         ),
                     }
                 }
@@ -371,33 +620,41 @@ impl DiagnosticCollector {
                         .filter(|name| tag.spel_attribute(*name).is_some())
                         .collect();
                     match (present.len(), tag.body().is_some()) {
-                        (0, false) => self.add_diagnostic(
-                            format!(
-                                "requires either a tag-body or one of these attributes: {}",
-                                names.join(", ")
+                        (0, false) => self.add(
+                            DiagnosticBuilder::new_missing_value(
+                                format!(
+                                    "requires either a tag-body or one of these attributes: {}",
+                                    names.join(", ")
+                                ),
+                                tag.range(),
                             ),
-                            DiagnosticSeverity::ERROR,
-                            tag.range(),
                         ),
                         (0, true) | (1, false) => {}
-                        _ => self.add_diagnostic(
-                            format!(
-                                "requires either a tag-body or only one of these attributes: {}",
-                                present.join(", ")
+                        _ => self.add(
+                            DiagnosticBuilder::new_conflicting_values(
+                                format!(
+                                    "requires either a tag-body or only one of these attributes: {}",
+                                    present.join(", ")
+                                ),
+                                tag.range(),
                             ),
-                            DiagnosticSeverity::ERROR,
-                            tag.range(),
                         ),
                     }
                 }
-                AttributeRule::ExactlyOrBody(name)
-                    if tag.spel_attribute(*name).is_some() == tag.body().is_some() =>
-                {
-                    self.add_diagnostic(
-                        format!("requires either a tag-body or the attribute {}", name,),
-                        DiagnosticSeverity::ERROR,
-                        tag.range(),
-                    );
+                AttributeRule::ExactlyOrBody(name) => match (tag.spel_attribute(*name), tag.body()) {
+                    (None, None) => self.add(
+                        DiagnosticBuilder::new_missing_value(
+                            format!("requires either a tag-body or the attribute \"{}\"", name),
+                            tag.range(),
+                        ),
+                    ),
+                    (Some(_), Some(_)) => self.add(
+                        DiagnosticBuilder::new_conflicting_values(
+                            format!("requires either a tag-body or the attribute \"{}\"", name),
+                            tag.range(),
+                        ),
+                    ),
+                    _ => {}
                 }
                 AttributeRule::OnlyOneOf(names) => {
                     let present: Vec<&str> = names
@@ -406,13 +663,14 @@ impl DiagnosticCollector {
                         .filter(|name| tag.spel_attribute(name).is_some())
                         .collect();
                     if present.len() > 1 {
-                        self.add_diagnostic(
-                            format!(
-                                "can only have one of these attributes: {}",
-                                present.join(", ")
+                        self.add(
+                            DiagnosticBuilder::new_conflicting_values(
+                                format!(
+                                    "can only have one of these attributes: {}",
+                                    present.join(", ")
+                                ),
+                                tag.range(),
                             ),
-                            DiagnosticSeverity::WARNING,
-                            tag.range(),
                         );
                     }
                 }
@@ -423,21 +681,23 @@ impl DiagnosticCollector {
                         .filter(|name| tag.spel_attribute(name).is_some())
                         .collect();
                     match (present.len(), tag.body().is_some()) {
-                        (len, true) if len > 0 => self.add_diagnostic(
-                            format!(
-                                "can only have either a tag-body or one of these attributes: {}",
-                                present.join(", ")
+                        (len, true) if len > 0 => self.add(
+                            DiagnosticBuilder::new_conflicting_values(
+                                format!(
+                                    "can only have either a tag-body or one of these attributes: {}",
+                                    present.join(", ")
+                                ),
+                                tag.range(),
                             ),
-                            DiagnosticSeverity::WARNING,
-                            tag.range(),
                         ),
-                        (len, false) if len > 1 => self.add_diagnostic(
-                            format!(
-                                "can only have one of these attributes: {}",
-                                present.join(", ")
+                        (len, false) if len > 1 => self.add(
+                            DiagnosticBuilder::new_conflicting_values(
+                                format!(
+                                    "can only have one of these attributes: {}",
+                                    present.join(", ")
+                                ),
+                                tag.range(),
                             ),
-                            DiagnosticSeverity::WARNING,
-                            tag.range(),
                         ),
                         _ => {}
                     }
@@ -445,56 +705,59 @@ impl DiagnosticCollector {
                 AttributeRule::OnlyOrBody(name)
                     if tag.spel_attribute(*name).is_some() && tag.body().is_some() =>
                 {
-                    self.add_diagnostic(
-                        format!("can only have either a tag-body or the {} attribute", name),
-                        DiagnosticSeverity::WARNING,
-                        tag.range(),
+                    self.add(
+                        DiagnosticBuilder::new_conflicting_values(
+                            format!("can only have either a tag-body or the \"{}\" attribute", name),
+                            tag.range(),
+                        ),
                     );
                 }
                 AttributeRule::OnlyWith(name1, name2)
-                    if tag.spel_attribute(*name1).is_some()
-                        && !tag.spel_attribute(*name2).is_some() =>
-                {
-                    self.add_diagnostic(
-                        format!("attribute {} is useless without attribute {}", name1, name2),
-                        DiagnosticSeverity::WARNING,
-                        tag.range(),
-                    );
+                    if !tag.spel_attribute(*name2).is_some() => match tag.spel_attribute(*name1) {
+                    Some(attribute) => self.add(
+                        DiagnosticBuilder::new_superfluous_value(
+                            format!("attribute \"{}\" is useless without attribute \"{}\"", name1, name2),
+                            attribute.range(),
+                        ),
+                    ),
+                    None => {}
                 }
                 AttributeRule::OnlyWithEither(name, names)
-                    if tag.spel_attribute(*name).is_some()
-                        && !names.iter().any(|name| tag.spel_attribute(*name).is_some()) =>
-                {
-                    self.add_diagnostic(
-                        format!(
-                            "attribute {} is useless without one of these attributes: {}",
-                            name,
-                            names.join(", ")
+                    if !names.iter().any(|name| tag.spel_attribute(*name).is_some()) =>
+                        match tag.spel_attribute(*name) {
+                    Some(attribute) => self.add(
+                        DiagnosticBuilder::new_superfluous_value(
+                            format!(
+                                "attribute \"{}\" is useless without one of these attributes: {}",
+                                name,
+                                names.join(", ")
+                            ),
+                            attribute.range(),
                         ),
-                        DiagnosticSeverity::WARNING,
-                        tag.range(),
-                    );
+                    ),
+                    None => {}
                 }
                 AttributeRule::OnlyWithEitherOrBody(name, names)
-                    if tag.spel_attribute(*name).is_some()
-                        && !names.iter().any(|name| tag.spel_attribute(*name).is_some())
-                        && tag.body().is_none() =>
-                {
-                    self.add_diagnostic(
-                        format!(
-                            "attribute {} is useless without either a tag-body or one of these attributes: {}",
-                            name,
-                            names.join(", ")
+                    if !names.iter().any(|name| tag.spel_attribute(*name).is_some())
+                        && tag.body().is_none() => match tag.spel_attribute(*name) {
+                    Some(attribute) => self.add(
+                        DiagnosticBuilder::new_superfluous_value(
+                            format!(
+                                "attribute \"{}\" is useless without either a tag-body or one of these attributes: {}",
+                                name,
+                                names.join(", ")
+                            ),
+                            attribute.range(),
                         ),
-                        DiagnosticSeverity::WARNING,
-                        tag.range(),
-                    );
+                    ),
+                    None => {}
                 }
                 AttributeRule::Required(name) if !tag.spel_attribute(*name).is_some() => {
-                    self.add_diagnostic(
-                        format!("missing required attribute {}", name),
-                        DiagnosticSeverity::ERROR,
-                        tag.range(),
+                    self.add(
+                        DiagnosticBuilder::new_missing_value(
+                            format!("missing required attribute \"{}\"", name),
+                            tag.range(),
+                        ),
                     );
                 }
                 AttributeRule::UriExists(uri_name, module_name) => {
@@ -525,7 +788,7 @@ impl DiagnosticCollector {
                                         ..
                                     },
                                 ..
-                            }) if fragments.len() == 1 => Some(fragments[0].clone()),
+                            }) if fragments.len() == 1 => fragments.first(),
                             Some(_) => continue,
                             None => None,
                         };
@@ -541,165 +804,151 @@ impl DiagnosticCollector {
                             Some(module) => {
                                 let file = format!("{}{}", module.path, uri);
                                 if !Path::new(&file).exists() {
-                                    self.add_diagnostic(
-                                        format!("included file {} does not exist", file),
-                                        DiagnosticSeverity::ERROR,
+                                    self.add(DiagnosticBuilder::new_missing_file(
+                                        format!("included file \"{}\" does not exist", uri),
                                         tag.range(),
-                                    );
+                                    ));
                                 }
                             }
-                            None => self.add_diagnostic(
+                            None => self.add(DiagnosticBuilder::new_unknown_module(
                                 match module_value {
                                     Some(WordFragment::Interpolation(i)) => format!(
-                                        "interpolation \"{}\" is interpreted as the current module, which is not listed in the module-file",
+                                        concat!(
+                                            "interpolation \"{}\" is interpreted as the current ",
+                                            "module, which is not listed in the module-file"
+                                        ),
                                         i
                                     ),
-                                    Some(WordFragment::String(StringLiteral {
-                                        content, ..
-                                    })) => {
-                                        format!("module \"{}\" not listed in module-file", content)
-                                    },
+                                    Some(WordFragment::String(literal)) => format!(
+                                        "module \"{}\" not listed in module-file",
+                                        literal.content
+                                    ),
                                     None => "current module not listed in module-file".to_string(),
                                 },
-                                DiagnosticSeverity::HINT,
                                 tag.range(),
-                            ),
+                            )),
                         }
                     }
                 }
                 AttributeRule::ValueOneOf(name, values)
                     if string_literal_attribute_value(tag.spel_attribute(*name))
-                        .is_some_and(|value| !values.contains(&value.as_str())) =>
+                        .is_some_and(|value| !values.contains(&&*value)) =>
                 {
-                    self.add_diagnostic(
+                    self.add(DiagnosticBuilder::new_invalid_literal(
                         format!(
-                            "attribute {} should be one of these values: [{}]",
+                            "attribute \"{}\" should be one of these values: [{}]",
                             name,
                             values.join(", ")
                         ),
-                        DiagnosticSeverity::ERROR,
                         tag.range(),
-                    );
+                    ));
                 }
                 AttributeRule::ValueOneOfCaseInsensitive(name, values)
                     if string_literal_attribute_value(tag.spel_attribute(*name))
                         .is_some_and(|value| !values.contains(&value.to_uppercase().as_str())) =>
                 {
-                    self.add_diagnostic(
+                    self.add(DiagnosticBuilder::new_invalid_literal(
                         format!(
-                            "attribute {} should be one of these (caseinsensitive) values: [{}]",
+                            "attribute \"{}\" should be one of these (caseinsensitive) values: [{}]",
                             name,
                             values.join(", ")
                         ),
-                        DiagnosticSeverity::ERROR,
                         tag.range(),
-                    );
+                    ));
                 }
-                AttributeRule::OnlyWithValue(name, attribute, value)
-                    if tag.spel_attribute(*name).is_some()
-                        && !string_literal_attribute_value(tag.spel_attribute(*attribute))
-                            .is_some_and(|v| &v.as_str() == value) =>
-                {
-                    self.add_diagnostic(
+                AttributeRule::OnlyWithValue(name, attribute_name, value)
+                    if !string_literal_attribute_value(tag.spel_attribute(*attribute_name))
+                        .is_some_and(|v| *v == **value) => match tag.spel_attribute(*name) {
+                    Some(attribute) => self.add(DiagnosticBuilder::new_superfluous_value(
                         format!(
-                            "attribute {} is useless without attribute {} containing the value {}",
-                            name, attribute, value
+                            "attribute \"{}\" is useless without attribute \"{}\" containing the value {}",
+                            name, attribute_name, value
                         ),
-                        DiagnosticSeverity::WARNING,
-                        tag.range(),
-                    );
+                        attribute.range(),
+                    )),
+                    None => {}
                 }
-                AttributeRule::OnlyWithEitherValue(name, attribute, values)
-                    if tag.spel_attribute(*name).is_some()
-                        && !string_literal_attribute_value(tag.spel_attribute(*attribute))
-                            .is_some_and(|value| values.contains(&value.as_str())) =>
-                {
-                    self.add_diagnostic(
+                AttributeRule::OnlyWithEitherValue(name, attribute_name, values)
+                    if !string_literal_attribute_value(tag.spel_attribute(*attribute_name))
+                        .is_some_and(|value| values.contains(&&*value)) => match tag.spel_attribute(*name) {
+                    Some(attribute) => self.add(DiagnosticBuilder::new_superfluous_value(
                         format!(
-                            "attribute {} is useless without attribute {} containing one of these values: [{}]",
-                            name, attribute, values.join(", ")
+                            "attribute \"{}\" is useless without attribute \"{}\" containing one of these values: [{}]",
+                            name, attribute_name, values.join(", ")
                         ),
-                        DiagnosticSeverity::WARNING,
-                        tag.range(),
-                    );
+                        attribute.range(),
+                    )),
+                    None => {}
                 }
-                AttributeRule::BodyOnlyWithEitherValue(attribute, values)
-                    if tag.body().is_some()
-                        && !string_literal_attribute_value(tag.spel_attribute(*attribute))
-                            .is_some_and(|value| values.contains(&value.as_str())) =>
-                {
-                    self.add_diagnostic(
+                AttributeRule::BodyOnlyWithEitherValue(attribute_name, values)
+                    if !string_literal_attribute_value(tag.spel_attribute(*attribute_name))
+                        .is_some_and(|value| values.contains(&&*value)) => match tag.body() {
+                    Some(body) => self.add(DiagnosticBuilder::new_superfluous_value(
                         format!(
-                            "tag-body is useless without attribute {} containing one of these values: [{}]",
-                            attribute, values.join(", ")
+                            "tag-body is useless without attribute \"{}\" containing one of these values: [{}]",
+                            attribute_name, values.join(", ")
                         ),
-                        DiagnosticSeverity::WARNING,
-                        tag.range(),
-                    );
+                        body.open_location.range(), // TODO: why does body have no close_location?
+                    )),
+                    None => {}
                 }
                 AttributeRule::RequiredWithValue(name, attribute, value)
                     if string_literal_attribute_value(tag.spel_attribute(*attribute))
-                        .is_some_and(|v| &v.as_str() == value)
-                        && !tag.spel_attribute(*name).is_some() =>
-                {
-                    self.add_diagnostic(
+                        .is_some_and(|v| *v == **value)
+                        && !tag.spel_attribute(*name).is_some() => {
+                    self.add(DiagnosticBuilder::new_missing_value(
                         format!(
-                            "attribute {} is required when attribute {} is {}",
+                            "attribute \"{}\" is required when attribute \"{}\" is \"{}\"",
                             name, attribute, value
                         ),
-                        DiagnosticSeverity::ERROR,
                         tag.range(),
-                    );
+                    ));
                 }
                 AttributeRule::RequiredOrBodyWithValue(name, attribute, value)
                     if string_literal_attribute_value(tag.spel_attribute(*attribute))
-                        .is_some_and(|v| &v.as_str() == value) =>
-                {
+                        .is_some_and(|v| *v == **value) => {
                     let has_attribute = tag.spel_attribute(*name).is_some();
                     let has_body = tag.body().is_some();
                     match (has_attribute, has_body) {
-                        (false, false) => self.add_diagnostic(
+                        (false, false) => self.add(DiagnosticBuilder::new_missing_value(
                             format!(
-                                "either attribute {} or a tag-body is required when attribute {} is \"{}\"",
+                                "either attribute \"{}\" or a tag-body is required when attribute \"{}\" is \"{}\"",
                                 name,
                                 attribute,
                                 value
                             ),
-                            DiagnosticSeverity::ERROR,
                             tag.range(),
-                        ),
-                        (true, true) => self.add_diagnostic(
+                        )),
+                        (true, true) => self.add(DiagnosticBuilder::new_conflicting_values(
                             format!(
-                                "exactly one of attribute {} or a tag-body is required when attribute {} is \"{}\"",
+                                "exactly one of attribute \"{}\" or a tag-body is required when attribute \"{}\" is \"{}\"",
                                 name,
                                 attribute,
                                 value
                             ),
-                            DiagnosticSeverity::ERROR,
                             tag.range(),
-                        ),
+                        )),
                         _ => {}
                     }
                 }
                 AttributeRule::RequiredWithEitherValue(name, attribute, values)
                     if string_literal_attribute_value(tag.spel_attribute(*attribute))
-                        .is_some_and(|value| values.contains(&value.as_str()))
+                        .is_some_and(|value| values.contains(&&*value))
                         && !tag.spel_attribute(*name).is_some() =>
                 {
-                    self.add_diagnostic(
+                    self.add(DiagnosticBuilder::new_missing_value(
                         format!(
-                            "attribute {} is required when attribute {} is either of [{}]",
+                            "attribute \"{}\" is required when attribute \"{}\" is either of [{}]",
                             name,
                             attribute,
                             values.join(", ")
                         ),
-                        DiagnosticSeverity::ERROR,
                         tag.range(),
-                    );
+                    ));
                 }
                 AttributeRule::ExactlyOneOfOrBodyWithValue(names, attribute, value)
                     if string_literal_attribute_value(tag.spel_attribute(*attribute))
-                        .is_some_and(|v| &v.as_str() == value) =>
+                        .is_some_and(|v| *v == **value) =>
                 {
                     let present: Vec<&str> = names
                         .iter()
@@ -709,29 +958,33 @@ impl DiagnosticCollector {
                     let has_body = tag.body().is_some();
                     match (present.len(), has_body) {
                         (0, false) => {
-                            self.add_diagnostic(
+                            self.add(DiagnosticBuilder::new_missing_value(
                                 format!(
-                                    "when attribute {} is \"{}\" either a tag-body or exactly one of these attributes is required: [{}]",
+                                    concat!(
+                                        "when attribute \"{}\" is \"{}\" either a tag-body or ",
+                                        "exactly one of these attributes is required: [{}]",
+                                    ),
                                     attribute, value, names.join(", ")
                                 ),
-                                DiagnosticSeverity::ERROR,
                                 tag.range(),
-                            );
+                            ));
                         }
                         (0, true) | (1, false) => {}
-                        _ => self.add_diagnostic(
+                        _ => self.add(DiagnosticBuilder::new_conflicting_values(
                             format!(
-                                "when attribute {} is \"{}\" only one of a tag-body and these attributes is required: [{}]",
+                                concat!(
+                                    "when attribute \"{}\" is \"{}\" only one of a tag-body and ",
+                                    "these attributes is required: [{}]",
+                                ),
                                 attribute, value, names.join(", ")
                             ),
-                            DiagnosticSeverity::ERROR,
                             tag.range(),
-                        ),
+                        )),
                     }
                 }
                 AttributeRule::ExactlyOneOfOrBodyWithEitherValue(names, attribute, values)
                     if string_literal_attribute_value(tag.spel_attribute(*attribute))
-                        .is_some_and(|value| values.contains(&value.as_str())) =>
+                        .is_some_and(|value| values.contains(&&*value)) =>
                 {
                     let present: Vec<&str> = names
                         .iter()
@@ -740,23 +993,27 @@ impl DiagnosticCollector {
                         .collect();
                     let has_body = tag.body().is_some();
                     match (present.len(), has_body) {
-                        (0, false) => self.add_diagnostic(
+                        (0, false) => self.add(DiagnosticBuilder::new_missing_value(
                             format!(
-                                "when attribute {} is either of [{}] either a tag-body or exactly one of these attributes is required: [{}]",
+                                concat!(
+                                    "when attribute \"{}\" is either of [{}] either a tag-body or ",
+                                    "exactly one of these attributes is required: [{}]",
+                                ),
                                 attribute, values.join(", "), names.join(", ")
                             ),
-                            DiagnosticSeverity::ERROR,
                             tag.range(),
-                        ),
+                        )),
                         (0, true) | (1, false) => {}
-                        _ => self.add_diagnostic(
+                        _ => self.add(DiagnosticBuilder::new_conflicting_values(
                             format!(
-                                "when attribute {} is either of [{}] only one of a tag-body and these attributes is required: [{}]",
+                                concat!(
+                                    "when attribute \"{}\" is either of [{}] only one of a ",
+                                    "tag-body and these attributes is required: [{}]",
+                                ),
                                 attribute, values.join(", "), names.join(", ")
                             ),
-                            DiagnosticSeverity::ERROR,
                             tag.range(),
-                        )
+                        ))
                     }
                 }
                 _ => {}
@@ -791,19 +1048,17 @@ impl DiagnosticCollector {
                 ParsedAttribute::Erroneous(_, errors) => {
                     for error in errors {
                         match error {
-                            AttributeError::Superfluous(text, location) => {
-                                self.add_superfluous_diagnostic(text, location.range());
-                            }
+                            AttributeError::Superfluous(text, location) => self.add(
+                                DiagnosticBuilder::new_syntax_error(text, location.range())
+                                    .with_tag(DiagnosticTag::UNNECESSARY)
+                                    .with_code(CodeActionImplementation::REMOVE_SUPERFLUOUS_CODE),
+                            ),
                         }
                     }
                 }
-                ParsedAttribute::Unparsable(message, location) => {
-                    self.add_diagnostic(
-                        message.to_string(),
-                        DiagnosticSeverity::ERROR,
-                        location.range(),
-                    );
-                }
+                ParsedAttribute::Unparsable(message, location) => self.add(
+                    DiagnosticBuilder::new_syntax_error(message, location.range()),
+                ),
             }
         }
         return match html.body() {
@@ -812,68 +1067,14 @@ impl DiagnosticCollector {
         };
     }
 
-    fn add_diagnostic(&mut self, message: String, severity: DiagnosticSeverity, range: Range) {
-        self.diagnostics.push(Diagnostic {
-            message,
-            severity: Some(severity),
-            range,
-            source: Some(String::from("lspml")),
-            ..Default::default()
-        });
-    }
-
-    fn add_diagnostic_with_tag(
-        &mut self,
-        message: String,
-        severity: DiagnosticSeverity,
-        range: Range,
-        tag: DiagnosticTag,
-    ) {
-        self.diagnostics.push(Diagnostic {
-            message,
-            severity: Some(severity),
-            range,
-            source: Some(String::from("lspml")),
-            tags: Some(vec![tag]),
-            ..Default::default()
-        });
-    }
-
-    fn add_diagnostic_with_code(
-        &mut self,
-        message: String,
-        severity: DiagnosticSeverity,
-        range: Range,
-        code: NumberOrString,
-        data: Option<serde_json::Value>,
-    ) {
-        self.diagnostics.push(Diagnostic {
-            message,
-            severity: Some(severity),
-            range,
-            source: Some(String::from("lspml")),
-            code: Some(code),
-            data,
-            ..Default::default()
-        });
-    }
-
-    fn add_superfluous_diagnostic(&mut self, text: &String, range: Range) {
-        self.diagnostics.push(Diagnostic {
-            message: format!("\"{}\" is superfluous", text),
-            severity: Some(DiagnosticSeverity::ERROR),
-            range,
-            source: Some(String::from("lspml")),
-            tags: Some(vec![DiagnosticTag::UNNECESSARY]),
-            code: Some(CodeActionImplementation::REMOVE_SUPERFLUOUS_CODE),
-            ..Default::default()
-        });
+    fn add(&mut self, builder: DiagnosticBuilder) {
+        self.diagnostics.push(builder.build());
     }
 }
 
 fn string_literal_attribute_value(
     attribute: Option<&ParsedAttribute<SpelAttribute>>,
-) -> Option<&String> {
+) -> Option<Arc<str>> {
     let attribute = match attribute {
         Some(ParsedAttribute::Valid(attribute)) => attribute,
         Some(ParsedAttribute::Erroneous(attribute, _)) => attribute,
@@ -882,7 +1083,7 @@ fn string_literal_attribute_value(
     return match &attribute.value.spel {
         SpelAst::String(SpelResult::Valid(Word { fragments })) if fragments.len() == 1 => {
             match &fragments[0] {
-                WordFragment::String(StringLiteral { content, .. }) => Some(content),
+                WordFragment::String(StringLiteral { content, .. }) => Some(content.clone()),
                 _ => None,
             }
         }
@@ -1018,52 +1219,50 @@ impl SpelValidator<'_> {
 
     fn validate_global_function(&mut self, function: &Function) -> Result<()> {
         let argument_count = function.arguments.len();
-        match grammar::Function::from_str(function.name.as_str()) {
+        match grammar::Function::from_str(&*function.name) {
             Ok(definition) => match definition.argument_number {
                 ArgumentNumber::AtLeast(number) if argument_count < number => {
-                    self.collector.add_diagnostic(
+                    self.collector.add(DiagnosticBuilder::new_invalid_function(
                         format!(
                             "invalid arguments number to \"{}\", expected {} or more but got {}",
                             definition.name, number, argument_count,
                         ),
-                        DiagnosticSeverity::ERROR,
                         self.locations_range(
                             &function.name_location,
                             &function.closing_bracket_location,
                         ),
-                    )
+                    ))
                 }
                 ArgumentNumber::Exactly(number) if argument_count != number => {
-                    self.collector.add_diagnostic(
+                    self.collector.add(DiagnosticBuilder::new_invalid_function(
                         format!(
                             "invalid arguments number to \"{}\", expected {} but got {}",
                             definition.name, number, argument_count,
                         ),
-                        DiagnosticSeverity::ERROR,
                         self.locations_range(
                             &function.name_location,
                             &function.closing_bracket_location,
                         ),
-                    );
+                    ));
                 }
-                ArgumentNumber::None if argument_count != 0 => self.collector.add_diagnostic(
-                    format!(
-                        "invalid arguments number to \"{}\", expected 0 but got {}",
-                        definition.name, argument_count,
-                    ),
-                    DiagnosticSeverity::ERROR,
-                    self.locations_range(
-                        &function.name_location,
-                        &function.closing_bracket_location,
-                    ),
-                ),
+                ArgumentNumber::None if argument_count != 0 => {
+                    self.collector.add(DiagnosticBuilder::new_invalid_function(
+                        format!(
+                            "invalid arguments number to \"{}\", expected 0 but got {}",
+                            definition.name, argument_count,
+                        ),
+                        self.locations_range(
+                            &function.name_location,
+                            &function.closing_bracket_location,
+                        ),
+                    ))
+                }
                 _ => {}
             },
-            Err(err) => self.collector.add_diagnostic(
-                err.to_string(),
-                DiagnosticSeverity::ERROR,
+            Err(err) => self.collector.add(DiagnosticBuilder::new_invalid_function(
+                err,
                 self.locations_range(&function.name_location, &function.closing_bracket_location),
-            ),
+            )),
         }
         for argument in &function.arguments {
             match &argument.argument {
@@ -1181,28 +1380,30 @@ impl SpelValidator<'_> {
             },
         };
         match err.proposed_fixes.len() {
-            0 => self.collector.add_diagnostic(
+            0 => self.collector.add(DiagnosticBuilder::new_syntax_error(
                 format!("invalid {}: {}", r#type, err.message),
-                DiagnosticSeverity::ERROR,
                 range,
-            ),
+            )),
             _ => {
                 let offset = Position {
                     line: attribute.value.opening_quote_location.line as u32,
                     character: attribute.value.opening_quote_location.char as u32 + 1,
                 };
-                self.collector.add_diagnostic_with_code(
-                    format!("invalid {}: {}", r#type, err.message),
-                    DiagnosticSeverity::ERROR,
-                    range,
-                    CodeActionImplementation::FIX_SPEL_SYNTAX_CODE,
-                    serde_json::to_value(
-                        err.proposed_fixes
-                            .iter()
-                            .map(|fix| fix.to_text_edit(&offset))
-                            .collect::<Vec<TextEdit>>(),
+                self.collector.add(
+                    DiagnosticBuilder::new_syntax_error(
+                        format!("invalid {}: {}", r#type, err.message),
+                        range,
                     )
-                    .ok(),
+                    .with_code(CodeActionImplementation::FIX_SPEL_SYNTAX_CODE)
+                    .with_data(
+                        serde_json::to_value(
+                            err.proposed_fixes
+                                .iter()
+                                .map(|fix| fix.to_text_edit(&offset))
+                                .collect::<Vec<TextEdit>>(),
+                        )
+                        .unwrap(),
+                    ),
                 );
             }
         }
@@ -1210,7 +1411,37 @@ impl SpelValidator<'_> {
 }
 
 pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnostic>, LsError> {
-    let uri = params.text_document.uri;
+    return diagnose_uri(params.text_document.uri);
+}
+
+pub fn diagnose_all(
+    dir: &Path,
+    result: &mut HashMap<PathBuf, Vec<Diagnostic>>,
+) -> anyhow::Result<()> {
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            diagnose_all(&path, result)?;
+        } else {
+            let path = path.canonicalize()?;
+            let file = path.to_string_lossy().to_string();
+            let uri = Url::from_str(&format!("file://{}", file).as_str())
+                .expect("path should be a parsable uri");
+            let mut diagnostics = diagnose_uri(uri)?;
+            if !diagnostics.is_empty() {
+                diagnostics.sort_by(|a, b| match a.severity.cmp(&b.severity) {
+                    Ordering::Equal => a.r#type.cmp(&b.r#type),
+                    cmp => cmp,
+                });
+                result.insert(path, diagnostics);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn diagnose_uri(uri: Url) -> Result<Vec<Diagnostic>, LsError> {
     let document = match document_store::get(&uri) {
         Some(document) => Ok(document),
         None => document_store::Document::from_uri(&uri)

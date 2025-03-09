@@ -690,7 +690,7 @@ mod tests {
         let tokenizer = &mut Tokenizer::new();
         let root_object = Object::Name(Word {
             fragments: vec![WordFragment::String(StringLiteral {
-                content: "_someVariable".to_string(),
+                content: "_someVariable".into(),
                 location: Location::VariableLength {
                     char: 0,
                     line: 0,
@@ -732,7 +732,7 @@ mod tests {
         let tokenizer = &mut Tokenizer::new();
         let root_object = Object::Name(Word {
             fragments: vec![WordFragment::String(StringLiteral {
-                content: "_someVariable".to_string(),
+                content: "_someVariable".into(),
                 location: Location::VariableLength {
                     char: 0,
                     line: 0,

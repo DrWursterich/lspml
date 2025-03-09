@@ -9,7 +9,9 @@ use lsp_types::{
 use crate::{
     capabilities::CodeActionImplementation,
     document_store,
-    parser::{Attribute, Node, ParsedAttribute, ParsedHtml, ParsedTag, SpIf, SpelAttribute, SpmlTag},
+    parser::{
+        Attribute, Node, ParsedAttribute, ParsedHtml, ParsedTag, SpIf, SpelAttribute, SpmlTag,
+    },
     spel::ast::{
         Argument, Comparable, ComparissonOperator, Condition, Function, SpelAst, SpelResult,
     },
@@ -116,7 +118,10 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
         Some(Node::Tag(ParsedTag::Valid(SpmlTag::SpIf(tag)))) => tag,
         Some(Node::Tag(ParsedTag::Erroneous(SpmlTag::SpIf(tag), _))) => tag,
         Some(Node::Html(ParsedHtml::Valid(html))) => {
-            match document.tree.find_tag_in_attributes(html, params.range.start)  {
+            match document
+                .tree
+                .find_tag_in_attributes(html, params.range.start)
+            {
                 Some(ParsedTag::Valid(SpmlTag::SpIf(tag))) => tag,
                 Some(ParsedTag::Erroneous(SpmlTag::SpIf(tag), _)) => tag,
                 // TODO: find if in tag body
@@ -381,8 +386,10 @@ fn parse_is_null(root: &Condition) -> Option<(String, String)> {
     match root {
         Condition::Function(Function {
             name, arguments, ..
-        }) if arguments.len() == 1 && name == "isNull" => match &arguments[0].argument {
-            Argument::Object(interpolation) => Some((interpolation.content.to_string(), "true".to_string())),
+        }) if arguments.len() == 1 && &**name == "isNull" => match &arguments[0].argument {
+            Argument::Object(interpolation) => {
+                Some((interpolation.content.to_string(), "true".to_string()))
+            }
             argument => Some((argument.to_string(), "true".to_string())),
         },
         Condition::NegatedCondition { condition, .. } => {
@@ -396,7 +403,7 @@ fn is_null_argument(root: &Condition) -> Option<String> {
     match root {
         Condition::Function(Function {
             name, arguments, ..
-        }) if arguments.len() == 1 && name == "isNull" => match &arguments[0].argument {
+        }) if arguments.len() == 1 && &**name == "isNull" => match &arguments[0].argument {
             Argument::Object(interpolation) => Some(interpolation.content.to_string()),
             argument => Some(argument.to_string()),
         },
