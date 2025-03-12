@@ -699,7 +699,7 @@ pub struct Regex {
 mod tests {
     use std::sync::Arc;
 
-    use crate::spel::ast::{Interpolation, Location, Object, StringLiteral, Word, WordFragment};
+    use super::{Interpolation, Location, Object, StringLiteral, Word, WordFragment};
 
     #[test]
     fn test_format_interpolated_word() {

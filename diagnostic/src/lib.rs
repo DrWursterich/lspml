@@ -790,7 +790,7 @@ impl DiagnosticCollector {
                             Some(WordFragment::Interpolation(_)) | None => {
                                 modules::find_module_for_file(Path::new(self.file.path().as_str()))
                             }
-                            Some(WordFragment::String(StringLiteral { ref content, .. })) => {
+                            Some(WordFragment::String(StringLiteral { content, .. })) => {
                                 modules::find_module_by_name(&content)
                             }
                         };

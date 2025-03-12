@@ -1640,7 +1640,7 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::spel::ast::{
+    use crate::ast::{
         Anchor, Argument, Comparable, ComparissonOperator, Condition, ConditionAst,
         ConditionOperator, Expression, ExpressionAst, ExpressionOperator, Function,
         FunctionArgument, Interpolation, Location, Null, Number, Object, ObjectAst, Sign,

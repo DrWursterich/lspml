@@ -3972,8 +3972,8 @@ impl Tree {
     ) -> Option<&'a ParsedTag<SpmlTag>> {
         for attribute in &tag.attributes {
             let attribute = match attribute {
-                ParsedAttribute::Valid(ref attribute) => attribute,
-                ParsedAttribute::Erroneous(ref attribute, _) => attribute,
+                ParsedAttribute::Valid(attribute) => attribute,
+                ParsedAttribute::Erroneous(attribute, _) => attribute,
                 ParsedAttribute::Unparsable(_, _) => continue,
             };
             if let Some(value) = &attribute.value {
