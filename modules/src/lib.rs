@@ -13,8 +13,8 @@ use serde::Deserialize;
 pub(crate) struct ModuleMappings(HashMap<String, Module>);
 
 #[derive(Clone, Debug, Deserialize, Hash)]
-pub(crate) struct Module {
-    pub(crate) path: String,
+pub struct Module {
+    pub path: String,
 }
 
 impl Deref for ModuleMappings {
@@ -27,7 +27,7 @@ impl Deref for ModuleMappings {
 
 pub(crate) static MODULE_MAPPINGS: OnceLock<Arc<Mutex<ModuleMappings>>> = OnceLock::new();
 
-pub(crate) fn init_module_mappings_from_file(file: &str) -> Result<()> {
+pub fn init_module_mappings_from_file(file: &str) -> Result<()> {
     MODULE_MAPPINGS
         .set(Arc::new(Mutex::new(ModuleMappings(
             fs::read_to_string(&file)
@@ -46,7 +46,7 @@ pub(crate) fn init_module_mappings_from_file(file: &str) -> Result<()> {
     return Ok(());
 }
 
-pub(crate) fn init_empty_module_mappings() -> Result<()> {
+pub fn init_empty_module_mappings() -> Result<()> {
     MODULE_MAPPINGS
         .set(Arc::new(Mutex::new(ModuleMappings(HashMap::new()))))
         .map_err(|_| anyhow::anyhow!("could not initialize module mappings; mutex poisoned"))?;
@@ -57,7 +57,7 @@ pub(crate) fn init_empty_module_mappings() -> Result<()> {
     return Ok(());
 }
 
-pub(crate) fn all_modules<'a>() -> Vec<(String, Module)> {
+pub fn all_modules<'a>() -> Vec<(String, Module)> {
     return MODULE_MAPPINGS
         .get()
         .expect("module mappings not initialized")
@@ -68,7 +68,7 @@ pub(crate) fn all_modules<'a>() -> Vec<(String, Module)> {
         .collect();
 }
 
-pub(crate) fn find_module_by_name(module: &str) -> Option<Module> {
+pub fn find_module_by_name(module: &str) -> Option<Module> {
     return MODULE_MAPPINGS
         .get()
         .expect("module mappings not initialized")
@@ -78,7 +78,7 @@ pub(crate) fn find_module_by_name(module: &str) -> Option<Module> {
         .cloned();
 }
 
-pub(crate) fn find_module_for_file(file: &Path) -> Option<Module> {
+pub fn find_module_for_file(file: &Path) -> Option<Module> {
     return MODULE_MAPPINGS
         .get()
         .expect("module mappings not initialized")

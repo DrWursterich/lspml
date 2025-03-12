@@ -1,8 +1,8 @@
-pub(crate) mod ast;
-pub(crate) mod grammar;
-pub(crate) mod parser;
+pub mod ast;
+pub mod grammar;
+pub mod parser;
 
-pub(crate) struct Scanner {
+pub struct Scanner {
     cursor: usize,
     characters: Vec<char>,
 }

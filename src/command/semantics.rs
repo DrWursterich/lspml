@@ -4,23 +4,16 @@ use anyhow::Result;
 use lsp_server::ErrorCode;
 use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensParams};
 
-use crate::{
-    document_store,
-    grammar::AttributeRule,
-    parser::{
-        HtmlAttributeValueContent, HtmlAttributeValueFragment, HtmlNode, Node, ParsableTag,
-        ParsedAttribute, ParsedHtml, ParsedTag, SpmlTag, Tree,
-    },
-    spel::ast::{
-        Anchor, Argument, Comparable, Condition, Expression, Function, Identifier, Interpolation,
-        Location, Null, Number, Object, Query, Regex, SignedNumber, SpelAst, SpelResult,
-        StringLiteral, Uri, Word, WordFragment,
-    },
+use super::LsError;
+use grammar::AttributeRule;
+use parser::{
+    HtmlAttributeValueContent, HtmlAttributeValueFragment, HtmlNode, Node, ParsableTag,
+    ParsedAttribute, ParsedHtml, ParsedTag, SpmlTag, Tree,
 };
-
-use super::{
-    super::capabilities::{TOKEN_MODIFIERS, TOKEN_TYPES},
-    LsError,
+use spel::ast::{
+    Anchor, Argument, Comparable, Condition, Expression, Function, Identifier, Interpolation,
+    Location, Null, Number, Object, Query, Regex, SignedNumber, SpelAst, SpelResult, StringLiteral,
+    Uri, Word, WordFragment,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -81,7 +74,7 @@ impl Tokenizer {
             char,
             line,
             length,
-            token_type: TOKEN_TYPES
+            token_type: capabilities::TOKEN_TYPES
                 .iter()
                 .enumerate()
                 .find_map(|(index, token_type)| match token_type == r#type {
@@ -89,7 +82,7 @@ impl Tokenizer {
                     false => None,
                 })
                 .expect(&format!("no token type \"{}\" found", r#type.as_str())),
-            token_modifiers_bitset: TOKEN_MODIFIERS
+            token_modifiers_bitset: capabilities::TOKEN_MODIFIERS
                 .iter()
                 .enumerate()
                 .filter_map(|(index, modifier)| match modifiers.contains(modifier) {
@@ -679,11 +672,8 @@ fn index_interpolation(interpolation: &Interpolation, token_collector: &mut Spel
 mod tests {
     use lsp_types::{SemanticToken, SemanticTokenType};
 
-    use crate::{
-        capabilities::TOKEN_TYPES,
-        command::semantics::{SpelTokenCollector, Tokenizer},
-        spel::ast::{Location, Object, StringLiteral, Word, WordFragment},
-    };
+    use super::{SpelTokenCollector, Tokenizer};
+    use spel::ast::{Location, Object, StringLiteral, Word, WordFragment};
 
     #[test]
     fn test_index_single_object() {
@@ -712,7 +702,7 @@ mod tests {
                 delta_start: 14,
                 delta_line: 8,
                 length: 13,
-                token_type: TOKEN_TYPES
+                token_type: capabilities::TOKEN_TYPES
                     .iter()
                     .enumerate()
                     .find_map(|(index, token_type)| {
@@ -763,7 +753,7 @@ mod tests {
                     delta_start: 14,
                     delta_line: 8,
                     length: 13,
-                    token_type: TOKEN_TYPES
+                    token_type: capabilities::TOKEN_TYPES
                         .iter()
                         .enumerate()
                         .find_map(|(index, token_type)| {
@@ -779,7 +769,7 @@ mod tests {
                     delta_start: 14,
                     delta_line: 1,
                     length: 13,
-                    token_type: TOKEN_TYPES
+                    token_type: capabilities::TOKEN_TYPES
                         .iter()
                         .enumerate()
                         .find_map(|(index, token_type)| {
@@ -808,7 +798,7 @@ mod tests {
                     delta_start: 0,
                     delta_line: 0,
                     length: 3,
-                    token_type: TOKEN_TYPES
+                    token_type: capabilities::TOKEN_TYPES
                         .iter()
                         .enumerate()
                         .find_map(|(index, token_type)| {
@@ -824,7 +814,7 @@ mod tests {
                     delta_start: 4,
                     delta_line: 0,
                     length: 9,
-                    token_type: TOKEN_TYPES
+                    token_type: capabilities::TOKEN_TYPES
                         .iter()
                         .enumerate()
                         .find_map(|(index, token_type)| {
@@ -840,7 +830,7 @@ mod tests {
                     delta_start: 10,
                     delta_line: 0,
                     length: 3,
-                    token_type: TOKEN_TYPES
+                    token_type: capabilities::TOKEN_TYPES
                         .iter()
                         .enumerate()
                         .find_map(|(index, token_type)| {

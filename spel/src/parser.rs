@@ -16,7 +16,7 @@ use super::{
 };
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum SyntaxFix {
+pub enum SyntaxFix {
     Insert(Position, String),
     Delete(Location),
     Replace(Location, String),
@@ -25,7 +25,7 @@ pub(crate) enum SyntaxFix {
 const ADDITIONAL_CHARS_IN_ANCHOR: [char; 1] = ['.'];
 
 impl SyntaxFix {
-    pub(crate) fn to_text_edit(&self, offset: &Position) -> TextEdit {
+    pub fn to_text_edit(&self, offset: &Position) -> TextEdit {
         return match self {
             SyntaxFix::Insert(position, text) => {
                 let position = Position {
@@ -79,9 +79,9 @@ impl SyntaxFix {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct SyntaxError {
-    pub(crate) message: Box<str>,
-    pub(crate) proposed_fixes: Vec<SyntaxFix>,
+pub struct SyntaxError {
+    pub message: Box<str>,
+    pub proposed_fixes: Vec<SyntaxFix>,
 }
 
 impl Display for SyntaxError {
@@ -117,18 +117,18 @@ macro_rules! syntax_error {
     };
 }
 
-pub(crate) struct Parser {
+pub struct Parser {
     scanner: Scanner,
 }
 
 impl Parser {
-    pub(crate) fn new(string: &str) -> Self {
+    pub fn new(string: &str) -> Self {
         return Self {
             scanner: Scanner::new(string),
         };
     }
 
-    pub(crate) fn parse_object_ast(&mut self) -> Result<ObjectAst, SyntaxError> {
+    pub fn parse_object_ast(&mut self) -> Result<ObjectAst, SyntaxError> {
         self.scanner.skip_whitespace();
         if self.scanner.is_done() {
             return Err(syntax_error!("string is empty"));
@@ -141,7 +141,7 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_expression_ast(&mut self) -> Result<ExpressionAst, SyntaxError> {
+    pub fn parse_expression_ast(&mut self) -> Result<ExpressionAst, SyntaxError> {
         self.scanner.skip_whitespace();
         if self.scanner.is_done() {
             return Err(syntax_error!("string is empty"));
@@ -154,7 +154,7 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_condition_ast(&mut self) -> Result<ConditionAst, SyntaxError> {
+    pub fn parse_condition_ast(&mut self) -> Result<ConditionAst, SyntaxError> {
         self.scanner.skip_whitespace();
         if self.scanner.is_done() {
             return Err(syntax_error!("string is empty"));
@@ -167,7 +167,7 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_text(&mut self) -> Result<Word, SyntaxError> {
+    pub fn parse_text(&mut self) -> Result<Word, SyntaxError> {
         let mut string = String::new();
         let mut fragments = Vec::new();
         let mut start = self.scanner.cursor as u16;
@@ -211,7 +211,7 @@ impl Parser {
         return Ok(Word { fragments });
     }
 
-    pub(crate) fn parse_uri(&mut self) -> Result<Uri, SyntaxError> {
+    pub fn parse_uri(&mut self) -> Result<Uri, SyntaxError> {
         let mut fragments = Vec::new();
         self.scanner.skip_whitespace();
         loop {
@@ -262,7 +262,7 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_regex(&mut self) -> Result<Regex, SyntaxError> {
+    pub fn parse_regex(&mut self) -> Result<Regex, SyntaxError> {
         if self.scanner.is_done() {
             return Err(syntax_error!("string is empty"));
         }
@@ -292,7 +292,7 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_query(&mut self) -> Result<Query, SyntaxError> {
+    pub fn parse_query(&mut self) -> Result<Query, SyntaxError> {
         if self.scanner.is_done() {
             return Err(syntax_error!("string is empty"));
         }
@@ -318,7 +318,7 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_identifier(&mut self) -> Result<Identifier, SyntaxError> {
+    pub fn parse_identifier(&mut self) -> Result<Identifier, SyntaxError> {
         self.scanner.skip_whitespace();
         if self.scanner.is_done() {
             return Err(syntax_error!("string is empty"));
@@ -720,7 +720,7 @@ impl Parser {
         return self.resolve_comparable(comparable);
     }
 
-    pub(crate) fn parse_comparable(&mut self) -> Result<Comparable, SyntaxError> {
+    pub fn parse_comparable(&mut self) -> Result<Comparable, SyntaxError> {
         return Ok(match self.scanner.peek() {
             Some('\'') => Comparable::String(self.parse_string()?),
             Some('$') => {

@@ -1,21 +1,16 @@
 use lsp_server::ErrorCode;
 use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse, Position, Range, Uri as Url};
 use std::{cmp::Ordering, iter, path::Path};
-use tree_sitter::Point;
 
-use crate::{
-    document_store::{self, Document},
-    grammar::{TagAttributeType, TagAttributes},
-    modules,
-    parser::{
-        AttributeValue, HtmlAttributeValueContent, HtmlAttributeValueFragment, HtmlNode, Node,
-        ParsableTag, ParsedAttribute, ParsedHtml, ParsedTag, SpelAttribute, SpelAttributeValue,
-        SpmlTag,
-    },
-    spel::ast::{
-        Argument, Comparable, Condition, Expression, Function, Identifier, Location, Object, Query,
-        Regex, SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment,
-    },
+use grammar::{TagAttributeType, TagAttributes};
+use parser::{
+    AttributeValue, HtmlAttributeValueContent, HtmlAttributeValueFragment, HtmlNode, Node,
+    ParsableTag, ParsedAttribute, ParsedHtml, ParsedTag, SpelAttribute, SpelAttributeValue,
+    SpmlTag,
+};
+use spel::ast::{
+    Argument, Comparable, Condition, Expression, Function, Identifier, Location, Object, Query,
+    Regex, SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment,
 };
 
 use super::LsError;
@@ -23,7 +18,7 @@ use super::LsError;
 type Variable = String;
 
 struct DefinitionsFinder<'a> {
-    document: &'a Document,
+    document: &'a document_store::Document,
     uri: &'a Url,
     variable: Variable,
     upper_bound: Position,
@@ -33,7 +28,7 @@ struct DefinitionsFinder<'a> {
 impl DefinitionsFinder<'_> {
     fn find(
         upper_bound: Position,
-        document: &Document,
+        document: &document_store::Document,
         uri: &Url,
         variable: Variable,
     ) -> Vec<lsp_types::Location> {
@@ -185,9 +180,9 @@ pub(crate) fn definition(
         if !attribute.value.is_inside(&cursor) {
             continue;
         }
-        let offset = Point {
-            row: attribute.value.opening_quote_location.line + 1,
-            column: attribute.value.opening_quote_location.char,
+        let offset = Position {
+            line: (attribute.value.opening_quote_location.line + 1) as u32,
+            character: attribute.value.opening_quote_location.char as u32,
         };
         let node = match &attribute.value.spel {
             SpelAst::Comparable(SpelResult::Valid(comparable)) => {
@@ -306,7 +301,7 @@ fn tags_in_attributes(html: &HtmlNode) -> Box<dyn Iterator<Item = SpmlTag> + '_>
 fn find_node_in_identifier(
     identifier: &Identifier,
     cursor: &Position,
-    offset: &Point,
+    offset: &Position,
 ) -> Option<Variable> {
     match identifier {
         // TODO
@@ -345,7 +340,7 @@ fn find_node_in_identifier(
 fn find_node_in_comparable(
     comparable: &Comparable,
     cursor: &Position,
-    offset: &Point,
+    offset: &Position,
 ) -> Option<Variable> {
     return match comparable {
         Comparable::Condition(condition) => find_node_in_condition(condition, cursor, offset),
@@ -362,7 +357,7 @@ fn find_node_in_comparable(
 fn find_node_in_condition(
     condition: &Condition,
     cursor: &Position,
-    offset: &Point,
+    offset: &Position,
 ) -> Option<Variable> {
     return match condition {
         Condition::Object(interpolation) => {
@@ -402,7 +397,7 @@ fn find_node_in_condition(
 fn find_node_in_expression(
     expression: &Expression,
     cursor: &Position,
-    offset: &Point,
+    offset: &Position,
 ) -> Option<Variable> {
     return match expression {
         // Expression::Number(_) => todo!(),
@@ -447,7 +442,7 @@ fn find_node_in_expression(
     };
 }
 
-fn find_node_in_object(object: &Object, cursor: &Position, offset: &Point) -> Option<Variable> {
+fn find_node_in_object(object: &Object, cursor: &Position, offset: &Position) -> Option<Variable> {
     return match object {
         // Object::Anchor(_) => todo!(),
         Object::Function(function) => find_node_in_global_function(function, cursor, offset),
@@ -518,7 +513,7 @@ fn find_node_in_object(object: &Object, cursor: &Position, offset: &Point) -> Op
 fn find_node_in_global_function(
     function: &Function,
     cursor: &Position,
-    offset: &Point,
+    offset: &Position,
 ) -> Option<Variable> {
     return match compare_cursor_to_location(&function.opening_bracket_location, cursor, offset) {
         Ordering::Less => None,
@@ -552,17 +547,17 @@ fn find_node_in_global_function(
     };
 }
 
-fn find_node_in_query(_query: &Query, _cursor: &Position, _offset: &Point) -> Option<Variable> {
+fn find_node_in_query(_query: &Query, _cursor: &Position, _offset: &Position) -> Option<Variable> {
     // TODO
     return None;
 }
 
-fn find_node_in_regex(_regex: &Regex, _cursor: &Position, _offset: &Point) -> Option<Variable> {
+fn find_node_in_regex(_regex: &Regex, _cursor: &Position, _offset: &Position) -> Option<Variable> {
     // TODO
     return None;
 }
 
-fn find_node_in_text(text: &Word, cursor: &Position, offset: &Point) -> Option<Variable> {
+fn find_node_in_text(text: &Word, cursor: &Position, offset: &Position) -> Option<Variable> {
     match text.fragments.len() {
         1 => match &text.fragments[0] {
             WordFragment::String(_) => {
@@ -589,19 +584,23 @@ fn find_node_in_text(text: &Word, cursor: &Position, offset: &Point) -> Option<V
     return None;
 }
 
-fn find_node_in_uri(_uri: &Uri, _cursor: &Position, _offset: &Point) -> Option<Variable> {
+fn find_node_in_uri(_uri: &Uri, _cursor: &Position, _offset: &Position) -> Option<Variable> {
     // TODO
     return None;
 }
 
 // TODO: only respects single line spels
-fn compare_cursor_to_location(location: &Location, cursor: &Position, offset: &Point) -> Ordering {
-    let cursor = cursor.character as usize - offset.column;
-    let start = location.char() as usize;
+fn compare_cursor_to_location(
+    location: &Location,
+    cursor: &Position,
+    offset: &Position,
+) -> Ordering {
+    let cursor = cursor.character - offset.character;
+    let start = location.char() as u32;
     if start > cursor {
         return Ordering::Less;
     }
-    if location.len() as usize + start < cursor {
+    if location.len() as u32 + start < cursor {
         return Ordering::Greater;
     }
     return Ordering::Equal;

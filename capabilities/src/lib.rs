@@ -9,7 +9,7 @@ use lsp_types::{
     TextDocumentSyncKind, WorkDoneProgressOptions,
 };
 
-pub(crate) const TOKEN_TYPES: &'static [SemanticTokenType] = &[
+pub const TOKEN_TYPES: &'static [SemanticTokenType] = &[
     SemanticTokenType::ENUM,
     SemanticTokenType::ENUM_MEMBER,
     SemanticTokenType::FUNCTION,
@@ -24,7 +24,7 @@ pub(crate) const TOKEN_TYPES: &'static [SemanticTokenType] = &[
     SemanticTokenType::VARIABLE,
 ];
 
-pub(crate) const TOKEN_MODIFIERS: &'static [SemanticTokenModifier] = &[
+pub const TOKEN_MODIFIERS: &'static [SemanticTokenModifier] = &[
     SemanticTokenModifier::DECLARATION,
     SemanticTokenModifier::DEFINITION,
     SemanticTokenModifier::DEPRECATED,
@@ -32,7 +32,7 @@ pub(crate) const TOKEN_MODIFIERS: &'static [SemanticTokenModifier] = &[
     SemanticTokenModifier::MODIFICATION,
 ];
 
-pub(crate) enum CodeActionImplementation {
+pub enum CodeActionImplementation {
     GenerateDefaultHeaders,
     NameToCondition,
     ConditionToName,
@@ -42,10 +42,10 @@ pub(crate) enum CodeActionImplementation {
 }
 
 impl CodeActionImplementation {
-    pub(crate) const GENERATE_DEFAULT_HEADER_CODE: NumberOrString = NumberOrString::Number(7126);
-    pub(crate) const FIX_SPEL_SYNTAX_CODE: NumberOrString = NumberOrString::Number(7127);
-    pub(crate) const REMOVE_SUPERFLUOUS_CODE: NumberOrString = NumberOrString::Number(7128);
-    pub(crate) const ADD_MISSING_CODE: NumberOrString = NumberOrString::Number(7129);
+    pub const GENERATE_DEFAULT_HEADER_CODE: NumberOrString = NumberOrString::Number(7126);
+    pub const FIX_SPEL_SYNTAX_CODE: NumberOrString = NumberOrString::Number(7127);
+    pub const REMOVE_SUPERFLUOUS_CODE: NumberOrString = NumberOrString::Number(7128);
+    pub const ADD_MISSING_CODE: NumberOrString = NumberOrString::Number(7129);
 
     pub(crate) fn kinds() -> Vec<CodeActionKind> {
         return vec![
@@ -59,7 +59,7 @@ impl CodeActionImplementation {
         ];
     }
 
-    pub(crate) fn to_kind(&self) -> CodeActionKind {
+    pub fn to_kind(&self) -> CodeActionKind {
         return CodeActionKind::new(match self {
             CodeActionImplementation::GenerateDefaultHeaders => "refactor.generate_default_headers",
             CodeActionImplementation::NameToCondition => "refactor.name_to_condition",
@@ -84,7 +84,7 @@ impl Display for CodeActionImplementation {
     }
 }
 
-pub(crate) fn create() -> ServerCapabilities {
+pub fn create() -> ServerCapabilities {
     return ServerCapabilities {
         definition_provider: Some(OneOf::Left(true)),
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),

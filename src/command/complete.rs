@@ -7,16 +7,14 @@ use lsp_types::{
     MarkupContent, MarkupKind, Position, Range, TextDocumentPositionParams, TextEdit, Uri as Url,
 };
 
-use crate::{
-    document_store::{self, Document},
-    grammar::{self, TagAttribute, TagAttributeType, TagAttributes, TagChildren, TagDefinition},
-    modules::{self, Module},
-    parser::{
-        AttributeValue, ErrorNode, Node, ParsableTag, ParsedAttribute, ParsedTag, SpelAttribute,
-        SpelAttributeValue, SpmlTag, TagBody, TagError,
-    },
-    spel::ast::{SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment},
+use grammar::{
+    self, AttributeRule, TagAttribute, TagAttributeType, TagAttributes, TagChildren, TagDefinition,
 };
+use parser::{
+    AttributeValue, ErrorNode, Node, ParsableTag, ParsedAttribute, ParsedTag, SpelAttribute,
+    SpelAttributeValue, SpmlTag, TagBody, TagError,
+};
+use spel::ast::{SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment};
 
 use super::LsError;
 
@@ -24,14 +22,14 @@ use super::LsError;
 struct CompletionCollector<'a> {
     cursor: Position,
     file: &'a Url,
-    document: &'a Document,
+    document: &'a document_store::Document,
     completions: Vec<CompletionItem>,
 }
 
 impl CompletionCollector<'_> {
     fn new<'a>(
         params: &'a TextDocumentPositionParams,
-        document: &'a Document,
+        document: &'a document_store::Document,
     ) -> CompletionCollector<'a> {
         return CompletionCollector {
             cursor: params.position,
@@ -246,8 +244,8 @@ impl CompletionCollector<'_> {
                         for rule in tag.definition().attribute_rules {
                             let name = name.strip_suffix("_attribute").unwrap_or(name);
                             match rule {
-                                grammar::AttributeRule::ValueOneOf(attribute_name, values)
-                                | grammar::AttributeRule::ValueOneOfCaseInsensitive(
+                                AttributeRule::ValueOneOf(attribute_name, values)
+                                | AttributeRule::ValueOneOfCaseInsensitive(
                                     attribute_name,
                                     values,
                                 ) if attribute_name == &name => {
@@ -326,7 +324,7 @@ impl CompletionCollector<'_> {
         return true;
     }
 
-    fn complete_uri(&mut self, uri: &Uri, module: &Module) -> Result<()> {
+    fn complete_uri(&mut self, uri: &Uri, module: &modules::Module) -> Result<()> {
         let path = uri.to_string();
         for entry in fs::read_dir(module.path.clone() + path.as_str())? {
             let entry = entry?;
@@ -414,8 +412,6 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
 //         TextDocumentPositionParams, Uri as Url, WorkDoneProgressParams,
 //     };
 
-//     use crate::document_store::Document;
-
 //     use super::CompletionCollector;
 
 //     #[test]
@@ -444,7 +440,7 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
 //             context: None,
 //         };
 
-//         let document = Document::new(document_content.to_string()).unwrap();
+//         let document = document_store::Document::new(document_content.to_string()).unwrap();
 //         let mut completion_collector =
 //             CompletionCollector::new(&params.text_document_position, &document);
 //         completion_collector.search_completions_in_document();

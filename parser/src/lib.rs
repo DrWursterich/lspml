@@ -1,19 +1,17 @@
 #![allow(non_snake_case)]
+#![feature(fn_traits)]
 
 use std::{cmp::Ordering, str::Utf8Error};
 
 use anyhow::Result;
 use lsp_types::{Position, Range};
-
-pub use derive::{DocumentNode, ParsableTag, Tag};
 use phf::phf_map;
 
-use crate::{
-    grammar::{TagAttributeType, TagDefinition},
-    spel::{
-        self,
-        ast::{SpelAst, SpelResult},
-    },
+use derive::{DocumentNode, ParsableTag, Tag};
+use grammar::{TagAttributeType, TagDefinition};
+use spel::{
+    self,
+    ast::{SpelAst, SpelResult},
 };
 
 static TAGS: phf::Map<
@@ -103,11 +101,11 @@ static TAGS: phf::Map<
     "spt_worklist_tag" => |parser| Ok(SptWorklist::parse(parser)?.map(SpmlTag::SptWorklist)),
 };
 
-pub(crate) trait DocumentNode {
+pub trait DocumentNode {
     fn range(&self) -> Range;
 }
 
-pub(crate) trait ParsableTag {
+pub trait ParsableTag {
     // TODO: eh?
     fn parse(parser: &mut TreeParser) -> Result<ParsedTag<Self>>
     where
@@ -128,13 +126,13 @@ pub(crate) trait ParsableTag {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Tree {
-    pub(crate) header: Header,
-    pub(crate) nodes: Vec<Node>,
+pub struct Tree {
+    pub header: Header,
+    pub nodes: Vec<Node>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum ParsedHtml {
+pub enum ParsedHtml {
     Valid(HtmlNode),
     Erroneous(HtmlNode, Vec<TagError>),
     Unparsable(Box<str>, Location),
@@ -151,20 +149,20 @@ impl DocumentNode for ParsedHtml {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum ParsedNode<R, E> {
+pub enum ParsedNode<R, E> {
     Valid(R),
     Incomplete(E),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum ParsedLocation {
+pub enum ParsedLocation {
     Valid(Location),
     Erroneous(Location), // TODO: needs info about error
     Missing,
 }
 
 impl ParsedLocation {
-    pub(crate) fn location(&self) -> Option<&Location> {
+    pub fn location(&self) -> Option<&Location> {
         return match &self {
             ParsedLocation::Valid(location) => Some(location),
             ParsedLocation::Erroneous(location) => Some(location),
@@ -173,36 +171,36 @@ impl ParsedLocation {
     }
 }
 
-pub(crate) trait RangedNode {
+pub trait RangedNode {
     fn range(&self) -> Option<Range>;
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Header {
-    pub(crate) java_headers: Vec<ParsedNode<PageHeader, IncompletePageHeader>>,
-    pub(crate) taglib_imports: Vec<ParsedNode<TagLibImport, IncompleteTagLibImport>>,
+pub struct Header {
+    pub java_headers: Vec<ParsedNode<PageHeader, IncompletePageHeader>>,
+    pub taglib_imports: Vec<ParsedNode<TagLibImport, IncompleteTagLibImport>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct PageHeader {
-    pub(crate) open_bracket: SingleLineLocation,
-    pub(crate) page: SingleLineLocation,
-    pub(crate) language: Option<ParsedAttribute<PlainAttribute>>,
-    pub(crate) page_encoding: Option<ParsedAttribute<PlainAttribute>>,
-    pub(crate) content_type: Option<ParsedAttribute<PlainAttribute>>,
-    pub(crate) imports: Vec<ParsedAttribute<PlainAttribute>>,
-    pub(crate) close_bracket: SingleLineLocation,
+pub struct PageHeader {
+    pub open_bracket: SingleLineLocation,
+    pub page: SingleLineLocation,
+    pub language: Option<ParsedAttribute<PlainAttribute>>,
+    pub page_encoding: Option<ParsedAttribute<PlainAttribute>>,
+    pub content_type: Option<ParsedAttribute<PlainAttribute>>,
+    pub imports: Vec<ParsedAttribute<PlainAttribute>>,
+    pub close_bracket: SingleLineLocation,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct IncompletePageHeader {
-    pub(crate) open_bracket: ParsedLocation,
-    pub(crate) page: ParsedLocation,
-    pub(crate) language: Option<ParsedAttribute<PlainAttribute>>,
-    pub(crate) page_encoding: Option<ParsedAttribute<PlainAttribute>>,
-    pub(crate) content_type: Option<ParsedAttribute<PlainAttribute>>,
-    pub(crate) imports: Vec<ParsedAttribute<PlainAttribute>>,
-    pub(crate) close_bracket: ParsedLocation,
+pub struct IncompletePageHeader {
+    pub open_bracket: ParsedLocation,
+    pub page: ParsedLocation,
+    pub language: Option<ParsedAttribute<PlainAttribute>>,
+    pub page_encoding: Option<ParsedAttribute<PlainAttribute>>,
+    pub content_type: Option<ParsedAttribute<PlainAttribute>>,
+    pub imports: Vec<ParsedAttribute<PlainAttribute>>,
+    pub close_bracket: ParsedLocation,
 }
 
 impl RangedNode for IncompletePageHeader {
@@ -236,22 +234,22 @@ impl RangedNode for IncompletePageHeader {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct TagLibImport {
-    pub(crate) open_bracket: SingleLineLocation,
-    pub(crate) taglib: SingleLineLocation,
-    pub(crate) origin: TagLibOrigin,
-    pub(crate) prefix: ParsedAttribute<PlainAttribute>,
-    pub(crate) close_bracket: SingleLineLocation,
+pub struct TagLibImport {
+    pub open_bracket: SingleLineLocation,
+    pub taglib: SingleLineLocation,
+    pub origin: TagLibOrigin,
+    pub prefix: ParsedAttribute<PlainAttribute>,
+    pub close_bracket: SingleLineLocation,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct IncompleteTagLibImport {
-    pub(crate) open_bracket: ParsedLocation,
-    pub(crate) taglib: ParsedLocation,
-    pub(crate) origin: Option<TagLibOrigin>,
-    pub(crate) prefix: Option<ParsedAttribute<PlainAttribute>>,
-    pub(crate) close_bracket: ParsedLocation,
-    pub(crate) errors: Vec<ErrorNode>,
+pub struct IncompleteTagLibImport {
+    pub open_bracket: ParsedLocation,
+    pub taglib: ParsedLocation,
+    pub origin: Option<TagLibOrigin>,
+    pub prefix: Option<ParsedAttribute<PlainAttribute>>,
+    pub close_bracket: ParsedLocation,
+    pub errors: Vec<ErrorNode>,
 }
 
 impl RangedNode for IncompleteTagLibImport {
@@ -281,7 +279,7 @@ impl RangedNode for IncompleteTagLibImport {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum TagLibOrigin {
+pub enum TagLibOrigin {
     Uri(ParsedAttribute<PlainAttribute>),
     TagDir(ParsedAttribute<PlainAttribute>),
 }
@@ -303,13 +301,13 @@ impl TagLibOrigin {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct TagBody {
+pub struct TagBody {
     pub open_location: SingleLineLocation,
     pub nodes: Vec<Node>,
 }
 
 #[derive(Clone, Debug, PartialEq, DocumentNode)]
-pub(crate) enum Node {
+pub enum Node {
     Tag(ParsedTag<SpmlTag>),
     Html(ParsedHtml),
     Text(TextNode),
@@ -317,42 +315,42 @@ pub(crate) enum Node {
 }
 
 #[derive(Clone, Debug, PartialEq, DocumentNode)]
-pub(crate) struct HtmlNode {
-    pub(crate) open_location: SingleLineLocation,
-    pub(crate) name: Box<str>,
-    pub(crate) attributes: Vec<ParsedAttribute<HtmlAttribute>>,
-    pub(crate) body: Option<TagBody>,
-    pub(crate) close_location: SingleLineLocation,
+pub struct HtmlNode {
+    pub open_location: SingleLineLocation,
+    pub name: Box<str>,
+    pub attributes: Vec<ParsedAttribute<HtmlAttribute>>,
+    pub body: Option<TagBody>,
+    pub close_location: SingleLineLocation,
 }
 
 impl HtmlNode {
-    pub(crate) fn open_location(&self) -> &SingleLineLocation {
+    pub fn open_location(&self) -> &SingleLineLocation {
         return &self.open_location;
     }
 
-    pub(crate) fn close_location(&self) -> &SingleLineLocation {
+    pub fn close_location(&self) -> &SingleLineLocation {
         return &self.close_location;
     }
 
-    pub(crate) fn body(&self) -> &Option<TagBody> {
+    pub fn body(&self) -> &Option<TagBody> {
         return &self.body;
     }
 }
 
 #[derive(Clone, Debug, PartialEq, DocumentNode)]
-pub(crate) struct TextNode {
-    pub(crate) content: Box<str>,
-    pub(crate) range: Range,
+pub struct TextNode {
+    pub content: Box<str>,
+    pub range: Range,
 }
 
 #[derive(Clone, Debug, PartialEq, DocumentNode)]
-pub(crate) struct ErrorNode {
-    pub(crate) content: Box<str>,
-    pub(crate) range: Range,
+pub struct ErrorNode {
+    pub content: Box<str>,
+    pub range: Range,
 }
 
 #[derive(Clone, Debug, PartialEq, Tag, DocumentNode, ParsableTag)]
-pub(crate) enum SpmlTag {
+pub enum SpmlTag {
     SpArgument(SpArgument),
     SpAttribute(SpAttribute),
     SpBarcode(SpBarcode),
@@ -457,10 +455,10 @@ impl DepthCounter {
 macro_rules! tag_struct {
     (#[$definition:expr] $name:ident {}) => {
         #[derive(Clone, Debug, PartialEq, DocumentNode)]
-        pub(crate) struct $name {
-            pub(crate) open_location: SingleLineLocation,
-            pub(crate) body: Option<TagBody>,
-            pub(crate) close_location: SingleLineLocation,
+        pub struct $name {
+            pub open_location: SingleLineLocation,
+            pub body: Option<TagBody>,
+            pub close_location: SingleLineLocation,
         }
 
         impl Tag for $name {
@@ -708,11 +706,11 @@ macro_rules! tag_struct {
 
     (#[$definition:expr] $name:ident { $( $param:ident ),+ $(,)* }) => {
         #[derive(Clone, Debug, PartialEq, DocumentNode)]
-        pub(crate) struct $name {
-            pub(crate) open_location: SingleLineLocation,
-            $(pub(crate) $param: Option<ParsedAttribute<SpelAttribute>>,)+
-            pub(crate) body: Option<TagBody>,
-            pub(crate) close_location: SingleLineLocation,
+        pub struct $name {
+            pub open_location: SingleLineLocation,
+            $(pub $param: Option<ParsedAttribute<SpelAttribute>>,)+
+            pub body: Option<TagBody>,
+            pub close_location: SingleLineLocation,
         }
 
         impl Tag for $name {
@@ -1954,19 +1952,19 @@ tag_struct!(
     }
 );
 
-pub(crate) trait Tag {
+pub trait Tag {
     fn start(&self) -> Position;
 
     fn end(&self) -> Position;
 }
 
-pub(crate) trait Attribute {
+pub trait Attribute {
     fn start(&self) -> Position;
 
     fn end(&self) -> Position;
 }
 
-pub(crate) trait AttributeValue {
+pub trait AttributeValue {
     fn opening_quote_location(&self) -> &SingleLineLocation;
 
     fn closing_quote_location(&self) -> &SingleLineLocation;
@@ -2002,37 +2000,37 @@ pub(crate) trait AttributeValue {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct AttributeKey {
-    pub(crate) value: Box<str>,
-    pub(crate) location: SingleLineLocation,
+pub struct AttributeKey {
+    pub value: Box<str>,
+    pub location: SingleLineLocation,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct PlainAttribute {
-    pub(crate) key: AttributeKey,
-    pub(crate) value: PlainAttributeValue,
+pub struct PlainAttribute {
+    pub key: AttributeKey,
+    pub value: PlainAttributeValue,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct PlainAttributeValue {
-    pub(crate) equals_location: SingleLineLocation,
-    pub(crate) opening_quote_location: SingleLineLocation,
-    pub(crate) content: Box<str>,
-    pub(crate) closing_quote_location: SingleLineLocation,
+pub struct PlainAttributeValue {
+    pub equals_location: SingleLineLocation,
+    pub opening_quote_location: SingleLineLocation,
+    pub content: Box<str>,
+    pub closing_quote_location: SingleLineLocation,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct HtmlAttribute {
-    pub(crate) key: AttributeKey,
-    pub(crate) value: Option<HtmlAttributeValue>,
+pub struct HtmlAttribute {
+    pub key: AttributeKey,
+    pub value: Option<HtmlAttributeValue>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct HtmlAttributeValue {
-    pub(crate) equals_location: SingleLineLocation,
-    pub(crate) opening_quote_location: SingleLineLocation,
-    pub(crate) content: HtmlAttributeValueContent,
-    pub(crate) closing_quote_location: SingleLineLocation,
+pub struct HtmlAttributeValue {
+    pub equals_location: SingleLineLocation,
+    pub opening_quote_location: SingleLineLocation,
+    pub content: HtmlAttributeValueContent,
+    pub closing_quote_location: SingleLineLocation,
 }
 
 impl Attribute for HtmlAttribute {
@@ -2059,7 +2057,7 @@ impl AttributeValue for HtmlAttributeValue {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum HtmlAttributeValueContent {
+pub enum HtmlAttributeValueContent {
     Empty,
     Plain(Box<str>),
     Tag(ParsedTag<SpmlTag>),
@@ -2067,7 +2065,7 @@ pub(crate) enum HtmlAttributeValueContent {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum HtmlAttributeValueFragment {
+pub enum HtmlAttributeValueFragment {
     Plain(Box<str>),
     Tag(ParsedTag<SpmlTag>),
 }
@@ -2083,14 +2081,14 @@ impl AttributeValue for PlainAttributeValue {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum ParsedAttribute<A: Attribute> {
+pub enum ParsedAttribute<A: Attribute> {
     Valid(A),
     Erroneous(A, Vec<AttributeError>),
     Unparsable(Box<str>, Location),
 }
 
 impl<R: Attribute> ParsedAttribute<R> {
-    pub(crate) fn start(&self) -> Position {
+    pub fn start(&self) -> Position {
         return match &self {
             ParsedAttribute::Valid(attribute) => attribute.start(),
             ParsedAttribute::Erroneous(attribute, _) => attribute.start(),
@@ -2098,7 +2096,7 @@ impl<R: Attribute> ParsedAttribute<R> {
         };
     }
 
-    pub(crate) fn end(&self) -> Position {
+    pub fn end(&self) -> Position {
         return match &self {
             ParsedAttribute::Valid(attribute) => attribute.end(),
             ParsedAttribute::Erroneous(attribute, _) => attribute.end(),
@@ -2106,7 +2104,7 @@ impl<R: Attribute> ParsedAttribute<R> {
         };
     }
 
-    pub(crate) fn range(&self) -> Range {
+    pub fn range(&self) -> Range {
         return Range {
             start: self.start(),
             end: self.end(),
@@ -2115,12 +2113,12 @@ impl<R: Attribute> ParsedAttribute<R> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum AttributeError {
+pub enum AttributeError {
     Superfluous(Box<str>, Location),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum ParsedTag<A: Tag> {
+pub enum ParsedTag<A: Tag> {
     Valid(A),
     Erroneous(A, Vec<TagError>),
     Unparsable(Box<str>, Location),
@@ -2151,7 +2149,7 @@ impl<T: Tag> DocumentNode for ParsedTag<T> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum TagError {
+pub enum TagError {
     Superfluous(Box<str>, Location),
     Missing(Box<str>, Location),
 }
@@ -2167,9 +2165,9 @@ impl Attribute for PlainAttribute {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct SpelAttribute {
-    pub(crate) key: AttributeKey,
-    pub(crate) value: SpelAttributeValue,
+pub struct SpelAttribute {
+    pub key: AttributeKey,
+    pub value: SpelAttributeValue,
 }
 
 impl Attribute for SpelAttribute {
@@ -2183,11 +2181,11 @@ impl Attribute for SpelAttribute {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct SpelAttributeValue {
-    pub(crate) equals_location: SingleLineLocation,
-    pub(crate) opening_quote_location: SingleLineLocation,
-    pub(crate) spel: SpelAst,
-    pub(crate) closing_quote_location: SingleLineLocation,
+pub struct SpelAttributeValue {
+    pub equals_location: SingleLineLocation,
+    pub opening_quote_location: SingleLineLocation,
+    pub spel: SpelAst,
+    pub closing_quote_location: SingleLineLocation,
 }
 
 impl AttributeValue for SpelAttributeValue {
@@ -2201,49 +2199,49 @@ impl AttributeValue for SpelAttributeValue {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum Location {
+pub enum Location {
     SingleLine(SingleLineLocation),
     MultiLine(MultiLineLocation),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct SingleLineLocation {
-    pub(crate) char: usize,
-    pub(crate) line: usize,
-    pub(crate) length: usize,
+pub struct SingleLineLocation {
+    pub char: usize,
+    pub line: usize,
+    pub length: usize,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct MultiLineLocation {
-    pub(crate) start_char: usize,
-    pub(crate) start_line: usize,
-    pub(crate) end_char: usize,
-    pub(crate) end_line: usize,
+pub struct MultiLineLocation {
+    pub start_char: usize,
+    pub start_line: usize,
+    pub end_char: usize,
+    pub end_line: usize,
 }
 
 impl Location {
-    pub(crate) fn contains(&self, position: &Position) -> bool {
+    pub fn contains(&self, position: &Position) -> bool {
         return match &self {
             Location::SingleLine(location) => location.contains(position),
             Location::MultiLine(location) => location.contains(position),
         };
     }
 
-    pub(crate) fn start(&self) -> Position {
+    pub fn start(&self) -> Position {
         return match &self {
             Location::SingleLine(location) => location.start(),
             Location::MultiLine(location) => location.start(),
         };
     }
 
-    pub(crate) fn end(&self) -> Position {
+    pub fn end(&self) -> Position {
         return match &self {
             Location::SingleLine(location) => location.end(),
             Location::MultiLine(location) => location.end(),
         };
     }
 
-    pub(crate) fn range(&self) -> Range {
+    pub fn range(&self) -> Range {
         return match &self {
             Location::SingleLine(location) => location.range(),
             Location::MultiLine(location) => location.range(),
@@ -2252,31 +2250,31 @@ impl Location {
 }
 
 impl SingleLineLocation {
-    pub(crate) fn new(char: usize, line: usize, length: usize) -> Self {
+    pub fn new(char: usize, line: usize, length: usize) -> Self {
         return SingleLineLocation { char, line, length };
     }
 
-    pub(crate) fn contains(&self, position: &Position) -> bool {
+    pub fn contains(&self, position: &Position) -> bool {
         return self.line == position.line as usize
             && self.char <= position.character as usize
             && self.char + self.length > position.character as usize;
     }
 
-    pub(crate) fn start(&self) -> Position {
+    pub fn start(&self) -> Position {
         return Position {
             line: self.line as u32,
             character: self.char as u32,
         };
     }
 
-    pub(crate) fn end(&self) -> Position {
+    pub fn end(&self) -> Position {
         return Position {
             line: self.line as u32,
             character: (self.char + self.length) as u32,
         };
     }
 
-    pub(crate) fn range(&self) -> Range {
+    pub fn range(&self) -> Range {
         return Range {
             start: self.start(),
             end: self.end(),
@@ -2333,7 +2331,7 @@ impl MultiLineLocation {
     }
 }
 
-pub(crate) struct TreeParser<'tree> {
+pub struct TreeParser<'tree> {
     cursor: tree_sitter::TreeCursor<'tree>,
     text_bytes: &'tree [u8],
 }
@@ -3932,14 +3930,14 @@ fn range_from_points(start: tree_sitter::Point, end: tree_sitter::Point) -> Rang
 }
 
 impl Tree {
-    pub(crate) fn new(ts: tree_sitter::Tree, text: &String) -> Result<Self> {
+    pub fn new(ts: tree_sitter::Tree, text: &String) -> Result<Self> {
         let parser = &mut TreeParser::new(ts.walk(), &text);
         let header = parser.parse_header()?;
         let nodes = parser.parse_tags()?;
         return Ok(Tree { header, nodes });
     }
 
-    pub(crate) fn node_at<'a>(&'a self, position: Position) -> Option<&'a Node> {
+    pub fn node_at<'a>(&'a self, position: Position) -> Option<&'a Node> {
         let mut nodes = &self.nodes;
         let mut current = None;
         loop {
@@ -3967,7 +3965,7 @@ impl Tree {
         }
     }
 
-    pub(crate) fn find_tag_in_attributes<'a>(
+    pub fn find_tag_in_attributes<'a>(
         &self,
         tag: &'a HtmlNode,
         position: Position,
@@ -4024,7 +4022,7 @@ impl Tree {
         return None;
     }
 
-    pub(crate) fn parent_of(&self, node: &Node) -> Option<&Node> {
+    pub fn parent_of(&self, node: &Node) -> Option<&Node> {
         let position = node.range().start;
         let mut nodes = &self.nodes;
         let mut current = None;
@@ -4075,18 +4073,16 @@ fn find_node_at(nodes: &Vec<Node>, position: Position) -> Option<&Node> {
 mod tests {
     use std::sync::Arc;
 
-    use crate::{
-        parser::{
-            AttributeKey, AttributeParser, Header, HtmlAttribute, HtmlAttributeValue,
-            HtmlAttributeValueContent, HtmlNode, Location, Node, NodeMovement, PageHeader,
-            ParsedAttribute, ParsedHtml, ParsedNode, ParsedTag, PlainAttribute,
-            PlainAttributeValue, SingleLineLocation, SpBarcode, SpPrint, SpelAttribute,
-            SpelAttributeValue, SpmlTag, TagLibImport, TagLibOrigin,
-        },
-        spel::{
-            self,
-            ast::{Identifier, Object, SpelAst, SpelResult, StringLiteral, Word, WordFragment},
-        },
+    use super::{
+        AttributeKey, AttributeParser, Header, HtmlAttribute, HtmlAttributeValue,
+        HtmlAttributeValueContent, HtmlNode, Location, Node, NodeMovement, PageHeader,
+        ParsedAttribute, ParsedHtml, ParsedNode, ParsedTag, PlainAttribute, PlainAttributeValue,
+        SingleLineLocation, SpBarcode, SpPrint, SpelAttribute, SpelAttributeValue, SpmlTag,
+        TagLibImport, TagLibOrigin,
+    };
+    use spel::{
+        self,
+        ast::{Identifier, Object, SpelAst, SpelResult, StringLiteral, Word, WordFragment},
     };
 
     use super::{

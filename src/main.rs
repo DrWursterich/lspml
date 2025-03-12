@@ -1,15 +1,7 @@
-#![feature(fn_traits)]
-
-use std::{
-    collections::{BTreeMap, HashMap},
-    error::Error,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{error::Error, fs};
 
 use anyhow::Result;
 use clap::Parser;
-use command::diagnostic::{self, Diagnostic};
 use lsp_server::{Connection, Message};
 use lsp_types::{
     CancelParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
@@ -17,14 +9,7 @@ use lsp_types::{
 };
 use structured_logger::Builder;
 
-mod analyze;
-mod capabilities;
 mod command;
-mod document_store;
-mod grammar;
-mod modules;
-mod parser;
-mod spel;
 
 #[derive(Parser, Debug)]
 #[clap(name = "lspml")]
@@ -35,31 +20,6 @@ struct CommandLineOpts {
     log_level: String,
     #[clap(long)]
     modules_file: Option<String>,
-    #[command(subcommand)]
-    command: Option<Commands>,
-}
-
-#[derive(clap::Subcommand, Debug)]
-enum Commands {
-    Analyze {
-        #[clap(long)]
-        directory: String,
-        #[clap(long, default_value_t = analyze::Format::TEXT)]
-        format: analyze::Format,
-        #[clap(long)]
-        ignore: Option<Vec<diagnostic::Type>>,
-    },
-}
-
-struct NullLogWriter;
-
-impl structured_logger::Writer for NullLogWriter {
-    fn write_log(
-        &self,
-        _value: &BTreeMap<log::kv::Key, log::kv::Value>,
-    ) -> std::result::Result<(), std::io::Error> {
-        return Ok(());
-    }
 }
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
@@ -78,10 +38,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
                         .ok()
                 })
                 .map(|file| structured_logger::json::new_writer(file))
-                .unwrap_or_else(|| match opts.command {
-                    Some(_) => Box::new(NullLogWriter),
-                    None => structured_logger::json::new_writer(std::io::stderr()),
-                }),
+                .unwrap_or_else(|| structured_logger::json::new_writer(std::io::stderr())),
         )
         .init();
     log::info!("lspml starting...");
@@ -90,39 +47,6 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         Some(file) => modules::init_module_mappings_from_file(&file),
         None => modules::init_empty_module_mappings(),
     }?;
-
-    match opts.command {
-        Some(Commands::Analyze {
-            directory,
-            format,
-            ignore,
-        }) => {
-            let mut diagnostics: HashMap<PathBuf, Vec<command::diagnostic::Diagnostic>> =
-                HashMap::new();
-            let path = Path::new(&directory);
-            if !path.is_dir() {
-                return Err(anyhow::anyhow!("{} is not a directory", directory).into());
-            }
-            command::diagnostic::diagnose_all(&path, &mut diagnostics)?;
-            if let Some(ignore) = ignore {
-                diagnostics = diagnostics
-                    .into_iter()
-                    .filter_map(|(key, values)| {
-                        let values = values
-                            .into_iter()
-                            .filter(|d| !ignore.contains(&d.r#type))
-                            .collect::<Vec<Diagnostic>>();
-                        return match values.is_empty() {
-                            true => None,
-                            false => Some((key, values)),
-                        };
-                    })
-                    .collect();
-            }
-            return Ok(analyze::print(diagnostics, format)?);
-        }
-        None => (),
-    }
 
     let (connection, io_threads) = Connection::stdio();
     let server_capabilities = serde_json::to_value(capabilities::create())?;

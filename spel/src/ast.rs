@@ -8,7 +8,7 @@ use core::{
 use super::parser::SyntaxError;
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Identifier {
+pub enum Identifier {
     Name(Word),
     FieldAccess {
         identifier: Box<Identifier>,
@@ -29,7 +29,7 @@ impl Display for Identifier {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Object {
+pub enum Object {
     Anchor(Anchor),
     Function(Function),
     Name(Word),
@@ -69,12 +69,12 @@ impl Display for Object {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Function {
-    pub(crate) name: Arc<str>,
-    pub(crate) arguments: Vec<FunctionArgument>,
-    pub(crate) name_location: Location,
-    pub(crate) opening_bracket_location: Location,
-    pub(crate) closing_bracket_location: Location,
+pub struct Function {
+    pub name: Arc<str>,
+    pub arguments: Vec<FunctionArgument>,
+    pub name_location: Location,
+    pub opening_bracket_location: Location,
+    pub closing_bracket_location: Location,
 }
 
 impl Display for Function {
@@ -96,10 +96,10 @@ impl Display for Function {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Anchor {
-    pub(crate) name: Word,
-    pub(crate) opening_bracket_location: Location,
-    pub(crate) closing_bracket_location: Location,
+pub struct Anchor {
+    pub name: Word,
+    pub opening_bracket_location: Location,
+    pub closing_bracket_location: Location,
 }
 
 impl Display for Anchor {
@@ -109,9 +109,9 @@ impl Display for Anchor {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct FunctionArgument {
-    pub(crate) argument: Argument,
-    pub(crate) comma_location: Option<Location>,
+pub struct FunctionArgument {
+    pub argument: Argument,
+    pub comma_location: Option<Location>,
 }
 
 impl Display for FunctionArgument {
@@ -121,7 +121,7 @@ impl Display for FunctionArgument {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Argument {
+pub enum Argument {
     Anchor(Anchor),
     Function(Function),
     Null(Null),
@@ -150,8 +150,8 @@ impl Display for Argument {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Word {
-    pub(crate) fragments: Vec<WordFragment>,
+pub struct Word {
+    pub fragments: Vec<WordFragment>,
 }
 
 impl Display for Word {
@@ -164,7 +164,7 @@ impl Display for Word {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum WordFragment {
+pub enum WordFragment {
     String(StringLiteral),
     Interpolation(Interpolation),
 }
@@ -179,10 +179,10 @@ impl Display for WordFragment {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Interpolation {
-    pub(crate) content: Object,
-    pub(crate) opening_bracket_location: Location,
-    pub(crate) closing_bracket_location: Location,
+pub struct Interpolation {
+    pub content: Object,
+    pub opening_bracket_location: Location,
+    pub closing_bracket_location: Location,
 }
 
 impl Display for Interpolation {
@@ -192,9 +192,9 @@ impl Display for Interpolation {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct StringLiteral {
-    pub(crate) content: Arc<str>,
-    pub(crate) location: Location,
+pub struct StringLiteral {
+    pub content: Arc<str>,
+    pub location: Location,
 }
 
 impl Display for StringLiteral {
@@ -204,8 +204,8 @@ impl Display for StringLiteral {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Null {
-    pub(crate) location: Location,
+pub struct Null {
+    pub location: Location,
 }
 
 impl Display for Null {
@@ -215,7 +215,7 @@ impl Display for Null {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Expression {
+pub enum Expression {
     Function(Function),
     Null(Null),
     Number(Number),
@@ -275,9 +275,9 @@ impl Display for Expression {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Number {
-    pub(crate) content: Arc<str>,
-    pub(crate) location: Location,
+pub struct Number {
+    pub content: Arc<str>,
+    pub location: Location,
 }
 
 impl Display for Number {
@@ -287,10 +287,10 @@ impl Display for Number {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct SignedNumber {
-    pub(crate) sign: Sign,
-    pub(crate) sign_location: Location,
-    pub(crate) number: Number,
+pub struct SignedNumber {
+    pub sign: Sign,
+    pub sign_location: Location,
+    pub number: Number,
 }
 
 impl Display for SignedNumber {
@@ -301,7 +301,7 @@ impl Display for SignedNumber {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Sign {
+pub enum Sign {
     Plus,
     Minus,
 }
@@ -316,7 +316,7 @@ impl Display for Sign {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum ExpressionOperator {
+pub enum ExpressionOperator {
     Addition,
     Subtraction,
     Division,
@@ -363,7 +363,7 @@ impl PartialOrd for ExpressionOperator {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Condition {
+pub enum Condition {
     True {
         location: Location,
     },
@@ -396,7 +396,7 @@ pub(crate) enum Condition {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Comparable {
+pub enum Comparable {
     Condition(Condition),
     Expression(Expression),
     Function(Function),
@@ -419,7 +419,7 @@ impl Display for Comparable {
 }
 
 impl Comparable {
-    pub(crate) fn r#type(&self) -> &str {
+    pub fn r#type(&self) -> &str {
         match self {
             Comparable::Condition(_) => "condition",
             Comparable::Expression(_) => "expression",
@@ -457,7 +457,7 @@ impl Display for Condition {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum ConditionOperator {
+pub enum ConditionOperator {
     And,
     Or,
 }
@@ -472,7 +472,7 @@ impl Display for ConditionOperator {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum ComparissonOperator {
+pub enum ComparissonOperator {
     Equal,
     Unequal,
     GreaterThan,
@@ -496,7 +496,7 @@ impl Display for ComparissonOperator {
 
 // TODO: better name!
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum UndecidedExpressionContent {
+pub enum UndecidedExpressionContent {
     Condition(Condition),
     Expression(Expression),
     Function(Function),
@@ -519,7 +519,7 @@ impl Display for UndecidedExpressionContent {
 }
 
 impl UndecidedExpressionContent {
-    pub(crate) fn r#type(&self) -> &str {
+    pub fn r#type(&self) -> &str {
         return match self {
             UndecidedExpressionContent::Condition(_) => "condition",
             UndecidedExpressionContent::Expression(_) => "expression",
@@ -532,14 +532,14 @@ impl UndecidedExpressionContent {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Location {
+pub enum Location {
     SingleCharacter { char: u16, line: u16 },
     DoubleCharacter { char: u16, line: u16 },
     VariableLength { char: u16, line: u16, length: u16 },
 }
 
 impl Location {
-    pub(crate) fn char(&self) -> u16 {
+    pub fn char(&self) -> u16 {
         return match self {
             Location::SingleCharacter { char, .. }
             | Location::DoubleCharacter { char, .. }
@@ -547,7 +547,7 @@ impl Location {
         };
     }
 
-    pub(crate) fn line(&self) -> u16 {
+    pub fn line(&self) -> u16 {
         return match self {
             Location::SingleCharacter { line, .. }
             | Location::DoubleCharacter { line, .. }
@@ -555,7 +555,7 @@ impl Location {
         };
     }
 
-    pub(crate) fn len(&self) -> u16 {
+    pub fn len(&self) -> u16 {
         return match self {
             Location::SingleCharacter { .. } => 1 as u16,
             Location::DoubleCharacter { .. } => 2 as u16,
@@ -577,13 +577,13 @@ impl Display for Location {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum SpelResult<AST> {
+pub enum SpelResult<AST> {
     Valid(AST),
     Invalid(SyntaxError),
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum SpelAst {
+pub enum SpelAst {
     Comparable(SpelResult<Comparable>),
     Condition(SpelResult<Condition>),
     Expression(SpelResult<Expression>),
@@ -596,8 +596,8 @@ pub(crate) enum SpelAst {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct ObjectAst {
-    pub(crate) root: Object,
+pub struct ObjectAst {
+    pub root: Object,
 }
 
 impl ObjectAst {
@@ -607,8 +607,8 @@ impl ObjectAst {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct ExpressionAst {
-    pub(crate) root: Expression,
+pub struct ExpressionAst {
+    pub root: Expression,
 }
 
 impl ExpressionAst {
@@ -618,8 +618,8 @@ impl ExpressionAst {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct ConditionAst {
-    pub(crate) root: Condition,
+pub struct ConditionAst {
+    pub root: Condition,
 }
 
 impl ConditionAst {
@@ -629,7 +629,7 @@ impl ConditionAst {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Uri {
+pub enum Uri {
     Literal(UriLiteral),
     Object(Interpolation),
 }
@@ -644,9 +644,9 @@ impl Display for Uri {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct UriLiteral {
-    pub(crate) fragments: Vec<UriFragment>,
-    pub(crate) file_extension: Option<UriFileExtension>,
+pub struct UriLiteral {
+    pub fragments: Vec<UriFragment>,
+    pub file_extension: Option<UriFileExtension>,
 }
 
 impl Display for UriLiteral {
@@ -662,9 +662,9 @@ impl Display for UriLiteral {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct UriFragment {
-    pub(crate) slash_location: Location,
-    pub(crate) content: Word,
+pub struct UriFragment {
+    pub slash_location: Location,
+    pub content: Word,
 }
 
 impl Display for UriFragment {
@@ -674,9 +674,9 @@ impl Display for UriFragment {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct UriFileExtension {
-    pub(crate) dot_location: Location,
-    pub(crate) content: Word,
+pub struct UriFileExtension {
+    pub dot_location: Location,
+    pub content: Word,
 }
 
 impl Display for UriFileExtension {
@@ -686,13 +686,13 @@ impl Display for UriFileExtension {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Query {
-    pub(crate) location: Location,
+pub struct Query {
+    pub location: Location,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Regex {
-    pub(crate) location: Location,
+pub struct Regex {
+    pub location: Location,
 }
 
 #[cfg(test)]

@@ -1,15 +1,30 @@
 use std::{
     collections::HashMap,
+    error::Error,
     fmt::{Display, Formatter},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use anyhow::Result;
+use clap::Parser;
 use serde_json::json;
 
 use colored::Colorize;
 
-use crate::command::diagnostic::{Diagnostic, Severity};
+use diagnostic::{Diagnostic, Severity};
+
+#[derive(Parser, Debug)]
+#[clap(name = "lspml-analyze")]
+struct CommandLineOpts {
+    #[clap(long)]
+    modules_file: Option<String>,
+    #[clap(long, default_value_t = String::from("."))]
+    directory: String,
+    #[clap(long, default_value_t = Format::TEXT)]
+    format: Format,
+    #[clap(long)]
+    ignore: Option<Vec<diagnostic::Type>>,
+}
 
 #[derive(Clone, Debug, clap::ValueEnum)]
 pub enum Format {
@@ -24,6 +39,39 @@ impl Display for Format {
             Format::GITLAB => write!(f, "gitbal"),
         };
     }
+}
+
+fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
+    let opts = CommandLineOpts::parse();
+
+    match opts.modules_file {
+        Some(file) => modules::init_module_mappings_from_file(&file),
+        None => modules::init_empty_module_mappings(),
+    }?;
+
+    let mut diagnostics: HashMap<PathBuf, Vec<Diagnostic>> = HashMap::new();
+    let path = Path::new(&opts.directory);
+    if !path.is_dir() {
+        return Err(anyhow::anyhow!("{} is not a directory", opts.directory).into());
+    }
+    diagnostic::diagnose_all(&path, &mut diagnostics)?;
+    if let Some(ignore) = opts.ignore {
+        diagnostics = diagnostics
+            .into_iter()
+            .filter_map(|(key, values)| {
+                let values = values
+                    .into_iter()
+                    .filter(|d| !ignore.contains(&d.r#type))
+                    .collect::<Vec<Diagnostic>>();
+                return match values.is_empty() {
+                    true => None,
+                    false => Some((key, values)),
+                };
+            })
+            .collect();
+    }
+
+    return Ok(print(diagnostics, opts.format)?);
 }
 
 pub fn print(diagnostics: HashMap<PathBuf, Vec<Diagnostic>>, format: Format) -> Result<()> {

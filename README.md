@@ -91,18 +91,29 @@ The `modules-file` is a `json` file, in which module names can be mapped to loca
 }
 ```
 
+## install
+
+You can install the binaries without checking this project out via:
+
+```bash
+cargo +nightly install --git https://github.com/DrWursterich/lspml.git
+```
+
+Or if you have tinkered with it:
+
+```bash
+cargo +nightly install --path .
+```
+
 ## build
 
 ```bash
 cargo +nightly build --release
 ```
 
-You can find the `lspml` executable afterwards like so:
-```bash
-find . -name lspml -executable
-```
+This creates the executables `lspml` and `lspml-analyze` at `./target/release/` or `./target/debug/` if not using `--release`
 
-## install
+## use
 
 ### neovim
 

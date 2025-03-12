@@ -1,0 +1,16 @@
+[package]
+name = "parser"
+version = "0.0.2"
+edition = "2024"
+repository = "https://github.com/DrWursterich/lspml/parser"
+license = "MIT"
+
+[dependencies]
+anyhow = "1.0.79"
+derive = { path = "../derive" }
+grammar = { path = "../grammar" }
+log = "0.4.20"
+lsp-types = "0.97.0"
+phf = { version = "0.11.2", features = ["macros"] }
+spel = { path = "../spel" }
+tree-sitter = "0.23.0"

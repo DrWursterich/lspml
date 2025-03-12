@@ -9,35 +9,29 @@ use std::{
 };
 
 use anyhow::Result;
-use lsp_server::ErrorCode;
+use ::grammar::AttributeRule;
 use lsp_types::{
     CodeDescription, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticParams, NumberOrString,
     Position, Range, TextEdit, Uri as Url,
 };
 
-use crate::{
-    capabilities::CodeActionImplementation,
-    document_store,
-    grammar::AttributeRule,
-    modules,
-    parser::{
-        AttributeError, DocumentNode, ErrorNode, Header, HtmlAttributeValueContent,
-        HtmlAttributeValueFragment, HtmlNode, Node, ParsableTag, ParsedAttribute, ParsedHtml,
-        ParsedLocation, ParsedNode, ParsedTag, RangedNode, SpelAttribute, SpelAttributeValue,
-        SpmlTag, TagError, Tree,
+use capabilities::CodeActionImplementation;
+use modules;
+use parser::{
+    AttributeError, DocumentNode, ErrorNode, Header, HtmlAttributeValueContent,
+    HtmlAttributeValueFragment, HtmlNode, Node, ParsableTag, ParsedAttribute, ParsedHtml,
+    ParsedLocation, ParsedNode, ParsedTag, RangedNode, SpelAttribute, SpelAttributeValue, SpmlTag,
+    TagError, Tree,
+};
+use spel::{
+    ast::{
+        Argument, Comparable, Condition, Expression, Function, Identifier, Interpolation, Location,
+        Object, Query, Regex, SpelAst, SpelResult, StringLiteral, Uri, Word, WordFragment,
     },
-    spel::{
-        ast::{
-            Argument, Comparable, Condition, Expression, Function, Identifier, Interpolation,
-            Location, Object, Query, Regex, SpelAst, SpelResult, StringLiteral, Uri, Word,
-            WordFragment,
-        },
-        grammar::{self, ArgumentNumber},
-        parser::SyntaxError,
-    },
+    grammar::{self, ArgumentNumber},
+    parser::SyntaxError,
 };
 
-use super::LsError;
 
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct Diagnostic {
@@ -1219,7 +1213,7 @@ impl SpelValidator<'_> {
 
     fn validate_global_function(&mut self, function: &Function) -> Result<()> {
         let argument_count = function.arguments.len();
-        match grammar::Function::from_str(&*function.name) {
+        match grammar::FunctionDefinition::from_str(&*function.name) {
             Ok(definition) => match definition.argument_number {
                 ArgumentNumber::AtLeast(number) if argument_count < number => {
                     self.collector.add(DiagnosticBuilder::new_invalid_function(
@@ -1410,7 +1404,7 @@ impl SpelValidator<'_> {
     }
 }
 
-pub(crate) fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnostic>, LsError> {
+pub fn diagnostic(params: DocumentDiagnosticParams) -> Result<Vec<Diagnostic>> {
     return diagnose_uri(params.text_document.uri);
 }
 
@@ -1426,6 +1420,9 @@ pub fn diagnose_all(
         } else {
             let path = path.canonicalize()?;
             let file = path.to_string_lossy().to_string();
+            if !file.ends_with(".spml") {
+                continue;
+            }
             let uri = Url::from_str(&format!("file://{}", file).as_str())
                 .expect("path should be a parsable uri");
             let mut diagnostics = diagnose_uri(uri)?;
@@ -1441,25 +1438,16 @@ pub fn diagnose_all(
     Ok(())
 }
 
-fn diagnose_uri(uri: Url) -> Result<Vec<Diagnostic>, LsError> {
+fn diagnose_uri(uri: Url) -> Result<Vec<Diagnostic>> {
     let document = match document_store::get(&uri) {
         Some(document) => Ok(document),
         None => document_store::Document::from_uri(&uri)
             .map(|document| document_store::put(&uri, document))
-            .map_err(|err| {
-                log::error!("failed to read {:?}: {}", uri, err);
-                return LsError {
-                    message: format!("cannot read file {:?}", uri),
-                    code: ErrorCode::RequestFailed,
-                };
-            }),
+            .map_err(|err| anyhow::anyhow!("cannot read file {}: {}", uri.path(), err)),
     }?;
-    let mut collector = DiagnosticCollector::new(uri);
+    let mut collector = DiagnosticCollector::new(uri.clone());
     collector
         .validate_document(&document.tree)
-        .map_err(|err| LsError {
-            message: format!("failed to validate document: {}", err),
-            code: ErrorCode::RequestFailed,
-        })?;
+        .map_err(|err|  anyhow::anyhow!("failed to validate {}: {}", uri.path(), err))?;
     return Ok(collector.diagnostics);
 }

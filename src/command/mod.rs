@@ -8,7 +8,6 @@ use std::fmt;
 mod action;
 mod complete;
 mod definition;
-pub mod diagnostic;
 mod highlight;
 mod hover;
 mod semantics;
@@ -24,6 +23,15 @@ impl std::error::Error for LsError {}
 impl fmt::Display for LsError {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         return write!(formatter, "{:?}: {}", self.code, self.message);
+    }
+}
+
+impl From<Error> for LsError {
+    fn from(error: Error) -> Self {
+        return LsError {
+            message: error.to_string(),
+            code: ErrorCode::RequestFailed,
+        };
     }
 }
 
@@ -94,7 +102,7 @@ pub(crate) fn diagnostic(request: Request) -> Result<Message> {
                     .ok(),
                     error: None,
                 },
-                Err(err) => err.to_response(request.id),
+                Err(err) => LsError::from(err).to_response(request.id),
             })
         })
         .map_err(Error::from);

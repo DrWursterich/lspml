@@ -1,22 +1,33 @@
 [package]
 name = "lspml"
-version = "0.0.1"
-edition = "2021"
+version = "0.0.2"
+edition = "2024"
 repository = "https://github.com/DrWursterich/lspml"
 license = "MIT"
 
 [dependencies]
 anyhow = "1.0.79"
+capabilities = { path = "./capabilities" }
 clap = { version = "4.4.18", features = ["derive", "env", "wrap_help"] }
 colored = "3.0.0"
-derive = { path = "./derive" }
+diagnostic = { path = "./diagnostic" }
+document_store = { path = "./document_store" }
+grammar = { path = "./grammar" }
 log = "0.4.20"
 lsp-server = "0.7.6"
 lsp-types = "0.97.0"
-phf = { version = "0.11.2", features = ["macros"] }
-serde = "1.0.194"
-serde_json = "1.0.111"
+modules = { path = "./modules" }
+parser = { path = "./parser" }
+serde = { version = "1.0.214", features = ["derive"] }
+serde_json = "1.0.140"
+spel = { path = "./spel" }
 structured-logger = "1.0.3"
-tree-sitter = "0.23.0"
-tree-sitter-spml = { git = "https://github.com/DrWursterich/tree-sitter-spml.git" }
+
+[[bin]]
+name = "lspml"
+path = "src/main.rs"
+
+[[bin]]
+name = "lspml-analyze"
+path = "src/bin/analyze.rs"
 

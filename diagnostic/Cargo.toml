@@ -1,0 +1,19 @@
+[package]
+name = "diagnostic"
+version = "0.0.2"
+edition = "2024"
+repository = "https://github.com/DrWursterich/lspml/diagnostic"
+license = "MIT"
+
+[dependencies]
+anyhow = "1.0.79"
+capabilities = { path = "../capabilities" }
+clap = { version = "4.4.18", features = ["derive"] }
+document_store = { path = "../document_store" }
+grammar = { path = "../grammar" }
+log = "0.4.20"
+lsp-types = "0.97.0"
+modules = { path = "../modules" }
+parser = { path = "../parser" }
+serde_json = "1.0.140"
+spel = { path = "../spel" }

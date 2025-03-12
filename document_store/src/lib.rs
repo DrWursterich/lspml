@@ -9,16 +9,16 @@ use anyhow::{Error, Result};
 use lsp_types::Uri;
 use tree_sitter::Parser;
 
-use crate::parser::Tree;
+use parser::Tree;
 
 #[derive(Clone, Debug)]
-pub(crate) struct Document {
-    pub(crate) text: Box<str>,
-    pub(crate) tree: Tree,
+pub struct Document {
+    pub text: Box<str>,
+    pub tree: Tree,
 }
 
 impl Document {
-    pub(crate) fn new(text: String) -> Result<Document> {
+    pub fn new(text: String) -> Result<Document> {
         let mut parser = Parser::new();
         parser.set_language(&tree_sitter_spml::language())?;
         return match parser.parse(&text, None) {
@@ -30,7 +30,7 @@ impl Document {
         };
     }
 
-    pub(crate) fn from_uri(uri: &Uri) -> Result<Document> {
+    pub fn from_uri(uri: &Uri) -> Result<Document> {
         return match Path::new(uri.path().as_str()) {
             path if path.exists() => fs::read_to_string(path.to_owned())
                 .map(Document::new)
@@ -45,7 +45,7 @@ fn document_store() -> &'static Arc<Mutex<HashMap<Uri, Document>>> {
     return DOCUMENT_STORE.get_or_init(|| Arc::new(Mutex::new(HashMap::new())));
 }
 
-pub(crate) fn get(uri: &Uri) -> Option<Document> {
+pub fn get(uri: &Uri) -> Option<Document> {
     return document_store()
         .lock()
         .expect("document_store mutex poisoned")
@@ -53,7 +53,7 @@ pub(crate) fn get(uri: &Uri) -> Option<Document> {
         .cloned();
 }
 
-pub(crate) fn put(uri: &Uri, document: Document) -> Document {
+pub fn put(uri: &Uri, document: Document) -> Document {
     document_store()
         .lock()
         .expect("document_store mutex poisoned")

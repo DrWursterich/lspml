@@ -6,15 +6,12 @@ use lsp_types::{
     Uri, WorkspaceEdit,
 };
 
-use crate::{
-    capabilities::CodeActionImplementation,
-    document_store,
-    parser::{
-        Attribute, Node, ParsedAttribute, ParsedHtml, ParsedTag, SpIf, SpelAttribute, SpmlTag,
-    },
-    spel::ast::{
-        Argument, Comparable, ComparissonOperator, Condition, Function, SpelAst, SpelResult,
-    },
+use capabilities::CodeActionImplementation;
+use parser::{
+    Attribute, Node, ParsedAttribute, ParsedHtml, ParsedTag, SpIf, SpelAttribute, SpmlTag,
+};
+use spel::ast::{
+    Argument, Comparable, ComparissonOperator, Condition, Function, SpelAst, SpelResult,
 };
 
 use super::LsError;
@@ -377,7 +374,7 @@ fn construct_condition_to_name<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
                     }),
                     ..CodeAction::default()
                 })
-            })
+            });
         }
     }
 }

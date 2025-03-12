@@ -1,0 +1,9 @@
+[package]
+name = "capabilities"
+version = "0.0.2"
+edition = "2024"
+repository = "https://github.com/DrWursterich/lspml/capabilities"
+license = "MIT"
+
+[dependencies]
+lsp-types = "0.97.0"

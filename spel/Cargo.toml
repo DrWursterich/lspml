@@ -1,0 +1,10 @@
+[package]
+name = "spel"
+version = "0.0.2"
+edition = "2024"
+repository = "https://github.com/DrWursterich/lspml/spel"
+license = "MIT"
+
+[dependencies]
+anyhow = "1.0.79"
+lsp-types = "0.97.0"
