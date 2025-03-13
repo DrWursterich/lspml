@@ -44,10 +44,10 @@ A work-in-progress language server for the sitepark markup language (spml).
 
 ### static code analisis
 
-this project also contains the `analyze` command to invoke its diagnostic statically.
+this project also contains the `lspml-analyze` command to invoke its diagnostic statically.
 
 ```
-#$ lspml analyze --directory src/main/webapp/ --module-file module_mappings.json
+#$ lspml-analyze --directory src/main/webapp/ --module-file module_mappings.json
 src/main/webapp/templates/sectionTypes/bad.spml
 [CRITICAL] missing required attribute "name" (MISSING_VALUE) on line 10
 [ERROR]    included file "/functions/missing.spml" does not exist (MISSING_FILE) on line 24
@@ -59,24 +59,20 @@ src/main/webapp/templates/sectionTypes/veryBad.spml
 [CRITICAL] syntax error: unexpected ":" (SYNTAX_ERROR) on line 2
 ```
 
-When using the `gitlab` format for [code-quality](https://docs.gitlab.com/ci/testing/code_quality) `lspml analyze` has to be executed from the projects root directory such that the relative paths in the json output align. It may also be usefull to add `--ignore UNKNOWN_MODULE` to skip validation of dependencies.
+When using the `gitlab` format for [code-quality](https://docs.gitlab.com/ci/testing/code_quality) `lspml-analyze` has to be executed from the projects root directory such that the relative paths in the json output align. It may also be usefull to add `--ignore UNKNOWN_MODULE` to skip validation of dependencies.
 
 __disclaimer__: this functionallity will probably become a separate project/binary when it leaves the experimental state!
 
 ## commandline
 
 ```
-Usage: lspml [OPTIONS] [COMMAND]
-
-Commands:
-  analyze
-  help     Print this message or the help of the given subcommand(s)
+Usage: lspml [OPTIONS]
 
 Options:
       --log-file <LOG_FILE>
       --log-level <LOG_LEVEL>        [default: INFO]
       --modules-file <MODULES_FILE>
-  -h, --help                         Print help
+  -h, --help
 ```
 
 The `modules-file` is a `json` file, in which module names can be mapped to local repositories like so:
