@@ -8,8 +8,8 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::Result;
 use ::grammar::AttributeRule;
+use anyhow::Result;
 use lsp_types::{
     CodeDescription, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticParams, NumberOrString,
     Position, Range, TextEdit, Uri as Url,
@@ -19,9 +19,8 @@ use capabilities::CodeActionImplementation;
 use modules;
 use parser::{
     AttributeError, DocumentNode, ErrorNode, Header, HtmlAttributeValueContent,
-    HtmlAttributeValueFragment, HtmlNode, Node, ParsableTag, ParsedAttribute, ParsedHtml,
-    ParsedLocation, ParsedNode, ParsedTag, RangedNode, SpelAttribute, SpelAttributeValue, SpmlTag,
-    TagError, Tree,
+    HtmlAttributeValueFragment, HtmlNode, Node, ParsableTag, ParsedAttribute, ParsedHeader,
+    ParsedHtml, ParsedTag, SpelAttribute, SpelAttributeValue, SpmlTag, TagError, Tree,
 };
 use spel::{
     ast::{
@@ -31,7 +30,6 @@ use spel::{
     grammar::{self, ArgumentNumber},
     parser::SyntaxError,
 };
-
 
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct Diagnostic {
@@ -297,129 +295,59 @@ impl DiagnosticCollector {
         }
         for header in &header.java_headers {
             match header {
-                ParsedNode::Valid(_header) => (),
-                ParsedNode::Incomplete(header) => {
-                    if let Some(range) = header.range() {
-                        match &header.open_bracket {
-                            ParsedLocation::Valid(_) => (),
-                            ParsedLocation::Erroneous(location) => {
-                                self.add(DiagnosticBuilder::new_invalid_header(
-                                    "invalid java header opening bracket. should be '<%@'",
+                ParsedHeader::Valid(_) => (),
+                ParsedHeader::Erroneous(_, errors) => {
+                    for error in errors {
+                        self.add(match error {
+                            TagError::Superfluous(text, location) => {
+                                DiagnosticBuilder::new_superfluous_value(
+                                    format!("\"{}\" is superfluous", text),
                                     location.range(),
-                                ))
+                                )
                             }
-                            ParsedLocation::Missing => {
-                                self.add(DiagnosticBuilder::new_invalid_header(
-                                    "invalid java header: missing '<%@'",
-                                    range,
-                                ))
-                            }
-                        };
-                        match &header.page {
-                            ParsedLocation::Valid(_) => (),
-                            ParsedLocation::Erroneous(location) => {
-                                self.add(DiagnosticBuilder::new_invalid_header(
-                                    "invalid java header 'page'",
+                            TagError::Missing(text, location) => {
+                                DiagnosticBuilder::new_invalid_header(
+                                    format!("\"{}\" is missing", text),
                                     location.range(),
-                                ))
+                                )
                             }
-                            ParsedLocation::Missing => {
-                                self.add(DiagnosticBuilder::new_invalid_header(
-                                    "invalid java header: missing 'page'",
-                                    range,
-                                ))
-                            }
-                        };
-                        match &header.close_bracket {
-                            ParsedLocation::Valid(_) => (),
-                            ParsedLocation::Erroneous(location) => {
-                                self.add(DiagnosticBuilder::new_invalid_header(
-                                    "invalid java header closing bracket. should be '%>'",
-                                    location.range(),
-                                ))
-                            }
-                            ParsedLocation::Missing => {
-                                self.add(DiagnosticBuilder::new_invalid_header(
-                                    "java header is unclosed",
-                                    range,
-                                ))
-                            }
-                        }
+                        })
                     }
+                }
+                ParsedHeader::Unparsable(text, location) => {
+                    self.add(DiagnosticBuilder::new_invalid_header(
+                        format!("unexpected \"{}\"", text),
+                        location.range(),
+                    ))
                 }
             }
         }
         for header in &header.taglib_imports {
             match header {
-                ParsedNode::Valid(_header) => (),
-                ParsedNode::Incomplete(header) => {
-                    if let Some(range) = header.range() {
-                        match &header.open_bracket {
-                            ParsedLocation::Valid(_) => (),
-                            ParsedLocation::Erroneous(location) => {
-                                self.add(DiagnosticBuilder::new_invalid_header(
-                                    "invalid taglib header opening bracket. should be '<%@'",
+                ParsedHeader::Valid(_) => (),
+                ParsedHeader::Erroneous(_, errors) => {
+                    for error in errors {
+                        self.add(match error {
+                            TagError::Superfluous(text, location) => {
+                                DiagnosticBuilder::new_superfluous_value(
+                                    format!("\"{}\" is superfluous", text),
                                     location.range(),
-                                ))
+                                )
                             }
-                            ParsedLocation::Missing => {
-                                self.add(DiagnosticBuilder::new_invalid_header(
-                                    "invalid taglib header: missing '<%@'",
-                                    range,
-                                ))
-                            }
-                        };
-                        match &header.taglib {
-                            ParsedLocation::Valid(_) => (),
-                            ParsedLocation::Erroneous(location) => {
-                                self.add(DiagnosticBuilder::new_invalid_header(
-                                    "invalid taglib header 'taglib'",
+                            TagError::Missing(text, location) => {
+                                DiagnosticBuilder::new_invalid_header(
+                                    format!("\"{}\" is missing", text),
                                     location.range(),
-                                ))
+                                )
                             }
-                            ParsedLocation::Missing => {
-                                self.add(DiagnosticBuilder::new_invalid_header(
-                                    "invalid taglib header: missing 'taglib'",
-                                    range,
-                                ))
-                            }
-                        };
-                        match &header.origin {
-                            Some(_) => (),
-                            None => self.add(DiagnosticBuilder::new_invalid_header(
-                                "invalid taglib header: missing 'uri' or 'tagdir' attribute",
-                                range,
-                            )),
-                        };
-                        match &header.prefix {
-                            Some(_) => (),
-                            None => self.add(DiagnosticBuilder::new_invalid_header(
-                                "invalid taglib header: missing 'prefix' attribute",
-                                range,
-                            )),
-                        };
-                        match &header.close_bracket {
-                            ParsedLocation::Valid(_) => (),
-                            ParsedLocation::Erroneous(location) => {
-                                self.add(DiagnosticBuilder::new_invalid_header(
-                                    "invalid taglib header closing bracket. should be '%>'",
-                                    location.range(),
-                                ))
-                            }
-                            ParsedLocation::Missing => {
-                                self.add(DiagnosticBuilder::new_invalid_header(
-                                    "taglib header is unclosed",
-                                    range,
-                                ))
-                            }
-                        }
-                        for error in &header.errors {
-                            self.add(DiagnosticBuilder::new_invalid_header(
-                                format!("syntax error: unexpected \"{}\"", error.content),
-                                error.range,
-                            ))
-                        }
+                        })
                     }
+                }
+                ParsedHeader::Unparsable(text, location) => {
+                    self.add(DiagnosticBuilder::new_invalid_header(
+                        format!("unexpected \"{}\"", text),
+                        location.range(),
+                    ))
                 }
             }
         }
@@ -1448,6 +1376,6 @@ fn diagnose_uri(uri: Url) -> Result<Vec<Diagnostic>> {
     let mut collector = DiagnosticCollector::new(uri.clone());
     collector
         .validate_document(&document.tree)
-        .map_err(|err|  anyhow::anyhow!("failed to validate {}: {}", uri.path(), err))?;
+        .map_err(|err| anyhow::anyhow!("failed to validate {}: {}", uri.path(), err))?;
     return Ok(collector.diagnostics);
 }
