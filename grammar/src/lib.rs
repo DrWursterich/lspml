@@ -1837,7 +1837,7 @@ impl TagDefinition {
             ("value", TagAttributeType::String),
         rules &[
             AttributeRule::Required("name"),
-            AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
+            AttributeRule::OnlyOneOfOrBody(&["value", "fixvalue"]),
         ]
     );
 
@@ -1922,7 +1922,7 @@ impl TagDefinition {
     );
 }
 
-pub const TOP_LEVEL_TAGS: [TagDefinition; 78] = [
+pub const TOP_LEVEL_TAGS: [TagDefinition; 79] = [
     TagDefinition::SP_ATTRIBUTE,
     TagDefinition::SP_BARCODE,
     TagDefinition::SP_BREAK,
@@ -1991,6 +1991,7 @@ pub const TOP_LEVEL_TAGS: [TagDefinition; 78] = [
     TagDefinition::SPT_LINK,
     TagDefinition::SPT_NUMBER,
     TagDefinition::SPT_PERSONALIZATION,
+    TagDefinition::SPT_PHONENUMBER,
     TagDefinition::SPT_PREHTML,
     TagDefinition::SPT_SMARTEDITOR,
     TagDefinition::SPT_SPML,
