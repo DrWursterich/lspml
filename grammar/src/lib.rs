@@ -450,7 +450,7 @@ impl TagDefinition {
             ("lt", TagAttributeType::Comparable),
             ("lte", TagAttributeType::Comparable),
             ("match", TagAttributeType::Regex),
-            ("name", TagAttributeType::Identifier),
+            ("name", TagAttributeType::Object),
             ("neq", TagAttributeType::Comparable),
         rules &[
             AttributeRule::ExactlyOneOf(&["name", "condition"]),
@@ -1117,7 +1117,7 @@ impl TagDefinition {
         rules &[
             AttributeRule::Required("name"),
             AttributeRule::ExactlyOneOfOrBody(&["value", "expression", "condition", "object"]),
-            AttributeRule::OnlyWithEitherOrBody("default", &["object", "expression"]),
+            AttributeRule::OnlyWithEitherOrBody("default", &["value", "object", "expression"]),
             AttributeRule::OnlyOneOf(&["overwrite", "insert"]),
             AttributeRule::ValueOneOf("scope", &["page", "request", "session"]),
             AttributeRule::ValueOneOf("insert", &["replace", "append", "prepend"]),
@@ -1740,6 +1740,17 @@ impl TagDefinition {
         rules &[AttributeRule::ValueOneOf("mode", &["php"])]
     );
 
+    pub const SPT_PHONENUMBER: TagDefinition = tag_definition!(
+        type "spt",
+        name "phonenumber",
+        deprecated false,
+        children TagChildren::None,
+        attributes
+            ("name", TagAttributeType::Identifier),
+            ("size", TagAttributeType::Expression),
+        rules &[AttributeRule::Required("name")]
+    );
+
     pub const SPT_PREHTML: TagDefinition = tag_definition!(
         type "spt",
         name "prehtml",
@@ -2068,6 +2079,7 @@ impl FromStr for TagDefinition {
             "spt_link_tag" => Ok(TagDefinition::SPT_LINK),
             "spt_number_tag" => Ok(TagDefinition::SPT_NUMBER),
             "spt_personalization_tag" => Ok(TagDefinition::SPT_PERSONALIZATION),
+            "spt_phonenumber_tag" => Ok(TagDefinition::SPT_PHONENUMBER),
             "spt_prehtml_tag" => Ok(TagDefinition::SPT_PREHTML),
             "spt_smarteditor_tag" => Ok(TagDefinition::SPT_SMARTEDITOR),
             "spt_spml_tag" => Ok(TagDefinition::SPT_SPML),
