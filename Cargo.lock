@@ -880,7 +880,7 @@ checksum = "c4013970217383f67b18aef68f6fb2e8d409bc5755227092d32efb0422ba24b8"
 [[package]]
 name = "tree-sitter-spml"
 version = "0.0.1"
-source = "git+https://github.com/DrWursterich/tree-sitter-spml.git#bd13d7288c6733ee0f84e476bfdee03bd023d33c"
+source = "git+https://github.com/DrWursterich/tree-sitter-spml.git#8753d3527db4d8fc90356fddb06dc7d6d9431fc3"
 dependencies = [
  "cc",
  "tree-sitter",
