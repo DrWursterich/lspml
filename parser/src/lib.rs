@@ -88,7 +88,7 @@ static TAGS: phf::Map<
     "spt_iterator_tag" => |parser| Ok(SptIterator::parse(parser)?.map(SpmlTag::SptIterator)),
     "spt_link_tag" => |parser| Ok(SptLink::parse(parser)?.map(SpmlTag::SptLink)),
     "spt_number_tag" => |parser| Ok(SptNumber::parse(parser)?.map(SpmlTag::SptNumber)),
-    "spt_personalization_tag" => |parser| Ok(SptPersonalization::parse(parser)?.map(SpmlTag::SptPersonalization)),
+    "spt_phonenumber_tag" => |parser| Ok(SptPhonenumber::parse(parser)?.map(SpmlTag::SptPhonenumber)),
     "spt_prehtml_tag" => |parser| Ok(SptPrehtml::parse(parser)?.map(SpmlTag::SptPrehtml)),
     "spt_smarteditor_tag" => |parser| Ok(SptSmarteditor::parse(parser)?.map(SpmlTag::SptSmarteditor)),
     "spt_spml_tag" => |parser| Ok(SptSpml::parse(parser)?.map(SpmlTag::SptSpml)),
@@ -330,6 +330,7 @@ pub enum SpmlTag {
     SptLink(SptLink),
     SptNumber(SptNumber),
     SptPersonalization(SptPersonalization),
+    SptPhonenumber(SptPhonenumber),
     SptPrehtml(SptPrehtml),
     SptSmarteditor(SptSmarteditor),
     SptSpml(SptSpml),
@@ -1740,6 +1741,14 @@ tag_struct!(
         mode_attribute,
         name_attribute,
         publisher_attribute,
+    }
+);
+
+tag_struct!(
+    #[TagDefinition::SPT_PHONENUMBER]
+    SptPhonenumber {
+        name_attribute,
+        size_attribute,
     }
 );
 
