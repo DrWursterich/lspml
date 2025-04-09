@@ -490,6 +490,7 @@ dependencies = [
  "phf",
  "spel",
  "tree-sitter",
+ "tree-sitter-spml",
 ]
 
 [[package]]

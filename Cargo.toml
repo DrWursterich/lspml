@@ -1,3 +1,6 @@
+[workspace]
+default-members = [ "capabilities", "derive", "diagnostic", "document_store", "grammar", "modules", "parser", "spel" ]
+
 [package]
 name = "lspml"
 version = "0.0.2"
