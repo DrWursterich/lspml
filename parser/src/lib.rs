@@ -3281,7 +3281,10 @@ impl<'a> TreeParser<'a> {
                 "comment" | "xml_comment" | "html_doctype" | "java_tag" => (),
                 "text" | "xml_entity" => {
                     tags.push(self.parse_text().map(Node::Text)?);
-                    continue;
+                    let kind = self.cursor.node().kind();
+                    if kind == "text" || kind == "xml_entity" {
+                        break;
+                    }
                 }
                 "ERROR" => tags.push(self.parse_error().map(Node::Error)?),
                 "html_tag" | "script_tag" | "style_tag" => {
