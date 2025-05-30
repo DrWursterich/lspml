@@ -3284,6 +3284,8 @@ impl<'a> TreeParser<'a> {
                     let kind = self.cursor.node().kind();
                     if kind == "text" || kind == "xml_entity" {
                         break;
+                    } else {
+                        continue;
                     }
                 }
                 "ERROR" => tags.push(self.parse_error().map(Node::Error)?),
