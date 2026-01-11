@@ -11,9 +11,9 @@ derive = { path = "../derive" }
 grammar = { path = "../grammar" }
 log = "0.4.20"
 lsp-types = "0.97.0"
-phf = { version = "0.11.2", features = ["macros"] }
+phf = { version = "0.13.1", features = ["macros"] }
 spel = { path = "../spel" }
-tree-sitter = "0.25.3"
+tree-sitter = "0.26.3"
 
 [dev-dependencies]
 tree-sitter-spml = { git = "https://github.com/DrWursterich/tree-sitter-spml.git" }
