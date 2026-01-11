@@ -113,29 +113,30 @@ This creates the executables `lspml` and `lspml-analyze` at `./target/release/` 
 
 ### neovim
 
-As of now there is no `lsp-config` configuration for lspml, so attatching it has to be done manually:
+- make sure `*.spml` files are associated with the `spml` filetype
+
 ```lua
--- manually attach lspml ls
-vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter" }, {
-    pattern = { "*.spml" },
-    callback = function(ev)
-        vim.lsp.start({
-            name = 'lspml',
-            cmd = {
-                '/path/to/lspml',
-                '--modules-file', '/path/to/module_mappings.json', --optional
-                '--log-file', '/path/to/lspml.log.json',           --optional
-                '--log-level', 'INFO',                             --optional
-            },
-            root_dir = vim.fs.dirname(vim.fs.find({ 'src' }, { upward = true })[1]),
-        })
-        vim.api.nvim_create_autocmd('LspAttach', {
-            callback = function(client, bufnr)
-                -- register custom keymaps, omnifunc, formatting, ...
-            end,
-        })
-    end
+vim.filetype.add({
+  extension = {
+    spml = "spml",
+  },
 })
+```
+
+- manually attach lspml ls
+```lua
+vim.lsp.config('lspml', {
+	filetypes = { 'spml' },
+	cmd = {
+		'/path/to/lspml',
+		'--log-file', '/path/to/lspml.log.json',           -- optional
+		'--log-level', 'TRACE',                            -- optional
+		'--modules-file', '/path/to/module_mappings.json', -- optional
+	},
+	root_markers = { 'src', 'pom.xml' },
+	trace = 'verbose',
+})
+vim.lsp.enable('lspml')
 ```
 
 ### sublime text
