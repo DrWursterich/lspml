@@ -79,23 +79,21 @@ fn main_loop(
                 if connection.handle_shutdown(&request)? {
                     break;
                 }
-                match request.method.as_str() {
-                    "textDocument/completion" => command::complete(request).map(Some),
-                    "textDocument/definition" => command::definition(request).map(Some),
-                    "textDocument/diagnostic" => command::diagnostic(request).map(Some),
-                    "textDocument/documentHighlight" => command::highlight(request).map(Some), // stub
-                    "textDocument/semanticTokens/full" => command::semantics(request).map(Some),
-                    "textDocument/codeAction" => command::action(request).map(Some),
-                    "textDocument/hover" => command::hover(request),
-                    _ => command::unknown(request).map(Some),
-                }
-                .and_then(|response| match response {
-                    Some(response) => connection
-                        .sender
-                        .send(response)
-                        .map_err(|err| anyhow::anyhow!(err)),
-                    None => Ok(()),
-                })?;
+                let method = match request.method.as_str() {
+                    "textDocument/completion" => command::complete,
+                    "textDocument/definition" => command::definition,
+                    "textDocument/diagnostic" => command::diagnostic,
+                    "textDocument/documentHighlight" => command::highlight, // stub
+                    "textDocument/semanticTokens/full" => command::semantics,
+                    "textDocument/codeAction" => command::action,
+                    "textDocument/hover" => command::hover,
+                    _ => command::unknown,
+                };
+                let response = method(request)?;
+                connection
+                    .sender
+                    .send(response)
+                    .map_err(|err| anyhow::anyhow!(err))?;
             }
             Message::Response(response) => {
                 log::info!("got unknown response: {:?}", response);
