@@ -1,5 +1,7 @@
 use lsp_server::ErrorCode;
-use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse, Position, Range, Uri as Url};
+use lsp_types::{
+    GotoDefinitionParams, GotoDefinitionResponse, LocationLink, Position, Range, Uri as Url,
+};
 use std::{cmp::Ordering, iter, path::Path};
 
 use grammar::{TagAttributeType, TagAttributes};
@@ -229,17 +231,24 @@ pub(crate) fn definition(
                         text_params.text_document.uri.path().as_str(),
                     ))
                 });
-                return Ok(module
-                    .map(|module| module.path + &uri.to_string())
+                let file_path = module.map(|module| module.path + &uri.to_string());
+                return Ok(file_path
                     .filter(|file| Path::new(&file).exists())
                     .and_then(|file| format!("file://{}", &file).parse().ok())
-                    .map(|uri| lsp_types::Location {
-                        range: Range {
+                    .map(|uri| LocationLink {
+                        origin_selection_range: Some(Range {
+                            start: attribute.value.opening_quote_location.end(),
+                            end: attribute.value.closing_quote_location.start(),
+                        }),
+                        target_uri: uri,
+                        target_range: Range {
                             ..Default::default()
                         },
-                        uri,
+                        target_selection_range: Range {
+                            ..Default::default()
+                        },
                     })
-                    .map(GotoDefinitionResponse::Scalar));
+                    .map(|link| GotoDefinitionResponse::Link(vec![link])));
             }
             SpelAst::Uri(SpelResult::Valid(uri)) => find_node_in_uri(uri, &cursor, &offset),
             _ => None,
