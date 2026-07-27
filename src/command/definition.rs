@@ -231,10 +231,8 @@ pub(crate) fn definition(
                         text_params.text_document.uri.path().as_str(),
                     ))
                 });
-                let file_path = module
-                    .map(|module| module.path + &uri.to_string())
-                    .unwrap_or_else(|| uri.to_string());
-                return Ok(Some(file_path)
+                let file_path = module.map(|module| module.path + &uri.to_string());
+                return Ok(file_path
                     .filter(|file| Path::new(&file).exists())
                     .and_then(|file| format!("file://{}", &file).parse().ok())
                     .map(|uri| LocationLink {
