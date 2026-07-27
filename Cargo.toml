@@ -17,7 +17,7 @@ diagnostic = { path = "./diagnostic" }
 document_store = { path = "./document_store" }
 grammar = { path = "./grammar" }
 log = "0.4.20"
-lsp-server = "0.7.6"
+lsp-server = "0.7.9"
 lsp-types = "0.97.0"
 modules = { path = "./modules" }
 parser = { path = "./parser" }
