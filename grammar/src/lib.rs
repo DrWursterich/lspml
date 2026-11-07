@@ -1874,7 +1874,7 @@ impl TagDefinition {
         rules &[
             AttributeRule::Required("name"),
             AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
-            AttributeRule::ValueOneOf("theme", &["simple", "advanced"]),
+            AttributeRule::ValueOneOf("theme", &["simple", "advanced", "strict"]),
             AttributeRule::ValueOneOf("toggle", &["true", "false", "auto"]),
         ]
     );
