@@ -134,7 +134,7 @@ pub(crate) fn hover(request: Request) -> Result<Message> {
         },
         Ok(None) => Response {
             id: request.id,
-            result: None,
+            result: Some(serde_json::value::Value::Null),
             error: None,
         },
         Err(err) => err.to_response(request.id),
