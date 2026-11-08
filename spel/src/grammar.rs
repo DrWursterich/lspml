@@ -85,7 +85,7 @@ impl FunctionDefinition {
     pub(crate) const RANDOM_UUID: FunctionDefinition =
         FunctionDefinition::new("randomUUID", ArgumentNumber::None, "Erzeugt eine UUID");
     pub(crate) const ROUND: FunctionDefinition = FunctionDefinition::new(
-        "floor",
+        "round",
         ArgumentNumber::Exactly(1),
         "Rundet eine Zahl zum nächsten Integer",
     );
