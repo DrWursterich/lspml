@@ -35,3 +35,50 @@ syn = "3.0.3"
 tree-sitter = "0.26.11"
 tree-sitter-spml = { git = "https://github.com/DrWursterich/tree-sitter-spml.git", rev = "70335d88006f0e97dba983cbe8fd7e874807dfa9" }
 url = "2.5.8"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unreachable_pub = "warn"
+unused_qualifications = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+# 267 hits, nearly all in macro-generated code; noise, not signal.
+elided_lifetimes_in_paths = "allow"
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+# These are all mechanically fixable and are addressed by the lint cleanup;
+# they move to "deny" once the tree is clean.
+needless_return = "warn"
+needless_borrow = "warn"
+explicit_auto_deref = "warn"
+len_zero = "warn"
+single_component_path_imports = "warn"
+redundant_static_lifetimes = "warn"
+expect_fun_call = "warn"
+to_string_trait_impl = "warn"
+# Reachable panics that are real but not yet fixed; tracked, not silenced.
+todo = "warn"
+unimplemented = "warn"
+# lspml-derive uses panic! for compile-time macro errors.
+panic = "allow"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+# Keeps file:line in panics reported from users' editors.
+debug = "line-tables-only"
+
+[profile.dev]
+debug = "line-tables-only"
+
+# tree-sitter-spml is a C parser compiled by cc, which takes its -O level from
+# the profile. At opt-level 0 the SPML parse dominates every keystroke in a
+# debug build.
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.test.package."*"]
+opt-level = 2
