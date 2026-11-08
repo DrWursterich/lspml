@@ -6,6 +6,7 @@ members = ["crates/*"]
 version = "0.2.0"
 edition = "2024"
 rust-version = "1.88"
+publish = false
 license = "MIT"
 repository = "https://github.com/DrWursterich/lspml"
 
