@@ -72,15 +72,15 @@ jobs:
       - run: cargo doc --workspace --no-deps --locked
 
   msrv:
-    name: msrv (1.90)
+    name: msrv (1.95)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.90
+      - uses: dtolnay/rust-toolchain@1.95
       - uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - run: cargo +1.90 check --workspace --all-targets --locked
+      - run: cargo +1.95 check --workspace --all-targets --locked
 
   deny:
     name: cargo-deny

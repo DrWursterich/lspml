@@ -4,3 +4,4 @@ git-fetch-with-cli = true
 [alias]
 lint = "clippy --workspace --all-targets --locked -- -D warnings"
 verify = "test --workspace --all-targets --locked"
+msrv = "check --workspace --all-targets --locked"
