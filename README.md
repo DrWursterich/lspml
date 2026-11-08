@@ -92,13 +92,14 @@ The `modules-file` is a `json` file, in which module names can be mapped to loca
 You can install the binaries without checking this project out via:
 
 ```bash
-cargo install --locked --git https://github.com/DrWursterich/lspml.git
+cargo install --locked --git https://github.com/DrWursterich/lspml.git lspml-server lspml-cli
 ```
 
 Or if you have tinkered with it:
 
 ```bash
-cargo install --locked --path .
+cargo install --locked --path crates/lspml-server
+cargo install --locked --path crates/lspml-cli
 ```
 
 ## build

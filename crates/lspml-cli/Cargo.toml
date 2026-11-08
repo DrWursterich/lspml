@@ -1,0 +1,23 @@
+[package]
+name = "lspml-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Static analysis for the Sitepark Markup Language (SPML), sharing the language server's diagnostics."
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+colored = { workspace = true }
+lspml-diagnostics = { workspace = true }
+lspml-modules = { workspace = true }
+serde_json = { workspace = true }
+
+[[bin]]
+name = "lspml-analyze"
+path = "src/main.rs"
+
+[lints]
+workspace = true

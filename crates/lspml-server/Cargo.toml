@@ -1,5 +1,5 @@
 [package]
-name = "lspml"
+name = "lspml-server"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,7 +10,6 @@ description = "Language server for the Sitepark Markup Language (SPML)."
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
-colored = { workspace = true }
 log = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
@@ -31,10 +30,6 @@ tree-sitter-spml = { workspace = true }
 [[bin]]
 name = "lspml"
 path = "src/main.rs"
-
-[[bin]]
-name = "lspml-analyze"
-path = "src/bin/analyze.rs"
 
 [lints]
 workspace = true

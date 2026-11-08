@@ -442,33 +442,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "lspml"
+name = "lspml-capabilities"
+version = "0.2.0"
+dependencies = [
+ "lsp-types",
+]
+
+[[package]]
+name = "lspml-cli"
 version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
  "colored",
- "log",
- "lsp-server",
- "lsp-types",
- "lspml-capabilities",
  "lspml-diagnostics",
- "lspml-document-store",
- "lspml-grammar",
  "lspml-modules",
- "lspml-spel",
- "lspml-spml",
  "serde_json",
- "structured-logger",
- "tree-sitter",
- "tree-sitter-spml",
-]
-
-[[package]]
-name = "lspml-capabilities"
-version = "0.2.0"
-dependencies = [
- "lsp-types",
 ]
 
 [[package]]
@@ -527,6 +516,28 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "lspml-server"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "log",
+ "lsp-server",
+ "lsp-types",
+ "lspml-capabilities",
+ "lspml-diagnostics",
+ "lspml-document-store",
+ "lspml-grammar",
+ "lspml-modules",
+ "lspml-spel",
+ "lspml-spml",
+ "serde_json",
+ "structured-logger",
+ "tree-sitter",
+ "tree-sitter-spml",
 ]
 
 [[package]]
