@@ -70,9 +70,16 @@ Usage: lspml [OPTIONS]
 
 Options:
       --log-file <LOG_FILE>
-      --log-level <LOG_LEVEL>        [default: INFO]
+          Where to write the structured log. Rotated at --log-file-max-size
+      --log-level <LOG_LEVEL>
+          [default: INFO]
+      --log-file-max-size <LOG_FILE_MAX_SIZE>
+          Rotate the log file once it reaches this many bytes, keeping three older files
+          [default: 67108864]
       --modules-file <MODULES_FILE>
+          json mapping SPML module names to local directories
   -h, --help
+          Print help
 ```
 
 The `modules-file` is a `json` file, in which module names can be mapped to local repositories like so:
@@ -86,6 +93,12 @@ The `modules-file` is a `json` file, in which module names can be mapped to loca
     }
 }
 ```
+
+### logging
+
+`--log-file` is rotated once it reaches `--log-file-max-size` bytes (64 MiB by
+default), keeping three older files alongside it, so the default configuration
+is bounded at about 256 MiB and cannot fill a disk.
 
 ## install
 
@@ -131,7 +144,7 @@ vim.lsp.config('lspml', {
 	cmd = {
 		'/path/to/lspml',
 		'--log-file', '/path/to/lspml.log.json',           -- optional
-		'--log-level', 'TRACE',                            -- optional
+		'--log-level', 'INFO',                             -- optional
 		'--modules-file', '/path/to/module_mappings.json', -- optional
 	},
 	root_markers = { 'src', 'pom.xml' },

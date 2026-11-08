@@ -11,6 +11,7 @@ description = "Language server for the Sitepark Markup Language (SPML)."
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
+file-rotate = { workspace = true }
 log = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }

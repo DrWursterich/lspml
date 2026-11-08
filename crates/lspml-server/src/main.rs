@@ -1,7 +1,8 @@
-use std::{error::Error, fs};
+use std::error::Error;
 
 use anyhow::Result;
 use clap::Parser;
+use file_rotate::{ContentLimit, FileRotate, compression::Compression, suffix::AppendCount};
 use lsp_server::{Connection, Message};
 use lsp_types::{
     CancelParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
@@ -11,13 +12,24 @@ use structured_logger::Builder;
 
 mod command;
 
+/// Default size at which the log file is rotated.
+const DEFAULT_LOG_FILE_MAX_BYTES: usize = 64 * 1024 * 1024;
+
+/// How many rotated log files to keep besides the current one.
+const LOG_FILES_KEPT: usize = 3;
+
 #[derive(Parser, Debug)]
 #[clap(name = "lspml")]
 struct CommandLineOpts {
+    /// Where to write the structured log. Rotated at --log-file-max-size
     #[clap(long)]
     log_file: Option<String>,
     #[clap(long, default_value = "INFO")]
     log_level: String,
+    /// Rotate the log file once it reaches this many bytes, keeping three older files
+    #[clap(long, default_value_t = DEFAULT_LOG_FILE_MAX_BYTES)]
+    log_file_max_size: usize,
+    /// json mapping SPML module names to local directories
     #[clap(long)]
     modules_file: Option<String>,
 }
@@ -26,20 +38,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let opts = CommandLineOpts::parse();
 
     Builder::with_level(&opts.log_level)
-        .with_target_writer(
-            "*",
-            opts.log_file
-                .clone()
-                .and_then(|file| {
-                    fs::File::options()
-                        .create(true)
-                        .append(true)
-                        .open(file)
-                        .ok()
-                })
-                .map(|file| structured_logger::json::new_writer(file))
-                .unwrap_or_else(|| structured_logger::json::new_writer(std::io::stderr())),
-        )
+        .with_target_writer("*", log_writer(&opts))
         .init();
     log::info!("lspml starting...");
     log::debug!("commandline opts: {:?}", opts);
@@ -158,4 +157,17 @@ fn saved(params: DidSaveTextDocumentParams) -> Result<()> {
 fn closed(_: DidCloseTextDocumentParams) -> Result<()> {
     // lspml_document_store::free(&uri); ?
     Ok(())
+}
+
+fn log_writer(opts: &CommandLineOpts) -> Box<dyn structured_logger::Writer> {
+    match &opts.log_file {
+        Some(path) => structured_logger::json::new_writer(FileRotate::new(
+            path,
+            AppendCount::new(LOG_FILES_KEPT),
+            ContentLimit::Bytes(opts.log_file_max_size),
+            Compression::None,
+            None,
+        )),
+        None => structured_logger::json::new_writer(std::io::stderr()),
+    }
 }
