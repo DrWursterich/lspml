@@ -5,6 +5,7 @@ default-members = [ "capabilities", "derive", "diagnostic", "document_store", "g
 name = "lspml"
 version = "0.0.2"
 edition = "2024"
+rust-version = "1.88"
 repository = "https://github.com/DrWursterich/lspml"
 license = "MIT"
 

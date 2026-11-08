@@ -92,19 +92,19 @@ The `modules-file` is a `json` file, in which module names can be mapped to loca
 You can install the binaries without checking this project out via:
 
 ```bash
-cargo +nightly install --git https://github.com/DrWursterich/lspml.git
+cargo install --locked --git https://github.com/DrWursterich/lspml.git
 ```
 
 Or if you have tinkered with it:
 
 ```bash
-cargo +nightly install --path .
+cargo install --locked --path .
 ```
 
 ## build
 
 ```bash
-cargo +nightly build --release
+cargo build --locked --release
 ```
 
 This creates the executables `lspml` and `lspml-analyze` at `./target/release/` or `./target/debug/` if not using `--release`
