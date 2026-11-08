@@ -93,6 +93,7 @@ pub enum Type {
     UnknownModule,
 }
 
+#[cfg(feature = "cli")]
 impl clap::ValueEnum for Type {
     fn value_variants<'a>() -> &'a [Self] {
         static VARIANTS: [Type; 11] = [

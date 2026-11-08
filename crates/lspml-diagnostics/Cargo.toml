@@ -8,10 +8,14 @@ publish.workspace = true
 license.workspace = true
 description = "Validation rules for the Sitepark Markup Language (SPML)."
 
+[features]
+# `impl clap::ValueEnum for Type`, for the CLI's --ignore flag.
+cli = ["dep:clap"]
+
 [dependencies]
 anyhow = { workspace = true }
 lspml-capabilities = { workspace = true }
-clap = { workspace = true }
+clap = { workspace = true, optional = true }
 lspml-document-store = { workspace = true }
 lspml-grammar = { workspace = true }
 log = { workspace = true }

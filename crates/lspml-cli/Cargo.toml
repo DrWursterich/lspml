@@ -12,7 +12,7 @@ description = "Static analysis for the Sitepark Markup Language (SPML), sharing 
 anyhow = { workspace = true }
 clap = { workspace = true }
 colored = { workspace = true }
-lspml-diagnostics = { workspace = true }
+lspml-diagnostics = { workspace = true, features = ["cli"] }
 lspml-modules = { workspace = true }
 serde_json = { workspace = true }
 
