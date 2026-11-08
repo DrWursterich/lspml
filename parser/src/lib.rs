@@ -614,7 +614,7 @@ macro_rules! tag_struct {
         }
     };
 
-    (#[$definition:expr] $name:ident { $( $param:ident ),+ $(,)* }) => {
+    (#[$definition:expr] $name:ident { $( $param:ident => $attribute:literal ),+ $(,)* }) => {
         #[derive(Clone, Debug, PartialEq, DocumentNode)]
         pub struct $name {
             pub open_location: SingleLineLocation,
@@ -737,11 +737,9 @@ macro_rules! tag_struct {
                             continue;
                         },
                         NodeMovingResult::Ok(node) => match node.kind() {
-                            $(stringify!($param) => {
+                            $(concat!($attribute, "_attribute") => {
                                 $param = Some(
-                                    stringify!($param)
-                                        .strip_suffix("_attribute")
-                                        .and_then(|n| $definition.attributes.get_by_name(n))
+                                    $definition.attributes.get_by_name($attribute)
                                         .map(|d| parser.parse_spel_attribute(&d.r#type))
                                         .unwrap()?,
                                 );
@@ -872,16 +870,16 @@ macro_rules! tag_struct {
                 let mut attributes = Vec::new();
                 $(
                     if let Some(attribute) = self.$param.as_ref() {
-                        attributes.push((stringify!($param), attribute));
+                        attributes.push((concat!($attribute, "_attribute"), attribute));
                     }
                 )+
                 return attributes;
             }
 
             fn spel_attribute(&self, name: &str) -> Option<&ParsedAttribute<SpelAttribute>> {
-                return match format!("{}_attribute", name).as_str() {
+                return match name {
                     $(
-                        stringify!($param) => self.$param.as_ref(),
+                        $attribute => self.$param.as_ref(),
                     )+
                     _ => None,
                 };
@@ -893,35 +891,35 @@ macro_rules! tag_struct {
 tag_struct!(
     #[TagDefinition::SP_ARGUMENT]
     SpArgument {
-        condition_attribute,
-        default_attribute,
-        expression_attribute,
-        locale_attribute,
-        name_attribute,
-        object_attribute,
-        value_attribute,
+        condition_attribute => "condition",
+        default_attribute => "default",
+        expression_attribute => "expression",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        object_attribute => "object",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_ATTRIBUTE]
     SpAttribute {
-        dynamics_attribute,
-        name_attribute,
-        object_attribute,
-        text_attribute,
+        dynamics_attribute => "dynamics",
+        name_attribute => "name",
+        object_attribute => "object",
+        text_attribute => "text",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_BARCODE]
     SpBarcode {
-        height_attribute,
-        locale_attribute,
-        name_attribute,
-        scope_attribute,
-        text_attribute,
-        type_attribute,
+        height_attribute => "height",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        scope_attribute => "scope",
+        text_attribute => "text",
+        type_attribute => "type",
     }
 );
 
@@ -933,28 +931,28 @@ tag_struct!(
 tag_struct!(
     #[TagDefinition::SP_CALENDARSHEET]
     SpCalendarsheet {
-        action_attribute,
-        date_attribute,
-        from_attribute,
-        mode_attribute,
-        name_attribute,
-        object_attribute,
-        scope_attribute,
-        to_attribute,
-        value_attribute,
+        action_attribute => "action",
+        date_attribute => "date",
+        from_attribute => "from",
+        mode_attribute => "mode",
+        name_attribute => "name",
+        object_attribute => "object",
+        scope_attribute => "scope",
+        to_attribute => "to",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_CHECKBOX]
     SpCheckbox {
-        checked_attribute,
-        disabled_attribute,
-        locale_attribute,
-        name_attribute,
-        readonly_attribute,
-        type_attribute,
-        value_attribute,
+        checked_attribute => "checked",
+        disabled_attribute => "disabled",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        readonly_attribute => "readonly",
+        type_attribute => "type",
+        value_attribute => "value",
     }
 );
 
@@ -966,18 +964,18 @@ tag_struct!(
 tag_struct!(
     #[TagDefinition::SP_COLLECTION]
     SpCollection {
-        action_attribute,
-        condition_attribute,
-        default_attribute,
-        expression_attribute,
-        index_attribute,
-        locale_attribute,
-        name_attribute,
-        object_attribute,
-        publisher_attribute,
-        query_attribute,
-        scope_attribute,
-        value_attribute,
+        action_attribute => "action",
+        condition_attribute => "condition",
+        default_attribute => "default",
+        expression_attribute => "expression",
+        index_attribute => "index",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        object_attribute => "object",
+        publisher_attribute => "publisher",
+        query_attribute => "query",
+        scope_attribute => "scope",
+        value_attribute => "value",
     }
 );
 
@@ -989,11 +987,11 @@ tag_struct!(
 tag_struct!(
     #[TagDefinition::SP_DIFF]
     SpDiff {
-        from_attribute,
-        locale_attribute,
-        lookup_attribute,
-        name_attribute,
-        to_attribute,
+        from_attribute => "from",
+        locale_attribute => "locale",
+        lookup_attribute => "lookup",
+        name_attribute => "name",
+        to_attribute => "to",
     }
 );
 
@@ -1005,150 +1003,152 @@ tag_struct!(
 tag_struct!(
     #[TagDefinition::SP_ELSEIF]
     SpElseIf {
-        condition_attribute,
-        eq_attribute,
-        gt_attribute,
-        gte_attribute,
-        ic_attribute,
-        isNull_attribute,
-        locale_attribute,
-        lt_attribute,
-        lte_attribute,
-        match_attribute,
-        name_attribute,
-        neq_attribute,
+        condition_attribute => "condition",
+        contains_attribute => "contains",
+        eq_attribute => "eq",
+        gt_attribute => "gt",
+        gte_attribute => "gte",
+        ic_attribute => "ic",
+        isNull_attribute => "isNull",
+        locale_attribute => "locale",
+        lt_attribute => "lt",
+        lte_attribute => "lte",
+        match_attribute => "match",
+        name_attribute => "name",
+        neq_attribute => "neq",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_ERROR]
-    SpError { code_attribute }
+    SpError { code_attribute => "code" }
 );
 
 tag_struct!(
     #[TagDefinition::SP_EXPIRE]
-    SpExpire { date_attribute }
+    SpExpire { date_attribute => "date" }
 );
 
 tag_struct!(
     #[TagDefinition::SP_FILTER]
     SpFilter {
-        attribute_attribute,
-        collection_attribute,
-        filter_attribute,
-        format_attribute,
-        from_attribute,
-        ic_attribute,
-        invert_attribute,
-        locale_attribute,
-        mode_attribute,
-        name_attribute,
-        scope_attribute,
-        to_attribute,
-        type_attribute,
+        attribute_attribute => "attribute",
+        collection_attribute => "collection",
+        filter_attribute => "filter",
+        format_attribute => "format",
+        from_attribute => "from",
+        ic_attribute => "ic",
+        invert_attribute => "invert",
+        locale_attribute => "locale",
+        mode_attribute => "mode",
+        name_attribute => "name",
+        scope_attribute => "scope",
+        to_attribute => "to",
+        type_attribute => "type",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_FOR]
     SpFor {
-        condition_attribute,
-        from_attribute,
-        index_attribute,
-        locale_attribute,
-        step_attribute,
-        to_attribute,
+        condition_attribute => "condition",
+        from_attribute => "from",
+        index_attribute => "index",
+        locale_attribute => "locale",
+        step_attribute => "step",
+        to_attribute => "to",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_FORM]
     SpForm {
-        command_attribute,
-        context_attribute,
-        enctype_attribute,
-        handler_attribute,
-        id_attribute,
-        locale_attribute,
-        method_attribute,
-        module_attribute,
-        name_attribute,
-        nameencoding_attribute,
-        template_attribute,
-        uri_attribute,
+        command_attribute => "command",
+        context_attribute => "context",
+        enctype_attribute => "enctype",
+        handler_attribute => "handler",
+        id_attribute => "id",
+        locale_attribute => "locale",
+        method_attribute => "method",
+        module_attribute => "module",
+        name_attribute => "name",
+        nameencoding_attribute => "nameencoding",
+        template_attribute => "template",
+        uri_attribute => "uri",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_HIDDEN]
     SpHidden {
-        fixvalue_attribute,
-        locale_attribute,
-        name_attribute,
-        type_attribute,
-        value_attribute,
+        fixvalue_attribute => "fixvalue",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        type_attribute => "type",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_IF]
     SpIf {
-        condition_attribute,
-        eq_attribute,
-        gt_attribute,
-        gte_attribute,
-        ic_attribute,
-        isNull_attribute,
-        locale_attribute,
-        lt_attribute,
-        lte_attribute,
-        match_attribute,
-        name_attribute,
-        neq_attribute,
+        condition_attribute => "condition",
+        contains_attribute => "contains",
+        eq_attribute => "eq",
+        gt_attribute => "gt",
+        gte_attribute => "gte",
+        ic_attribute => "ic",
+        isNull_attribute => "isNull",
+        locale_attribute => "locale",
+        lt_attribute => "lt",
+        lte_attribute => "lte",
+        match_attribute => "match",
+        name_attribute => "name",
+        neq_attribute => "neq",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_INCLUDE]
     SpInclude {
-        anchor_attribute,
-        arguments_attribute,
-        context_attribute,
-        mode_attribute,
-        module_attribute,
-        return_attribute,
-        template_attribute,
-        uri_attribute,
+        anchor_attribute => "anchor",
+        arguments_attribute => "arguments",
+        context_attribute => "context",
+        mode_attribute => "mode",
+        module_attribute => "module",
+        return_attribute => "return",
+        template_attribute => "template",
+        uri_attribute => "uri",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_IO]
     SpIo {
-        contenttype_attribute,
-        type_attribute,
+        contenttype_attribute => "contenttype",
+        type_attribute => "type",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_ITERATOR]
     SpIterator {
-        collection_attribute,
-        item_attribute,
-        max_attribute,
-        min_attribute,
+        collection_attribute => "collection",
+        item_attribute => "item",
+        max_attribute => "max",
+        min_attribute => "min",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_JSON]
     SpJson {
-        indent_attribute,
-        locale_attribute,
-        name_attribute,
-        object_attribute,
-        overwrite_attribute,
-        scope_attribute,
+        indent_attribute => "indent",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        object_attribute => "object",
+        overwrite_attribute => "overwrite",
+        scope_attribute => "scope",
     }
 );
 
@@ -1160,88 +1160,88 @@ tag_struct!(
 tag_struct!(
     #[TagDefinition::SP_LINKTREE]
     SpLinktree {
-        attributes_attribute,
-        locale_attribute,
-        localelink_attribute,
-        name_attribute,
-        parentlink_attribute,
-        rootelement_attribute,
-        sortkeys_attribute,
-        sortsequences_attribute,
-        sorttypes_attribute,
+        attributes_attribute => "attributes",
+        locale_attribute => "locale",
+        localelink_attribute => "localelink",
+        name_attribute => "name",
+        parentlink_attribute => "parentlink",
+        rootelement_attribute => "rootelement",
+        sortkeys_attribute => "sortkeys",
+        sortsequences_attribute => "sortsequences",
+        sorttypes_attribute => "sorttypes",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_LIVETREE]
     SpLivetree {
-        action_attribute,
-        leaflink_attribute,
-        locale_attribute,
-        name_attribute,
-        node_attribute,
-        parentlink_attribute,
-        publisher_attribute,
-        rootElement_attribute,
-        sortkeys_attribute,
-        sortsequences_attribute,
-        sorttypes_attribute,
+        action_attribute => "action",
+        leaflink_attribute => "leaflink",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        node_attribute => "node",
+        parentlink_attribute => "parentlink",
+        publisher_attribute => "publisher",
+        rootelement_attribute => "rootelement",
+        sortkeys_attribute => "sortkeys",
+        sortsequences_attribute => "sortsequences",
+        sorttypes_attribute => "sorttypes",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_LOG]
-    SpLog { level_attribute }
+    SpLog { level_attribute => "level" }
 );
 
 tag_struct!(
     #[TagDefinition::SP_LOGIN]
     SpLogin {
-        captcharequired_attribute,
-        client_attribute,
-        locale_attribute,
-        login_attribute,
-        password_attribute,
-        scope_attribute,
-        session_attribute,
+        captcharequired_attribute => "captcharequired",
+        client_attribute => "client",
+        locale_attribute => "locale",
+        login_attribute => "login",
+        password_attribute => "password",
+        scope_attribute => "scope",
+        session_attribute => "session",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_LOOP]
     SpLoop {
-        collection_attribute,
-        item_attribute,
-        list_attribute,
-        locale_attribute,
-        separator_attribute,
+        collection_attribute => "collection",
+        item_attribute => "item",
+        list_attribute => "list",
+        locale_attribute => "locale",
+        separator_attribute => "separator",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_MAP]
     SpMap {
-        action_attribute,
-        condition_attribute,
-        default_attribute,
-        expression_attribute,
-        key_attribute,
-        locale_attribute,
-        name_attribute,
-        object_attribute,
-        overwrite_attribute,
-        scope_attribute,
-        value_attribute,
+        action_attribute => "action",
+        condition_attribute => "condition",
+        default_attribute => "default",
+        expression_attribute => "expression",
+        key_attribute => "key",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        object_attribute => "object",
+        overwrite_attribute => "overwrite",
+        scope_attribute => "scope",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_OPTION]
     SpOption {
-        disabled_attribute,
-        locale_attribute,
-        selected_attribute,
-        value_attribute,
+        disabled_attribute => "disabled",
+        locale_attribute => "locale",
+        selected_attribute => "selected",
+        value_attribute => "value",
     }
 );
 
@@ -1253,21 +1253,21 @@ tag_struct!(
 tag_struct!(
     #[TagDefinition::SP_PRINT]
     SpPrint {
-        arg_attribute,
-        condition_attribute,
-        convert_attribute,
-        cryptkey_attribute,
-        dateformat_attribute,
-        decimalformat_attribute,
-        decoding_attribute,
-        decrypt_attribute,
-        default_attribute,
-        encoding_attribute,
-        encrypt_attribute,
-        expression_attribute,
-        locale_attribute,
-        name_attribute,
-        text_attribute,
+        arg_attribute => "arg",
+        condition_attribute => "condition",
+        convert_attribute => "convert",
+        cryptkey_attribute => "cryptkey",
+        dateformat_attribute => "dateformat",
+        decimalformat_attribute => "decimalformat",
+        decoding_attribute => "decoding",
+        decrypt_attribute => "decrypt",
+        default_attribute => "default",
+        encoding_attribute => "encoding",
+        encrypt_attribute => "encrypt",
+        expression_attribute => "expression",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        text_attribute => "text",
     }
 );
 
@@ -1279,67 +1279,67 @@ tag_struct!(
 tag_struct!(
     #[TagDefinition::SP_RADIO]
     SpRadio {
-        checked_attribute,
-        disabled_attribute,
-        locale_attribute,
-        name_attribute,
-        readonly_attribute,
-        type_attribute,
-        value_attribute,
+        checked_attribute => "checked",
+        disabled_attribute => "disabled",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        readonly_attribute => "readonly",
+        type_attribute => "type",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_RANGE]
     SpRange {
-        collection_attribute,
-        name_attribute,
-        range_attribute,
-        scope_attribute,
+        collection_attribute => "collection",
+        name_attribute => "name",
+        range_attribute => "range",
+        scope_attribute => "scope",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_RETURN]
     SpReturn {
-        condition_attribute,
-        default_attribute,
-        expression_attribute,
-        locale_attribute,
-        object_attribute,
-        value_attribute,
+        condition_attribute => "condition",
+        default_attribute => "default",
+        expression_attribute => "expression",
+        locale_attribute => "locale",
+        object_attribute => "object",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_SASS]
     SpSass {
-        name_attribute,
-        options_attribute,
-        source_attribute,
+        name_attribute => "name",
+        options_attribute => "options",
+        source_attribute => "source",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_SCALEIMAGE]
     SpScaleimage {
-        background_attribute,
-        height_attribute,
-        locale_attribute,
-        name_attribute,
-        object_attribute,
-        options_attribute,
-        padding_attribute,
-        quality_attribute,
-        scalesteps_attribute,
-        scope_attribute,
-        width_attribute,
+        background_attribute => "background",
+        height_attribute => "height",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        object_attribute => "object",
+        options_attribute => "options",
+        padding_attribute => "padding",
+        quality_attribute => "quality",
+        scalesteps_attribute => "scalesteps",
+        scope_attribute => "scope",
+        width_attribute => "width",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_SCOPE]
-    SpScope { scope_attribute }
+    SpScope { scope_attribute => "scope" }
 );
 
 tag_struct!(
@@ -1350,49 +1350,49 @@ tag_struct!(
 tag_struct!(
     #[TagDefinition::SP_SELECT]
     SpSelect {
-        disabled_attribute,
-        locale_attribute,
-        multiple_attribute,
-        name_attribute,
-        type_attribute,
+        disabled_attribute => "disabled",
+        locale_attribute => "locale",
+        multiple_attribute => "multiple",
+        name_attribute => "name",
+        type_attribute => "type",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_SET]
     SpSet {
-        condition_attribute,
-        contentType_attribute,
-        default_attribute,
-        expression_attribute,
-        insert_attribute,
-        locale_attribute,
-        name_attribute,
-        object_attribute,
-        overwrite_attribute,
-        scope_attribute,
-        value_attribute,
+        condition_attribute => "condition",
+        contentType_attribute => "contentType",
+        default_attribute => "default",
+        expression_attribute => "expression",
+        insert_attribute => "insert",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        object_attribute => "object",
+        overwrite_attribute => "overwrite",
+        scope_attribute => "scope",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_SORT]
     SpSort {
-        collection_attribute,
-        keys_attribute,
-        locale_attribute,
-        name_attribute,
-        scope_attribute,
-        sequences_attribute,
-        types_attribute,
+        collection_attribute => "collection",
+        keys_attribute => "keys",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        scope_attribute => "scope",
+        sequences_attribute => "sequences",
+        types_attribute => "types",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_SUBINFORMATION]
     SpSubinformation {
-        name_attribute,
-        type_attribute,
+        name_attribute => "name",
+        type_attribute => "type",
     }
 );
 
@@ -1404,47 +1404,47 @@ tag_struct!(
 tag_struct!(
     #[TagDefinition::SP_TEXT]
     SpText {
-        disabled_attribute,
-        fixvalue_attribute,
-        format_attribute,
-        inputType_attribute,
-        locale_attribute,
-        name_attribute,
-        readonly_attribute,
-        type_attribute,
-        value_attribute,
+        disabled_attribute => "disabled",
+        fixvalue_attribute => "fixvalue",
+        format_attribute => "format",
+        inputType_attribute => "inputType",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        readonly_attribute => "readonly",
+        type_attribute => "type",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_TEXTAREA]
     SpTextarea {
-        disabled_attribute,
-        fixvalue_attribute,
-        locale_attribute,
-        name_attribute,
-        readonly_attribute,
-        type_attribute,
-        value_attribute,
+        disabled_attribute => "disabled",
+        fixvalue_attribute => "fixvalue",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        readonly_attribute => "readonly",
+        type_attribute => "type",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_TEXTIMAGE]
     SpTextimage {
-        background_attribute,
-        fontcolor_attribute,
-        fontname_attribute,
-        fontsize_attribute,
-        fontstyle_attribute,
-        gravity_attribute,
-        height_attribute,
-        locale_attribute,
-        name_attribute,
-        offset_attribute,
-        scope_attribute,
-        text_attribute,
-        width_attribute,
+        background_attribute => "background",
+        fontcolor_attribute => "fontcolor",
+        fontname_attribute => "fontname",
+        fontsize_attribute => "fontsize",
+        fontstyle_attribute => "fontstyle",
+        gravity_attribute => "gravity",
+        height_attribute => "height",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        offset_attribute => "offset",
+        scope_attribute => "scope",
+        text_attribute => "text",
+        width_attribute => "width",
     }
 );
 
@@ -1456,56 +1456,56 @@ tag_struct!(
 tag_struct!(
     #[TagDefinition::SP_TOGGLE]
     SpToggle {
-        disabled_attribute,
-        fixvalue_attribute,
-        locale_attribute,
-        name_attribute,
-        offValue_attribute,
-        onValue_attribute,
-        readonly_attribute,
-        type_attribute,
-        value_attribute,
+        disabled_attribute => "disabled",
+        fixvalue_attribute => "fixvalue",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        offValue_attribute => "offValue",
+        onValue_attribute => "onValue",
+        readonly_attribute => "readonly",
+        type_attribute => "type",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_UPLOAD]
     SpUpload {
-        locale_attribute,
-        name_attribute,
+        locale_attribute => "locale",
+        name_attribute => "name",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_URL]
     SpUrl {
-        absolute_attribute,
-        command_attribute,
-        context_attribute,
-        gui_attribute,
-        handler_attribute,
-        information_attribute,
-        locale_attribute,
-        module_attribute,
-        publisher_attribute,
-        template_attribute,
-        uri_attribute,
-        window_attribute,
+        absolute_attribute => "absolute",
+        command_attribute => "command",
+        context_attribute => "context",
+        gui_attribute => "gui",
+        handler_attribute => "handler",
+        information_attribute => "information",
+        locale_attribute => "locale",
+        module_attribute => "module",
+        publisher_attribute => "publisher",
+        template_attribute => "template",
+        uri_attribute => "uri",
+        window_attribute => "window",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SP_WARNING]
-    SpWarning { code_attribute }
+    SpWarning { code_attribute => "code" }
 );
 
 tag_struct!(
     #[TagDefinition::SP_WORKLIST]
     SpWorklist {
-        element_attribute,
-        name_attribute,
-        role_attribute,
-        user_attribute,
+        element_attribute => "element",
+        name_attribute => "name",
+        role_attribute => "role",
+        user_attribute => "user",
     }
 );
 
@@ -1517,356 +1517,354 @@ tag_struct!(
 tag_struct!(
     #[TagDefinition::SPT_COUNTER]
     SptCounter {
-        language_attribute,
-        mode_attribute,
-        name_attribute,
-        varName_attribute,
-        varname_attribute,
+        language_attribute => "language",
+        mode_attribute => "mode",
+        name_attribute => "name",
+        varName_attribute => "varName",
+        varname_attribute => "varname",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_DATE]
     SptDate {
-        disabled_attribute,
-        fixvalue_attribute,
-        locale_attribute,
-        name_attribute,
-        nowButton_attribute,
-        placeholder_attribute,
-        readonly_attribute,
-        size_attribute,
-        type_attribute,
-        value_attribute,
+        disabled_attribute => "disabled",
+        fixvalue_attribute => "fixvalue",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        nowButton_attribute => "nowButton",
+        placeholder_attribute => "placeholder",
+        readonly_attribute => "readonly",
+        size_attribute => "size",
+        type_attribute => "type",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_DIFF]
     SptDiff {
-        from_attribute,
-        style_attribute,
-        to_attribute,
+        from_attribute => "from",
+        style_attribute => "style",
+        to_attribute => "to",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_EMAIL2IMG]
     SptEmail2Img {
-        alt_attribute,
-        bgcolor_attribute,
-        bgcolor2_attribute,
-        color_attribute,
-        color2_attribute,
-        font_attribute,
-        font2_attribute,
-        fontsize_attribute,
-        fontsize2_attribute,
-        fontweight_attribute,
-        fontweight2_attribute,
-        form_attribute,
-        linkcolor_attribute,
-        name_attribute,
-        object_attribute,
-        onclick_attribute,
-        popupheight_attribute,
-        popupwidth_attribute,
-        title_attribute,
-        urlparam_attribute,
+        alt_attribute => "alt",
+        bgcolor_attribute => "bgcolor",
+        bgcolor2_attribute => "bgcolor2",
+        color_attribute => "color",
+        color2_attribute => "color2",
+        font_attribute => "font",
+        font2_attribute => "font2",
+        fontsize_attribute => "fontsize",
+        fontsize2_attribute => "fontsize2",
+        fontweight_attribute => "fontweight",
+        fontweight2_attribute => "fontweight2",
+        form_attribute => "form",
+        linkcolor_attribute => "linkcolor",
+        name_attribute => "name",
+        object_attribute => "object",
+        onclick_attribute => "onclick",
+        popupheight_attribute => "popupheight",
+        popupwidth_attribute => "popupwidth",
+        title_attribute => "title",
+        urlparam_attribute => "urlparam",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_ENCRYPTEMAIL]
     SptEncryptemail {
-        form_attribute,
-        name_attribute,
-        object_attribute,
-        popupheight_attribute,
-        popupwidth_attribute,
-        urlparam_attribute,
+        form_attribute => "form",
+        name_attribute => "name",
+        object_attribute => "object",
+        popupheight_attribute => "popupheight",
+        popupwidth_attribute => "popupwidth",
+        urlparam_attribute => "urlparam",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_ESCAPEEMAIL]
     SptEscapeemail {
-        alt_attribute,
-        bgcolor_attribute,
-        color_attribute,
-        font_attribute,
-        fontsize_attribute,
-        fontweight_attribute,
-        form_attribute,
-        name_attribute,
-        object_attribute,
-        onclick_attribute,
-        popupheight_attribute,
-        popupwidth_attribute,
-        title_attribute,
+        alt_attribute => "alt",
+        bgcolor_attribute => "bgcolor",
+        color_attribute => "color",
+        font_attribute => "font",
+        fontsize_attribute => "fontsize",
+        fontweight_attribute => "fontweight",
+        form_attribute => "form",
+        name_attribute => "name",
+        object_attribute => "object",
+        onclick_attribute => "onclick",
+        popupheight_attribute => "popupheight",
+        popupwidth_attribute => "popupwidth",
+        title_attribute => "title",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_FORMSOLUTIONS]
     SptFormsolutions {
-        locale_attribute,
-        name_attribute,
+        locale_attribute => "locale",
+        name_attribute => "name",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_ID2URL]
     SptId2Url {
-        classname_attribute,
-        locale_attribute,
-        name_attribute,
-        objekt_attribute,
-        querystring_attribute,
-        url_attribute,
+        classname_attribute => "classname",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        object_attribute => "object",
+        querystring_attribute => "querystring",
+        url_attribute => "url",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_ILINK]
     SptIlink {
-        action_attribute,
-        information_attribute,
-        step_attribute,
-        value_attribute,
+        action_attribute => "action",
+        information_attribute => "information",
+        step_attribute => "step",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_IMAGEEDITOR]
     SptImageeditor {
-        delete_attribute,
-        focalpoint_attribute,
-        locale_attribute,
-        name_attribute,
-        object_attribute,
-        width_attribute,
+        delete_attribute => "delete",
+        focalpoint_attribute => "focalpoint",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        object_attribute => "object",
+        width_attribute => "width",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_IMP]
     SptImp {
-        alt_attribute,
-        background_attribute,
-        color_attribute,
-        excerpt_attribute,
-        font_attribute,
-        fontcolor_attribute,
-        fontname_attribute,
-        fontsize_attribute,
-        fontweight_attribute,
-        format_attribute,
-        gravity_attribute,
-        height_attribute,
-        image_attribute,
-        manipulate_attribute,
-        offset_attribute,
-        padding_attribute,
-        paddingcolor_attribute,
-        scalesteps_attribute,
-        text_attribute,
-        transform_attribute,
-        urlonly_attribute,
-        width_attribute,
+        alt_attribute => "alt",
+        background_attribute => "background",
+        color_attribute => "color",
+        excerpt_attribute => "excerpt",
+        font_attribute => "font",
+        font_size_attribute => "font-size",
+        font_weight_attribute => "font-weight",
+        fontcolor_attribute => "fontcolor",
+        fontname_attribute => "fontname",
+        fontsize_attribute => "fontsize",
+        fontweight_attribute => "fontweight",
+        format_attribute => "format",
+        gravity_attribute => "gravity",
+        height_attribute => "height",
+        image_attribute => "image",
+        manipulate_attribute => "manipulate",
+        offset_attribute => "offset",
+        padding_attribute => "padding",
+        paddingcolor_attribute => "paddingcolor",
+        scalesteps_attribute => "scalesteps",
+        text_attribute => "text",
+        text_transform_attribute => "text-transform",
+        transform_attribute => "transform",
+        urlonly_attribute => "urlonly",
+        width_attribute => "width",
     }
 );
-/* TODO:
-        font-size_attribute,
-        font-weight_attribute,
-        text-transform_attribute,
-*/
 
 tag_struct!(
     #[TagDefinition::SPT_ITERATOR]
     SptIterator {
-        disabled_attribute,
-        invert_attribute,
-        item_attribute,
-        itemtext_attribute,
-        layout_attribute,
-        max_attribute,
-        min_attribute,
-        name_attribute,
-        readonly_attribute,
+        disabled_attribute => "disabled",
+        invert_attribute => "invert",
+        item_attribute => "item",
+        itemtext_attribute => "itemtext",
+        layout_attribute => "layout",
+        max_attribute => "max",
+        min_attribute => "min",
+        name_attribute => "name",
+        readonly_attribute => "readonly",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_LINK]
     SptLink {
-        filter_attribute,
-        filterattribute_attribute,
-        filteric_attribute,
-        filterinvert_attribute,
-        filtermode_attribute,
-        filterquery_attribute,
-        fixvalue_attribute,
-        height_attribute,
-        hidden_attribute,
-        locale_attribute,
-        name_attribute,
-        pools_attribute,
-        previewimage_attribute,
-        showtree_attribute,
-        size_attribute,
-        type_attribute,
-        value_attribute,
-        width_attribute,
+        filter_attribute => "filter",
+        filterattribute_attribute => "filterattribute",
+        filteric_attribute => "filteric",
+        filterinvert_attribute => "filterinvert",
+        filtermode_attribute => "filtermode",
+        filterquery_attribute => "filterquery",
+        fixvalue_attribute => "fixvalue",
+        height_attribute => "height",
+        hidden_attribute => "hidden",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        pools_attribute => "pools",
+        previewimage_attribute => "previewimage",
+        showtree_attribute => "showtree",
+        size_attribute => "size",
+        type_attribute => "type",
+        value_attribute => "value",
+        width_attribute => "width",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_NUMBER]
     SptNumber {
-        align_attribute,
-        disabled_attribute,
-        fixvalue_attribute,
-        locale_attribute,
-        name_attribute,
-        readonly_attribute,
-        size_attribute,
-        value_attribute,
+        align_attribute => "align",
+        disabled_attribute => "disabled",
+        fixvalue_attribute => "fixvalue",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        readonly_attribute => "readonly",
+        size_attribute => "size",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_PERSONALIZATION]
     SptPersonalization {
-        information_attribute,
-        mode_attribute,
-        name_attribute,
-        publisher_attribute,
+        information_attribute => "information",
+        mode_attribute => "mode",
+        name_attribute => "name",
+        publisher_attribute => "publisher",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_PHONENUMBER]
     SptPhonenumber {
-        name_attribute,
-        size_attribute,
+        name_attribute => "name",
+        size_attribute => "size",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_PREHTML]
     SptPrehtml {
-        name_attribute,
-        object_attribute,
+        name_attribute => "name",
+        object_attribute => "object",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_SMARTEDITOR]
     SptSmarteditor {
-        cols_attribute,
-        hide_attribute,
-        name_attribute,
-        options_attribute,
-        rows_attribute,
-        textlabel_attribute,
-        value_attribute,
+        cols_attribute => "cols",
+        hide_attribute => "hide",
+        name_attribute => "name",
+        options_attribute => "options",
+        rows_attribute => "rows",
+        textlabel_attribute => "textlabel",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_SPML]
-    SptSpml { api_attribute }
+    SptSpml { api_attribute => "api" }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_TEXT]
     SptText {
-        disabled_attribute,
-        editablePlaceholder_attribute,
-        fixvalue_attribute,
-        format_attribute,
-        hyphenEditor_attribute,
-        inputType_attribute,
-        locale_attribute,
-        name_attribute,
-        readonly_attribute,
-        size_attribute,
-        type_attribute,
-        value_attribute,
+        disabled_attribute => "disabled",
+        editablePlaceholder_attribute => "editablePlaceholder",
+        fixvalue_attribute => "fixvalue",
+        format_attribute => "format",
+        hyphenEditor_attribute => "hyphenEditor",
+        inputType_attribute => "inputType",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        readonly_attribute => "readonly",
+        size_attribute => "size",
+        type_attribute => "type",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_TEXTAREA]
     SptTextarea {
-        disabled_attribute,
-        editablePlaceholder_attribute,
-        fixvalue_attribute,
-        format_attribute,
-        hyphenEditor_attribute,
-        inputType_attribute,
-        locale_attribute,
-        name_attribute,
-        readonly_attribute,
-        size_attribute,
-        type_attribute,
-        value_attribute,
+        disabled_attribute => "disabled",
+        editablePlaceholder_attribute => "editablePlaceholder",
+        fixvalue_attribute => "fixvalue",
+        format_attribute => "format",
+        hyphenEditor_attribute => "hyphenEditor",
+        inputType_attribute => "inputType",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        readonly_attribute => "readonly",
+        size_attribute => "size",
+        type_attribute => "type",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_TIMESTAMP]
-    SptTimestamp { connect_attribute }
+    SptTimestamp { connect_attribute => "connect" }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_TINYMCE]
     SptTinymce {
-        cols_attribute,
-        config_attribute,
-        configextension_attribute,
-        configvalues_attribute,
-        disabled_attribute,
-        fixvalue_attribute,
-        name_attribute,
-        pools_attribute,
-        readonly_attribute,
-        rows_attribute,
-        theme_attribute,
-        toggle_attribute,
-        type_attribute,
-        value_attribute,
+        cols_attribute => "cols",
+        config_attribute => "config",
+        configextension_attribute => "configextension",
+        configvalues_attribute => "configvalues",
+        disabled_attribute => "disabled",
+        fixvalue_attribute => "fixvalue",
+        name_attribute => "name",
+        pools_attribute => "pools",
+        readonly_attribute => "readonly",
+        rows_attribute => "rows",
+        theme_attribute => "theme",
+        toggle_attribute => "toggle",
+        type_attribute => "type",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_UPDOWN]
     SptUpdown {
-        from_attribute,
-        locale_attribute,
-        name_attribute,
-        to_attribute,
-        value_attribute,
+        from_attribute => "from",
+        locale_attribute => "locale",
+        name_attribute => "name",
+        to_attribute => "to",
+        value_attribute => "value",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_UPLOAD]
     SptUpload {
-        locale_attribute,
-        name_attribute,
-        previewimage_attribute,
+        locale_attribute => "locale",
+        name_attribute => "name",
+        previewimage_attribute => "previewimage",
     }
 );
 
 tag_struct!(
     #[TagDefinition::SPT_WORKLIST]
     SptWorklist {
-        command_attribute,
-        informationID_attribute,
-        poolID_attribute,
-        worklistID_attribute,
+        command_attribute => "command",
+        informationID_attribute => "informationID",
+        poolID_attribute => "poolID",
+        worklistID_attribute => "worklistID",
     }
 );
 

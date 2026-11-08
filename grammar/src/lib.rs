@@ -441,6 +441,7 @@ impl TagDefinition {
         children TagChildren::Any,
         attributes
             ("condition", TagAttributeType::Condition),
+            ("contains", TagAttributeType::Comparable),
             ("eq", TagAttributeType::Comparable),
             ("gt", TagAttributeType::Comparable),
             ("gte", TagAttributeType::Comparable),
@@ -596,6 +597,7 @@ impl TagDefinition {
         children TagChildren::Any,
         attributes
             ("condition", TagAttributeType::Condition),
+            ("contains", TagAttributeType::Comparable),
             ("eq", TagAttributeType::Comparable),
             ("gt", TagAttributeType::Comparable),
             ("gte", TagAttributeType::Comparable),
@@ -744,13 +746,13 @@ impl TagDefinition {
             ("node", TagAttributeType::Identifier),
             ("parentlink", TagAttributeType::String),
             ("publisher", TagAttributeType::Object),
-            ("rootElement", TagAttributeType::Object),
+            ("rootelement", TagAttributeType::Object),
             ("sortkeys", TagAttributeType::String),
             ("sortsequences", TagAttributeType::String),
             ("sorttypes", TagAttributeType::String),
         rules &[
             AttributeRule::Required("name"),
-            AttributeRule::Required("rootElement"),
+            AttributeRule::Required("rootelement"),
             AttributeRule::Required("publisher"),
             AttributeRule::Required("parentlink"),
             AttributeRule::OnlyWith("sortsequences", "sortkeys"),
@@ -887,37 +889,7 @@ impl TagDefinition {
             ("locale", TagAttributeType::String),
             ("selected", TagAttributeType::Condition),
             ("value", TagAttributeType::String),
-        rules &[
-            // multiple separated by commas possible for all of these:
-            AttributeRule::ValueOneOf("convert", &["html2text", "wiki2html", "html2wiki"]),
-            AttributeRule::ValueOneOf(
-                "encoding",
-                &[
-                    "none",
-                    "html",
-                    "xml",
-                    "script",
-                    "php",
-                    // "php<;ignore=[backslash|singleQuote|doubleQuote|carriageReturn|newLine|backspace|tab|dollar] ...>
-                    "url",
-                    "url; charset=latin1",
-                    "entity",
-                    "plain",
-                    "ascii",
-                    "path",
-                    "filename",
-                    "wikitext",
-                    "base64",
-                    "base64NotChunked",
-                    "hex",
-                    "escff",
-                ],
-            ),
-            AttributeRule::ValueOneOf("decoding", &["none", "xml", "url", "base64", "escff"]),
-            AttributeRule::ValueOneOf("encrypt", &["3des", "aes", "unixcrypt", "md5", "sha"]),
-            AttributeRule::ValueOneOf("decrypt", &["3des", "aes"]),
-            AttributeRule::OnlyWithEither("cryptkey", &["encrypt", "decrypt"]),
-        ]
+        rules &[]
     );
 
     pub const SP_PASSWORD: TagDefinition = tag_definition!(
@@ -954,9 +926,37 @@ impl TagDefinition {
             AttributeRule::ExactlyOneOfOrBody(&["name", "text", "expression", "condition"]),
             AttributeRule::OnlyWithEitherOrBody("default", &["name", "expression"]),
             AttributeRule::OnlyOneOf(&["convert", "encoding", "decoding", "encrypt", "decrypt"]),
-            AttributeRule::OnlyWithEither("cryptkey", &["encrypt", "decrypt"]),
             AttributeRule::OnlyOneOf(&["dateformat", "decimalformat"]),
             AttributeRule::OnlyWith("arg", "text"),
+            // multiple separated by commas possible for all of these:
+            AttributeRule::ValueOneOf("convert", &["html2text", "wiki2html", "html2wiki"]),
+            AttributeRule::ValueOneOf(
+                "encoding",
+                &[
+                    "none",
+                    "html",
+                    "xml",
+                    "script",
+                    "php",
+                    // "php<;ignore=[backslash|singleQuote|doubleQuote|carriageReturn|newLine|backspace|tab|dollar] ...>
+                    "url",
+                    "url; charset=latin1",
+                    "entity",
+                    "plain",
+                    "ascii",
+                    "path",
+                    "filename",
+                    "wikitext",
+                    "base64",
+                    "base64NotChunked",
+                    "hex",
+                    "escff",
+                ],
+            ),
+            AttributeRule::ValueOneOf("decoding", &["none", "xml", "url", "base64", "escff"]),
+            AttributeRule::ValueOneOf("encrypt", &["3des", "aes", "unixcrypt", "md5", "sha"]),
+            AttributeRule::ValueOneOf("decrypt", &["3des", "aes"]),
+            AttributeRule::OnlyWithEither("cryptkey", &["encrypt", "decrypt"]),
         ]
     );
 
@@ -1231,7 +1231,6 @@ impl TagDefinition {
         rules &[
             AttributeRule::Required("name"),
             AttributeRule::Required("text"),
-            AttributeRule::OnlyOneOf(&["value", "fixvalue"]),
             AttributeRule::ValueOneOf("fontstyle", &["plain", "bold", "italic"]),
             AttributeRule::ValueOneOf(
                 "gravity",
@@ -1374,11 +1373,9 @@ impl TagDefinition {
             ("language", TagAttributeType::String),
             ("mode", TagAttributeType::String),
             ("name", TagAttributeType::Identifier),
-            ("varName", TagAttributeType::Identifier),
             ("varname", TagAttributeType::Identifier),
         rules &[
             AttributeRule::Required("name"),
-            AttributeRule::Deprecated("varName"),
             AttributeRule::ValueOneOf("mode", &["read", "write"]),
             AttributeRule::ValueOneOf("language", &["javascript", "php"]),
         ]
@@ -1523,7 +1520,7 @@ impl TagDefinition {
             ("classname", TagAttributeType::String),
             ("locale", TagAttributeType::Object),
             ("name", TagAttributeType::Identifier),
-            ("objekt", TagAttributeType::Object),
+            ("object", TagAttributeType::Object),
             ("querystring", TagAttributeType::String),
             ("url", TagAttributeType::String),
         rules &[
@@ -1573,8 +1570,8 @@ impl TagDefinition {
             ("color", TagAttributeType::String),
             ("excerpt", TagAttributeType::String),
             ("font", TagAttributeType::String),
-            ("font-size", TagAttributeType::Expression),
-            ("font-weight", TagAttributeType::String),
+            ("font_size", TagAttributeType::Expression),
+            ("font_weight", TagAttributeType::String),
             ("fontcolor", TagAttributeType::String),
             ("fontname", TagAttributeType::String),
             ("fontsize", TagAttributeType::Expression),
@@ -1589,7 +1586,7 @@ impl TagDefinition {
             ("paddingcolor", TagAttributeType::String),
             ("scalesteps", TagAttributeType::Condition),
             ("text", TagAttributeType::String),
-            ("text-transform", TagAttributeType::String),
+            ("text_transform", TagAttributeType::String),
             ("transform", TagAttributeType::String),
             ("urlonly", TagAttributeType::Condition),
             ("width", TagAttributeType::Expression),
