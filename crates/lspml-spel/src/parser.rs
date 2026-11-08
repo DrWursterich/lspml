@@ -170,7 +170,7 @@ impl Parser {
     pub fn parse_text(&mut self) -> Result<Word, SyntaxError> {
         let mut string = String::new();
         let mut fragments = Vec::new();
-        let mut start = self.scanner.cursor as u16;
+        let mut start = self.scanner.pos();
         loop {
             match self.scanner.peek() {
                 Some('$') => {
@@ -186,7 +186,7 @@ impl Parser {
                             },
                         }));
                         string = String::new();
-                        start = self.scanner.cursor as u16;
+                        start = self.scanner.pos();
                     }
                     fragments.push(WordFragment::Interpolation(interpolation))
                 }
@@ -218,7 +218,7 @@ impl Parser {
             match self.scanner.peek() {
                 Some('/') => {
                     let slash_location = Location::SingleCharacter {
-                        char: self.scanner.cursor as u16,
+                        char: self.scanner.pos(),
                         line: 0,
                     };
                     self.scanner.pop();
@@ -230,7 +230,7 @@ impl Parser {
                 }
                 Some('.') if !fragments.is_empty() => {
                     let dot_location = Location::SingleCharacter {
-                        char: self.scanner.cursor as u16,
+                        char: self.scanner.pos(),
                         line: 0,
                     };
                     self.scanner.pop();
@@ -266,7 +266,7 @@ impl Parser {
         if self.scanner.is_done() {
             return Err(syntax_error!("string is empty"));
         }
-        let start = self.scanner.cursor as u16;
+        let start = self.scanner.pos();
         let mut length = 0;
         loop {
             match self.scanner.peek() {
@@ -296,7 +296,7 @@ impl Parser {
         if self.scanner.is_done() {
             return Err(syntax_error!("string is empty"));
         }
-        let start = self.scanner.cursor as u16;
+        let start = self.scanner.pos();
         let mut length = 0;
         loop {
             match self.scanner.peek() {
@@ -330,7 +330,7 @@ impl Parser {
             match self.scanner.peek() {
                 Some('.') => {
                     let dot_location = Location::SingleCharacter {
-                        char: self.scanner.cursor as u16,
+                        char: self.scanner.pos(),
                         line: 0,
                     };
                     self.scanner.pop();
@@ -431,14 +431,14 @@ impl Parser {
                         let new_string = format!("${{{}}}", word);
                         let (char, line) = match word.fragments.first().unwrap() {
                             WordFragment::String(StringLiteral { location, .. }) => {
-                                (location.line(), location.char())
+                                (location.char(), location.line())
                             }
                             WordFragment::Interpolation(Interpolation {
                                 opening_bracket_location,
                                 ..
                             }) => (
-                                opening_bracket_location.line(),
                                 opening_bracket_location.char(),
+                                opening_bracket_location.line(),
                             ),
                         };
                         let length = match word.fragments.last().unwrap() {
@@ -635,7 +635,7 @@ impl Parser {
                 fix: [SyntaxFix::Insert(
                     Position {
                         line: 0,
-                        character: self.scanner.cursor as u32,
+                        character: self.scanner.pos() as u32,
                     },
                     " : 0".to_string(),
                 )],
@@ -677,7 +677,7 @@ impl Parser {
                 fix: [SyntaxFix::Insert(
                     Position {
                         line: 0,
-                        character: self.scanner.cursor as u32,
+                        character: self.scanner.pos() as u32,
                     },
                     ")".to_string(),
                 )],
@@ -766,7 +766,7 @@ impl Parser {
             Some('(') => self.parse_bracketed_comparable()?,
             Some('!') => Comparable::Condition(self.parse_negated_condition()?),
             Some(_) => {
-                let start = self.scanner.cursor as u16;
+                let start = self.scanner.pos();
                 let func = self.parse_name_or_global_function()?;
                 match func {
                     Object::Name(Word { fragments }) if fragments.len() == 1 => {
@@ -891,7 +891,7 @@ impl Parser {
                             fix: [SyntaxFix::Insert(
                                 Position {
                                     line: 0,
-                                    character: self.scanner.cursor as u32,
+                                    character: self.scanner.pos() as u32,
                                 },
                                 "=".to_string(),
                             )],
@@ -932,7 +932,7 @@ impl Parser {
                     false => ConditionOperator::Or,
                 };
                 let operator_location = Location::DoubleCharacter {
-                    char: self.scanner.cursor as u16,
+                    char: self.scanner.pos(),
                     line: 0,
                 };
                 self.scanner.pop();
@@ -945,7 +945,7 @@ impl Parser {
                         fix: [SyntaxFix::Insert(
                             Position {
                                 line: 0,
-                                character: self.scanner.cursor as u32,
+                                character: self.scanner.pos() as u32,
                             },
                             first.to_string(),
                         )],
@@ -1000,20 +1000,16 @@ impl Parser {
                             closing_bracket_location,
                         }))
                     }
-                    Comparable::Object(name) => {
-                        Ok(Comparable::Expression(Expression::Bracketed {
-                            expression: Box::new(Expression::Object(Box::new(name))),
-                            opening_bracket_location,
-                            closing_bracket_location,
-                        }))
-                    }
-                    Comparable::Null(null) => {
-                        Ok(Comparable::Expression(Expression::Bracketed {
-                            expression: Box::new(Expression::Null(null)),
-                            opening_bracket_location,
-                            closing_bracket_location,
-                        }))
-                    }
+                    Comparable::Object(name) => Ok(Comparable::Expression(Expression::Bracketed {
+                        expression: Box::new(Expression::Object(Box::new(name))),
+                        opening_bracket_location,
+                        closing_bracket_location,
+                    })),
+                    Comparable::Null(null) => Ok(Comparable::Expression(Expression::Bracketed {
+                        expression: Box::new(Expression::Null(null)),
+                        opening_bracket_location,
+                        closing_bracket_location,
+                    })),
                     Comparable::Function(function) => {
                         Ok(Comparable::Expression(Expression::Bracketed {
                             expression: Box::new(Expression::Function(function)),
@@ -1033,7 +1029,7 @@ impl Parser {
                 fix: [SyntaxFix::Insert(
                     Position {
                         line: 0,
-                        character: self.scanner.cursor as u32,
+                        character: self.scanner.pos() as u32,
                     },
                     ")".to_string(),
                 )],
@@ -1043,7 +1039,7 @@ impl Parser {
 
     fn parse_negated_condition(&mut self) -> Result<Condition, SyntaxError> {
         let exclamation_mark_location = Location::SingleCharacter {
-            char: self.scanner.cursor as u16,
+            char: self.scanner.pos(),
             line: 0,
         };
         self.scanner.pop();
@@ -1068,7 +1064,7 @@ impl Parser {
     }
 
     fn parse_number(&mut self) -> Result<Number, SyntaxError> {
-        let start = self.scanner.cursor as u16;
+        let start = self.scanner.pos();
         let mut result = self.parse_integer()?;
         loop {
             match self.scanner.peek() {
@@ -1205,7 +1201,7 @@ impl Parser {
 
     fn parse_string(&mut self) -> Result<StringLiteral, SyntaxError> {
         let mut result = String::new();
-        let start = self.scanner.cursor as u16;
+        let start = self.scanner.pos();
         if !self.scanner.take(&'\'') {
             return Err(syntax_error!("expected string"));
         }
@@ -1232,7 +1228,7 @@ impl Parser {
                                 fix: [SyntaxFix::Insert(
                                     Position {
                                         line: 0,
-                                        character: self.scanner.cursor as u32,
+                                        character: self.scanner.pos() as u32,
                                     },
                                     "\\".to_string(),
                                 )],
@@ -1244,7 +1240,7 @@ impl Parser {
                                 fix: [SyntaxFix::Insert(
                                     Position {
                                         line: 0,
-                                        character: self.scanner.cursor as u32,
+                                        character: self.scanner.pos() as u32,
                                     },
                                     "\\'".to_string(),
                                 )],
@@ -1275,7 +1271,7 @@ impl Parser {
                         fix: [SyntaxFix::Insert(
                             Position {
                                 line: 0,
-                                character: self.scanner.cursor as u32,
+                                character: self.scanner.pos() as u32,
                             },
                             "'".to_string(),
                         )],
@@ -1286,7 +1282,7 @@ impl Parser {
     }
 
     fn parse_interpolation(&mut self) -> Result<Interpolation, SyntaxError> {
-        let start = self.scanner.cursor as u16;
+        let start = self.scanner.pos();
         if !self.scanner.take_str("${") {
             return Err(syntax_error!("expected interpolation"));
         }
@@ -1311,7 +1307,7 @@ impl Parser {
                 fix: [SyntaxFix::Insert(
                     Position {
                         line: 0,
-                        character: self.scanner.cursor as u32,
+                        character: self.scanner.pos() as u32,
                     },
                     "}".to_string(),
                 )],
@@ -1320,14 +1316,14 @@ impl Parser {
     }
 
     fn parse_interpolated_anchor(&mut self) -> Result<Anchor, SyntaxError> {
-        let start = self.scanner.cursor as u16;
+        let start = self.scanner.pos();
         if !self.scanner.take_str("!{") {
             return Err(syntax_error! {
                 msg: "expected `{` after `!` for an interpolated anchor. try adding it",
                 fix: [SyntaxFix::Insert(
                     Position {
                         line: 0,
-                        character: self.scanner.cursor as u32 + 1,
+                        character: self.scanner.pos() as u32 + 1,
                     },
                     "{".to_string(),
                 )],
@@ -1354,7 +1350,7 @@ impl Parser {
                 fix: [SyntaxFix::Insert(
                     Position {
                         line: 0,
-                        character: self.scanner.cursor as u32,
+                        character: self.scanner.pos() as u32,
                     },
                     "}".to_string(),
                 )],
@@ -1367,7 +1363,7 @@ impl Parser {
         if let [WordFragment::String(StringLiteral { content, location })] = &name.fragments[..] {
             self.scanner.skip_whitespace();
             if let Some(&'(') = self.scanner.peek() {
-                let start = self.scanner.cursor as u16;
+                let start = self.scanner.pos();
                 let arguments = self.parse_function_arguments()?;
                 return Ok(Object::Function(Function {
                     name: content.clone(),
@@ -1392,7 +1388,7 @@ impl Parser {
             self.scanner.skip_whitespace();
             match self.scanner.peek() {
                 Some('[') => {
-                    let start = self.scanner.cursor as u16;
+                    let start = self.scanner.pos();
                     self.scanner.pop();
                     self.scanner.skip_whitespace();
                     let expression = self.parse_expression()?;
@@ -1403,7 +1399,7 @@ impl Parser {
                             fix: [SyntaxFix::Insert(
                                 Position {
                                     line: 0,
-                                    character: self.scanner.cursor as u32,
+                                    character: self.scanner.pos() as u32,
                                 },
                                 "]".to_string(),
                             )],
@@ -1424,7 +1420,7 @@ impl Parser {
                 }
                 Some('.') => {
                     let dot_location = Location::SingleCharacter {
-                        char: self.scanner.cursor as u16,
+                        char: self.scanner.pos(),
                         line: 0,
                     };
                     self.scanner.pop();
@@ -1436,7 +1432,7 @@ impl Parser {
                             [WordFragment::String(StringLiteral { content, location })],
                             Some('('),
                         ) => {
-                            let start = self.scanner.cursor as u16;
+                            let start = self.scanner.pos();
                             let arguments = self.parse_function_arguments()?;
                             Object::MethodAccess {
                                 object: Box::new(object),
@@ -1475,7 +1471,7 @@ impl Parser {
     fn parse_word_with_additional_chars(&mut self, chars: &[char]) -> Result<Word, SyntaxError> {
         let mut string = String::new();
         let mut fragments = Vec::new();
-        let mut start = self.scanner.cursor as u16;
+        let mut start = self.scanner.pos();
         loop {
             match self.scanner.peek() {
                 // TODO: evaluate what characters are __actually__ allowed
@@ -1501,7 +1497,7 @@ impl Parser {
                         }));
                         string = String::new();
                     }
-                    start = self.scanner.cursor as u16;
+                    start = self.scanner.pos();
                     fragments.push(WordFragment::Interpolation(interpolation))
                 }
                 _ => break,
@@ -1548,7 +1544,7 @@ impl Parser {
                         _ => Sign::Minus,
                     };
                     let sign_location = Location::SingleCharacter {
-                        char: self.scanner.cursor as u16,
+                        char: self.scanner.pos(),
                         line: 0,
                     };
                     self.scanner.pop();
@@ -1621,7 +1617,7 @@ impl Parser {
                         ),
                         None => SyntaxFix::Insert(
                             Position {
-                                character: self.scanner.cursor as u32,
+                                character: self.scanner.pos() as u32,
                                 line: 0,
                             },
                             ")".to_string(),
@@ -1654,7 +1650,7 @@ impl Parser {
                         msg: "unclosed function arguments. try adding the missing bracket",
                         fix: [SyntaxFix::Insert(
                             Position {
-                                character: self.scanner.cursor as u32,
+                                character: self.scanner.pos() as u32,
                                 line: 0,
                             },
                             ")".to_string(),
@@ -1666,13 +1662,13 @@ impl Parser {
     }
 
     fn trailing_characters_error(&self) -> SyntaxError {
-        let root_end = self.scanner.subtract_whitespace() as u16 + 1;
+        let root_end = self.scanner.subtract_whitespace() + 1;
         syntax_error! {
             fmt: ("trailing \"{}\". try removing it", self.scanner.rest()),
             fix: [SyntaxFix::Delete(Location::VariableLength {
                 char: root_end,
                 line: 0,
-                length: self.scanner.characters.len() as u16 - root_end,
+                length: self.scanner.byte_len() - root_end,
             })],
         }
     }
@@ -2818,6 +2814,44 @@ mod tests {
                 }
             }
         );
+    }
+
+    /// Positions the parser reports are byte offsets, matching what
+    /// tree-sitter produces for the surrounding document.
+    ///
+    /// The scanner works in characters, so it used to report character
+    /// indices, which coincide with byte offsets only for ascii. Every
+    /// position after a multi-byte character in an attribute value was
+    /// therefore too small -- by one per two-byte character -- and the
+    /// language server underlined the wrong span.
+    #[test]
+    fn reported_columns_are_byte_offsets() {
+        // `ä` is two bytes but one character, so the `${` that follows starts
+        // at byte offset 2 and character index 1.
+        let word = super::Parser::new("ä${_a}")
+            .parse_text()
+            .expect("text with an interpolation parses");
+        let [_, WordFragment::Interpolation(interpolation)] = &word.fragments[..] else {
+            panic!("expected a literal followed by an interpolation: {word:?}");
+        };
+        assert_eq!(
+            interpolation.opening_bracket_location.char(),
+            2,
+            "expected the byte offset of `${{`, not its character index"
+        );
+    }
+
+    /// The same input without the umlaut, as a control: byte offset and
+    /// character index agree there, so this held before the change too.
+    #[test]
+    fn reported_columns_are_unchanged_for_ascii() {
+        let word = super::Parser::new("a${_a}")
+            .parse_text()
+            .expect("text with an interpolation parses");
+        let [_, WordFragment::Interpolation(interpolation)] = &word.fragments[..] else {
+            panic!("expected a literal followed by an interpolation: {word:?}");
+        };
+        assert_eq!(interpolation.opening_bracket_location.char(), 1);
     }
 
     fn parse_object(string: &str) -> ObjectAst {

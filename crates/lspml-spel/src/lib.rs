@@ -5,14 +5,37 @@ pub mod parser;
 pub struct Scanner {
     cursor: usize,
     characters: Vec<char>,
+    byte_offsets: Vec<usize>,
 }
 
 impl Scanner {
     pub(crate) fn new(string: &str) -> Self {
+        let characters: Vec<char> = string.chars().collect();
+        let mut byte_offsets = Vec::with_capacity(characters.len() + 1);
+        let mut offset = 0;
+        for character in &characters {
+            byte_offsets.push(offset);
+            offset += character.len_utf8();
+        }
+        byte_offsets.push(offset);
         Self {
             cursor: 0,
-            characters: string.chars().collect(),
+            characters,
+            byte_offsets,
         }
+    }
+
+    /// Byte offset of the cursor within the scanned string.
+    pub(crate) fn pos(&self) -> u16 {
+        self.byte_offsets
+            .get(self.cursor)
+            .copied()
+            .map_or_else(|| self.byte_len(), |offset| offset as u16)
+    }
+
+    /// Byte length of the whole scanned string.
+    pub(crate) fn byte_len(&self) -> u16 {
+        self.byte_offsets.last().copied().unwrap_or(0) as u16
     }
 
     /// Returns true if further progress is not possible.
@@ -92,23 +115,14 @@ impl Scanner {
         result
     }
 
-    /// Finds the last position, that is not whitespace.
-    /// If none is found `0` is returned.
-    pub(crate) fn subtract_whitespace(&self) -> usize {
-        let mut cursor = match self.cursor {
-            0 => 0,
-            c => c - 1,
-        };
-        loop {
-            if !self
-                .characters
-                .get(cursor)
-                .is_some_and(|c| c.is_whitespace())
-            {
-                return cursor;
-            }
-            cursor -= 1;
-        }
+    /// Byte offset of the last character before the cursor that is not
+    /// whitespace. If none is found `0` is returned.
+    pub(crate) fn subtract_whitespace(&self) -> u16 {
+        let index = self.characters[..self.cursor.min(self.characters.len())]
+            .iter()
+            .rposition(|character| !character.is_whitespace())
+            .unwrap_or(0);
+        self.byte_offsets.get(index).copied().unwrap_or(0) as u16
     }
 
     /// Create a String from all remaining characters.
