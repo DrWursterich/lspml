@@ -1,0 +1,112 @@
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify:
+    name: tag matches the manifest version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Compare tag to workspace.package.version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          manifest="$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name == "lspml-server") | .version')"
+          echo "tag=$tag manifest=$manifest"
+          [ "$tag" = "$manifest" ] || {
+            echo "::error::tag $GITHUB_REF_NAME does not match version $manifest"
+            exit 1
+          }
+
+  build:
+    name: ${{ matrix.target }}
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, archive: tar }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, archive: zip }
+          # Apple clang cross-compiles the tree-sitter C parser with `-arch`,
+          # so both darwin targets build on the arm64 runner. This avoids
+          # depending on the deprecated x86 macOS image.
+          # - { os: macos-latest, target: x86_64-apple-darwin, archive: tar }
+          # - { os: macos-latest, target: aarch64-apple-darwin, archive: tar }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+          save-if: "false"
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }} -p lspml-server -p lspml-cli
+
+      - name: Package (tar.gz)
+        if: matrix.archive == 'tar'
+        run: |
+          name="lspml-${GITHUB_REF_NAME}-${{ matrix.target }}"
+          mkdir "$name"
+          cp "target/${{ matrix.target }}/release/lspml" \
+             "target/${{ matrix.target }}/release/lspml-analyze" \
+             README.md LICENSE "$name/"
+          tar czf "$name.tar.gz" "$name"
+          shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"
+
+      - name: Package (zip)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $name = "lspml-$env:GITHUB_REF_NAME-${{ matrix.target }}"
+          New-Item -ItemType Directory $name | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/lspml.exe",
+                    "target/${{ matrix.target }}/release/lspml-analyze.exe",
+                    README.md, LICENSE $name
+          Compress-Archive $name "$name.zip"
+          (Get-FileHash "$name.zip" -Algorithm SHA256).Hash |
+            Out-File -Encoding ascii "$name.zip.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.target }}
+          path: |
+            lspml-*.tar.gz*
+            lspml-*.zip*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: orhun/git-cliff-action@v4
+        id: changelog
+        with:
+          args: --latest --strip header
+      - uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.changelog.outputs.content }}
+          files: dist/*
+          fail_on_unmatched_files: true
