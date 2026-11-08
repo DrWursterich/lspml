@@ -26,7 +26,7 @@ const ADDITIONAL_CHARS_IN_ANCHOR: [char; 1] = ['.'];
 
 impl SyntaxFix {
     pub fn to_text_edit(&self, offset: &Position) -> TextEdit {
-        return match self {
+        match self {
             SyntaxFix::Insert(position, text) => {
                 let position = Position {
                     line: offset.line + position.line,
@@ -74,7 +74,7 @@ impl SyntaxFix {
                     new_text: text.clone(),
                 }
             }
-        };
+        }
     }
 }
 
@@ -123,9 +123,9 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(string: &str) -> Self {
-        return Self {
+        Self {
             scanner: Scanner::new(string),
-        };
+        }
     }
 
     pub fn parse_object_ast(&mut self) -> Result<ObjectAst, SyntaxError> {
@@ -198,7 +198,7 @@ impl Parser {
             }
         }
         let length = string.len() as u16;
-        if length > 0 || fragments.len() == 0 {
+        if length > 0 || fragments.is_empty() {
             fragments.push(WordFragment::String(StringLiteral {
                 content: string.into(),
                 location: Location::VariableLength {
@@ -208,7 +208,7 @@ impl Parser {
                 },
             }));
         }
-        return Ok(Word { fragments });
+        Ok(Word { fragments })
     }
 
     pub fn parse_uri(&mut self) -> Result<Uri, SyntaxError> {
@@ -228,7 +228,7 @@ impl Parser {
                         slash_location,
                     });
                 }
-                Some('.') if fragments.len() != 0 => {
+                Some('.') if !fragments.is_empty() => {
                     let dot_location = Location::SingleCharacter {
                         char: self.scanner.cursor as u16,
                         line: 0,
@@ -243,7 +243,7 @@ impl Parser {
                         }),
                     }));
                 }
-                Some('$') if fragments.len() == 0 => {
+                Some('$') if fragments.is_empty() => {
                     let interpolation = self.parse_interpolation()?;
                     self.scanner.skip_whitespace();
                     return match self.scanner.is_done() {
@@ -357,18 +357,18 @@ impl Parser {
             Some(char) => return Err(syntax_error!("unexpected char \"{}\"", char)),
             None => return Err(syntax_error!("unexpected end")),
         };
-        return self.parse_object_access(object);
+        self.parse_object_access(object)
     }
 
     fn parse_expression(&mut self) -> Result<Expression, SyntaxError> {
         let result = self.parse_undecided_expression_content()?;
-        return self.resolve_expression_content(result);
+        self.resolve_expression_content(result)
     }
 
     fn parse_undecided_expression_content(
         &mut self,
     ) -> Result<UndecidedExpressionContent, SyntaxError> {
-        return match self.scanner.peek() {
+        match self.scanner.peek() {
             Some('\'') => self.parse_string().map(UndecidedExpressionContent::String),
             Some('$') => self
                 .parse_interpolation()
@@ -469,8 +469,8 @@ impl Parser {
                     object => Err(syntax_error!("unexpected \"{}\"", object)),
                 }
             }
-            None => return Err(syntax_error!("unexpected end")),
-        };
+            None => Err(syntax_error!("unexpected end")),
+        }
     }
 
     fn resolve_expression_content(
@@ -478,13 +478,13 @@ impl Parser {
         content: UndecidedExpressionContent,
     ) -> Result<Expression, SyntaxError> {
         self.scanner.skip_whitespace();
-        return match self.resolve_undecided_expression_content(content)? {
+        match self.resolve_undecided_expression_content(content)? {
             UndecidedExpressionContent::Expression(expression) => Ok(expression),
             UndecidedExpressionContent::Name(name) => Ok(Expression::Object(Box::new(name))),
             UndecidedExpressionContent::Null(null) => Ok(Expression::Null(null)),
             UndecidedExpressionContent::Function(function) => Ok(Expression::Function(function)),
             content => Err(syntax_error!("unexpected {}", content.r#type())),
-        };
+        }
     }
 
     fn resolve_undecided_expression_content(
@@ -495,9 +495,7 @@ impl Parser {
         match content {
             UndecidedExpressionContent::Expression(expression) => {
                 let expression = self.try_parse_binary_operation(expression)?;
-                return match self
-                    .try_parse_comparisson(&Comparable::Expression(expression.clone()))?
-                {
+                match self.try_parse_comparisson(&Comparable::Expression(expression.clone()))? {
                     Some(comparison) => {
                         let condition = self.resolve_comparable(comparison)?;
                         self.resolve_undecided_expression_content(
@@ -505,14 +503,14 @@ impl Parser {
                         )
                     }
                     None => Ok(UndecidedExpressionContent::Expression(expression)),
-                };
+                }
             }
             UndecidedExpressionContent::Function(function) => {
                 let function_function = function.clone();
                 let expression = Expression::Function(function);
                 let expression_function = expression.clone();
                 let binary_expression = self.try_parse_binary_operation(expression)?;
-                return match self
+                match self
                     .try_parse_comparisson(&Comparable::Expression(binary_expression.clone()))?
                 {
                     Some(comparison) => {
@@ -538,12 +536,10 @@ impl Parser {
                             // should be an UndecidedExpressionContent::Function !
                         },
                     },
-                };
+                }
             }
             UndecidedExpressionContent::Condition(condition) => {
-                return match self
-                    .try_parse_comparisson(&Comparable::Condition(condition.clone()))?
-                {
+                match self.try_parse_comparisson(&Comparable::Condition(condition.clone()))? {
                     Some(comparison) => {
                         let condition = self.resolve_comparable(comparison)?;
                         self.resolve_undecided_expression_content(
@@ -561,12 +557,10 @@ impl Parser {
                             None => Ok(UndecidedExpressionContent::Condition(condition)),
                         },
                     },
-                };
+                }
             }
             UndecidedExpressionContent::Name(ref name) => {
-                return match self
-                    .try_parse_binary_operation(Expression::Object(Box::new(name.clone())))?
-                {
+                match self.try_parse_binary_operation(Expression::Object(Box::new(name.clone())))? {
                     Expression::Object(name) => {
                         match self.try_parse_comparisson(&Comparable::Object(*name.clone()))? {
                             Some(comparison) => {
@@ -595,10 +589,10 @@ impl Parser {
                     expression => self.resolve_undecided_expression_content(
                         UndecidedExpressionContent::Expression(expression),
                     ),
-                };
+                }
             }
             UndecidedExpressionContent::String(ref string) => {
-                return match self.try_parse_comparisson(&Comparable::String(string.clone()))? {
+                match self.try_parse_comparisson(&Comparable::String(string.clone()))? {
                     Some(comparison) => {
                         let condition = self.resolve_comparable(comparison)?;
                         self.resolve_undecided_expression_content(
@@ -606,10 +600,10 @@ impl Parser {
                         )
                     }
                     None => Ok(content),
-                };
+                }
             }
             UndecidedExpressionContent::Null(ref null) => {
-                return match self.try_parse_comparisson(&Comparable::Null(null.clone()))? {
+                match self.try_parse_comparisson(&Comparable::Null(null.clone()))? {
                     Some(comparison) => {
                         let condition = self.resolve_comparable(comparison)?;
                         self.resolve_undecided_expression_content(
@@ -617,9 +611,9 @@ impl Parser {
                         )
                     }
                     None => Ok(content),
-                };
+                }
             }
-        };
+        }
     }
 
     fn try_parse_ternary(
@@ -653,13 +647,13 @@ impl Parser {
         };
         self.scanner.skip_whitespace();
         let right = self.parse_expression()?;
-        return Ok(Some(Expression::Ternary {
+        Ok(Some(Expression::Ternary {
             condition: Box::new(condition.clone()),
             left: Box::new(left),
             right: Box::new(right),
             question_mark_location,
             colon_location,
-        }));
+        }))
     }
 
     fn parse_bracketed_expression_content(
@@ -693,7 +687,7 @@ impl Parser {
             char: self.scanner.cursor as u16 - 1,
             line: 0,
         };
-        return Ok(match content {
+        Ok(match content {
             UndecidedExpressionContent::Expression(expression) => {
                 UndecidedExpressionContent::Expression(Expression::BracketedExpression {
                     expression: Box::new(expression),
@@ -708,20 +702,24 @@ impl Parser {
                     closing_bracket_location,
                 })
             }
+            #[allow(clippy::todo)]
             UndecidedExpressionContent::Name(_name) => todo!(),
+            #[allow(clippy::todo)]
             UndecidedExpressionContent::String(_string) => todo!(),
+            #[allow(clippy::todo)]
             UndecidedExpressionContent::Null(_null) => todo!(),
+            #[allow(clippy::todo)]
             UndecidedExpressionContent::Function(_function) => todo!(),
-        });
+        })
     }
 
     fn parse_condition(&mut self) -> Result<Condition, SyntaxError> {
         let comparable = self.parse_comparable()?;
-        return self.resolve_comparable(comparable);
+        self.resolve_comparable(comparable)
     }
 
     pub fn parse_comparable(&mut self) -> Result<Comparable, SyntaxError> {
-        return Ok(match self.scanner.peek() {
+        Ok(match self.scanner.peek() {
             Some('\'') => Comparable::String(self.parse_string()?),
             Some('$') => {
                 let object = self.parse_interpolation()?;
@@ -809,12 +807,12 @@ impl Parser {
                 }
             }
             None => return Err(syntax_error!("unexpected end")),
-        });
+        })
     }
 
     fn resolve_comparable(&mut self, comparable: Comparable) -> Result<Condition, SyntaxError> {
         self.scanner.skip_whitespace();
-        return match self.try_parse_comparisson(&comparable)? {
+        match self.try_parse_comparisson(&comparable)? {
             Some(comparisson) => self.resolve_comparable(comparisson),
             None => {
                 let condition = match comparable {
@@ -840,16 +838,16 @@ impl Parser {
                     None => Ok(condition),
                 }
             }
-        };
+        }
     }
 
     fn try_parse_comparisson(
         &mut self,
         left: &Comparable,
     ) -> Result<Option<Comparable>, SyntaxError> {
-        return Ok(match self.scanner.peek() {
+        Ok(match self.scanner.peek() {
             Some(char @ ('!' | '=' | '>' | '<')) => {
-                let char = char.clone();
+                let char = *char;
                 self.scanner.pop();
                 let equals = self.scanner.take(&'=');
                 let operator = match (char, equals) {
@@ -894,14 +892,14 @@ impl Parser {
                 }))
             }
             _ => None,
-        });
+        })
     }
 
     fn try_parse_binary_condition(
         &mut self,
         left: &Condition,
     ) -> Result<Option<Condition>, SyntaxError> {
-        return Ok(match self.scanner.peek() {
+        Ok(match self.scanner.peek() {
             Some(char @ ('&' | '|')) => {
                 let first = &char.clone();
                 let operator = match first == &'&' {
@@ -937,7 +935,7 @@ impl Parser {
                 })
             }
             _ => None,
-        });
+        })
     }
 
     fn parse_bracketed_comparable(&mut self) -> Result<Comparable, SyntaxError> {
@@ -956,7 +954,7 @@ impl Parser {
             comparable = Comparable::Condition(condition);
             self.scanner.skip_whitespace();
         }
-        return match self.scanner.pop() {
+        match self.scanner.pop() {
             Some(')') => {
                 let closing_bracket_location = Location::SingleCharacter {
                     char: self.scanner.cursor as u16 - 1,
@@ -977,12 +975,10 @@ impl Parser {
                             closing_bracket_location,
                         }))
                     }
-                    comparable => {
-                        return Err(syntax_error!(
-                            "unsupported brackets around \"{}\"",
-                            comparable.r#type()
-                        ));
-                    }
+                    comparable => Err(syntax_error!(
+                        "unsupported brackets around \"{}\"",
+                        comparable.r#type()
+                    )),
                 }
             }
             Some(char) => Err(syntax_error!("unexpected char \"{}\"", char)),
@@ -996,7 +992,7 @@ impl Parser {
                     ")".to_string(),
                 )],
             }),
-        };
+        }
     }
 
     fn parse_negated_condition(&mut self) -> Result<Condition, SyntaxError> {
@@ -1089,9 +1085,7 @@ impl Parser {
         };
         self.scanner.skip_whitespace();
         match self.parse_expression()? {
-            Expression::SignedExpression { .. } => {
-                return Err(syntax_error!("duplicate sign"));
-            }
+            Expression::SignedExpression { .. } => Err(syntax_error!("duplicate sign")),
             expression => Ok(Expression::SignedExpression {
                 expression: Box::new(expression),
                 sign,
@@ -1101,7 +1095,7 @@ impl Parser {
     }
 
     fn try_parse_binary_operation(&mut self, left: Expression) -> Result<Expression, SyntaxError> {
-        return Ok(
+        Ok(
             match self.scanner.transform(|c| match c {
                 '+' => Some(ExpressionOperator::Addition),
                 '-' => Some(ExpressionOperator::Subtraction),
@@ -1127,7 +1121,7 @@ impl Parser {
                 }
                 None => left,
             },
-        );
+        )
     }
 
     fn resolve_binary_operation_precidence(
@@ -1247,13 +1241,13 @@ impl Parser {
 
     fn parse_interpolation(&mut self) -> Result<Interpolation, SyntaxError> {
         let start = self.scanner.cursor as u16;
-        if !self.scanner.take_str(&"${") {
+        if !self.scanner.take_str("${") {
             return Err(syntax_error!("expected interpolation"));
         }
         self.scanner.skip_whitespace();
         let result = self.parse_object()?;
         self.scanner.skip_whitespace();
-        return match self.scanner.pop() {
+        match self.scanner.pop() {
             Some('}') => Ok(Interpolation {
                 content: result,
                 opening_bracket_location: Location::DoubleCharacter {
@@ -1276,12 +1270,12 @@ impl Parser {
                     "}".to_string(),
                 )],
             }),
-        };
+        }
     }
 
     fn parse_interpolated_anchor(&mut self) -> Result<Anchor, SyntaxError> {
         let start = self.scanner.cursor as u16;
-        if !self.scanner.take_str(&"!{") {
+        if !self.scanner.take_str("!{") {
             return Err(syntax_error! {
                 msg: "expected `{` after `!` for an interpolated anchor. try adding it",
                 fix: [SyntaxFix::Insert(
@@ -1296,7 +1290,7 @@ impl Parser {
         self.scanner.skip_whitespace();
         let result = self.parse_word_with_additional_chars(&ADDITIONAL_CHARS_IN_ANCHOR)?;
         self.scanner.skip_whitespace();
-        return match self.scanner.pop() {
+        match self.scanner.pop() {
             Some('}') => Ok(Anchor {
                 name: result,
                 opening_bracket_location: Location::DoubleCharacter {
@@ -1319,7 +1313,7 @@ impl Parser {
                     "}".to_string(),
                 )],
             }),
-        };
+        }
     }
 
     fn parse_name_or_global_function(&mut self) -> Result<Object, SyntaxError> {
@@ -1344,7 +1338,7 @@ impl Parser {
                 }));
             }
         }
-        return Ok(Object::Name(name));
+        Ok(Object::Name(name))
     }
 
     fn parse_object_access(&mut self, mut object: Object) -> Result<Object, SyntaxError> {
@@ -1429,7 +1423,7 @@ impl Parser {
     }
 
     fn parse_word(&mut self) -> Result<Word, SyntaxError> {
-        return self.parse_word_with_additional_chars(&[]);
+        self.parse_word_with_additional_chars(&[])
     }
 
     fn parse_word_with_additional_chars(&mut self, chars: &[char]) -> Result<Word, SyntaxError> {
@@ -1478,13 +1472,13 @@ impl Parser {
                 },
             }));
         }
-        return match fragments.len() > 0 {
+        match !fragments.is_empty() {
             true => Ok(Word { fragments }),
             false => Err(match self.scanner.peek() {
                 Some(char) => syntax_error!("unexpected char \"{}\"", char),
                 _ => syntax_error!("unexpected end"),
             }),
-        };
+        }
     }
 
     fn parse_function_arguments(&mut self) -> Result<Vec<FunctionArgument>, SyntaxError> {
@@ -1627,14 +1621,14 @@ impl Parser {
 
     fn trailing_characters_error(&self) -> SyntaxError {
         let root_end = self.scanner.subtract_whitespace() as u16 + 1;
-        return syntax_error! {
+        syntax_error! {
             fmt: ("trailing \"{}\". try removing it", self.scanner.rest()),
             fix: [SyntaxFix::Delete(Location::VariableLength {
                 char: root_end,
                 line: 0,
                 length: self.scanner.characters.len() as u16 - root_end,
             })],
-        };
+        }
     }
 }
 
@@ -2094,7 +2088,7 @@ mod tests {
     #[test]
     fn test_parse_invalid_field_access() {
         let string = "_string..length";
-        if let Ok(result) = (&mut super::Parser::new(&string)).parse_object_ast() {
+        if let Ok(result) = super::Parser::new(string).parse_object_ast() {
             panic!(
                 "successfully parsed invalid string \"{}\" into {:?}",
                 string, result
@@ -2300,7 +2294,7 @@ mod tests {
     #[test]
     fn test_parse_incomplete_addition() {
         let string = "12 +";
-        (&mut super::Parser::new(&string))
+        super::Parser::new(string)
             .parse_expression_ast()
             .expect_err(&format!(
                 "successfully parsed invalid string \"{}\"",
@@ -2781,20 +2775,20 @@ mod tests {
     }
 
     fn parse_object(string: &str) -> ObjectAst {
-        return (&mut super::Parser::new(&string))
+        super::Parser::new(string)
             .parse_object_ast()
-            .expect(&format!("error parsing object \"{}\"", string));
+            .unwrap_or_else(|_| panic!("error parsing object \"{}\"", string))
     }
 
     fn parse_expression(string: &str) -> ExpressionAst {
-        return (&mut super::Parser::new(&string))
+        super::Parser::new(string)
             .parse_expression_ast()
-            .expect(&format!("error parsing expression \"{}\"", string));
+            .unwrap_or_else(|_| panic!("error expression object \"{}\"", string))
     }
 
     fn parse_condition(string: &str) -> ConditionAst {
-        return (&mut super::Parser::new(&string))
+        super::Parser::new(string)
             .parse_condition_ast()
-            .expect(&format!("error parsing condition \"{}\"", string));
+            .unwrap_or_else(|_| panic!("error condition object \"{}\"", string))
     }
 }

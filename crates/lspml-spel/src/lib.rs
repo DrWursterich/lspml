@@ -9,21 +9,21 @@ pub struct Scanner {
 
 impl Scanner {
     pub(crate) fn new(string: &str) -> Self {
-        return Self {
+        Self {
             cursor: 0,
             characters: string.chars().collect(),
-        };
+        }
     }
 
     /// Returns true if further progress is not possible.
     pub(crate) fn is_done(&self) -> bool {
-        return self.cursor == self.characters.len();
+        self.cursor == self.characters.len()
     }
 
     /// Returns the next character without advancing the cursor.
     /// AKA "lookahead"
     pub(crate) fn peek(&self) -> Option<&char> {
-        return self.characters.get(self.cursor);
+        self.characters.get(self.cursor)
     }
 
     /// Returns the next character (if available) and advances the cursor.
@@ -32,7 +32,7 @@ impl Scanner {
         if result.is_some() {
             self.cursor += 1;
         }
-        return result;
+        result
     }
 
     /// Returns true if the `target` is found at the current cursor position,
@@ -46,7 +46,7 @@ impl Scanner {
         if result {
             self.cursor += 1;
         }
-        return result;
+        result
     }
 
     /// Returns true if the `target` is found at the current cursor position,
@@ -62,7 +62,7 @@ impl Scanner {
             self.cursor = end;
             return true;
         }
-        return false;
+        false
     }
 
     /// Returns true if the `target` any whitespace was skipped and the cursor
@@ -89,7 +89,7 @@ impl Scanner {
         if result.is_some() {
             self.cursor += 1;
         }
-        return result;
+        result
     }
 
     /// Finds the last position, that is not whitespace.
@@ -114,6 +114,6 @@ impl Scanner {
     /// Create a String from all remaining characters.
     /// If `is_done() == true` this returns `""`.
     pub(crate) fn rest(&self) -> String {
-        return String::from_iter(self.characters[self.cursor..].iter());
+        String::from_iter(self.characters[self.cursor..].iter())
     }
 }

@@ -31,18 +31,20 @@ impl CompletionCollector<'_> {
         params: &'a TextDocumentPositionParams,
         document: &'a lspml_document_store::Document,
     ) -> CompletionCollector<'a> {
-        return CompletionCollector {
+        CompletionCollector {
             cursor: params.position,
             file: &params.text_document.uri,
             document,
             completions: Vec::new(),
-        };
+        }
     }
 
     fn search_completions_in_document(&mut self) {
-        return match self.document.tree.node_at(self.cursor) {
-            Some(Node::Tag(ParsedTag::Valid(tag))) => self.search_completions_in_tag(tag),
-            Some(Node::Tag(ParsedTag::Erroneous(tag, errors))) => {
+        match self.document.tree.node_at(self.cursor) {
+            Some(Node::Tag(tag)) if let ParsedTag::Valid(tag) = &**tag => {
+                self.search_completions_in_tag(tag)
+            }
+            Some(Node::Tag(tag)) if let ParsedTag::Erroneous(tag, errors) = &**tag => {
                 for error in errors {
                     match error {
                         TagError::Superfluous(_, location) if location.contains(&self.cursor) => {
@@ -90,8 +92,8 @@ impl CompletionCollector<'_> {
                 //     }
                 // }
             }
-            Some(Node::Tag(ParsedTag::Unparsable(text, location))) => {
-                return self.completions.push(CompletionItem {
+            Some(Node::Tag(tag)) if let ParsedTag::Unparsable(text, location) = &**tag => {
+                self.completions.push(CompletionItem {
                     label: format!("unparsable \"{}\"", text),
                     kind: Some(CompletionItemKind::TEXT),
                     text_edit: Some(CompletionTextEdit::Edit(TextEdit {
@@ -99,14 +101,18 @@ impl CompletionCollector<'_> {
                         range: location.range(),
                     })),
                     ..Default::default()
-                });
+                })
             }
             Some(mut node @ Node::Error(ErrorNode { content, range })) => {
                 let mut closest_tag = None;
                 loop {
-                    (node, closest_tag) = match self.document.tree.parent_of(&node) {
-                        Some(parent @ Node::Tag(ParsedTag::Valid(tag))) => (parent, Some(tag)),
-                        Some(parent @ Node::Tag(ParsedTag::Erroneous(tag, errors))) => {
+                    (node, closest_tag) = match self.document.tree.parent_of(node) {
+                        Some(parent @ Node::Tag(tag)) if let ParsedTag::Valid(tag) = &**tag => {
+                            (parent, Some(tag))
+                        }
+                        Some(parent @ Node::Tag(tag))
+                            if let ParsedTag::Erroneous(tag, errors) = &**tag =>
+                        {
                             let new_text = errors.iter().find_map(|error| match error {
                                 TagError::Missing(text, _) if text.starts_with(&**content) => {
                                     Some(text)
@@ -138,7 +144,7 @@ impl CompletionCollector<'_> {
                 }
             }
             _ => self.complete_top_level_tags(),
-        };
+        }
     }
 
     fn complete_top_level_tags(&mut self) {
@@ -151,7 +157,7 @@ impl CompletionCollector<'_> {
             .for_each(|completion| self.completions.push(completion));
     }
 
-    fn complete_tag<'a>(&mut self, tag: &TagDefinition) {
+    fn complete_tag(&mut self, tag: &TagDefinition) {
         self.completions
             .push(Self::tag_to_completion(tag, self.determine_tag_range()));
     }
@@ -173,21 +179,21 @@ impl CompletionCollector<'_> {
             }
             break;
         }
-        return Range {
+        Range {
             start: Position {
-                line: self.cursor.line as u32,
+                line: self.cursor.line,
                 character: start,
             },
             end: Position {
-                line: self.cursor.line as u32,
-                character: self.cursor.character as u32,
+                line: self.cursor.line,
+                character: self.cursor.character,
             },
-        };
+        }
     }
 
     fn tag_to_completion(tag: &TagDefinition, range: Range) -> CompletionItem {
         let new_text = format!("<{}", tag.name);
-        return CompletionItem {
+        CompletionItem {
             label: new_text.clone(),
             kind: Some(CompletionItemKind::KEYWORD),
             detail: tag.detail.map(|detail| detail.to_string()),
@@ -199,14 +205,14 @@ impl CompletionCollector<'_> {
             }),
             text_edit: Some(CompletionTextEdit::Edit(TextEdit { new_text, range })),
             ..Default::default()
-        };
+        }
     }
 
     fn search_completions_in_tag(&mut self, tag: &SpmlTag) {
-        if let Some(body) = tag.body() {
-            if self.is_cursor_in_body(body) {
-                return self.complete_children_of(tag);
-            }
+        if let Some(body) = tag.body()
+            && self.is_cursor_in_body(body)
+        {
+            return self.complete_children_of(tag);
         }
         for (name, attribute) in &tag.spel_attributes() {
             let attribute = match attribute {
@@ -271,7 +277,7 @@ impl CompletionCollector<'_> {
                             ..
                         }) = attribute_type
                         {
-                            let module_attribute = match tag.spel_attribute(&module_attribute) {
+                            let module_attribute = match tag.spel_attribute(module_attribute) {
                                 Some(ParsedAttribute::Valid(attribute)) => Some(attribute),
                                 Some(ParsedAttribute::Erroneous(attribute, _)) => Some(attribute),
                                 _ => None,
@@ -284,56 +290,52 @@ impl CompletionCollector<'_> {
                                     },
                                 ..
                             }) = module_attribute
+                                && fragments.len() == 1
+                                && let WordFragment::String(StringLiteral { content, .. }) =
+                                    &fragments[0]
                             {
-                                if fragments.len() == 1 {
-                                    if let WordFragment::String(StringLiteral { content, .. }) =
-                                        &fragments[0]
-                                    {
-                                        module = lspml_modules::find_module_by_name(content);
-                                    }
-                                }
+                                module = lspml_modules::find_module_by_name(content);
                             }
                         }
                         let module = module.or_else(|| {
-                            lspml_document_store::uri_to_path(&self.file)
+                            lspml_document_store::uri_to_path(self.file)
                                 .ok()
                                 .and_then(|path| lspml_modules::find_module_for_file(&path))
                         });
-                        if let Some(module) = &module {
-                            if let Err(err) = self.complete_uri(uri, module) {
-                                log::error!("failed to complete uri: {}", err);
-                            }
+                        if let Some(module) = &module
+                            && let Err(err) = self.complete_uri(uri, module)
+                        {
+                            log::error!("failed to complete uri: {}", err);
                         }
                     }
                     _ => (),
                 };
             }
         }
-        return self.complete_attributes_of(tag);
+        self.complete_attributes_of(tag)
     }
 
     fn is_cursor_in_body(&self, body: &TagBody) -> bool {
         if (self.cursor.line as usize) < body.open_location.line {
             return false;
         }
-        if (self.cursor.line as usize) == body.open_location.line {
-            if (self.cursor.character as usize) <= body.open_location.char {
-                return false;
-            }
+        if (self.cursor.line as usize) == body.open_location.line
+            && (self.cursor.character as usize) <= body.open_location.char
+        {
+            return false;
         }
-        return true;
+        true
     }
 
     fn complete_uri(&mut self, uri: &Uri, module: &lspml_modules::Module) -> Result<()> {
         let path = uri.to_string();
         for entry in fs::read_dir(module.path.clone() + path.as_str())? {
             let entry = entry?;
-            let name;
-            if path.len() == 0 {
-                name = "/".to_string() + entry.file_name().to_str().unwrap();
+            let name = if path.is_empty() {
+                "/".to_string() + entry.file_name().to_str().unwrap()
             } else {
-                name = entry.file_name().to_str().unwrap().to_string();
-            }
+                entry.file_name().to_str().unwrap().to_string()
+            };
             if entry.path().is_dir() {
                 self.completions.push(CompletionItem {
                     label: name.clone() + "/",
@@ -350,7 +352,7 @@ impl CompletionCollector<'_> {
                 })
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     fn complete_attributes_of(&mut self, tag: &SpmlTag) {
@@ -394,15 +396,15 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
             .map(|document| lspml_document_store::put(uri, document))
             .map_err(|err| {
                 log::error!("failed to read {:?}: {}", uri, err);
-                return LsError {
+                LsError {
                     message: format!("cannot read file {:?}", uri),
                     code: ErrorCode::RequestFailed,
-                };
+                }
             }),
     }?;
     let mut completion_collector = CompletionCollector::new(&text_params, &document);
     completion_collector.search_completions_in_document();
-    return Ok(completion_collector.completions);
+    Ok(completion_collector.completions)
 }
 
 // #[cfg(test)]

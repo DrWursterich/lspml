@@ -9,7 +9,7 @@ use lsp_types::{
     TextDocumentSyncKind, WorkDoneProgressOptions,
 };
 
-pub const TOKEN_TYPES: &'static [SemanticTokenType] = &[
+pub const TOKEN_TYPES: &[SemanticTokenType] = &[
     SemanticTokenType::ENUM,
     SemanticTokenType::ENUM_MEMBER,
     SemanticTokenType::FUNCTION,
@@ -24,7 +24,7 @@ pub const TOKEN_TYPES: &'static [SemanticTokenType] = &[
     SemanticTokenType::VARIABLE,
 ];
 
-pub const TOKEN_MODIFIERS: &'static [SemanticTokenModifier] = &[
+pub const TOKEN_MODIFIERS: &[SemanticTokenModifier] = &[
     SemanticTokenModifier::DECLARATION,
     SemanticTokenModifier::DEFINITION,
     SemanticTokenModifier::DEPRECATED,
@@ -48,7 +48,7 @@ impl CodeActionImplementation {
     pub const ADD_MISSING_CODE: NumberOrString = NumberOrString::Number(7129);
 
     pub(crate) fn kinds() -> Vec<CodeActionKind> {
-        return vec![
+        vec![
             CodeActionImplementation::GenerateDefaultHeaders.to_kind(),
             CodeActionImplementation::NameToCondition.to_kind(),
             CodeActionImplementation::ConditionToName.to_kind(),
@@ -56,18 +56,18 @@ impl CodeActionImplementation {
             CodeActionImplementation::RemoveSuperfluousCode.to_kind(),
             CodeActionImplementation::AddMissingCode.to_kind(),
             CodeActionKind::SOURCE_FIX_ALL,
-        ];
+        ]
     }
 
     pub fn to_kind(&self) -> CodeActionKind {
-        return CodeActionKind::new(match self {
+        CodeActionKind::new(match self {
             CodeActionImplementation::GenerateDefaultHeaders => "refactor.generate_default_headers",
             CodeActionImplementation::NameToCondition => "refactor.name_to_condition",
             CodeActionImplementation::ConditionToName => "refactor.condition_to_name",
             CodeActionImplementation::FixSpelSyntax => "quickfix.fix_spel_syntax",
             CodeActionImplementation::RemoveSuperfluousCode => "quickfix.remove_superfluous_code",
             CodeActionImplementation::AddMissingCode => "quickfix.add_missing_code",
-        });
+        })
     }
 }
 
@@ -85,7 +85,7 @@ impl Display for CodeActionImplementation {
 }
 
 pub fn create() -> ServerCapabilities {
-    return ServerCapabilities {
+    ServerCapabilities {
         definition_provider: Some(OneOf::Left(true)),
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
         document_highlight_provider: Some(OneOf::Left(true)),
@@ -119,5 +119,5 @@ pub fn create() -> ServerCapabilities {
             ..CodeActionOptions::default()
         })),
         ..ServerCapabilities::default()
-    };
+    }
 }

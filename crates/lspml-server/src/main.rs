@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     io_threads.join()?;
 
     log::info!("shutting down lspml...");
-    return Ok(());
+    Ok(())
 }
 
 fn main_loop(
@@ -120,12 +120,12 @@ fn main_loop(
         }
     }
 
-    return Ok(());
+    Ok(())
 }
 
 fn changed(params: DidChangeTextDocumentParams) -> Result<()> {
     let uri = params.text_document.uri;
-    return match &params.content_changes.last() {
+    match &params.content_changes.last() {
         Some(change) => {
             lspml_document_store::Document::new(change.text.to_owned()).map(|document| {
                 lspml_document_store::put(&uri, document);
@@ -133,30 +133,29 @@ fn changed(params: DidChangeTextDocumentParams) -> Result<()> {
             })
         }
         None => Ok(()),
-    };
+    }
 }
 
 fn opened(params: DidOpenTextDocumentParams) -> Result<()> {
     let uri = params.text_document.uri;
-    return match lspml_document_store::get(&uri) {
+    match lspml_document_store::get(&uri) {
         Some(_) => Ok(()),
         None => lspml_document_store::Document::new(params.text_document.text).map(|document| {
             lspml_document_store::put(&uri, document);
             log::debug!("opened {:?}", uri);
-            return ();
         }),
-    };
+    }
 }
 
 fn saved(params: DidSaveTextDocumentParams) -> Result<()> {
     let uri = params.text_document.uri;
-    return lspml_document_store::Document::from_uri(&uri).map(|document| {
+    lspml_document_store::Document::from_uri(&uri).map(|document| {
         lspml_document_store::put(&uri, document);
         log::debug!("saved {:?}", uri);
-    });
+    })
 }
 
 fn closed(_: DidCloseTextDocumentParams) -> Result<()> {
     // lspml_document_store::free(&uri); ?
-    return Ok(());
+    Ok(())
 }

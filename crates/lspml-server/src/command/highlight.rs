@@ -37,5 +37,5 @@ pub(crate) fn highlight(
         },
         kind: Some(DocumentHighlightKind::TEXT),
     };
-    return Ok(vec![highlight]);
+    Ok(vec![highlight])
 }

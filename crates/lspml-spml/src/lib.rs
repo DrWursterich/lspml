@@ -14,10 +14,9 @@ use lspml_spel::{
     ast::{SpelAst, SpelResult},
 };
 
-static TAGS: phf::Map<
-    &'static str,
-    fn(&mut TreeParser) -> Result<ParsedTag<SpmlTag>, anyhow::Error>,
-> = phf_map! {
+type TagParser = fn(&mut TreeParser) -> Result<ParsedTag<SpmlTag>, anyhow::Error>;
+
+static TAGS: phf::Map<&'static str, TagParser> = phf_map! {
     "attribute_tag" => |parser| Ok(SpAttribute::parse(parser)?.map(SpmlTag::SpAttribute)),
     "argument_tag" => |parser| Ok(SpArgument::parse(parser)?.map(SpmlTag::SpArgument)),
     "barcode_tag" => |parser| Ok(SpBarcode::parse(parser)?.map(SpmlTag::SpBarcode)),
@@ -141,11 +140,11 @@ pub enum ParsedHtml {
 
 impl DocumentNode for ParsedHtml {
     fn range(&self) -> Range {
-        return match &self {
+        match &self {
             ParsedHtml::Valid(html) => html.range(),
             ParsedHtml::Erroneous(html, _) => html.range(),
             ParsedHtml::Unparsable(_, location) => location.range(),
-        };
+        }
     }
 }
 
@@ -165,11 +164,11 @@ pub enum ParsedLocation {
 
 impl ParsedLocation {
     pub fn location(&self) -> Option<&Location> {
-        return match &self {
+        match &self {
             ParsedLocation::Valid(location) => Some(location),
             ParsedLocation::Erroneous(location) => Some(location),
             ParsedLocation::Missing => None,
-        };
+        }
     }
 }
 
@@ -217,7 +216,7 @@ pub struct TagBody {
 
 #[derive(Clone, Debug, PartialEq, DocumentNode)]
 pub enum Node {
-    Tag(ParsedTag<SpmlTag>),
+    Tag(Box<ParsedTag<SpmlTag>>),
     Html(ParsedHtml),
     Text(TextNode),
     Error(ErrorNode),
@@ -234,15 +233,15 @@ pub struct HtmlNode {
 
 impl HtmlNode {
     pub fn open_location(&self) -> &SingleLineLocation {
-        return &self.open_location;
+        &self.open_location
     }
 
     pub fn close_location(&self) -> &SingleLineLocation {
-        return &self.close_location;
+        &self.close_location
     }
 
     pub fn body(&self) -> &Option<TagBody> {
-        return &self.body;
+        &self.body
     }
 }
 
@@ -258,6 +257,7 @@ pub struct ErrorNode {
     pub range: Range,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Tag, DocumentNode, ParsableTag)]
 pub enum SpmlTag {
     SpArgument(SpArgument),
@@ -350,7 +350,7 @@ pub(crate) struct DepthCounter {
 
 impl DepthCounter {
     pub(crate) fn new() -> Self {
-        return Self { value: 0 };
+        Self { value: 0 }
     }
 
     pub(crate) fn bump(&mut self) {
@@ -358,7 +358,7 @@ impl DepthCounter {
     }
 
     pub(crate) fn get(&self) -> u8 {
-        return self.value;
+        self.value
     }
 }
 
@@ -373,11 +373,11 @@ macro_rules! tag_struct {
 
         impl Tag for $name {
             fn start(&self) -> Position {
-                return self.open_location.start();
+                self.open_location.start()
             }
 
             fn end(&self) -> Position {
-                return self.close_location.end();
+                self.close_location.end()
             }
         }
 
@@ -520,10 +520,10 @@ macro_rules! tag_struct {
                     body,
                     close_location,
                 };
-                return Ok(match errors.is_empty() {
+                Ok(match errors.is_empty() {
                     true => ParsedTag::Valid(tag),
                     false => ParsedTag::Erroneous(tag, errors),
-                });
+                })
             }
 
             fn parse_closing_tag(
@@ -585,31 +585,31 @@ macro_rules! tag_struct {
                 for _ in 0..depth_counter.get() {
                     parser.cursor.goto_parent();
                 }
-                return result;
+                result
             }
 
             fn definition(&self) -> TagDefinition {
-                return $definition;
+                $definition
             }
 
             fn open_location(&self) -> &SingleLineLocation {
-                return &self.open_location;
+                &self.open_location
             }
 
             fn close_location(&self) -> &SingleLineLocation {
-                return &self.close_location;
+                &self.close_location
             }
 
             fn body(&self) -> &Option<TagBody> {
-                return &self.body;
+                &self.body
             }
 
             fn spel_attributes(&self) -> Vec<(&str, &ParsedAttribute<SpelAttribute>)> {
-                return vec![];
+                vec![]
             }
 
             fn spel_attribute(&self, _name: &str) -> Option<&ParsedAttribute<SpelAttribute>> {
-                return None;
+                None
             }
         }
     };
@@ -625,11 +625,11 @@ macro_rules! tag_struct {
 
         impl Tag for $name {
             fn start(&self) -> Position {
-                return self.open_location.start();
+                self.open_location.start()
             }
 
             fn end(&self) -> Position {
-                return self.close_location.end();
+                self.close_location.end()
             }
         }
 
@@ -782,10 +782,10 @@ macro_rules! tag_struct {
                     body,
                     close_location,
                 };
-                return Ok(match errors.is_empty() {
+                Ok(match errors.is_empty() {
                     true => ParsedTag::Valid(tag),
                     false => ParsedTag::Erroneous(tag, errors),
-                });
+                })
             }
 
             fn parse_closing_tag(
@@ -847,23 +847,23 @@ macro_rules! tag_struct {
                 for _ in 0..depth_counter.get() {
                     parser.cursor.goto_parent();
                 }
-                return result;
+                result
             }
 
             fn definition(&self) -> TagDefinition {
-                return $definition;
+                $definition
             }
 
             fn open_location(&self) -> &SingleLineLocation {
-                return &self.open_location;
+                &self.open_location
             }
 
             fn close_location(&self) -> &SingleLineLocation {
-                return &self.close_location;
+                &self.close_location
             }
 
             fn body(&self) -> &Option<TagBody> {
-                return &self.body;
+                &self.body
             }
 
             fn spel_attributes(&self) -> Vec<(&str, &ParsedAttribute<SpelAttribute>)> {
@@ -873,16 +873,16 @@ macro_rules! tag_struct {
                         attributes.push((concat!($attribute, "_attribute"), attribute));
                     }
                 )+
-                return attributes;
+                attributes
             }
 
             fn spel_attribute(&self, name: &str) -> Option<&ParsedAttribute<SpelAttribute>> {
-                return match name {
+                match name {
                     $(
                         $attribute => self.$param.as_ref(),
                     )+
                     _ => None,
-                };
+                }
             }
         }
     };
@@ -1906,12 +1906,12 @@ pub trait AttributeValue {
             .closing_quote_location()
             .char
             .cmp(&(position.character as usize));
-        return match (closing_line, closing_char) {
+        matches!(
+            (closing_line, closing_char),
             (Ordering::Greater, _)
-            | (Ordering::Equal, Ordering::Greater)
-            | (Ordering::Equal, Ordering::Equal) => true,
-            _ => false,
-        };
+                | (Ordering::Equal, Ordering::Greater)
+                | (Ordering::Equal, Ordering::Equal)
+        )
     }
 }
 
@@ -1951,24 +1951,24 @@ pub struct HtmlAttributeValue {
 
 impl Attribute for HtmlAttribute {
     fn start(&self) -> Position {
-        return self.key.location.start();
+        self.key.location.start()
     }
 
     fn end(&self) -> Position {
-        return match &self.value {
+        match &self.value {
             Some(value) => value.closing_quote_location.end(),
             None => self.key.location.end(),
-        };
+        }
     }
 }
 
 impl AttributeValue for HtmlAttributeValue {
     fn opening_quote_location(&self) -> &SingleLineLocation {
-        return &self.opening_quote_location;
+        &self.opening_quote_location
     }
 
     fn closing_quote_location(&self) -> &SingleLineLocation {
-        return &self.closing_quote_location;
+        &self.closing_quote_location
     }
 }
 
@@ -1976,14 +1976,14 @@ impl AttributeValue for HtmlAttributeValue {
 pub enum HtmlAttributeValueContent {
     Empty,
     Plain(Box<str>),
-    Tag(ParsedTag<SpmlTag>),
+    Tag(Box<ParsedTag<SpmlTag>>),
     Fragmented(Vec<HtmlAttributeValueFragment>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum HtmlAttributeValueFragment {
     Plain(Box<str>),
-    Tag(ParsedTag<SpmlTag>),
+    Tag(Box<ParsedTag<SpmlTag>>),
 }
 
 impl AttributeValue for PlainAttributeValue {
@@ -1992,7 +1992,7 @@ impl AttributeValue for PlainAttributeValue {
     }
 
     fn closing_quote_location(&self) -> &SingleLineLocation {
-        return &self.closing_quote_location;
+        &self.closing_quote_location
     }
 }
 
@@ -2005,26 +2005,26 @@ pub enum ParsedAttribute<A: Attribute> {
 
 impl<R: Attribute> ParsedAttribute<R> {
     pub fn start(&self) -> Position {
-        return match &self {
+        match &self {
             ParsedAttribute::Valid(attribute) => attribute.start(),
             ParsedAttribute::Erroneous(attribute, _) => attribute.start(),
             ParsedAttribute::Unparsable(_, location) => location.start(),
-        };
+        }
     }
 
     pub fn end(&self) -> Position {
-        return match &self {
+        match &self {
             ParsedAttribute::Valid(attribute) => attribute.end(),
             ParsedAttribute::Erroneous(attribute, _) => attribute.end(),
             ParsedAttribute::Unparsable(_, location) => location.end(),
-        };
+        }
     }
 
     pub fn range(&self) -> Range {
-        return Range {
+        Range {
             start: self.start(),
             end: self.end(),
-        };
+        }
     }
 }
 
@@ -2045,11 +2045,11 @@ impl<R: Tag> ParsedTag<R> {
     where
         T: Tag,
     {
-        return match self {
+        match self {
             ParsedTag::Valid(tag) => ParsedTag::Valid(function(tag)),
             ParsedTag::Erroneous(tag, errors) => ParsedTag::Erroneous(function(tag), errors),
             ParsedTag::Unparsable(text, location) => ParsedTag::Unparsable(text, location),
-        };
+        }
     }
 }
 
@@ -2060,7 +2060,7 @@ impl<T: Tag> DocumentNode for ParsedTag<T> {
             ParsedTag::Erroneous(tag, _) => (tag.start(), tag.end()),
             ParsedTag::Unparsable(_, location) => return location.range(),
         };
-        return Range { start, end };
+        Range { start, end }
     }
 }
 
@@ -2072,20 +2072,20 @@ pub enum TagError {
 
 impl TagError {
     pub fn location(&self) -> &Location {
-        return match self {
-            TagError::Superfluous(_, location) => &location,
-            TagError::Missing(_, location) => &location,
-        };
+        match self {
+            TagError::Superfluous(_, location) => location,
+            TagError::Missing(_, location) => location,
+        }
     }
 }
 
 impl Attribute for PlainAttribute {
     fn start(&self) -> Position {
-        return self.key.location.start();
+        self.key.location.start()
     }
 
     fn end(&self) -> Position {
-        return self.value.closing_quote_location.end();
+        self.value.closing_quote_location.end()
     }
 }
 
@@ -2097,11 +2097,11 @@ pub struct SpelAttribute {
 
 impl Attribute for SpelAttribute {
     fn start(&self) -> Position {
-        return self.key.location.start();
+        self.key.location.start()
     }
 
     fn end(&self) -> Position {
-        return self.value.closing_quote_location.end();
+        self.value.closing_quote_location.end()
     }
 }
 
@@ -2115,11 +2115,11 @@ pub struct SpelAttributeValue {
 
 impl AttributeValue for SpelAttributeValue {
     fn opening_quote_location(&self) -> &SingleLineLocation {
-        return &self.opening_quote_location;
+        &self.opening_quote_location
     }
 
     fn closing_quote_location(&self) -> &SingleLineLocation {
-        return &self.closing_quote_location;
+        &self.closing_quote_location
     }
 }
 
@@ -2146,64 +2146,64 @@ pub struct MultiLineLocation {
 
 impl Location {
     pub fn contains(&self, position: &Position) -> bool {
-        return match &self {
+        match &self {
             Location::SingleLine(location) => location.contains(position),
             Location::MultiLine(location) => location.contains(position),
-        };
+        }
     }
 
     pub fn start(&self) -> Position {
-        return match &self {
+        match &self {
             Location::SingleLine(location) => location.start(),
             Location::MultiLine(location) => location.start(),
-        };
+        }
     }
 
     pub fn end(&self) -> Position {
-        return match &self {
+        match &self {
             Location::SingleLine(location) => location.end(),
             Location::MultiLine(location) => location.end(),
-        };
+        }
     }
 
     pub fn range(&self) -> Range {
-        return match &self {
+        match &self {
             Location::SingleLine(location) => location.range(),
             Location::MultiLine(location) => location.range(),
-        };
+        }
     }
 }
 
 impl SingleLineLocation {
     pub fn new(char: usize, line: usize, length: usize) -> Self {
-        return SingleLineLocation { char, line, length };
+        SingleLineLocation { char, line, length }
     }
 
     pub fn contains(&self, position: &Position) -> bool {
-        return self.line == position.line as usize
+        self.line == position.line as usize
             && self.char <= position.character as usize
-            && self.char + self.length > position.character as usize;
+            && self.char + self.length > position.character as usize
     }
 
     pub fn start(&self) -> Position {
-        return Position {
+        Position {
             line: self.line as u32,
             character: self.char as u32,
-        };
+        }
     }
 
     pub fn end(&self) -> Position {
-        return Position {
+        Position {
             line: self.line as u32,
             character: (self.char + self.length) as u32,
-        };
+        }
     }
 
     pub fn range(&self) -> Range {
-        return Range {
+        Range {
             start: self.start(),
             end: self.end(),
-        };
+        }
     }
 }
 
@@ -2214,16 +2214,16 @@ impl MultiLineLocation {
         end_char: usize,
         end_line: usize,
     ) -> Self {
-        return MultiLineLocation {
+        MultiLineLocation {
             start_char,
             start_line,
             end_char,
             end_line,
-        };
+        }
     }
 
     pub(crate) fn contains(&self, position: &Position) -> bool {
-        return match self.start_line.cmp(&(position.line as usize)) {
+        match self.start_line.cmp(&(position.line as usize)) {
             Ordering::Greater => false,
             Ordering::Equal => self.start_char <= position.character as usize,
             Ordering::Less => match self.end_line.cmp(&(position.line as usize)) {
@@ -2231,28 +2231,28 @@ impl MultiLineLocation {
                 Ordering::Equal => self.end_char > position.character as usize,
                 Ordering::Less => false,
             },
-        };
+        }
     }
 
     pub(crate) fn start(&self) -> Position {
-        return Position {
+        Position {
             line: self.start_line as u32,
             character: self.start_char as u32,
-        };
+        }
     }
 
     pub(crate) fn end(&self) -> Position {
-        return Position {
+        Position {
             line: self.end_line as u32,
             character: self.end_char as u32,
-        };
+        }
     }
 
     pub(crate) fn range(&self) -> Range {
-        return Range {
+        Range {
             start: self.start(),
             end: self.end(),
-        };
+        }
     }
 }
 
@@ -2294,7 +2294,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         let parser = AttributeParser::new(tree_parser);
         let result = parser.parse_plain();
         walk_parser_back_to(tree_parser, depth);
-        return result;
+        result
     }
 
     fn html(tree_parser: &'a mut TreeParser<'b>) -> Result<ParsedAttribute<HtmlAttribute>> {
@@ -2302,7 +2302,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         let parser = AttributeParser::new(tree_parser);
         let result = parser.parse_html();
         walk_parser_back_to(tree_parser, depth);
-        return result;
+        result
     }
 
     fn spel(
@@ -2313,16 +2313,16 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
         let parser = AttributeParser::new(tree_parser);
         let result = parser.parse_spel(r#type);
         walk_parser_back_to(tree_parser, depth);
-        return result;
+        result
     }
 
     fn new(tree_parser: &'a mut TreeParser<'b>) -> Self {
         let parent_node = tree_parser.cursor.node();
-        return AttributeParser {
+        AttributeParser {
             tree_parser,
             parent_node,
             errors: None,
-        };
+        }
     }
 
     fn parse_plain(mut self) -> Result<ParsedAttribute<PlainAttribute>> {
@@ -2386,10 +2386,10 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
             closing_quote_location,
         };
         let attribute = PlainAttribute { key, value };
-        return Ok(match self.errors {
+        Ok(match self.errors {
             Some(errors) => ParsedAttribute::Erroneous(attribute, errors),
             None => ParsedAttribute::Valid(attribute),
-        });
+        })
     }
 
     fn parse_html(mut self) -> Result<ParsedAttribute<HtmlAttribute>> {
@@ -2453,10 +2453,10 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
             None => None,
         };
         let attribute = HtmlAttribute { key, value };
-        return Ok(match self.errors {
+        Ok(match self.errors {
             Some(errors) => ParsedAttribute::Erroneous(attribute, errors),
             None => ParsedAttribute::Valid(attribute),
-        });
+        })
     }
 
     fn parse_spel(mut self, r#type: &TagAttributeType) -> Result<ParsedAttribute<SpelAttribute>> {
@@ -2522,10 +2522,10 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 closing_quote_location,
             },
         };
-        return Ok(match self.errors {
+        Ok(match self.errors {
             Some(errors) => ParsedAttribute::Erroneous(attribute, errors),
             None => ParsedAttribute::Valid(attribute),
-        });
+        })
     }
 
     fn parse_key(&mut self) -> Result<IntermediateAttributeParsingResult<tree_sitter::Node<'a>>> {
@@ -2616,7 +2616,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "missing attribute value for \"{}\"",
-                        self.tree_parser.node_text(&key_node)?
+                        self.tree_parser.node_text(key_node)?
                     )
                     .into(),
                     node_location(self.parent_node),
@@ -2624,7 +2624,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "missing attribute value for \"{}\"",
-                        self.tree_parser.node_text(&key_node)?
+                        self.tree_parser.node_text(key_node)?
                     )
                     .into(),
                     node_location(self.parent_node),
@@ -2658,7 +2658,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "attribute \"{}\" is missing a value",
-                        self.tree_parser.node_text(&key_node)?
+                        self.tree_parser.node_text(key_node)?
                     )
                     .into(),
                     node_location(self.parent_node),
@@ -2666,7 +2666,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "missing \"\"\" after attribute name \"{}=\"",
-                        self.tree_parser.node_text(&key_node)?
+                        self.tree_parser.node_text(key_node)?
                     )
                     .into(),
                     node_location(self.parent_node),
@@ -2708,7 +2708,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "\"{}\" attribute value string is unclosed",
-                        self.tree_parser.node_text(&key_node)?
+                        self.tree_parser.node_text(key_node)?
                     )
                     .into(),
                     node_location(self.parent_node),
@@ -2716,7 +2716,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "\"{}\" attribute value string is unclosed",
-                        self.tree_parser.node_text(&key_node)?
+                        self.tree_parser.node_text(key_node)?
                     )
                     .into(),
                     node_location(self.parent_node),
@@ -2756,7 +2756,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "\"{}\" html attribute value string is unclosed",
-                        self.tree_parser.node_text(&key_node)?
+                        self.tree_parser.node_text(key_node)?
                     )
                     .into(),
                     node_location(self.parent_node),
@@ -2764,7 +2764,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "\"{}\" html attribute value string has no content",
-                        self.tree_parser.node_text(&key_node)?
+                        self.tree_parser.node_text(key_node)?
                     )
                     .into(),
                     node_location(self.parent_node),
@@ -2857,9 +2857,9 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 Err(err) => SpelResult::Invalid(err),
             }),
         };
-        return Ok(IntermediateAttributeParsingResult::Partial((
+        Ok(IntermediateAttributeParsingResult::Partial((
             spel, movement,
-        )));
+        )))
     }
 
     fn parse_closing_quote(
@@ -2872,7 +2872,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 NodeMovingResult::NonExistent => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "\"{}\" closing attribute value string is unclosed",
-                        self.tree_parser.node_text(&key_node)?
+                        self.tree_parser.node_text(key_node)?
                     )
                     .into(),
                     node_location(self.parent_node),
@@ -2880,7 +2880,7 @@ impl<'a, 'b> AttributeParser<'a, 'b> {
                 NodeMovingResult::Missing(_) => IntermediateAttributeParsingResult::Failed(
                     format!(
                         "\"{}\" closing attribute value string is unclosed",
-                        self.tree_parser.node_text(&key_node)?
+                        self.tree_parser.node_text(key_node)?
                     )
                     .into(),
                     node_location(self.parent_node),
@@ -2933,10 +2933,10 @@ impl<'a> TreeParser<'a> {
         cursor: tree_sitter::TreeCursor<'tree>,
         text: &'tree String,
     ) -> TreeParser<'tree> {
-        return TreeParser {
+        TreeParser {
             cursor,
             text_bytes: text.as_bytes(),
-        };
+        }
     }
 
     fn goto(&mut self, movement: &NodeMovement) -> NodeMovingResult<'a> {
@@ -2958,11 +2958,11 @@ impl<'a> TreeParser<'a> {
             }
             return NodeMovingResult::Superfluous(node);
         }
-        return NodeMovingResult::Missing(node);
+        NodeMovingResult::Missing(node)
     }
 
     fn node_text(&self, node: &tree_sitter::Node<'_>) -> Result<&str, Utf8Error> {
-        return node.utf8_text(self.text_bytes);
+        node.utf8_text(self.text_bytes)
     }
 
     pub(crate) fn parse_header(&mut self) -> Result<Header> {
@@ -2991,10 +2991,10 @@ impl<'a> TreeParser<'a> {
                 break;
             }
         }
-        return Ok(Header {
+        Ok(Header {
             java_headers,
             taglib_imports,
-        });
+        })
     }
 
     fn parse_page_header(&mut self) -> Result<ParsedHeader<PageHeader>> {
@@ -3130,10 +3130,10 @@ impl<'a> TreeParser<'a> {
             imports,
             close_bracket,
         };
-        return Ok(match errors.is_empty() {
+        Ok(match errors.is_empty() {
             true => ParsedHeader::Valid(header),
             false => ParsedHeader::Erroneous(header, errors),
-        });
+        })
     }
 
     fn parse_taglib_header(&mut self) -> Result<ParsedHeader<TagLibImport>> {
@@ -3266,10 +3266,10 @@ impl<'a> TreeParser<'a> {
             prefix,
             close_bracket,
         };
-        return Ok(match errors.is_empty() {
+        Ok(match errors.is_empty() {
             true => ParsedHeader::Valid(header),
             false => ParsedHeader::Erroneous(header, errors),
-        });
+        })
     }
 
     fn parse_tags(&mut self) -> Result<Vec<Node>> {
@@ -3309,7 +3309,7 @@ impl<'a> TreeParser<'a> {
                 kind if kind.ends_with("_tag_close") => break,
                 kind => {
                     if let Some(parse_fn) = TAGS.get(kind) {
-                        tags.push(Node::Tag(parse_fn(self)?));
+                        tags.push(Node::Tag(Box::new(parse_fn(self)?)));
                     } else {
                         log::debug!("encountered unexpected tree sitter node {}", kind);
                     }
@@ -3319,7 +3319,7 @@ impl<'a> TreeParser<'a> {
                 break;
             }
         }
-        return Ok(tags);
+        Ok(tags)
     }
 
     fn parse_html_attribute_value_content(&mut self) -> Result<HtmlAttributeValueContent> {
@@ -3341,7 +3341,7 @@ impl<'a> TreeParser<'a> {
                 "\"" => break,
                 kind => {
                     if let Some(parse_fn) = TAGS.get(kind) {
-                        fragments.push(HtmlAttributeValueFragment::Tag(parse_fn(self)?));
+                        fragments.push(HtmlAttributeValueFragment::Tag(Box::new(parse_fn(self)?)));
                     } else {
                         log::debug!("encountered unexpected tree sitter node {}", kind);
                     }
@@ -3351,14 +3351,14 @@ impl<'a> TreeParser<'a> {
                 break;
             }
         }
-        return Ok(match fragments.len() {
+        Ok(match fragments.len() {
             0 => HtmlAttributeValueContent::Empty,
             1 => match fragments[0].to_owned() {
                 HtmlAttributeValueFragment::Plain(text) => HtmlAttributeValueContent::Plain(text),
                 HtmlAttributeValueFragment::Tag(tag) => HtmlAttributeValueContent::Tag(tag),
             },
             _ => HtmlAttributeValueContent::Fragmented(fragments),
-        });
+        })
     }
 
     fn parse_html_tag(&mut self) -> Result<ParsedHtml> {
@@ -3394,7 +3394,7 @@ impl<'a> TreeParser<'a> {
             break;
         }
         let name = node.utf8_text(self.text_bytes)?;
-        let name = name.strip_prefix("<").unwrap_or(&name).into();
+        let name = name.strip_prefix("<").unwrap_or(name).into();
         let open_location = match node_location(node) {
             Location::SingleLine(location) => location,
             _ => return Err(anyhow::anyhow!("\"<{}\" should be on a single line", name)),
@@ -3553,10 +3553,10 @@ impl<'a> TreeParser<'a> {
             body,
             close_location,
         };
-        return Ok(match errors.is_empty() {
+        Ok(match errors.is_empty() {
             true => ParsedHtml::Valid(html),
             false => ParsedHtml::Erroneous(html, errors),
-        });
+        })
     }
 
     fn parse_html_option_tag(&mut self) -> Result<ParsedHtml> {
@@ -3591,7 +3591,7 @@ impl<'a> TreeParser<'a> {
             break;
         }
         let name = node.utf8_text(self.text_bytes)?;
-        let name = name.strip_prefix("<").unwrap_or(&name).into();
+        let name = name.strip_prefix("<").unwrap_or(name).into();
         let open_location = match node_location(node) {
             Location::SingleLine(location) => location,
             _ => return Err(anyhow::anyhow!("\"<{}\" should be on a single line", name)),
@@ -3698,10 +3698,10 @@ impl<'a> TreeParser<'a> {
             body,
             close_location,
         };
-        return Ok(match errors.is_empty() {
+        Ok(match errors.is_empty() {
             true => ParsedHtml::Valid(html),
             false => ParsedHtml::Erroneous(html, errors),
-        });
+        })
     }
 
     fn parse_html_void_tag(&mut self) -> Result<ParsedHtml> {
@@ -3736,7 +3736,7 @@ impl<'a> TreeParser<'a> {
             break;
         }
         let name = node.utf8_text(self.text_bytes)?;
-        let name = name.strip_prefix("<").unwrap_or(&name).into();
+        let name = name.strip_prefix("<").unwrap_or(name).into();
         let open_location = match node_location(node) {
             Location::SingleLine(location) => location,
             _ => return Err(anyhow::anyhow!("\"<{}\" should be on a single line", name)),
@@ -3805,10 +3805,10 @@ impl<'a> TreeParser<'a> {
             body: None,
             close_location,
         };
-        return Ok(match errors.is_empty() {
+        Ok(match errors.is_empty() {
             true => ParsedHtml::Valid(html),
             false => ParsedHtml::Erroneous(html, errors),
-        });
+        })
     }
 
     fn parse_text(&mut self) -> Result<TextNode> {
@@ -3826,10 +3826,10 @@ impl<'a> TreeParser<'a> {
             };
         }
         let end = node.end_position();
-        return Ok(TextNode {
+        Ok(TextNode {
             content: content.into(),
             range: range_from_points(start, end),
-        });
+        })
     }
 
     fn parse_error(&mut self) -> Result<ErrorNode> {
@@ -3837,10 +3837,10 @@ impl<'a> TreeParser<'a> {
         let start = node.start_position();
         let end = node.end_position();
         let content = node.utf8_text(self.text_bytes)?.into();
-        return Ok(ErrorNode {
+        Ok(ErrorNode {
             content,
             range: range_from_points(start, end),
-        });
+        })
     }
 
     fn parse_tag_body(&mut self) -> Result<Option<TagBody>> {
@@ -3854,21 +3854,21 @@ impl<'a> TreeParser<'a> {
             return Ok(None);
         }
         let nodes = self.parse_tags()?;
-        return Ok(Some(TagBody {
+        Ok(Some(TagBody {
             open_location,
             nodes,
-        }));
+        }))
     }
 
     fn parse_plain_attribute(&mut self) -> Result<ParsedAttribute<PlainAttribute>> {
-        return AttributeParser::plain(self);
+        AttributeParser::plain(self)
     }
 
     fn parse_spel_attribute(
         &mut self,
         r#type: &TagAttributeType,
     ) -> Result<ParsedAttribute<SpelAttribute>> {
-        return AttributeParser::spel(self, r#type);
+        AttributeParser::spel(self, r#type)
     }
 
     fn move_missing_node_past_whitespaces(&self, node: tree_sitter::Node<'_>) -> Result<Location> {
@@ -3900,19 +3900,19 @@ impl<'a> TreeParser<'a> {
                 )
             }
         };
-        return Ok(Location::SingleLine(SingleLineLocation {
+        Ok(Location::SingleLine(SingleLineLocation {
             char,
             line,
             length: 0,
-        }));
+        }))
     }
 }
 
 fn find_next_node(current: tree_sitter::Node<'_>) -> Option<tree_sitter::Node<'_>> {
-    return current
+    current
         .next_sibling()
         .filter(|node| !node.is_missing())
-        .or_else(|| current.parent().and_then(find_next_node));
+        .or_else(|| current.parent().and_then(find_next_node))
 }
 
 fn node_location(node: tree_sitter::Node) -> Location {
@@ -3926,15 +3926,15 @@ fn node_location(node: tree_sitter::Node) -> Location {
             end.row,
         ));
     }
-    return Location::SingleLine(SingleLineLocation::new(
+    Location::SingleLine(SingleLineLocation::new(
         start.column,
         start.row,
         end.column - start.column,
-    ));
+    ))
 }
 
 fn range_from_points(start: tree_sitter::Point, end: tree_sitter::Point) -> Range {
-    return Range {
+    Range {
         start: Position {
             line: start.row as u32,
             character: start.column as u32,
@@ -3943,25 +3943,25 @@ fn range_from_points(start: tree_sitter::Point, end: tree_sitter::Point) -> Rang
             line: end.row as u32,
             character: end.column as u32,
         },
-    };
+    }
 }
 
 impl Tree {
     pub fn new(ts: tree_sitter::Tree, text: &String) -> Result<Self> {
-        let parser = &mut TreeParser::new(ts.walk(), &text);
+        let parser = &mut TreeParser::new(ts.walk(), text);
         let header = parser.parse_header()?;
         let nodes = parser.parse_tags()?;
-        return Ok(Tree { header, nodes });
+        Ok(Tree { header, nodes })
     }
 
-    pub fn node_at<'a>(&'a self, position: Position) -> Option<&'a Node> {
+    pub fn node_at(&self, position: Position) -> Option<&Node> {
         let mut nodes = &self.nodes;
         let mut current = None;
         loop {
             if let Some(node) = find_node_at(nodes, position) {
                 current = Some(node);
                 let body = match node {
-                    Node::Tag(tag) => match tag {
+                    Node::Tag(tag) => match &**tag {
                         ParsedTag::Valid(tag) => tag.body(),
                         ParsedTag::Erroneous(tag, _) => tag.body(),
                         ParsedTag::Unparsable(_, _) => &None,
@@ -4013,7 +4013,7 @@ impl Tree {
                                     HtmlAttributeValueFragment::Tag(parsed) => parsed,
                                     _ => continue,
                                 };
-                                let tag = match parsed {
+                                let tag = match &**parsed {
                                     ParsedTag::Valid(tag) => Some(tag),
                                     ParsedTag::Erroneous(tag, _) => Some(tag),
                                     ParsedTag::Unparsable(_, _) => None,
@@ -4036,7 +4036,7 @@ impl Tree {
             }
             continue;
         }
-        return None;
+        None
     }
 
     pub fn parent_of(&self, node: &Node) -> Option<&Node> {
@@ -4044,27 +4044,27 @@ impl Tree {
         let mut nodes = &self.nodes;
         let mut current = None;
         loop {
-            if let Some(node) = find_node_at(nodes, position) {
-                if node.range().start != position {
-                    current = Some(node);
-                    let body = match node {
-                        Node::Tag(tag) => match tag {
-                            ParsedTag::Valid(tag) => tag.body(),
-                            ParsedTag::Erroneous(tag, _) => tag.body(),
-                            ParsedTag::Unparsable(_, _) => return current,
-                        },
-                        Node::Html(tag) => match tag {
-                            ParsedHtml::Valid(tag) => tag.body(),
-                            ParsedHtml::Erroneous(tag, _) => tag.body(),
-                            ParsedHtml::Unparsable(_, _) => return current,
-                            // TODO: html attributes can contain spml tags
-                        },
-                        _ => &None,
-                    };
-                    if let Some(body) = body {
-                        nodes = &body.nodes;
-                        continue;
-                    }
+            if let Some(node) = find_node_at(nodes, position)
+                && node.range().start != position
+            {
+                current = Some(node);
+                let body = match node {
+                    Node::Tag(tag) => match &**tag {
+                        ParsedTag::Valid(tag) => tag.body(),
+                        ParsedTag::Erroneous(tag, _) => tag.body(),
+                        ParsedTag::Unparsable(_, _) => return current,
+                    },
+                    Node::Html(tag) => match tag {
+                        ParsedHtml::Valid(tag) => tag.body(),
+                        ParsedHtml::Erroneous(tag, _) => tag.body(),
+                        ParsedHtml::Unparsable(_, _) => return current,
+                        // TODO: html attributes can contain spml tags
+                    },
+                    _ => &None,
+                };
+                if let Some(body) = body {
+                    nodes = &body.nodes;
+                    continue;
                 }
             }
             return current;
@@ -4083,7 +4083,7 @@ fn find_node_at(nodes: &Vec<Node>, position: Position) -> Option<&Node> {
         }
         return Some(node);
     }
-    return None;
+    None
 }
 
 #[cfg(test)]
@@ -4149,7 +4149,7 @@ mod tests {
         let parser = &mut TreeParser::new(ts_tree.walk(), &document);
         let _header = parser.parse_header()?;
         let _tags = parser.parse_tags()?;
-        return Ok(());
+        Ok(())
     }
 
     #[test]
@@ -4276,7 +4276,7 @@ mod tests {
         let parser = &mut TreeParser::new(ts_tree.walk(), &document);
         let header = parser.parse_header()?;
         assert_eq!(header, expected);
-        return Ok(());
+        Ok(())
     }
 
     #[test]
@@ -4286,77 +4286,79 @@ mod tests {
             "%>\n",
             "<sp:barcode name=\"_testName\" text=\"some text\" scope=\"page\"/>\n",
         ));
-        let expected = vec![Node::Tag(ParsedTag::Valid(SpmlTag::SpBarcode(SpBarcode {
-            open_location: SingleLineLocation::new(0, 2, 11),
-            height_attribute: None,
-            locale_attribute: None,
-            name_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
-                key: AttributeKey {
-                    value: "name".into(),
-                    location: SingleLineLocation::new(12, 2, 4),
-                },
-                value: SpelAttributeValue {
-                    equals_location: SingleLineLocation::new(16, 2, 1),
-                    opening_quote_location: SingleLineLocation::new(17, 2, 1),
-                    spel: SpelAst::Identifier(SpelResult::Valid(Identifier::Name(Word {
-                        fragments: vec![WordFragment::String(StringLiteral {
-                            content: Arc::from("_testName"),
-                            location: lspml_spel::ast::Location::VariableLength {
-                                char: 0,
-                                line: 0,
-                                length: 9,
-                            },
-                        })],
-                    }))),
-                    closing_quote_location: SingleLineLocation::new(27, 2, 1),
-                },
-            })),
-            scope_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
-                key: AttributeKey {
-                    value: "scope".into(),
-                    location: SingleLineLocation::new(46, 2, 5),
-                },
-                value: SpelAttributeValue {
-                    equals_location: SingleLineLocation::new(51, 2, 1),
-                    opening_quote_location: SingleLineLocation::new(52, 2, 1),
-                    spel: SpelAst::String(SpelResult::Valid(Word {
-                        fragments: vec![WordFragment::String(StringLiteral {
-                            content: Arc::from("page"),
-                            location: lspml_spel::ast::Location::VariableLength {
-                                char: 0,
-                                line: 0,
-                                length: 4,
-                            },
-                        })],
-                    })),
-                    closing_quote_location: SingleLineLocation::new(57, 2, 1),
-                },
-            })),
-            text_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
-                key: AttributeKey {
-                    value: "text".into(),
-                    location: SingleLineLocation::new(29, 2, 4),
-                },
-                value: SpelAttributeValue {
-                    equals_location: SingleLineLocation::new(33, 2, 1),
-                    opening_quote_location: SingleLineLocation::new(34, 2, 1),
-                    spel: SpelAst::String(SpelResult::Valid(Word {
-                        fragments: vec![WordFragment::String(StringLiteral {
-                            content: Arc::from("some text"),
-                            location: lspml_spel::ast::Location::VariableLength {
-                                char: 0,
-                                line: 0,
-                                length: 9,
-                            },
-                        })],
-                    })),
-                    closing_quote_location: SingleLineLocation::new(44, 2, 1),
-                },
-            })),
-            type_attribute: None,
-            body: None,
-            close_location: SingleLineLocation::new(58, 2, 2),
-        })))];
+        let expected = vec![Node::Tag(Box::new(ParsedTag::Valid(SpmlTag::SpBarcode(
+            SpBarcode {
+                open_location: SingleLineLocation::new(0, 2, 11),
+                height_attribute: None,
+                locale_attribute: None,
+                name_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
+                    key: AttributeKey {
+                        value: "name".into(),
+                        location: SingleLineLocation::new(12, 2, 4),
+                    },
+                    value: SpelAttributeValue {
+                        equals_location: SingleLineLocation::new(16, 2, 1),
+                        opening_quote_location: SingleLineLocation::new(17, 2, 1),
+                        spel: SpelAst::Identifier(SpelResult::Valid(Identifier::Name(Word {
+                            fragments: vec![WordFragment::String(StringLiteral {
+                                content: Arc::from("_testName"),
+                                location: lspml_spel::ast::Location::VariableLength {
+                                    char: 0,
+                                    line: 0,
+                                    length: 9,
+                                },
+                            })],
+                        }))),
+                        closing_quote_location: SingleLineLocation::new(27, 2, 1),
+                    },
+                })),
+                scope_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
+                    key: AttributeKey {
+                        value: "scope".into(),
+                        location: SingleLineLocation::new(46, 2, 5),
+                    },
+                    value: SpelAttributeValue {
+                        equals_location: SingleLineLocation::new(51, 2, 1),
+                        opening_quote_location: SingleLineLocation::new(52, 2, 1),
+                        spel: SpelAst::String(SpelResult::Valid(Word {
+                            fragments: vec![WordFragment::String(StringLiteral {
+                                content: Arc::from("page"),
+                                location: lspml_spel::ast::Location::VariableLength {
+                                    char: 0,
+                                    line: 0,
+                                    length: 4,
+                                },
+                            })],
+                        })),
+                        closing_quote_location: SingleLineLocation::new(57, 2, 1),
+                    },
+                })),
+                text_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
+                    key: AttributeKey {
+                        value: "text".into(),
+                        location: SingleLineLocation::new(29, 2, 4),
+                    },
+                    value: SpelAttributeValue {
+                        equals_location: SingleLineLocation::new(33, 2, 1),
+                        opening_quote_location: SingleLineLocation::new(34, 2, 1),
+                        spel: SpelAst::String(SpelResult::Valid(Word {
+                            fragments: vec![WordFragment::String(StringLiteral {
+                                content: Arc::from("some text"),
+                                location: lspml_spel::ast::Location::VariableLength {
+                                    char: 0,
+                                    line: 0,
+                                    length: 9,
+                                },
+                            })],
+                        })),
+                        closing_quote_location: SingleLineLocation::new(44, 2, 1),
+                    },
+                })),
+                type_attribute: None,
+                body: None,
+                close_location: SingleLineLocation::new(58, 2, 2),
+            },
+        ))))];
         let mut ts_parser = tree_sitter::Parser::new();
         ts_parser
             .set_language(&tree_sitter_spml::language())
@@ -4368,7 +4370,7 @@ mod tests {
         let _header = parser.parse_header()?;
         let tags = parser.parse_tags()?;
         assert_eq!(tags, expected);
-        return Ok(());
+        Ok(())
     }
 
     #[test]
@@ -4387,46 +4389,48 @@ mod tests {
                 equals_location: SingleLineLocation::new(10, 2, 1),
                 opening_quote_location: SingleLineLocation::new(11, 2, 1),
                 content: HtmlAttributeValueContent::Fragmented(vec![
-                    HtmlAttributeValueFragment::Tag(ParsedTag::Valid(SpmlTag::SpPrint(SpPrint {
-                        open_location: SingleLineLocation::new(12, 2, 9),
-                        arg_attribute: None,
-                        condition_attribute: None,
-                        convert_attribute: None,
-                        cryptkey_attribute: None,
-                        dateformat_attribute: None,
-                        decimalformat_attribute: None,
-                        decoding_attribute: None,
-                        decrypt_attribute: None,
-                        default_attribute: None,
-                        encoding_attribute: None,
-                        encrypt_attribute: None,
-                        expression_attribute: None,
-                        locale_attribute: None,
-                        name_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
-                            key: AttributeKey {
-                                value: "name".into(),
-                                location: SingleLineLocation::new(22, 2, 4),
-                            },
-                            value: SpelAttributeValue {
-                                equals_location: SingleLineLocation::new(26, 2, 1),
-                                opening_quote_location: SingleLineLocation::new(27, 2, 1),
-                                spel: SpelAst::Object(SpelResult::Valid(Object::Name(Word {
-                                    fragments: vec![WordFragment::String(StringLiteral {
-                                        content: Arc::from("_class"),
-                                        location: lspml_spel::ast::Location::VariableLength {
-                                            char: 0,
-                                            line: 0,
-                                            length: 6,
-                                        },
-                                    })],
-                                }))),
-                                closing_quote_location: SingleLineLocation::new(34, 2, 1),
-                            },
-                        })),
-                        text_attribute: None,
-                        body: None,
-                        close_location: SingleLineLocation::new(35, 2, 2),
-                    }))),
+                    HtmlAttributeValueFragment::Tag(Box::new(ParsedTag::Valid(SpmlTag::SpPrint(
+                        SpPrint {
+                            open_location: SingleLineLocation::new(12, 2, 9),
+                            arg_attribute: None,
+                            condition_attribute: None,
+                            convert_attribute: None,
+                            cryptkey_attribute: None,
+                            dateformat_attribute: None,
+                            decimalformat_attribute: None,
+                            decoding_attribute: None,
+                            decrypt_attribute: None,
+                            default_attribute: None,
+                            encoding_attribute: None,
+                            encrypt_attribute: None,
+                            expression_attribute: None,
+                            locale_attribute: None,
+                            name_attribute: Some(ParsedAttribute::Valid(SpelAttribute {
+                                key: AttributeKey {
+                                    value: "name".into(),
+                                    location: SingleLineLocation::new(22, 2, 4),
+                                },
+                                value: SpelAttributeValue {
+                                    equals_location: SingleLineLocation::new(26, 2, 1),
+                                    opening_quote_location: SingleLineLocation::new(27, 2, 1),
+                                    spel: SpelAst::Object(SpelResult::Valid(Object::Name(Word {
+                                        fragments: vec![WordFragment::String(StringLiteral {
+                                            content: Arc::from("_class"),
+                                            location: lspml_spel::ast::Location::VariableLength {
+                                                char: 0,
+                                                line: 0,
+                                                length: 6,
+                                            },
+                                        })],
+                                    }))),
+                                    closing_quote_location: SingleLineLocation::new(34, 2, 1),
+                                },
+                            })),
+                            text_attribute: None,
+                            body: None,
+                            close_location: SingleLineLocation::new(35, 2, 2),
+                        },
+                    )))),
                     HtmlAttributeValueFragment::Plain(" centered".into()),
                 ]),
                 closing_quote_location: SingleLineLocation::new(46, 2, 1),
@@ -4445,7 +4449,7 @@ mod tests {
         parser.goto(&NodeMovement::NextSibling);
         let html = AttributeParser::html(&mut parser)?;
         assert_eq!(html, expected);
-        return Ok(());
+        Ok(())
     }
 
     #[test]
@@ -4467,7 +4471,7 @@ mod tests {
                     equals_location: SingleLineLocation::new(8, 2, 1),
                     opening_quote_location: SingleLineLocation::new(9, 2, 1),
                     content: HtmlAttributeValueContent::Fragmented(vec![
-                        HtmlAttributeValueFragment::Tag(ParsedTag::Valid(SpmlTag::SpPrint(
+                        HtmlAttributeValueFragment::Tag(Box::new(ParsedTag::Valid(SpmlTag::SpPrint(
                             SpPrint {
                                 open_location: SingleLineLocation::new(10, 2, 9),
                                 arg_attribute: None,
@@ -4513,7 +4517,7 @@ mod tests {
                                 body: None,
                                 close_location: SingleLineLocation::new(33, 2, 2),
                             },
-                        ))),
+                        )))),
                         HtmlAttributeValueFragment::Plain(" centered".into()),
                     ]),
                     closing_quote_location: SingleLineLocation::new(44, 2, 1),
@@ -4534,6 +4538,6 @@ mod tests {
         log::info!("kind: {}", parser.cursor.node().kind());
         let html = parser.parse_html_option_tag()?;
         assert_eq!(html, expected);
-        return Ok(());
+        Ok(())
     }
 }

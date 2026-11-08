@@ -42,15 +42,15 @@ impl DefinitionsFinder<'_> {
             definitions: Vec::new(),
         };
         finder.collect();
-        return finder.definitions;
+        finder.definitions
     }
 
     fn collect(&mut self) {
         let nodes = &self.document.tree.nodes;
         for node in nodes {
             let tag = match node {
-                Node::Tag(ParsedTag::Valid(tag)) => tag,
-                Node::Tag(ParsedTag::Erroneous(tag, _)) => tag,
+                Node::Tag(tag) if let ParsedTag::Valid(tag) = &**tag => tag,
+                Node::Tag(tag) if let ParsedTag::Erroneous(tag, _) = &**tag => tag,
                 Node::Html(ParsedHtml::Valid(html)) => {
                     for tag in tags_in_attributes(html) {
                         self.collect_from_tag(&tag);
@@ -69,20 +69,20 @@ impl DefinitionsFinder<'_> {
             if open_location.line > self.upper_bound.line as usize {
                 return;
             }
-            if open_location.line == self.upper_bound.line as usize {
-                if open_location.char >= self.upper_bound.character as usize {
-                    return;
-                }
+            if open_location.line == self.upper_bound.line as usize
+                && open_location.char >= self.upper_bound.character as usize
+            {
+                return;
             }
-            self.collect_from_tag(&tag);
+            self.collect_from_tag(tag);
         }
     }
 
     fn collect_from_tag(&mut self, tag: &SpmlTag) {
         if let TagAttributes::These(attributes) = tag.definition().attributes {
             for attribute in attributes {
-                if let TagAttributeType::Identifier = attribute.r#type {
-                    if let Some(ParsedAttribute::Valid(SpelAttribute {
+                if let TagAttributeType::Identifier = attribute.r#type
+                    && let Some(ParsedAttribute::Valid(SpelAttribute {
                         value:
                             SpelAttributeValue {
                                 spel:
@@ -93,42 +93,33 @@ impl DefinitionsFinder<'_> {
                                 ..
                             },
                         ..
-                    })) = tag.spel_attribute(&attribute.name)
-                    {
-                        if fragments.len() == 1 {
-                            if let WordFragment::String(StringLiteral { content, location }) =
-                                &fragments[0]
-                            {
-                                if &**content == self.variable {
-                                    let start = Position {
-                                        line: opening_quote_location.line as u32
-                                            + location.line() as u32,
-                                        character: opening_quote_location.char as u32
-                                            + location.char() as u32
-                                            + 1,
-                                    };
-                                    self.definitions.push(lsp_types::Location {
-                                        uri: self.uri.clone(),
-                                        range: Range {
-                                            start,
-                                            end: Position {
-                                                line: start.line,
-                                                character: start.character + location.len() as u32,
-                                            },
-                                        },
-                                    });
-                                }
-                            }
-                        }
-                    }
+                    })) = tag.spel_attribute(attribute.name)
+                    && fragments.len() == 1
+                    && let WordFragment::String(StringLiteral { content, location }) = &fragments[0]
+                    && **content == self.variable
+                {
+                    let start = Position {
+                        line: opening_quote_location.line as u32 + location.line() as u32,
+                        character: opening_quote_location.char as u32 + location.char() as u32 + 1,
+                    };
+                    self.definitions.push(lsp_types::Location {
+                        uri: self.uri.clone(),
+                        range: Range {
+                            start,
+                            end: Position {
+                                line: start.line,
+                                character: start.character + location.len() as u32,
+                            },
+                        },
+                    });
                 }
             }
         }
         if let Some(body) = &tag.body() {
             for node in &body.nodes {
                 let tag = match node {
-                    Node::Tag(ParsedTag::Valid(tag)) => tag,
-                    Node::Tag(ParsedTag::Erroneous(tag, _)) => tag,
+                    Node::Tag(tag) if let ParsedTag::Valid(tag) = &**tag => tag,
+                    Node::Tag(tag) if let ParsedTag::Erroneous(tag, _) = &**tag => tag,
                     _ => continue,
                 };
                 self.collect_from_tag(tag)
@@ -148,16 +139,16 @@ pub(crate) fn definition(
             .map(|document| lspml_document_store::put(file, document))
             .map_err(|err| {
                 log::error!("failed to read {:?}: {}", file, err);
-                return LsError {
+                LsError {
                     message: format!("cannot read file {:?}", file),
                     code: ErrorCode::RequestFailed,
-                };
+                }
             }),
     }?;
     let cursor = text_params.position;
     let tag = match document.tree.node_at(cursor) {
-        Some(Node::Tag(ParsedTag::Valid(tag))) => tag,
-        Some(Node::Tag(ParsedTag::Erroneous(tag, _))) => tag,
+        Some(Node::Tag(tag)) if let ParsedTag::Valid(tag) = &**tag => tag,
+        Some(Node::Tag(tag)) if let ParsedTag::Erroneous(tag, _) = &**tag => tag,
         Some(Node::Html(ParsedHtml::Valid(html))) => {
             &(match find_node_in_attributes(html, cursor) {
                 Some(tag) => tag,
@@ -221,10 +212,9 @@ pub(crate) fn definition(
                     ..
                 }) = module_attribute
                 // TODO: should use TagAttributeType::Uri { module_attribute} for this
+                    && let [WordFragment::String(StringLiteral { content, .. })] = &fragments[..]
                 {
-                    if let [WordFragment::String(StringLiteral { content, .. })] = &fragments[..] {
-                        module = lspml_modules::find_module_by_name(&content)
-                    }
+                    module = lspml_modules::find_module_by_name(content)
                 }
                 module = module.or_else(|| {
                     lspml_document_store::uri_to_path(&text_params.text_document.uri)
@@ -262,7 +252,7 @@ pub(crate) fn definition(
             };
         }
     }
-    return Ok(None);
+    Ok(None)
 }
 
 fn find_node_in_attributes(html: &HtmlNode, location: Position) -> Option<SpmlTag> {
@@ -279,21 +269,27 @@ fn tags_in_attributes(html: &HtmlNode) -> Box<dyn Iterator<Item = SpmlTag> + '_>
                 ParsedAttribute::Erroneous(attribute, _) => attribute.value,
                 ParsedAttribute::Unparsable(_, _) => None,
             })
-            .flat_map(|value| match value.content {
-                HtmlAttributeValueContent::Tag(ParsedTag::Valid(tag)) => {
-                    Box::new(iter::once(tag)) as Box<dyn Iterator<Item = SpmlTag>>
+            .flat_map(|value| match &value.content {
+                HtmlAttributeValueContent::Tag(tag) if let ParsedTag::Valid(tag) = &**tag => {
+                    Box::new(iter::once(tag.clone())) as Box<dyn Iterator<Item = SpmlTag>>
                 }
-                HtmlAttributeValueContent::Tag(ParsedTag::Erroneous(tag, _)) => {
-                    Box::new(iter::once(tag)) as Box<dyn Iterator<Item = SpmlTag>>
+                HtmlAttributeValueContent::Tag(tag)
+                    if let ParsedTag::Erroneous(tag, _) = &**tag =>
+                {
+                    Box::new(iter::once(tag.clone())) as Box<dyn Iterator<Item = SpmlTag>>
                 }
                 HtmlAttributeValueContent::Fragmented(fragments) => Box::new(
                     fragments
                         .iter()
                         .filter_map(|fragment| match fragment {
-                            HtmlAttributeValueFragment::Tag(ParsedTag::Valid(tag)) => {
+                            HtmlAttributeValueFragment::Tag(tag)
+                                if let ParsedTag::Valid(tag) = &**tag =>
+                            {
                                 Some(tag.clone())
                             }
-                            HtmlAttributeValueFragment::Tag(ParsedTag::Erroneous(tag, _)) => {
+                            HtmlAttributeValueFragment::Tag(tag)
+                                if let ParsedTag::Erroneous(tag, _) = &**tag =>
+                            {
                                 Some(tag.clone())
                             }
                             _ => None,
@@ -312,38 +308,32 @@ fn find_node_in_identifier(
     cursor: &Position,
     offset: &Position,
 ) -> Option<Variable> {
-    match identifier {
-        // TODO
-        // Identifier::FieldAccess { identifier, field, dot_location } => {
-        // }
-        Identifier::Name(Word { fragments }) => {
-            match fragments.len() {
-                1 => match &fragments[0] {
-                    WordFragment::String(_) => {
-                        // this IS the definition
-                    }
-                    WordFragment::Interpolation(interpolation) => {
-                        return find_node_in_object(&interpolation.content, cursor, offset);
-                    }
-                },
-                _ => {
-                    for fragment in fragments {
-                        if let WordFragment::Interpolation(interpolation) = fragment {
-                            if let Ordering::Less = compare_cursor_to_location(
-                                &interpolation.closing_bracket_location,
-                                cursor,
-                                offset,
-                            ) {
-                                return find_node_in_object(&interpolation.content, cursor, offset);
-                            };
-                        }
-                    }
+    if let Identifier::Name(Word { fragments }) = identifier {
+        match fragments.len() {
+            1 => match &fragments[0] {
+                WordFragment::String(_) => {
+                    // this IS the definition
                 }
-            };
-        }
-        _ => (),
-    };
-    return None;
+                WordFragment::Interpolation(interpolation) => {
+                    return find_node_in_object(&interpolation.content, cursor, offset);
+                }
+            },
+            _ => {
+                for fragment in fragments {
+                    if let WordFragment::Interpolation(interpolation) = fragment
+                        && let Ordering::Less = compare_cursor_to_location(
+                            &interpolation.closing_bracket_location,
+                            cursor,
+                            offset,
+                        )
+                    {
+                        return find_node_in_object(&interpolation.content, cursor, offset);
+                    };
+                }
+            }
+        };
+    }
+    None
 }
 
 fn find_node_in_comparable(
@@ -351,7 +341,7 @@ fn find_node_in_comparable(
     cursor: &Position,
     offset: &Position,
 ) -> Option<Variable> {
-    return match comparable {
+    match comparable {
         Comparable::Condition(condition) => find_node_in_condition(condition, cursor, offset),
         Comparable::Expression(expression) => find_node_in_expression(expression, cursor, offset),
         Comparable::Function(function) => find_node_in_global_function(function, cursor, offset),
@@ -361,14 +351,14 @@ fn find_node_in_comparable(
         // Comparable::String(_) => todo!(),
         // Comparable::Null(_) => todo!(),
         _ => None,
-    };
+    }
 }
 fn find_node_in_condition(
     condition: &Condition,
     cursor: &Position,
     offset: &Position,
 ) -> Option<Variable> {
-    return match condition {
+    match condition {
         Condition::Object(interpolation) => {
             find_node_in_object(&interpolation.content, cursor, offset)
         }
@@ -378,7 +368,7 @@ fn find_node_in_condition(
             right,
             operator_location,
             ..
-        } => match compare_cursor_to_location(&operator_location, cursor, offset) {
+        } => match compare_cursor_to_location(operator_location, cursor, offset) {
             Ordering::Less => find_node_in_condition(left, cursor, offset),
             Ordering::Equal => None,
             Ordering::Greater => find_node_in_condition(right, cursor, offset),
@@ -394,13 +384,13 @@ fn find_node_in_condition(
             right,
             operator_location,
             ..
-        } => match compare_cursor_to_location(&operator_location, cursor, offset) {
+        } => match compare_cursor_to_location(operator_location, cursor, offset) {
             Ordering::Less => find_node_in_comparable(left, cursor, offset),
             Ordering::Equal => None,
             Ordering::Greater => find_node_in_comparable(right, cursor, offset),
         },
         _ => None,
-    };
+    }
 }
 
 fn find_node_in_expression(
@@ -408,7 +398,7 @@ fn find_node_in_expression(
     cursor: &Position,
     offset: &Position,
 ) -> Option<Variable> {
-    return match expression {
+    match expression {
         // Expression::Number(_) => todo!(),
         Expression::Function(function) => find_node_in_global_function(function, cursor, offset),
         Expression::Object(interpolation) => {
@@ -425,7 +415,7 @@ fn find_node_in_expression(
             right,
             operator_location,
             ..
-        } => match compare_cursor_to_location(&operator_location, cursor, offset) {
+        } => match compare_cursor_to_location(operator_location, cursor, offset) {
             Ordering::Less => find_node_in_expression(left, cursor, offset),
             Ordering::Equal => None,
             Ordering::Greater => find_node_in_expression(right, cursor, offset),
@@ -436,23 +426,21 @@ fn find_node_in_expression(
             right,
             question_mark_location,
             colon_location,
-        } => match compare_cursor_to_location(&question_mark_location, cursor, offset) {
+        } => match compare_cursor_to_location(question_mark_location, cursor, offset) {
             Ordering::Less => find_node_in_condition(condition, cursor, offset),
             Ordering::Equal => None,
-            Ordering::Greater => {
-                match compare_cursor_to_location(&colon_location, cursor, offset) {
-                    Ordering::Less => find_node_in_expression(left, cursor, offset),
-                    Ordering::Equal => None,
-                    Ordering::Greater => find_node_in_expression(right, cursor, offset),
-                }
-            }
+            Ordering::Greater => match compare_cursor_to_location(colon_location, cursor, offset) {
+                Ordering::Less => find_node_in_expression(left, cursor, offset),
+                Ordering::Equal => None,
+                Ordering::Greater => find_node_in_expression(right, cursor, offset),
+            },
         },
         _ => None,
-    };
+    }
 }
 
 fn find_node_in_object(object: &Object, cursor: &Position, offset: &Position) -> Option<Variable> {
-    return match object {
+    match object {
         // Object::Anchor(_) => todo!(),
         Object::Function(function) => find_node_in_global_function(function, cursor, offset),
         Object::Name(Word { fragments }) => {
@@ -467,19 +455,19 @@ fn find_node_in_object(object: &Object, cursor: &Position, offset: &Position) ->
                 },
                 _ => {
                     for fragment in fragments {
-                        if let WordFragment::Interpolation(interpolation) = fragment {
-                            if let Ordering::Less = compare_cursor_to_location(
+                        if let WordFragment::Interpolation(interpolation) = fragment
+                            && let Ordering::Less = compare_cursor_to_location(
                                 &interpolation.closing_bracket_location,
                                 cursor,
                                 offset,
-                            ) {
-                                return find_node_in_object(&interpolation.content, cursor, offset);
-                            };
-                        }
+                            )
+                        {
+                            return find_node_in_object(&interpolation.content, cursor, offset);
+                        };
                     }
                 }
             };
-            return None;
+            None
         }
         // Object::Null(_) => todo!(),
         // Object::String(_) => todo!(),
@@ -488,7 +476,7 @@ fn find_node_in_object(object: &Object, cursor: &Position, offset: &Position) ->
             field: _field,
             dot_location,
         } => {
-            match compare_cursor_to_location(&dot_location, cursor, offset) {
+            match compare_cursor_to_location(dot_location, cursor, offset) {
                 Ordering::Less => find_node_in_object(object, cursor, offset),
                 Ordering::Equal => None,
                 Ordering::Greater => None, // TODO
@@ -499,7 +487,7 @@ fn find_node_in_object(object: &Object, cursor: &Position, offset: &Position) ->
             function: _function,
             dot_location,
         } => {
-            match compare_cursor_to_location(&dot_location, cursor, offset) {
+            match compare_cursor_to_location(dot_location, cursor, offset) {
                 Ordering::Less => find_node_in_object(object, cursor, offset),
                 Ordering::Equal => None,
                 Ordering::Greater => None, // TODO
@@ -510,13 +498,13 @@ fn find_node_in_object(object: &Object, cursor: &Position, offset: &Position) ->
             index,
             opening_bracket_location,
             ..
-        } => match compare_cursor_to_location(&opening_bracket_location, cursor, offset) {
+        } => match compare_cursor_to_location(opening_bracket_location, cursor, offset) {
             Ordering::Less => find_node_in_object(object, cursor, offset),
             Ordering::Equal => None,
             Ordering::Greater => find_node_in_expression(index, cursor, offset),
         },
         _ => None,
-    };
+    }
 }
 
 fn find_node_in_global_function(
@@ -524,7 +512,7 @@ fn find_node_in_global_function(
     cursor: &Position,
     offset: &Position,
 ) -> Option<Variable> {
-    return match compare_cursor_to_location(&function.opening_bracket_location, cursor, offset) {
+    match compare_cursor_to_location(&function.opening_bracket_location, cursor, offset) {
         Ordering::Less => None,
         Ordering::Equal => None,
         Ordering::Greater => {
@@ -532,13 +520,13 @@ fn find_node_in_global_function(
                 if argument
                     .comma_location
                     .as_ref()
-                    .filter(|l| compare_cursor_to_location(&l, cursor, offset) == Ordering::Less)
+                    .filter(|l| compare_cursor_to_location(l, cursor, offset) == Ordering::Less)
                     .is_none()
                 {
                     return match &argument.argument {
                         // Argument::Anchor(_) => todo!(),
                         Argument::Function(function) => {
-                            find_node_in_global_function(&function, cursor, offset)
+                            find_node_in_global_function(function, cursor, offset)
                         }
                         // Argument::Null(_) => todo!(),
                         // Argument::Number(_) => todo!(),
@@ -551,19 +539,19 @@ fn find_node_in_global_function(
                     };
                 }
             }
-            return None;
+            None
         }
-    };
+    }
 }
 
 fn find_node_in_query(_query: &Query, _cursor: &Position, _offset: &Position) -> Option<Variable> {
     // TODO
-    return None;
+    None
 }
 
 fn find_node_in_regex(_regex: &Regex, _cursor: &Position, _offset: &Position) -> Option<Variable> {
     // TODO
-    return None;
+    None
 }
 
 fn find_node_in_text(text: &Word, cursor: &Position, offset: &Position) -> Option<Variable> {
@@ -578,24 +566,24 @@ fn find_node_in_text(text: &Word, cursor: &Position, offset: &Position) -> Optio
         },
         _ => {
             for fragment in &text.fragments {
-                if let WordFragment::Interpolation(interpolation) = fragment {
-                    if let Ordering::Less = compare_cursor_to_location(
+                if let WordFragment::Interpolation(interpolation) = fragment
+                    && let Ordering::Less = compare_cursor_to_location(
                         &interpolation.closing_bracket_location,
                         cursor,
                         offset,
-                    ) {
-                        return find_node_in_object(&interpolation.content, cursor, offset);
-                    };
-                }
+                    )
+                {
+                    return find_node_in_object(&interpolation.content, cursor, offset);
+                };
             }
         }
     };
-    return None;
+    None
 }
 
 fn find_node_in_uri(_uri: &Uri, _cursor: &Position, _offset: &Position) -> Option<Variable> {
     // TODO
-    return None;
+    None
 }
 
 // TODO: only respects single line spels
@@ -612,5 +600,5 @@ fn compare_cursor_to_location(
     if location.len() as u32 + start < cursor {
         return Ordering::Greater;
     }
-    return Ordering::Equal;
+    Ordering::Equal
 }

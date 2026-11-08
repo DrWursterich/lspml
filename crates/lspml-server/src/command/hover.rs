@@ -26,20 +26,22 @@ pub(crate) fn hover(params: HoverParams) -> Result<Option<Hover>, LsError> {
             .map(|document| lspml_document_store::put(file, document))
             .map_err(|err| {
                 log::error!("failed to read {:?}: {}", file, err);
-                return LsError {
+                LsError {
                     message: format!("cannot read file {:?}", file),
                     code: ErrorCode::RequestFailed,
-                };
+                }
             }),
     }?;
     let cursor = text_params.position;
-    return match document.tree.node_at(cursor) {
-        Some(Node::Tag(ParsedTag::Valid(tag))) => hover_tag(tag, &cursor),
-        Some(Node::Tag(ParsedTag::Erroneous(tag, _))) => hover_tag(tag, &cursor),
+    match document.tree.node_at(cursor) {
+        Some(Node::Tag(tag)) if let ParsedTag::Valid(tag) = &**tag => hover_tag(tag, &cursor),
+        Some(Node::Tag(tag)) if let ParsedTag::Erroneous(tag, _) = &**tag => {
+            hover_tag(tag, &cursor)
+        }
         Some(Node::Html(ParsedHtml::Valid(html))) => hover_html(html, &cursor),
         Some(Node::Html(ParsedHtml::Erroneous(html, _))) => hover_html(html, &cursor),
         _ => Ok(None),
-    };
+    }
 }
 
 fn hover_tag(tag: &SpmlTag, cursor: &Position) -> Result<Option<Hover>, LsError> {
@@ -72,31 +74,29 @@ fn hover_tag(tag: &SpmlTag, cursor: &Position) -> Result<Option<Hover>, LsError>
                     range: None,
                 }));
         }
-        if attribute.value.is_inside(&cursor) {
+        if attribute.value.is_inside(cursor) {
             let offset = Position {
                 line: attribute.value.opening_quote_location.line as u32,
                 character: (attribute.value.opening_quote_location.char + 1) as u32,
             };
             return Ok(match &attribute.value.spel {
                 SpelAst::Comparable(SpelResult::Valid(comparable)) => {
-                    hover_comparable(comparable, &cursor, &offset)
+                    hover_comparable(comparable, cursor, &offset)
                 }
                 SpelAst::Condition(SpelResult::Valid(condition)) => {
-                    hover_condition(condition, &cursor, &offset)
+                    hover_condition(condition, cursor, &offset)
                 }
                 SpelAst::Expression(SpelResult::Valid(expression)) => {
-                    hover_expression(expression, &cursor, &offset)
+                    hover_expression(expression, cursor, &offset)
                 }
                 SpelAst::Identifier(SpelResult::Valid(identifier)) => {
-                    hover_identifier(identifier, &cursor, &offset)
+                    hover_identifier(identifier, cursor, &offset)
                 }
-                SpelAst::Object(SpelResult::Valid(object)) => {
-                    hover_object(object, &cursor, &offset)
-                }
-                SpelAst::Query(SpelResult::Valid(query)) => hover_query(query, &cursor, &offset),
-                SpelAst::Regex(SpelResult::Valid(regex)) => hover_regex(regex, &cursor, &offset),
-                SpelAst::String(SpelResult::Valid(word)) => hover_text(word, &cursor, &offset),
-                SpelAst::Uri(SpelResult::Valid(uri)) => hover_uri(uri, &cursor, &offset),
+                SpelAst::Object(SpelResult::Valid(object)) => hover_object(object, cursor, &offset),
+                SpelAst::Query(SpelResult::Valid(query)) => hover_query(query, cursor, &offset),
+                SpelAst::Regex(SpelResult::Valid(regex)) => hover_regex(regex, cursor, &offset),
+                SpelAst::String(SpelResult::Valid(word)) => hover_text(word, cursor, &offset),
+                SpelAst::Uri(SpelResult::Valid(uri)) => hover_uri(uri, cursor, &offset),
                 _ => None,
             }
             .map(|value| Hover {
@@ -108,7 +108,7 @@ fn hover_tag(tag: &SpmlTag, cursor: &Position) -> Result<Option<Hover>, LsError>
             }));
         }
     }
-    return Ok(None);
+    Ok(None)
 }
 
 fn hover_html(html: &HtmlNode, cursor: &Position) -> Result<Option<Hover>, LsError> {
@@ -126,20 +126,26 @@ fn hover_html(html: &HtmlNode, cursor: &Position) -> Result<Option<Hover>, LsErr
                 break;
             }
             match &value.content {
-                HtmlAttributeValueContent::Tag(ParsedTag::Valid(tag)) => {
-                    return hover_tag(tag, &cursor);
+                HtmlAttributeValueContent::Tag(tag) if let ParsedTag::Valid(tag) = &**tag => {
+                    return hover_tag(tag, cursor);
                 }
-                HtmlAttributeValueContent::Tag(ParsedTag::Erroneous(tag, _)) => {
-                    return hover_tag(tag, &cursor);
+                HtmlAttributeValueContent::Tag(tag)
+                    if let ParsedTag::Erroneous(tag, _) = &**tag =>
+                {
+                    return hover_tag(tag, cursor);
                 }
                 HtmlAttributeValueContent::Fragmented(fragments) => {
                     for fragment in fragments {
                         return match fragment {
-                            HtmlAttributeValueFragment::Tag(ParsedTag::Valid(tag)) => {
-                                hover_tag(tag, &cursor)
+                            HtmlAttributeValueFragment::Tag(tag)
+                                if let ParsedTag::Valid(tag) = &**tag =>
+                            {
+                                hover_tag(tag, cursor)
                             }
-                            HtmlAttributeValueFragment::Tag(ParsedTag::Erroneous(tag, _)) => {
-                                hover_tag(tag, &cursor)
+                            HtmlAttributeValueFragment::Tag(tag)
+                                if let ParsedTag::Erroneous(tag, _) = &**tag =>
+                            {
+                                hover_tag(tag, cursor)
                             }
                             _ => continue,
                         };
@@ -158,7 +164,7 @@ fn hover_identifier(
     _offset: &Position,
 ) -> Option<String> {
     // TODO
-    return None;
+    None
 }
 
 fn hover_comparable(
@@ -166,7 +172,7 @@ fn hover_comparable(
     cursor: &Position,
     offset: &Position,
 ) -> Option<String> {
-    return match comparable {
+    match comparable {
         Comparable::Condition(condition) => hover_condition(condition, cursor, offset),
         Comparable::Expression(expression) => hover_expression(expression, cursor, offset),
         Comparable::Function(function) => hover_global_function(function, cursor, offset),
@@ -174,10 +180,10 @@ fn hover_comparable(
         // Comparable::String(_) => todo!(),
         // Comparable::Null(_) => todo!(),
         _ => None,
-    };
+    }
 }
 fn hover_condition(condition: &Condition, cursor: &Position, offset: &Position) -> Option<String> {
-    return match condition {
+    match condition {
         Condition::Object(interpolation) => hover_object(&interpolation.content, cursor, offset),
         Condition::Function(function) => hover_global_function(function, cursor, offset),
         Condition::BinaryOperation {
@@ -185,7 +191,7 @@ fn hover_condition(condition: &Condition, cursor: &Position, offset: &Position) 
             right,
             operator_location,
             ..
-        } => match compare_cursor_to_location(&operator_location, cursor, offset) {
+        } => match compare_cursor_to_location(operator_location, cursor, offset) {
             Ordering::Less => hover_condition(left, cursor, offset),
             Ordering::Equal => None,
             Ordering::Greater => hover_condition(right, cursor, offset),
@@ -199,13 +205,13 @@ fn hover_condition(condition: &Condition, cursor: &Position, offset: &Position) 
             right,
             operator_location,
             ..
-        } => match compare_cursor_to_location(&operator_location, cursor, offset) {
+        } => match compare_cursor_to_location(operator_location, cursor, offset) {
             Ordering::Less => hover_comparable(left, cursor, offset),
             Ordering::Equal => None,
             Ordering::Greater => hover_comparable(right, cursor, offset),
         },
         _ => None,
-    };
+    }
 }
 
 fn hover_expression(
@@ -213,7 +219,7 @@ fn hover_expression(
     cursor: &Position,
     offset: &Position,
 ) -> Option<String> {
-    return match expression {
+    match expression {
         // Expression::Number(_) => todo!(),
         Expression::Function(function) => hover_global_function(function, cursor, offset),
         Expression::Object(interpolation) => hover_object(&interpolation.content, cursor, offset),
@@ -228,7 +234,7 @@ fn hover_expression(
             right,
             operator_location,
             ..
-        } => match compare_cursor_to_location(&operator_location, cursor, offset) {
+        } => match compare_cursor_to_location(operator_location, cursor, offset) {
             Ordering::Less => hover_expression(left, cursor, offset),
             Ordering::Equal => None,
             Ordering::Greater => hover_expression(right, cursor, offset),
@@ -239,23 +245,21 @@ fn hover_expression(
             right,
             question_mark_location,
             colon_location,
-        } => match compare_cursor_to_location(&question_mark_location, cursor, offset) {
+        } => match compare_cursor_to_location(question_mark_location, cursor, offset) {
             Ordering::Less => hover_condition(condition, cursor, offset),
             Ordering::Equal => None,
-            Ordering::Greater => {
-                match compare_cursor_to_location(&colon_location, cursor, offset) {
-                    Ordering::Less => hover_expression(left, cursor, offset),
-                    Ordering::Equal => None,
-                    Ordering::Greater => hover_expression(right, cursor, offset),
-                }
-            }
+            Ordering::Greater => match compare_cursor_to_location(colon_location, cursor, offset) {
+                Ordering::Less => hover_expression(left, cursor, offset),
+                Ordering::Equal => None,
+                Ordering::Greater => hover_expression(right, cursor, offset),
+            },
         },
         _ => None,
-    };
+    }
 }
 
 fn hover_object(object: &Object, cursor: &Position, offset: &Position) -> Option<String> {
-    return match object {
+    match object {
         // Object::Anchor(_) => todo!(),
         Object::Function(function) => hover_global_function(function, cursor, offset),
         Object::Name(Word { fragments }) => {
@@ -270,19 +274,19 @@ fn hover_object(object: &Object, cursor: &Position, offset: &Position) -> Option
                 },
                 _ => {
                     for fragment in fragments {
-                        if let WordFragment::Interpolation(interpolation) = fragment {
-                            if let Ordering::Less = compare_cursor_to_location(
+                        if let WordFragment::Interpolation(interpolation) = fragment
+                            && let Ordering::Less = compare_cursor_to_location(
                                 &interpolation.closing_bracket_location,
                                 cursor,
                                 offset,
-                            ) {
-                                return hover_object(&interpolation.content, cursor, offset);
-                            };
-                        }
+                            )
+                        {
+                            return hover_object(&interpolation.content, cursor, offset);
+                        };
                     }
                 }
             };
-            return None;
+            None
         }
         // Object::Null(_) => todo!(),
         // Object::String(_) => todo!(),
@@ -291,7 +295,7 @@ fn hover_object(object: &Object, cursor: &Position, offset: &Position) -> Option
             field: _field,
             dot_location,
         } => {
-            match compare_cursor_to_location(&dot_location, cursor, offset) {
+            match compare_cursor_to_location(dot_location, cursor, offset) {
                 Ordering::Less => hover_object(object, cursor, offset),
                 Ordering::Equal => None,
                 Ordering::Greater => None, // TODO
@@ -302,7 +306,7 @@ fn hover_object(object: &Object, cursor: &Position, offset: &Position) -> Option
             function: _function,
             dot_location,
         } => {
-            match compare_cursor_to_location(&dot_location, cursor, offset) {
+            match compare_cursor_to_location(dot_location, cursor, offset) {
                 Ordering::Less => hover_object(object, cursor, offset),
                 Ordering::Equal => None,
                 Ordering::Greater => None, // TODO
@@ -313,13 +317,13 @@ fn hover_object(object: &Object, cursor: &Position, offset: &Position) -> Option
             index,
             opening_bracket_location,
             ..
-        } => match compare_cursor_to_location(&opening_bracket_location, cursor, offset) {
+        } => match compare_cursor_to_location(opening_bracket_location, cursor, offset) {
             Ordering::Less => hover_object(object, cursor, offset),
             Ordering::Equal => None,
             Ordering::Greater => hover_expression(index, cursor, offset),
         },
         _ => None,
-    };
+    }
 }
 
 fn hover_global_function(
@@ -327,7 +331,7 @@ fn hover_global_function(
     cursor: &Position,
     offset: &Position,
 ) -> Option<String> {
-    return match compare_cursor_to_location(&function.opening_bracket_location, cursor, offset) {
+    match compare_cursor_to_location(&function.opening_bracket_location, cursor, offset) {
         Ordering::Less => FunctionDefinition::from_str(&function.name)
             .ok()
             .map(|tag| tag.documentation.to_owned().to_string()),
@@ -337,13 +341,13 @@ fn hover_global_function(
                 if argument
                     .comma_location
                     .as_ref()
-                    .filter(|l| compare_cursor_to_location(&l, cursor, offset) == Ordering::Less)
+                    .filter(|l| compare_cursor_to_location(l, cursor, offset) == Ordering::Less)
                     .is_none()
                 {
                     return match &argument.argument {
                         // Argument::Anchor(_) => todo!(),
                         Argument::Function(function) => {
-                            hover_global_function(&function, cursor, offset)
+                            hover_global_function(function, cursor, offset)
                         }
                         // Argument::Null(_) => todo!(),
                         // Argument::Number(_) => todo!(),
@@ -356,19 +360,19 @@ fn hover_global_function(
                     };
                 }
             }
-            return None;
+            None
         }
-    };
+    }
 }
 
 fn hover_query(_query: &Query, _cursor: &Position, _offset: &Position) -> Option<String> {
     // TODO
-    return None;
+    None
 }
 
 fn hover_regex(_regex: &Regex, _cursor: &Position, _offset: &Position) -> Option<String> {
     // TODO
-    return None;
+    None
 }
 
 fn hover_text(text: &Word, cursor: &Position, offset: &Position) -> Option<String> {
@@ -383,24 +387,24 @@ fn hover_text(text: &Word, cursor: &Position, offset: &Position) -> Option<Strin
         },
         _ => {
             for fragment in &text.fragments {
-                if let WordFragment::Interpolation(interpolation) = fragment {
-                    if let Ordering::Less = compare_cursor_to_location(
+                if let WordFragment::Interpolation(interpolation) = fragment
+                    && let Ordering::Less = compare_cursor_to_location(
                         &interpolation.closing_bracket_location,
                         cursor,
                         offset,
-                    ) {
-                        return hover_object(&interpolation.content, cursor, offset);
-                    };
-                }
+                    )
+                {
+                    return hover_object(&interpolation.content, cursor, offset);
+                };
             }
         }
     };
-    return None;
+    None
 }
 
 fn hover_uri(_uri: &Uri, _cursor: &Position, _offset: &Position) -> Option<String> {
     // TODO
-    return None;
+    None
 }
 
 // TODO: only respects single line spels
@@ -417,5 +421,5 @@ fn compare_cursor_to_location(
     if location.len() as u32 + start < cursor {
         return Ordering::Greater;
     }
-    return Ordering::Equal;
+    Ordering::Equal
 }

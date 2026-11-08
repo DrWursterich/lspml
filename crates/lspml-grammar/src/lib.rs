@@ -14,7 +14,7 @@ pub struct TagDefinition {
 
 impl PartialEq for TagDefinition {
     fn eq(&self, other: &Self) -> bool {
-        return self.name == other.name;
+        self.name == other.name
     }
 }
 
@@ -26,10 +26,10 @@ pub enum TagAttributes {
 
 impl TagAttributes {
     pub fn get_by_name(&self, name: &str) -> Option<&TagAttribute> {
-        return match self {
+        match self {
             TagAttributes::None => None,
             TagAttributes::These(definitions) => definitions.iter().find(|a| a.name == name),
-        };
+        }
     }
 }
 
@@ -2007,7 +2007,7 @@ impl FromStr for TagDefinition {
     type Err = Error;
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
-        return match string {
+        match string {
             "argument_tag" => Ok(TagDefinition::SP_ARGUMENT),
             "attribute_tag" => Ok(TagDefinition::SP_ATTRIBUTE),
             "barcode_tag" => Ok(TagDefinition::SP_BARCODE),
@@ -2091,6 +2091,6 @@ impl FromStr for TagDefinition {
             "spt_upload_tag" => Ok(TagDefinition::SPT_UPLOAD),
             "spt_worklist_tag" => Ok(TagDefinition::SPT_WORKLIST),
             tag => Err(anyhow::anyhow!("not a valid tag: \"{}\"", tag)),
-        };
+        }
     }
 }

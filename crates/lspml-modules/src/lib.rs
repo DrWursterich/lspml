@@ -21,7 +21,7 @@ impl Deref for ModuleMappings {
     type Target = HashMap<String, Module>;
 
     fn deref(&self) -> &Self::Target {
-        return &self.0;
+        &self.0
     }
 }
 
@@ -30,7 +30,7 @@ pub(crate) static MODULE_MAPPINGS: OnceLock<Arc<Mutex<ModuleMappings>>> = OnceLo
 pub fn init_module_mappings_from_file(file: &str) -> Result<()> {
     MODULE_MAPPINGS
         .set(Arc::new(Mutex::new(ModuleMappings(
-            fs::read_to_string(&file)
+            fs::read_to_string(file)
                 .map_err(|err| anyhow::anyhow!("failed to read {}: {}", file, err))
                 .and_then(|text| {
                     serde_json::from_str(&text)
@@ -43,7 +43,7 @@ pub fn init_module_mappings_from_file(file: &str) -> Result<()> {
         file,
         MODULE_MAPPINGS.get().unwrap()
     );
-    return Ok(());
+    Ok(())
 }
 
 pub fn init_empty_module_mappings() -> Result<()> {
@@ -54,10 +54,10 @@ pub fn init_empty_module_mappings() -> Result<()> {
         "created empty module mappings: {:?}",
         MODULE_MAPPINGS.get().unwrap()
     );
-    return Ok(());
+    Ok(())
 }
 
-pub fn all_modules<'a>() -> Vec<(String, Module)> {
+pub fn all_modules() -> Vec<(String, Module)> {
     return MODULE_MAPPINGS
         .get()
         .expect("module mappings not initialized")

@@ -100,11 +100,11 @@ impl FunctionDefinition {
         argument_number: ArgumentNumber,
         documentation: &'static str,
     ) -> Self {
-        return FunctionDefinition {
+        FunctionDefinition {
             name,
             argument_number,
             documentation,
-        };
+        }
     }
 }
 
@@ -112,7 +112,7 @@ impl FromStr for FunctionDefinition {
     type Err = anyhow::Error;
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
-        return match string {
+        match string {
             "ceil" => Ok(FunctionDefinition::CEIL),
             "coalesce" => Ok(FunctionDefinition::COALESCE),
             "collection" => Ok(FunctionDefinition::COLLECTION),
@@ -130,7 +130,7 @@ impl FromStr for FunctionDefinition {
             "round" => Ok(FunctionDefinition::ROUND),
             "translatable" => Ok(FunctionDefinition::TRANSLATABLE),
             name => Err(anyhow::anyhow!("unknown function \"{}\"", name)),
-        };
+        }
     }
 }
 

@@ -39,7 +39,7 @@ pub fn tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }
         _ => panic!("derive(Tag) is only supported for enums"),
     };
-    return proc_macro::TokenStream::from(expanded);
+    proc_macro::TokenStream::from(expanded)
 }
 
 #[proc_macro_derive(DocumentNode)]
@@ -105,7 +105,7 @@ pub fn document_node(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
         }
         _ => panic!("derive(DocumentNode) is only supported for structs and enums"),
     };
-    return proc_macro::TokenStream::from(expanded);
+    proc_macro::TokenStream::from(expanded)
 }
 
 #[proc_macro_derive(ParsableTag)]
@@ -190,17 +190,17 @@ pub fn parsable_tag(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }
         _ => panic!("derive(ParsableTag) is only supported for structs and enums"),
     };
-    return proc_macro::TokenStream::from(expanded);
+    proc_macro::TokenStream::from(expanded)
 }
 
 fn get_type(r#type: &Type) -> Option<&PathSegment> {
-    return match r#type {
+    match r#type {
         Type::Path(TypePath {
             path: Path { segments, .. },
             ..
         }) => segments.last(),
         _ => None,
-    };
+    }
 }
 
 fn get_type_name(r#type: &PathSegment) -> Option<String> {

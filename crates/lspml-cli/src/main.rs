@@ -34,10 +34,10 @@ pub enum Format {
 
 impl Display for Format {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return match self {
+        match self {
             Format::TEXT => write!(f, "text"),
             Format::GITLAB => write!(f, "gitbal"),
-        };
+        }
     }
 }
 
@@ -54,7 +54,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     if !path.is_dir() {
         return Err(anyhow::anyhow!("{} is not a directory", opts.directory).into());
     }
-    lspml_diagnostics::diagnose_all(&path, &mut diagnostics)?;
+    lspml_diagnostics::diagnose_all(path, &mut diagnostics)?;
     if let Some(ignore) = opts.ignore {
         diagnostics = diagnostics
             .into_iter()
@@ -63,22 +63,22 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
                     .into_iter()
                     .filter(|d| !ignore.contains(&d.r#type))
                     .collect::<Vec<Diagnostic>>();
-                return match values.is_empty() {
+                match values.is_empty() {
                     true => None,
                     false => Some((key, values)),
-                };
+                }
             })
             .collect();
     }
 
-    return Ok(print(diagnostics, opts.format)?);
+    Ok(print(diagnostics, opts.format)?)
 }
 
 pub fn print(diagnostics: HashMap<PathBuf, Vec<Diagnostic>>, format: Format) -> Result<()> {
-    return match format {
+    match format {
         Format::TEXT => print_text(diagnostics),
         Format::GITLAB => print_code_quality(diagnostics),
-    };
+    }
 }
 
 fn print_text(diagnostics: HashMap<PathBuf, Vec<Diagnostic>>) -> Result<()> {
@@ -112,7 +112,7 @@ fn print_text(diagnostics: HashMap<PathBuf, Vec<Diagnostic>>) -> Result<()> {
         }
         println!();
     }
-    return Ok(());
+    Ok(())
 }
 
 fn print_code_quality(diagnostics: HashMap<PathBuf, Vec<Diagnostic>>) -> Result<()> {
@@ -146,5 +146,5 @@ fn print_code_quality(diagnostics: HashMap<PathBuf, Vec<Diagnostic>>) -> Result<
         }
     }
     println!("{}", serde_json::to_string(&array)?);
-    return Ok(());
+    Ok(())
 }

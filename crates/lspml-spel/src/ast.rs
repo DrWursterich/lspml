@@ -19,12 +19,12 @@ pub enum Identifier {
 
 impl Display for Identifier {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        return match self {
+        match self {
             Identifier::Name(name) => name.fmt(formatter),
             Identifier::FieldAccess {
                 identifier, field, ..
             } => write!(formatter, "{}.{}", identifier, field),
-        };
+        }
     }
 }
 
@@ -54,7 +54,7 @@ pub enum Object {
 
 impl Display for Object {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        return match self {
+        match self {
             Object::Anchor(anchor) => anchor.fmt(formatter),
             Object::Function(function) => function.fmt(formatter),
             Object::Name(name) => name.fmt(formatter),
@@ -64,7 +64,7 @@ impl Display for Object {
                 object, function, ..
             } => write!(formatter, "{}.{}", object, function),
             Object::ArrayAccess { object, index, .. } => write!(formatter, "{}[{}]", object, index),
-        };
+        }
     }
 }
 
@@ -159,7 +159,7 @@ impl Display for Word {
         for fragment in &self.fragments {
             fragment.fmt(formatter)?;
         }
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -199,7 +199,7 @@ pub struct StringLiteral {
 
 impl Display for StringLiteral {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        return formatter.write_str(&self.content);
+        formatter.write_str(&self.content)
     }
 }
 
@@ -210,7 +210,7 @@ pub struct Null {
 
 impl Display for Null {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        return formatter.write_str("null");
+        formatter.write_str("null")
     }
 }
 
@@ -247,7 +247,7 @@ pub enum Expression {
 
 impl Display for Expression {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        return match self {
+        match self {
             Expression::Function(function) => function.fmt(formatter),
             Expression::Null(null) => null.fmt(formatter),
             Expression::Number(number) => number.fmt(formatter),
@@ -270,7 +270,7 @@ impl Display for Expression {
                 right,
                 ..
             } => write!(formatter, "{} ? {} : {}", condition, left, right),
-        };
+        }
     }
 }
 
@@ -308,10 +308,10 @@ pub enum Sign {
 
 impl Display for Sign {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        return formatter.write_str(match self {
+        formatter.write_str(match self {
             Sign::Plus => "+",
             Sign::Minus => "-",
-        });
+        })
     }
 }
 
@@ -327,14 +327,14 @@ pub enum ExpressionOperator {
 
 impl Display for ExpressionOperator {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        return formatter.write_str(match self {
+        formatter.write_str(match self {
             ExpressionOperator::Addition => "+",
             ExpressionOperator::Subtraction => "-",
             ExpressionOperator::Division => "/",
             ExpressionOperator::Multiplication => "*",
             ExpressionOperator::Modulo => "%",
             ExpressionOperator::Power => "^",
-        });
+        })
     }
 }
 
@@ -433,7 +433,7 @@ impl Comparable {
 
 impl Display for Condition {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        return match self {
+        match self {
             Condition::True { .. } => formatter.write_str("true"),
             Condition::False { .. } => formatter.write_str("false"),
             Condition::Object(interpolation) => interpolation.fmt(formatter),
@@ -452,7 +452,7 @@ impl Display for Condition {
                 right,
                 ..
             } => write!(formatter, "{} {} {}", left, operator, right),
-        };
+        }
     }
 }
 
@@ -464,10 +464,10 @@ pub enum ConditionOperator {
 
 impl Display for ConditionOperator {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        return formatter.write_str(match self {
+        formatter.write_str(match self {
             ConditionOperator::And => "&&",
             ConditionOperator::Or => "||",
-        });
+        })
     }
 }
 
@@ -483,14 +483,14 @@ pub enum ComparissonOperator {
 
 impl Display for ComparissonOperator {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        return formatter.write_str(match self {
+        formatter.write_str(match self {
             ComparissonOperator::Equal => "==",
             ComparissonOperator::Unequal => "!=",
             ComparissonOperator::GreaterThan => ">",
             ComparissonOperator::GreaterThanOrEqual => ">=",
             ComparissonOperator::LessThan => "<",
             ComparissonOperator::LessThanOrEqual => "<=",
-        });
+        })
     }
 }
 
@@ -507,27 +507,27 @@ pub enum UndecidedExpressionContent {
 
 impl Display for UndecidedExpressionContent {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        return match self {
+        match self {
             UndecidedExpressionContent::Condition(condition) => condition.fmt(formatter),
             UndecidedExpressionContent::Expression(expression) => expression.fmt(formatter),
             UndecidedExpressionContent::Function(function) => function.fmt(formatter),
             UndecidedExpressionContent::Name(interpolation) => interpolation.fmt(formatter),
             UndecidedExpressionContent::Null(null) => null.fmt(formatter),
             UndecidedExpressionContent::String(string) => string.fmt(formatter),
-        };
+        }
     }
 }
 
 impl UndecidedExpressionContent {
     pub fn r#type(&self) -> &str {
-        return match self {
+        match self {
             UndecidedExpressionContent::Condition(_) => "condition",
             UndecidedExpressionContent::Expression(_) => "expression",
             UndecidedExpressionContent::Function(_) => "function",
             UndecidedExpressionContent::Name(_) => "object",
             UndecidedExpressionContent::Null(_) => "null",
             UndecidedExpressionContent::String(_) => "string",
-        };
+        }
     }
 }
 
@@ -540,27 +540,28 @@ pub enum Location {
 
 impl Location {
     pub fn char(&self) -> u16 {
-        return match self {
+        match self {
             Location::SingleCharacter { char, .. }
             | Location::DoubleCharacter { char, .. }
             | Location::VariableLength { char, .. } => *char,
-        };
+        }
     }
 
     pub fn line(&self) -> u16 {
-        return match self {
+        match self {
             Location::SingleCharacter { line, .. }
             | Location::DoubleCharacter { line, .. }
             | Location::VariableLength { line, .. } => *line,
-        };
+        }
     }
 
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> u16 {
-        return match self {
-            Location::SingleCharacter { .. } => 1 as u16,
-            Location::DoubleCharacter { .. } => 2 as u16,
+        match self {
+            Location::SingleCharacter { .. } => 1_u16,
+            Location::DoubleCharacter { .. } => 2_u16,
             Location::VariableLength { length, .. } => *length,
-        };
+        }
     }
 }
 
@@ -602,7 +603,7 @@ pub struct ObjectAst {
 
 impl ObjectAst {
     pub(crate) fn new(root: Object) -> Self {
-        return Self { root };
+        Self { root }
     }
 }
 
@@ -613,7 +614,7 @@ pub struct ExpressionAst {
 
 impl ExpressionAst {
     pub(crate) fn new(root: Expression) -> Self {
-        return Self { root };
+        Self { root }
     }
 }
 
@@ -624,7 +625,7 @@ pub struct ConditionAst {
 
 impl ConditionAst {
     pub(crate) fn new(root: Condition) -> Self {
-        return Self { root };
+        Self { root }
     }
 }
 
@@ -636,10 +637,10 @@ pub enum Uri {
 
 impl Display for Uri {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        return match self {
+        match self {
             Uri::Literal(literal) => literal.fmt(formatter),
             Uri::Object(object) => object.fmt(formatter),
-        };
+        }
     }
 }
 

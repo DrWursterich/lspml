@@ -31,10 +31,10 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
             .map(|document| lspml_document_store::put(&uri, document))
             .map_err(|err| {
                 log::error!("failed to read {:?}: {}", uri, err);
-                return LsError {
+                LsError {
                     message: format!("cannot read file {:?}", uri),
                     code: ErrorCode::RequestFailed,
-                };
+                }
             }),
     }?;
     let mut actions = Vec::new();
@@ -56,7 +56,7 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
             })
             .flatten()
             .collect::<Vec<TextEdit>>();
-        if edits.len() > 0 {
+        if !edits.is_empty() {
             actions.push(CodeActionOrCommand::CodeAction(CodeAction {
                 title: "fix all spel syntax errors".to_string(),
                 kind: Some(CodeActionKind::SOURCE_FIX_ALL),
@@ -74,16 +74,16 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
                     actions.push(construct_generate_default_header(&uri))
                 }
                 Some(CodeActionImplementation::FIX_SPEL_SYNTAX_CODE) => {
-                    diagnostic
+                    if let Some(edits) = diagnostic
                         .data
                         .and_then(|data| serde_json::from_value(data).ok())
-                        .map(|edits| {
-                            actions.push(construct_fix_spel_syntax(
-                                &uri,
-                                format!("quick-fix: {}", diagnostic.message),
-                                edits,
-                            ))
-                        });
+                    {
+                        actions.push(construct_fix_spel_syntax(
+                            &uri,
+                            format!("quick-fix: {}", diagnostic.message),
+                            edits,
+                        ))
+                    }
                 }
                 Some(CodeActionImplementation::REMOVE_SUPERFLUOUS_CODE) => {
                     actions.push(construct_fix_spel_syntax(
@@ -96,24 +96,24 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
                     ));
                 }
                 Some(CodeActionImplementation::ADD_MISSING_CODE) => {
-                    diagnostic
+                    if let Some(edit) = diagnostic
                         .data
                         .and_then(|data| serde_json::from_value(data).ok())
-                        .map(|edit| {
-                            actions.push(construct_fix_spel_syntax(
-                                &uri,
-                                format!("quick-fix: {}", diagnostic.message),
-                                vec![edit],
-                            ))
-                        });
+                    {
+                        actions.push(construct_fix_spel_syntax(
+                            &uri,
+                            format!("quick-fix: {}", diagnostic.message),
+                            vec![edit],
+                        ))
+                    }
                 }
                 _ => (),
             }
         }
     }
     let if_tag = match document.tree.node_at(params.range.start) {
-        Some(Node::Tag(ParsedTag::Valid(SpmlTag::SpIf(tag)))) => tag,
-        Some(Node::Tag(ParsedTag::Erroneous(SpmlTag::SpIf(tag), _))) => tag,
+        Some(Node::Tag(tag)) if let ParsedTag::Valid(SpmlTag::SpIf(tag)) = &**tag => tag,
+        Some(Node::Tag(tag)) if let ParsedTag::Erroneous(SpmlTag::SpIf(tag), _) = &**tag => tag,
         Some(Node::Html(ParsedHtml::Valid(html))) => {
             match document
                 .tree
@@ -129,21 +129,21 @@ pub(crate) fn action(params: CodeActionParams) -> Result<Vec<CodeActionOrCommand
         }
         _ => return Ok(actions),
     };
-    if let Some(action) = construct_name_to_condition(&uri, &if_tag) {
+    if let Some(action) = construct_name_to_condition(&uri, if_tag) {
         actions.push(action);
     }
-    if let Some(action) = construct_condition_to_name(&uri, &if_tag) {
+    if let Some(action) = construct_condition_to_name(&uri, if_tag) {
         actions.push(action);
     }
-    return Ok(actions);
+    Ok(actions)
 }
 
-fn construct_generate_default_header<'a>(uri: &Uri) -> CodeActionOrCommand {
+fn construct_generate_default_header(uri: &Uri) -> CodeActionOrCommand {
     let document_start = Position {
         line: 0,
         character: 0,
     };
-    return CodeActionOrCommand::CodeAction(CodeAction {
+    CodeActionOrCommand::CodeAction(CodeAction {
         title: "generate default header".to_string(),
         kind: Some(CodeActionImplementation::GenerateDefaultHeaders.to_kind()),
         edit: Some(WorkspaceEdit {
@@ -160,15 +160,15 @@ fn construct_generate_default_header<'a>(uri: &Uri) -> CodeActionOrCommand {
             ..WorkspaceEdit::default()
         }),
         ..CodeAction::default()
-    });
+    })
 }
 
-fn construct_fix_spel_syntax<'a>(
+fn construct_fix_spel_syntax(
     uri: &Uri,
     title: String,
     edits: Vec<TextEdit>,
 ) -> CodeActionOrCommand {
-    return CodeActionOrCommand::CodeAction(CodeAction {
+    CodeActionOrCommand::CodeAction(CodeAction {
         title,
         kind: Some(CodeActionImplementation::GenerateDefaultHeaders.to_kind()),
         edit: Some(WorkspaceEdit {
@@ -176,10 +176,10 @@ fn construct_fix_spel_syntax<'a>(
             ..WorkspaceEdit::default()
         }),
         ..CodeAction::default()
-    });
+    })
 }
 
-fn construct_name_to_condition<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActionOrCommand> {
+fn construct_name_to_condition(uri: &Uri, if_tag: &SpIf) -> Option<CodeActionOrCommand> {
     let name_attribute = match &if_tag.name_attribute {
         Some(ParsedAttribute::Valid(attribute)) => attribute,
         Some(ParsedAttribute::Erroneous(attribute, _)) => attribute,
@@ -213,7 +213,7 @@ fn construct_name_to_condition<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
         "neq" => format!("${{{}}} != {}", name, value),
         _ => format!("${{{}}} == {}", name, value),
     };
-    return Some(CodeActionOrCommand::CodeAction(CodeAction {
+    Some(CodeActionOrCommand::CodeAction(CodeAction {
         title: format!("transform \"name\" and \"{}\" to \"condition\"", operator),
         kind: Some(CodeActionImplementation::NameToCondition.to_kind()),
         edit: Some(WorkspaceEdit {
@@ -242,7 +242,7 @@ fn construct_name_to_condition<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
             ..WorkspaceEdit::default()
         }),
         ..CodeAction::default()
-    }));
+    }))
 }
 
 fn first_comparable_if_attribute(if_tag: &SpIf) -> Option<(&str, &SpelAttribute)> {
@@ -281,10 +281,10 @@ fn first_comparable_if_attribute(if_tag: &SpIf) -> Option<(&str, &SpelAttribute)
         Some(ParsedAttribute::Erroneous(attribute, _)) => return Some(("isNull", attribute)),
         _ => (),
     };
-    return None;
+    None
 }
 
-fn construct_condition_to_name<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActionOrCommand> {
+fn construct_condition_to_name(uri: &Uri, if_tag: &SpIf) -> Option<CodeActionOrCommand> {
     let condition_attribute = match &if_tag.condition_attribute {
         Some(ParsedAttribute::Valid(attribute)) => attribute,
         Some(ParsedAttribute::Erroneous(attribute, _)) => attribute,
@@ -302,8 +302,7 @@ fn construct_condition_to_name<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
             ..
         } => {
             let operator_name;
-            let new_text;
-            match (&**left, &**right) {
+            let new_text = match (&**left, &**right) {
                 (Comparable::Object(inner), _) => {
                     operator_name = match operator {
                         ComparissonOperator::Equal => "eq",
@@ -313,10 +312,10 @@ fn construct_condition_to_name<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
                         ComparissonOperator::LessThan => "lt",
                         ComparissonOperator::LessThanOrEqual => "lte",
                     };
-                    new_text = format!(
+                    format!(
                         "name=\"{}\" {}=\"{}\"",
                         inner.content, operator_name, *right
-                    );
+                    )
                 }
                 (_, Comparable::Object(inner)) => {
                     operator_name = match operator {
@@ -327,12 +326,11 @@ fn construct_condition_to_name<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
                         ComparissonOperator::LessThan => "gt",
                         ComparissonOperator::LessThanOrEqual => "gte",
                     };
-                    new_text =
-                        format!("name=\"{}\" {}=\"{}\"", inner.content, operator_name, *left);
+                    format!("name=\"{}\" {}=\"{}\"", inner.content, operator_name, *left)
                 }
                 _ => return None,
             };
-            return Some(CodeActionOrCommand::CodeAction(CodeAction {
+            Some(CodeActionOrCommand::CodeAction(CodeAction {
                 title: format!(
                     "transform \"condition\" to \"name\" and \"{}\"",
                     operator_name
@@ -352,30 +350,28 @@ fn construct_condition_to_name<'a>(uri: &Uri, if_tag: &SpIf) -> Option<CodeActio
                     ..WorkspaceEdit::default()
                 }),
                 ..CodeAction::default()
-            }));
+            }))
         }
-        condition => {
-            return parse_is_null(&condition).map(|(name, value)| {
-                CodeActionOrCommand::CodeAction(CodeAction {
-                    title: "transform \"condition\" to \"name\" and \"isNull\"".to_string(),
-                    kind: Some(CodeActionImplementation::ConditionToName.to_kind()),
-                    edit: Some(WorkspaceEdit {
-                        changes: Some(HashMap::from([(
-                            uri.clone(),
-                            vec![TextEdit {
-                                range: Range {
-                                    start: condition_attribute.start(),
-                                    end: condition_attribute.end(),
-                                },
-                                new_text: format!("name=\"{}\" isNull=\"{}\"", name, value),
-                            }],
-                        )])),
-                        ..WorkspaceEdit::default()
-                    }),
-                    ..CodeAction::default()
-                })
-            });
-        }
+        condition => parse_is_null(condition).map(|(name, value)| {
+            CodeActionOrCommand::CodeAction(CodeAction {
+                title: "transform \"condition\" to \"name\" and \"isNull\"".to_string(),
+                kind: Some(CodeActionImplementation::ConditionToName.to_kind()),
+                edit: Some(WorkspaceEdit {
+                    changes: Some(HashMap::from([(
+                        uri.clone(),
+                        vec![TextEdit {
+                            range: Range {
+                                start: condition_attribute.start(),
+                                end: condition_attribute.end(),
+                            },
+                            new_text: format!("name=\"{}\" isNull=\"{}\"", name, value),
+                        }],
+                    )])),
+                    ..WorkspaceEdit::default()
+                }),
+                ..CodeAction::default()
+            })
+        }),
     }
 }
 

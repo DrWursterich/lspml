@@ -22,22 +22,23 @@ impl std::error::Error for LsError {}
 
 impl fmt::Display for LsError {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        return write!(formatter, "{:?}: {}", self.code, self.message);
+        write!(formatter, "{:?}: {}", self.code, self.message)
     }
 }
 
 impl From<Error> for LsError {
     fn from(error: Error) -> Self {
-        return LsError {
+        LsError {
             message: error.to_string(),
             code: ErrorCode::RequestFailed,
-        };
+        }
     }
 }
 
 impl LsError {
+    #[allow(clippy::wrong_self_convention)]
     fn to_response(self, request_id: RequestId) -> Response {
-        return Response {
+        Response {
             id: request_id,
             result: None,
             error: Some(ResponseError {
@@ -45,13 +46,13 @@ impl LsError {
                 code: self.code as i32,
                 data: None,
             }),
-        };
+        }
     }
 }
 
 pub(crate) fn complete(request: Request) -> Result<Message> {
     log::trace!("got completion request: {request:?}");
-    return serde_json::from_value(request.params)
+    serde_json::from_value(request.params)
         .map(|params| {
             Message::Response(match complete::complete(params) {
                 Ok(completions) => Response {
@@ -62,12 +63,12 @@ pub(crate) fn complete(request: Request) -> Result<Message> {
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(Error::from);
+        .map_err(Error::from)
 }
 
 pub(crate) fn definition(request: Request) -> Result<Message> {
     log::trace!("got go to definition request: {request:?}");
-    return serde_json::from_value(request.params)
+    serde_json::from_value(request.params)
         .map(|params| {
             Message::Response(match definition::definition(params) {
                 Ok(definition) => Response {
@@ -80,12 +81,12 @@ pub(crate) fn definition(request: Request) -> Result<Message> {
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(Error::from);
+        .map_err(Error::from)
 }
 
 pub(crate) fn diagnostic(request: Request) -> Result<Message> {
     log::trace!("got diagnose request: {request:?}");
-    return serde_json::from_value(request.params)
+    serde_json::from_value(request.params)
         .map(|params| {
             Message::Response(match lspml_diagnostics::diagnostic(params) {
                 Ok(diagnostic) => Response {
@@ -105,12 +106,12 @@ pub(crate) fn diagnostic(request: Request) -> Result<Message> {
                 Err(err) => LsError::from(err).to_response(request.id),
             })
         })
-        .map_err(Error::from);
+        .map_err(Error::from)
 }
 
 pub(crate) fn highlight(request: Request) -> Result<Message> {
     log::trace!("got highlight request: {request:?}");
-    return serde_json::from_value(request.params)
+    serde_json::from_value(request.params)
         .map(|params| {
             Message::Response(match highlight::highlight(params) {
                 Ok(highlights) => Response {
@@ -121,7 +122,7 @@ pub(crate) fn highlight(request: Request) -> Result<Message> {
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(Error::from);
+        .map_err(Error::from)
 }
 
 pub(crate) fn hover(request: Request) -> Result<Message> {
@@ -139,12 +140,12 @@ pub(crate) fn hover(request: Request) -> Result<Message> {
         },
         Err(err) => err.to_response(request.id),
     };
-    return Ok(Message::Response(response));
+    Ok(Message::Response(response))
 }
 
 pub(crate) fn semantics(request: Request) -> Result<Message> {
     log::trace!("got semantics request: {request:?}");
-    return serde_json::from_value(request.params)
+    serde_json::from_value(request.params)
         .map(|params| {
             Message::Response(match semantics::semantics(params) {
                 Ok(tokens) => Response {
@@ -159,12 +160,12 @@ pub(crate) fn semantics(request: Request) -> Result<Message> {
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(Error::from);
+        .map_err(Error::from)
 }
 
 pub(crate) fn action(request: Request) -> Result<Message> {
     log::trace!("got code-action request: {request:?}");
-    return serde_json::from_value(request.params)
+    serde_json::from_value(request.params)
         .map(|params| {
             Message::Response(match action::action(params) {
                 Ok(actions) => match serde_json::to_value(actions) {
@@ -187,12 +188,12 @@ pub(crate) fn action(request: Request) -> Result<Message> {
                 Err(err) => err.to_response(request.id),
             })
         })
-        .map_err(Error::from);
+        .map_err(Error::from)
 }
 
 pub(crate) fn unknown(request: Request) -> Result<Message> {
     log::info!("got unknonwn request: {request:?}");
-    return Ok(Message::Response(Response {
+    Ok(Message::Response(Response {
         id: request.id,
         result: None,
         error: Some(ResponseError {
@@ -200,5 +201,5 @@ pub(crate) fn unknown(request: Request) -> Result<Message> {
             code: ErrorCode::MethodNotFound as i32,
             data: None,
         }),
-    }));
+    }))
 }
