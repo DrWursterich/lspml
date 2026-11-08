@@ -1,5 +1,5 @@
 use quote::{quote, quote_spanned};
-use syn::{parse_macro_input, DeriveInput, Path, PathSegment, Type, TypePath};
+use syn::{DeriveInput, Path, PathSegment, Type, TypePath, parse_macro_input};
 
 extern crate proc_macro;
 

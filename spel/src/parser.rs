@@ -5,6 +5,7 @@ use core::fmt;
 use lsp_types::{Position, Range, TextEdit};
 
 use super::{
+    Scanner,
     ast::{
         Anchor, Argument, Comparable, ComparissonOperator, Condition, ConditionAst,
         ConditionOperator, Expression, ExpressionAst, ExpressionOperator, Function,
@@ -12,7 +13,6 @@ use super::{
         Query, Regex, Sign, SignedNumber, StringLiteral, UndecidedExpressionContent, Uri,
         UriFileExtension, UriFragment, UriLiteral, Word, WordFragment,
     },
-    Scanner,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -256,7 +256,7 @@ impl Parser {
                     return Ok(Uri::Literal(UriLiteral {
                         fragments,
                         file_extension: None,
-                    }))
+                    }));
                 }
             }
         }
@@ -286,7 +286,7 @@ impl Parser {
                             line: 0,
                             length,
                         },
-                    })
+                    });
                 }
             }
         }
@@ -312,7 +312,7 @@ impl Parser {
                             line: 0,
                             length,
                         },
-                    })
+                    });
                 }
             }
         }
@@ -872,7 +872,7 @@ impl Parser {
                                 },
                                 "=".to_string(),
                             )],
-                        })
+                        });
                     }
                 };
                 let operator_location = match equals {
@@ -981,7 +981,7 @@ impl Parser {
                         return Err(syntax_error!(
                             "unsupported brackets around \"{}\"",
                             comparable.r#type()
-                        ))
+                        ));
                     }
                 }
             }
@@ -1052,7 +1052,7 @@ impl Parser {
                             line: 0,
                             length: self.scanner.cursor as u16 - start,
                         },
-                    })
+                    });
                 }
             }
         }
@@ -1208,7 +1208,7 @@ impl Parser {
                                     },
                                     "\\'".to_string(),
                                 )],
-                            })
+                            });
                         }
                     }
                 }
@@ -1239,7 +1239,7 @@ impl Parser {
                             },
                             "'".to_string(),
                         )],
-                    })
+                    });
                 }
             }
         }
@@ -1619,7 +1619,7 @@ impl Parser {
                             },
                             ")".to_string(),
                         )],
-                    })
+                    });
                 }
             };
         }
