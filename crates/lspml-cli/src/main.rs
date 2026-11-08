@@ -20,7 +20,7 @@ struct CommandLineOpts {
     modules_file: Option<String>,
     #[clap(long, default_value_t = String::from("."))]
     directory: String,
-    #[clap(long, default_value_t = Format::TEXT)]
+    #[clap(long, default_value_t = Format::Text)]
     format: Format,
     #[clap(long)]
     ignore: Option<Vec<lspml_diagnostics::Type>>,
@@ -28,15 +28,15 @@ struct CommandLineOpts {
 
 #[derive(Clone, Debug, clap::ValueEnum)]
 pub enum Format {
-    TEXT,
-    GITLAB,
+    Text,
+    Gitlab,
 }
 
 impl Display for Format {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Format::TEXT => write!(f, "text"),
-            Format::GITLAB => write!(f, "gitbal"),
+            Format::Text => write!(f, "text"),
+            Format::Gitlab => write!(f, "gitbal"),
         }
     }
 }
@@ -76,8 +76,8 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
 pub fn print(diagnostics: HashMap<PathBuf, Vec<Diagnostic>>, format: Format) -> Result<()> {
     match format {
-        Format::TEXT => print_text(diagnostics),
-        Format::GITLAB => print_code_quality(diagnostics),
+        Format::Text => print_text(diagnostics),
+        Format::Gitlab => print_code_quality(diagnostics),
     }
 }
 

@@ -385,7 +385,7 @@ fn parse_is_null(root: &Condition) -> Option<(String, String)> {
             }
             argument => Some((argument.to_string(), "true".to_string())),
         },
-        Condition::NegatedCondition { condition, .. } => {
+        Condition::Negated { condition, .. } => {
             is_null_argument(condition).map(|argument| (argument, "false".to_string()))
         }
         _ => None,

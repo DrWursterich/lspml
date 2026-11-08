@@ -45,6 +45,7 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_lsp_type(self) -> lsp_types::Diagnostic {
         lsp_types::Diagnostic {
             range: self.range,
@@ -1082,12 +1083,8 @@ impl SpelValidator<'_> {
             Expression::Object(interpolation) => {
                 self.validate_object(&interpolation.content)?;
             }
-            Expression::SignedExpression { expression, .. } => {
-                self.validate_expression(expression)?
-            }
-            Expression::BracketedExpression { expression, .. } => {
-                self.validate_expression(expression)?
-            }
+            Expression::Signed { expression, .. } => self.validate_expression(expression)?,
+            Expression::Bracketed { expression, .. } => self.validate_expression(expression)?,
             Expression::BinaryOperation { left, right, .. } => {
                 self.validate_expression(left)?;
                 self.validate_expression(right)?;
@@ -1113,10 +1110,8 @@ impl SpelValidator<'_> {
                 self.validate_object(content)?;
             }
             Condition::Function(function) => self.validate_global_function(function)?,
-            Condition::BracketedCondition { condition, .. } => {
-                self.validate_condition(condition)?
-            }
-            Condition::NegatedCondition { condition, .. } => self.validate_condition(condition)?,
+            Condition::Bracketed { condition, .. } => self.validate_condition(condition)?,
+            Condition::Negated { condition, .. } => self.validate_condition(condition)?,
             Condition::BinaryOperation { left, right, .. } => {
                 self.validate_condition(left)?;
                 self.validate_condition(right)?;

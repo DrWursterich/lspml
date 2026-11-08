@@ -417,7 +417,7 @@ fn index_expression(expression: &Expression, token_collector: &mut SpelTokenColl
                 &[],
             );
         }
-        Expression::SignedExpression {
+        Expression::Signed {
             expression,
             sign_location,
             ..
@@ -435,7 +435,7 @@ fn index_expression(expression: &Expression, token_collector: &mut SpelTokenColl
             token_collector.add(operation_location, &SemanticTokenType::OPERATOR, &[]);
             index_expression(right, token_collector);
         }
-        Expression::BracketedExpression {
+        Expression::Bracketed {
             expression,
             opening_bracket_location,
             closing_bracket_location,
@@ -489,7 +489,7 @@ fn index_condition(condition: &Condition, token_collector: &mut SpelTokenCollect
             token_collector.add(operator_location, &SemanticTokenType::OPERATOR, &[]);
             index_condition(right, token_collector);
         }
-        Condition::BracketedCondition {
+        Condition::Bracketed {
             condition,
             opening_bracket_location,
             closing_bracket_location,
@@ -498,7 +498,7 @@ fn index_condition(condition: &Condition, token_collector: &mut SpelTokenCollect
             index_condition(condition, token_collector);
             token_collector.add(closing_bracket_location, &SemanticTokenType::OPERATOR, &[]);
         }
-        Condition::NegatedCondition {
+        Condition::Negated {
             condition,
             exclamation_mark_location,
         } => {

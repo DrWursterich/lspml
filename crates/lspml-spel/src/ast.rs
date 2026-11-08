@@ -220,12 +220,12 @@ pub enum Expression {
     Null(Null),
     Number(Number),
     Object(Box<Interpolation>),
-    SignedExpression {
+    Signed {
         expression: Box<Expression>,
         sign: Sign,
         sign_location: Location,
     },
-    BracketedExpression {
+    Bracketed {
         expression: Box<Expression>,
         opening_bracket_location: Location,
         closing_bracket_location: Location,
@@ -252,10 +252,10 @@ impl Display for Expression {
             Expression::Null(null) => null.fmt(formatter),
             Expression::Number(number) => number.fmt(formatter),
             Expression::Object(interpolation) => interpolation.fmt(formatter),
-            Expression::SignedExpression {
+            Expression::Signed {
                 expression, sign, ..
             } => write!(formatter, "{}{}", sign, expression),
-            Expression::BracketedExpression { expression, .. } => {
+            Expression::Bracketed { expression, .. } => {
                 write!(formatter, "({})", expression)
             }
             Expression::BinaryOperation {
@@ -378,12 +378,12 @@ pub enum Condition {
         right: Box<Condition>,
         operator_location: Location,
     },
-    BracketedCondition {
+    Bracketed {
         condition: Box<Condition>,
         opening_bracket_location: Location,
         closing_bracket_location: Location,
     },
-    NegatedCondition {
+    Negated {
         condition: Box<Condition>,
         exclamation_mark_location: Location,
     },
@@ -438,14 +438,14 @@ impl Display for Condition {
             Condition::False { .. } => formatter.write_str("false"),
             Condition::Object(interpolation) => interpolation.fmt(formatter),
             Condition::Function(function) => function.fmt(formatter),
-            Condition::BracketedCondition { condition, .. } => write!(formatter, "({})", condition),
+            Condition::Bracketed { condition, .. } => write!(formatter, "({})", condition),
             Condition::BinaryOperation {
                 left,
                 operator,
                 right,
                 ..
             } => write!(formatter, "{} {} {}", left, operator, right),
-            Condition::NegatedCondition { condition, .. } => write!(formatter, "!{}", condition),
+            Condition::Negated { condition, .. } => write!(formatter, "!{}", condition),
             Condition::Comparisson {
                 left,
                 operator,

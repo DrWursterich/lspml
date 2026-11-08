@@ -196,10 +196,8 @@ fn hover_condition(condition: &Condition, cursor: &Position, offset: &Position) 
             Ordering::Equal => None,
             Ordering::Greater => hover_condition(right, cursor, offset),
         },
-        Condition::BracketedCondition { condition, .. } => {
-            hover_condition(condition, cursor, offset)
-        }
-        Condition::NegatedCondition { condition, .. } => hover_condition(condition, cursor, offset),
+        Condition::Bracketed { condition, .. } => hover_condition(condition, cursor, offset),
+        Condition::Negated { condition, .. } => hover_condition(condition, cursor, offset),
         Condition::Comparisson {
             left,
             right,
@@ -223,12 +221,8 @@ fn hover_expression(
         // Expression::Number(_) => todo!(),
         Expression::Function(function) => hover_global_function(function, cursor, offset),
         Expression::Object(interpolation) => hover_object(&interpolation.content, cursor, offset),
-        Expression::SignedExpression { expression, .. } => {
-            hover_expression(expression, cursor, offset)
-        }
-        Expression::BracketedExpression { expression, .. } => {
-            hover_expression(expression, cursor, offset)
-        }
+        Expression::Signed { expression, .. } => hover_expression(expression, cursor, offset),
+        Expression::Bracketed { expression, .. } => hover_expression(expression, cursor, offset),
         Expression::BinaryOperation {
             left,
             right,

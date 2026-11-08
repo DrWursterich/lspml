@@ -373,12 +373,8 @@ fn find_node_in_condition(
             Ordering::Equal => None,
             Ordering::Greater => find_node_in_condition(right, cursor, offset),
         },
-        Condition::BracketedCondition { condition, .. } => {
-            find_node_in_condition(condition, cursor, offset)
-        }
-        Condition::NegatedCondition { condition, .. } => {
-            find_node_in_condition(condition, cursor, offset)
-        }
+        Condition::Bracketed { condition, .. } => find_node_in_condition(condition, cursor, offset),
+        Condition::Negated { condition, .. } => find_node_in_condition(condition, cursor, offset),
         Condition::Comparisson {
             left,
             right,
@@ -404,10 +400,10 @@ fn find_node_in_expression(
         Expression::Object(interpolation) => {
             find_node_in_object(&interpolation.content, cursor, offset)
         }
-        Expression::SignedExpression { expression, .. } => {
+        Expression::Signed { expression, .. } => {
             find_node_in_expression(expression, cursor, offset)
         }
-        Expression::BracketedExpression { expression, .. } => {
+        Expression::Bracketed { expression, .. } => {
             find_node_in_expression(expression, cursor, offset)
         }
         Expression::BinaryOperation {

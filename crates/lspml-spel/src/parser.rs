@@ -689,14 +689,14 @@ impl Parser {
         };
         Ok(match content {
             UndecidedExpressionContent::Expression(expression) => {
-                UndecidedExpressionContent::Expression(Expression::BracketedExpression {
+                UndecidedExpressionContent::Expression(Expression::Bracketed {
                     expression: Box::new(expression),
                     opening_bracket_location,
                     closing_bracket_location,
                 })
             }
             UndecidedExpressionContent::Condition(condition) => {
-                UndecidedExpressionContent::Condition(Condition::BracketedCondition {
+                UndecidedExpressionContent::Condition(Condition::Bracketed {
                     condition: Box::new(condition),
                     opening_bracket_location,
                     closing_bracket_location,
@@ -962,14 +962,14 @@ impl Parser {
                 };
                 match comparable {
                     Comparable::Expression(expression) => {
-                        Ok(Comparable::Expression(Expression::BracketedExpression {
+                        Ok(Comparable::Expression(Expression::Bracketed {
                             expression: Box::new(expression),
                             opening_bracket_location,
                             closing_bracket_location,
                         }))
                     }
                     Comparable::Condition(condition) => {
-                        Ok(Comparable::Condition(Condition::BracketedCondition {
+                        Ok(Comparable::Condition(Condition::Bracketed {
                             condition: Box::new(condition),
                             opening_bracket_location,
                             closing_bracket_location,
@@ -1003,7 +1003,7 @@ impl Parser {
         self.scanner.pop();
         self.scanner.skip_whitespace();
         match self.parse_condition()? {
-            Condition::NegatedCondition {
+            Condition::Negated {
                 exclamation_mark_location: second,
                 ..
             } => Err(syntax_error! {
@@ -1014,7 +1014,7 @@ impl Parser {
                     length: second.char() + second.len() - exclamation_mark_location.char(),
                 })],
             }),
-            condition => Ok(Condition::NegatedCondition {
+            condition => Ok(Condition::Negated {
                 condition: Box::new(condition),
                 exclamation_mark_location,
             }),
@@ -1085,8 +1085,8 @@ impl Parser {
         };
         self.scanner.skip_whitespace();
         match self.parse_expression()? {
-            Expression::SignedExpression { .. } => Err(syntax_error!("duplicate sign")),
-            expression => Ok(Expression::SignedExpression {
+            Expression::Signed { .. } => Err(syntax_error!("duplicate sign")),
+            expression => Ok(Expression::Signed {
                 expression: Box::new(expression),
                 sign,
                 sign_location,
@@ -2176,7 +2176,7 @@ mod tests {
                             },
                         })]
                     })),
-                    index: Expression::SignedExpression {
+                    index: Expression::Signed {
                         expression: Box::new(Expression::Number(Number {
                             content: "1".into(),
                             location: Location::VariableLength {
@@ -2217,7 +2217,7 @@ mod tests {
         assert_eq!(
             parse_expression("-13.5e-2"),
             ExpressionAst {
-                root: Expression::SignedExpression {
+                root: Expression::Signed {
                     expression: Box::new(Expression::Number(Number {
                         content: "13.5e-2".into(),
                         location: Location::VariableLength {
@@ -2238,9 +2238,9 @@ mod tests {
         assert_eq!(
             parse_expression(" -( -6E+2 ) "),
             ExpressionAst {
-                root: Expression::SignedExpression {
-                    expression: Box::new(Expression::BracketedExpression {
-                        expression: Box::new(Expression::SignedExpression {
+                root: Expression::Signed {
+                    expression: Box::new(Expression::Bracketed {
+                        expression: Box::new(Expression::Signed {
                             expression: Box::new(Expression::Number(Number {
                                 content: "6E+2".into(),
                                 location: Location::VariableLength {
@@ -2329,7 +2329,7 @@ mod tests {
                         operator_location: Location::SingleCharacter { char: 2, line: 0 }
                     }),
                     operator: ExpressionOperator::Addition,
-                    right: Box::new(Expression::SignedExpression {
+                    right: Box::new(Expression::Signed {
                         expression: Box::new(Expression::Number(Number {
                             content: "3".into(),
                             location: Location::VariableLength {
@@ -2603,7 +2603,7 @@ mod tests {
         assert_eq!(
             parse_condition("(false || true)"),
             ConditionAst {
-                root: Condition::BracketedCondition {
+                root: Condition::Bracketed {
                     condition: Box::new(Condition::BinaryOperation {
                         left: Box::new(Condition::False {
                             location: Location::VariableLength {
