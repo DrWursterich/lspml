@@ -112,7 +112,7 @@ macro_rules! tag_definition {
             name: concat!($tag_type, ":", $tag_name),
             detail: None,
             documentation: Some(
-                include_str!(concat!("../../doc/", $tag_type, "_", $tag_name, "/tag.md"))
+                include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc/", $tag_type, "_", $tag_name, "/tag.md"))
             ),
             deprecated: $deprecated,
             children: $children,
@@ -133,7 +133,8 @@ macro_rules! tag_definition {
             name: concat!($tag_type, ":", $tag_name),
             detail: None,
             documentation: match include_str!(concat!(
-                "../../doc/",
+                env!("CARGO_MANIFEST_DIR"),
+                "/doc/",
                 $tag_type,
                 "_",
                 $tag_name,
@@ -153,7 +154,8 @@ macro_rules! tag_definition {
                         documentation: Some(
                             include_str!(
                                 concat!(
-                                    "../../doc/",
+                                    env!("CARGO_MANIFEST_DIR"),
+                                    "/doc/",
                                     $tag_type,
                                     "_",
                                     $tag_name,
