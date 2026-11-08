@@ -1,0 +1,20 @@
+[package]
+name = "lspml-document-store"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Parsed-document cache for the lspml language server."
+
+[dependencies]
+anyhow = { workspace = true }
+log = { workspace = true }
+lsp-types = { workspace = true }
+lspml-spml = { workspace = true }
+tree-sitter = { workspace = true }
+tree-sitter-spml = { workspace = true }
+url = { workspace = true }
+
+[lints]
+workspace = true

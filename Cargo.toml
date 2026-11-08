@@ -1,37 +1,37 @@
 [workspace]
-default-members = [ "capabilities", "derive", "diagnostic", "document_store", "grammar", "modules", "parser", "spel" ]
+resolver = "3"
+members = ["crates/*"]
 
-[package]
-name = "lspml"
-version = "0.0.2"
+[workspace.package]
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.88"
-repository = "https://github.com/DrWursterich/lspml"
 license = "MIT"
+repository = "https://github.com/DrWursterich/lspml"
 
-[dependencies]
-anyhow = "1.0.79"
-capabilities = { path = "./capabilities" }
-clap = { version = "4.4.18", features = ["derive", "env", "wrap_help"] }
-colored = "3.0.0"
-diagnostic = { path = "./diagnostic" }
-document_store = { path = "./document_store" }
-grammar = { path = "./grammar" }
-log = "0.4.20"
+[workspace.dependencies]
+lspml-capabilities = { path = "crates/lspml-capabilities" }
+lspml-diagnostics = { path = "crates/lspml-diagnostics" }
+lspml-document-store = { path = "crates/lspml-document-store" }
+lspml-grammar = { path = "crates/lspml-grammar" }
+lspml-modules = { path = "crates/lspml-modules" }
+lspml-spel = { path = "crates/lspml-spel" }
+lspml-spml = { path = "crates/lspml-spml" }
+lspml-derive = { path = "crates/lspml-derive" }
+
+anyhow = "1.0.104"
+clap = { version = "4.6", features = ["derive", "env", "wrap_help"] }
+colored = "3.1"
+log = "0.4.33"
 lsp-server = "0.7.9"
 lsp-types = "0.97.0"
-modules = { path = "./modules" }
-parser = { path = "./parser" }
-serde = { version = "1.0.214", features = ["derive"] }
-serde_json = "1.0.140"
-spel = { path = "./spel" }
-structured-logger = "1.0.3"
-
-[[bin]]
-name = "lspml"
-path = "src/main.rs"
-
-[[bin]]
-name = "lspml-analyze"
-path = "src/bin/analyze.rs"
-
+phf = { version = "0.14", features = ["macros"] }
+proc-macro2 = "1.0.107"
+quote = "1.0.47"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+structured-logger = "1.0.5"
+syn = "3.0.3"
+tree-sitter = "0.26.11"
+tree-sitter-spml = { git = "https://github.com/DrWursterich/tree-sitter-spml.git", rev = "70335d88006f0e97dba983cbe8fd7e874807dfa9" }
+url = "2.5.8"

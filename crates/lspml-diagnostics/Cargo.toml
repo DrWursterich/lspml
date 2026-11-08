@@ -1,0 +1,28 @@
+[package]
+name = "lspml-diagnostics"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Validation rules for the Sitepark Markup Language (SPML)."
+
+[dependencies]
+anyhow = { workspace = true }
+lspml-capabilities = { workspace = true }
+clap = { workspace = true }
+lspml-document-store = { workspace = true }
+lspml-grammar = { workspace = true }
+log = { workspace = true }
+lsp-types = { workspace = true }
+lspml-modules = { workspace = true }
+lspml-spml = { workspace = true }
+serde_json = { workspace = true }
+lspml-spel = { workspace = true }
+
+[dev-dependencies]
+tree-sitter = { workspace = true }
+tree-sitter-spml = { workspace = true }
+
+[lints]
+workspace = true

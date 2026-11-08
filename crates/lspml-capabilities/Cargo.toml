@@ -1,0 +1,14 @@
+[package]
+name = "lspml-capabilities"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "LSP capability declarations and protocol vocabulary shared by the lspml server and its diagnostics."
+
+[dependencies]
+lsp-types = { workspace = true }
+
+[lints]
+workspace = true

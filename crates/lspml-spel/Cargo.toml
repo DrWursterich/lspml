@@ -1,0 +1,15 @@
+[package]
+name = "lspml-spel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Parser and AST for the Sitepark Expression Language (spel)."
+
+[dependencies]
+anyhow = { workspace = true }
+lsp-types = { workspace = true }
+
+[lints]
+workspace = true

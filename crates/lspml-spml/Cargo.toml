@@ -1,0 +1,24 @@
+[package]
+name = "lspml-spml"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Parser and typed AST for the Sitepark Markup Language (SPML), on top of tree-sitter-spml."
+
+[dependencies]
+anyhow = { workspace = true }
+lspml-derive = { workspace = true }
+lspml-grammar = { workspace = true }
+log = { workspace = true }
+lsp-types = { workspace = true }
+phf = { workspace = true }
+lspml-spel = { workspace = true }
+tree-sitter = { workspace = true }
+
+[dev-dependencies]
+tree-sitter-spml = { workspace = true }
+
+[lints]
+workspace = true
