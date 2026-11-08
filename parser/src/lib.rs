@@ -1,5 +1,5 @@
+// camelCase names are derives from SPML attributes
 #![allow(non_snake_case)]
-#![feature(fn_traits)]
 
 use std::{cmp::Ordering, str::Utf8Error};
 
@@ -3310,8 +3310,8 @@ impl<'a> TreeParser<'a> {
                 }
                 kind if kind.ends_with("_tag_close") => break,
                 kind => {
-                    if let Some(mut parse_fn) = TAGS.get(kind).take() {
-                        tags.push(Node::Tag(parse_fn.call_mut((self,))?));
+                    if let Some(parse_fn) = TAGS.get(kind) {
+                        tags.push(Node::Tag(parse_fn(self)?));
                     } else {
                         log::debug!("encountered unexpected tree sitter node {}", kind);
                     }
@@ -3342,9 +3342,8 @@ impl<'a> TreeParser<'a> {
                 // "ERROR" => fragments.push(self.parse_error().map(Node::Error)?),
                 "\"" => break,
                 kind => {
-                    if let Some(mut parse_fn) = TAGS.get(kind).take() {
-                        fragments
-                            .push(HtmlAttributeValueFragment::Tag(parse_fn.call_mut((self,))?));
+                    if let Some(parse_fn) = TAGS.get(kind) {
+                        fragments.push(HtmlAttributeValueFragment::Tag(parse_fn(self)?));
                     } else {
                         log::debug!("encountered unexpected tree sitter node {}", kind);
                     }
