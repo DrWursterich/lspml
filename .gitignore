@@ -1,6 +1,13 @@
-**/target/
-/target/
+target/
 /test-spml/
-lspml.log.json
+
+lspml.log.json*
+*.log.json
+
 lspml_id_rsa*
-module_mappings.json
+
+/module_mappings.json
+
+perf.data*
+flamegraph.svg
+*.rs.bk
