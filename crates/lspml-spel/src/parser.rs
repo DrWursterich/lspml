@@ -702,14 +702,39 @@ impl Parser {
                     closing_bracket_location,
                 })
             }
-            #[allow(clippy::todo)]
-            UndecidedExpressionContent::Name(_name) => todo!(),
-            #[allow(clippy::todo)]
-            UndecidedExpressionContent::String(_string) => todo!(),
-            #[allow(clippy::todo)]
-            UndecidedExpressionContent::Null(_null) => todo!(),
-            #[allow(clippy::todo)]
-            UndecidedExpressionContent::Function(_function) => todo!(),
+            // Brackets around a single object, `null` or function call are
+            // redundant but legal, and each has an `Expression` form, so they
+            // are represented as a bracketed expression.
+            UndecidedExpressionContent::Name(name) => {
+                UndecidedExpressionContent::Expression(Expression::Bracketed {
+                    expression: Box::new(Expression::Object(Box::new(name))),
+                    opening_bracket_location,
+                    closing_bracket_location,
+                })
+            }
+            UndecidedExpressionContent::Null(null) => {
+                UndecidedExpressionContent::Expression(Expression::Bracketed {
+                    expression: Box::new(Expression::Null(null)),
+                    opening_bracket_location,
+                    closing_bracket_location,
+                })
+            }
+            UndecidedExpressionContent::Function(function) => {
+                UndecidedExpressionContent::Expression(Expression::Bracketed {
+                    expression: Box::new(Expression::Function(function)),
+                    opening_bracket_location,
+                    closing_bracket_location,
+                })
+            }
+            // A string literal is a `Comparable`, not an `Expression`, and
+            // there is no bracketed comparable in the AST, so this one is
+            // reported rather than represented.
+            UndecidedExpressionContent::String(string) => {
+                return Err(syntax_error!(
+                    "brackets around the string {} are not supported. try removing them",
+                    string
+                ));
+            }
         })
     }
 
@@ -975,9 +1000,30 @@ impl Parser {
                             closing_bracket_location,
                         }))
                     }
-                    comparable => Err(syntax_error!(
-                        "unsupported brackets around \"{}\"",
-                        comparable.r#type()
+                    Comparable::Object(name) => {
+                        Ok(Comparable::Expression(Expression::Bracketed {
+                            expression: Box::new(Expression::Object(Box::new(name))),
+                            opening_bracket_location,
+                            closing_bracket_location,
+                        }))
+                    }
+                    Comparable::Null(null) => {
+                        Ok(Comparable::Expression(Expression::Bracketed {
+                            expression: Box::new(Expression::Null(null)),
+                            opening_bracket_location,
+                            closing_bracket_location,
+                        }))
+                    }
+                    Comparable::Function(function) => {
+                        Ok(Comparable::Expression(Expression::Bracketed {
+                            expression: Box::new(Expression::Function(function)),
+                            opening_bracket_location,
+                            closing_bracket_location,
+                        }))
+                    }
+                    Comparable::String(string) => Err(syntax_error!(
+                        "unsupported brackets around string \"{}\"",
+                        string
                     )),
                 }
             }
