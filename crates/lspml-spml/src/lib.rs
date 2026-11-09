@@ -176,7 +176,7 @@ pub trait RangedNode {
     fn range(&self) -> Option<Range>;
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Header {
     pub java_headers: Vec<ParsedHeader<PageHeader>>,
     pub taglib_imports: Vec<ParsedHeader<TagLibImport>>,
@@ -2974,7 +2974,7 @@ impl<'a> TreeParser<'a> {
             ));
         }
         if !self.cursor.goto_first_child() {
-            return Err(anyhow::anyhow!("document is empty"));
+            return Ok(Header::default());
         }
         let mut java_headers = Vec::new();
         let mut taglib_imports = Vec::new();
@@ -4538,6 +4538,35 @@ mod tests {
         log::info!("kind: {}", parser.cursor.node().kind());
         let html = parser.parse_html_option_tag()?;
         assert_eq!(html, expected);
+        Ok(())
+    }
+
+    fn parse_tree(document: &str) -> Result<super::Tree> {
+        let document = String::from(document);
+        let mut ts_parser = tree_sitter::Parser::new();
+        ts_parser
+            .set_language(&tree_sitter_spml::language())
+            .map_err(Error::from)?;
+        let ts_tree = ts_parser
+            .parse(&document, None)
+            .ok_or_else(|| anyhow::anyhow!("treesitter parsing failed"))?;
+        super::Tree::new(ts_tree, &document)
+    }
+
+    #[test]
+    fn test_parse_empty_document() -> Result<()> {
+        let tree = parse_tree("")?;
+        assert!(tree.header.java_headers.is_empty());
+        assert!(tree.header.taglib_imports.is_empty());
+        assert!(tree.nodes.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_whitespace_only_document() -> Result<()> {
+        let tree = parse_tree("\n  \n")?;
+        assert!(tree.header.java_headers.is_empty());
+        assert!(tree.header.taglib_imports.is_empty());
         Ok(())
     }
 }
