@@ -1,4 +1,4 @@
-use std::{fs, iter::Iterator};
+use std::{fs, iter::Iterator, str::FromStr};
 
 use anyhow::Result;
 use lsp_server::ErrorCode;
@@ -26,8 +26,8 @@ struct CompletionCollector<'a> {
     completions: Vec<CompletionItem>,
 }
 
-impl CompletionCollector<'_> {
-    fn new<'a>(
+impl<'a> CompletionCollector<'a> {
+    fn new(
         params: &'a TextDocumentPositionParams,
         document: &'a lspml_document_store::Document,
     ) -> CompletionCollector<'a> {
@@ -137,13 +137,54 @@ impl CompletionCollector<'_> {
                         None => break,
                     };
                 }
+                if self.complete_attributes_of_unterminated_tag() {
+                    return;
+                }
                 if let Some(tag) = closest_tag {
                     self.complete_attributes_of(tag);
                 } else {
                     self.complete_top_level_tags();
                 }
             }
-            _ => self.complete_top_level_tags(),
+            _ => {
+                if !self.complete_attributes_of_unterminated_tag() {
+                    self.complete_top_level_tags();
+                }
+            }
+        }
+    }
+
+    /// tree-sitter does not consider an unterminated start tag a tag if the cursor is placed
+    /// behind it. `<sp:if ` for example becomes an error node `<sp:if`, which ends before the
+    /// cursor, or gets merged into one large error node together with its surrounding tags.
+    /// Therefore this inspects the text in front of the cursor instead and completes the
+    /// attributes of the tag, if that text ends in an unterminated spml start tag.
+    fn complete_attributes_of_unterminated_tag(&mut self) -> bool {
+        match self
+            .text_before_cursor()
+            .and_then(find_unterminated_start_tag)
+        {
+            Some((definition, present)) => {
+                self.complete_attributes(&definition, |name| present.contains(&name));
+                true
+            }
+            None => false,
+        }
+    }
+
+    fn text_before_cursor(&self) -> Option<&'a str> {
+        let text: &'a str = &self.document.text;
+        let mut line_start = 0;
+        for _ in 0..self.cursor.line {
+            line_start += text[line_start..].find('\n')? + 1;
+        }
+        let line_end = text[line_start..]
+            .find('\n')
+            .map_or(text.len(), |index| line_start + index);
+        let cursor = line_start + self.cursor.character as usize;
+        match cursor <= line_end {
+            true => text.get(..cursor),
+            false => None,
         }
     }
 
@@ -151,7 +192,7 @@ impl CompletionCollector<'_> {
         self.complete_tags(lspml_grammar::TOP_LEVEL_TAGS.iter());
     }
 
-    fn complete_tags<'a>(&mut self, tags: impl Iterator<Item = &'a TagDefinition>) {
+    fn complete_tags<'t>(&mut self, tags: impl Iterator<Item = &'t TagDefinition>) {
         let range = self.determine_tag_range();
         tags.map(|tag| Self::tag_to_completion(tag, range))
             .for_each(|completion| self.completions.push(completion));
@@ -212,6 +253,9 @@ impl CompletionCollector<'_> {
         if let Some(body) = tag.body()
             && self.is_cursor_in_body(body)
         {
+            if self.complete_attributes_of_unterminated_tag() {
+                return;
+            }
             return self.complete_children_of(tag);
         }
         for (name, attribute) in &tag.spel_attributes() {
@@ -356,10 +400,18 @@ impl CompletionCollector<'_> {
     }
 
     fn complete_attributes_of(&mut self, tag: &SpmlTag) {
-        if let TagAttributes::These(possible) = tag.definition().attributes {
+        self.complete_attributes(&tag.definition(), |name| tag.spel_attribute(name).is_some());
+    }
+
+    fn complete_attributes(
+        &mut self,
+        definition: &TagDefinition,
+        is_present: impl Fn(&str) -> bool,
+    ) {
+        if let TagAttributes::These(possible) = definition.attributes {
             possible
                 .iter()
-                .filter(|attribute| tag.spel_attribute(attribute.name).is_none())
+                .filter(|attribute| !is_present(attribute.name))
                 .map(|attribute| CompletionItem {
                     label: attribute.name.to_string(),
                     kind: Some(CompletionItemKind::PROPERTY),
@@ -387,6 +439,46 @@ impl CompletionCollector<'_> {
     }
 }
 
+/// Finds the spml start tag that `text` ends in, if that tag is not terminated yet and `text`
+/// ends either in between its attributes or within a partially typed attribute name.
+/// Returns the definition of that tag together with the names of its attributes.
+fn find_unterminated_start_tag(text: &str) -> Option<(TagDefinition, Vec<&str>)> {
+    let is_name_char = |c: char| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | ':');
+    let (name_end, kind) = text.rmatch_indices('<').find_map(|(index, _)| {
+        let rest = &text[index + 1..];
+        let name = &rest[..rest.find(|c| !is_name_char(c)).unwrap_or(rest.len())];
+        let kind = match name.split_once(':') {
+            Some(("sp", name)) => format!("{}_tag", name),
+            Some(("spt", name)) => format!("spt_{}_tag", name),
+            _ => return None,
+        };
+        Some((index + 1 + name.len(), kind))
+    })?;
+    let definition = TagDefinition::from_str(&kind).ok()?;
+    let mut rest = &text[name_end..];
+    // without whitespace the tag name itself is still being typed
+    if !rest.starts_with(char::is_whitespace) {
+        return None;
+    }
+    let mut attributes = Vec::new();
+    loop {
+        rest = rest.trim_start();
+        let (name, remainder) =
+            rest.split_at(rest.find(|c| !is_name_char(c)).unwrap_or(rest.len()));
+        if remainder.is_empty() {
+            return Some((definition, attributes));
+        }
+        if name.is_empty() {
+            return None;
+        }
+        let value = remainder.trim_start().strip_prefix('=')?.trim_start();
+        let quote = value.chars().next().filter(|c| matches!(c, '"' | '\''))?;
+        let value_length = value[1..].find(quote)?;
+        attributes.push(name);
+        rest = &value[value_length + 2..];
+    }
+}
+
 pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, LsError> {
     let text_params = params.text_document_position;
     let uri = &text_params.text_document.uri;
@@ -407,61 +499,267 @@ pub(crate) fn complete(params: CompletionParams) -> Result<Vec<CompletionItem>, 
     Ok(completion_collector.completions)
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use lsp_types::{
-//         CompletionParams, PartialResultParams, Position, TextDocumentIdentifier,
-//         TextDocumentPositionParams, Uri as Url, WorkDoneProgressParams,
-//     };
+#[cfg(test)]
+mod tests {
+    use lsp_types::{
+        CompletionItem, CompletionItemKind, Position, TextDocumentIdentifier,
+        TextDocumentPositionParams,
+    };
 
-//     use super::CompletionCollector;
+    use super::{CompletionCollector, find_unterminated_start_tag};
 
-//     #[test]
-//     fn test_completion_for_attributes_in_nested_tag() {
-//         let document_content = concat!(
-//             "<%@ page language=\"java\" pageEncoding=\"UTF-8\" contentType=\"text/html; charset=UTF-8\"%>\n",
-//             "<sp:include module=\"test-module\" uri=\"/functions/doSomething.spml\">\n",
-//             "\t<sp:argument \n",
-//             "</sp:include>\n");
-//         let params: CompletionParams = CompletionParams {
-//             text_document_position: TextDocumentPositionParams {
-//                 text_document: TextDocumentIdentifier {
-//                     uri: "file:///some/test/file.spml".parse().unwrap(),
-//                 },
-//                 position: Position {
-//                     line: 2,
-//                     character: 14,
-//                 },
-//             },
-//             work_done_progress_params: WorkDoneProgressParams {
-//                 work_done_token: None,
-//             },
-//             partial_result_params: PartialResultParams {
-//                 partial_result_token: None,
-//             },
-//             context: None,
-//         };
+    const HEADER: &str = concat!(
+        "<%@ page language=\"java\" pageEncoding=\"UTF-8\" contentType=\"text/html; charset=UTF-8\"\n",
+        "%><%@ taglib uri=\"http://www.sitepark.com/taglibs/core\" prefix=\"sp\"\n",
+        "%><%@ taglib tagdir=\"/WEB-INF/tags/spt\" prefix=\"spt\"\n",
+        "%><%@ taglib tagdir=\"/WEB-INF/tags/tag\" prefix=\"tag\"\n",
+        "%>\n",
+    );
 
-//         let document = lspml_document_store::Document::new(document_content.to_string()).unwrap();
-//         let mut completion_collector =
-//             CompletionCollector::new(&params.text_document_position, &document);
-//         completion_collector.search_completions_in_document();
-//         let result = completion_collector.completions;
+    const SP_IF_ATTRIBUTES: [&str; 13] = [
+        "condition",
+        "contains",
+        "eq",
+        "gt",
+        "gte",
+        "ic",
+        "isNull",
+        "locale",
+        "lt",
+        "lte",
+        "match",
+        "name",
+        "neq",
+    ];
 
-//         assert_eq!(
-//             result
-//                 .iter()
-//                 .map(|c| c.label.clone())
-//                 .collect::<Vec<String>>(),
-//             vec![
-//                 "condition",
-//                 "default",
-//                 "expression",
-//                 "locale",
-//                 "name",
-//                 "object",
-//                 "value",
-//             ]
-//         );
-//     }
-// }
+    /// completes at the position of `|` in `body`, which is appended to a jsp header.
+    fn complete(body: &str) -> Vec<CompletionItem> {
+        let text = format!("{}{}", HEADER, body);
+        let cursor = text.find('|').expect("body should contain a cursor marker");
+        let before_cursor = &text[..cursor];
+        let position = Position {
+            line: before_cursor.matches('\n').count() as u32,
+            character: before_cursor.rsplit('\n').next().unwrap_or("").len() as u32,
+        };
+        let document = lspml_document_store::Document::new(text.replacen('|', "", 1)).unwrap();
+        let params = TextDocumentPositionParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///some/test/file.spml".parse().unwrap(),
+            },
+            position,
+        };
+        let mut completion_collector = CompletionCollector::new(&params, &document);
+        completion_collector.search_completions_in_document();
+        completion_collector.completions
+    }
+
+    fn attributes(completions: &[CompletionItem]) -> Vec<&str> {
+        completions
+            .iter()
+            .filter(|completion| completion.kind == Some(CompletionItemKind::PROPERTY))
+            .map(|completion| completion.label.as_str())
+            .collect()
+    }
+
+    fn tags(completions: &[CompletionItem]) -> Vec<&str> {
+        completions
+            .iter()
+            .filter(|completion| completion.label.starts_with('<'))
+            .map(|completion| completion.label.as_str())
+            .collect()
+    }
+
+    fn sp_if_attributes_except(present: &[&str]) -> Vec<&'static str> {
+        SP_IF_ATTRIBUTES
+            .into_iter()
+            .filter(|attribute| !present.contains(attribute))
+            .collect()
+    }
+
+    fn assert_completes_attributes(body: &str, expected: &[&str]) {
+        let completions = complete(body);
+        assert_eq!(
+            attributes(&completions),
+            expected,
+            "attributes for {:?}",
+            body
+        );
+        assert_eq!(
+            tags(&completions),
+            Vec::<&str>::new(),
+            "tags for {:?}",
+            body
+        );
+    }
+
+    fn assert_completes_tags(body: &str) {
+        let completions = complete(body);
+        assert_eq!(
+            attributes(&completions),
+            Vec::<&str>::new(),
+            "attributes for {:?}",
+            body
+        );
+        assert!(
+            tags(&completions).contains(&"<sp:print"),
+            "tags for {:?}",
+            body
+        );
+    }
+
+    #[test]
+    fn test_completion_for_attributes_of_unterminated_tag() {
+        assert_completes_attributes("<sp:if |", &SP_IF_ATTRIBUTES);
+        assert_completes_attributes("<sp:if \t |", &SP_IF_ATTRIBUTES);
+        assert_completes_attributes("<sp:if\n\t|", &SP_IF_ATTRIBUTES);
+        assert_completes_attributes("<sp:print |", &attributes(&complete("<sp:print |/>")));
+    }
+
+    #[test]
+    fn test_completion_for_partially_typed_attribute_of_unterminated_tag() {
+        assert_completes_attributes("<sp:if n|", &SP_IF_ATTRIBUTES);
+        assert_completes_attributes("<sp:if na|", &SP_IF_ATTRIBUTES);
+    }
+
+    #[test]
+    fn test_completion_for_attributes_of_unterminated_tag_followed_by_content() {
+        assert_completes_attributes("<sp:if |\n<sp:print name=\"x\"/>\n", &SP_IF_ATTRIBUTES);
+        assert_completes_attributes("<sp:if n|\n<sp:print name=\"x\"/>\n", &SP_IF_ATTRIBUTES);
+        assert_completes_attributes(
+            "<sp:print |\n<div></div>\n",
+            &attributes(&complete("<sp:print |/>")),
+        );
+        assert_completes_attributes("<div>\n<sp:if |\n</div>\n", &SP_IF_ATTRIBUTES);
+    }
+
+    #[test]
+    fn test_completion_for_attributes_of_unterminated_tag_with_attributes() {
+        let expected = sp_if_attributes_except(&["name"]);
+        assert_completes_attributes("<sp:if name=\"x\" |", &expected);
+        assert_completes_attributes("<sp:if name=\"x\" n|", &expected);
+        assert_completes_attributes("<sp:if name=\"x\"\n    |", &expected);
+        assert_completes_attributes("<sp:if name=\"x\"\n    |\n<div></div>\n", &expected);
+        assert_completes_attributes("<sp:if name=\"x\" |\n<sp:print name=\"x\"/>\n", &expected);
+        assert_completes_attributes(
+            "<sp:if name=\"x\" eq='y > z' |",
+            &sp_if_attributes_except(&["name", "eq"]),
+        );
+    }
+
+    #[test]
+    fn test_completion_for_attributes_in_nested_tag() {
+        assert_completes_attributes(
+            concat!(
+                "<sp:include module=\"test-module\" uri=\"/functions/doSomething.spml\">\n",
+                "\t<sp:argument |\n",
+                "</sp:include>\n",
+            ),
+            &[
+                "condition",
+                "default",
+                "expression",
+                "locale",
+                "name",
+                "object",
+                "value",
+            ],
+        );
+        assert_completes_attributes(
+            "<sp:print name=\"y\">\n<sp:if |\n</sp:print>\n",
+            &SP_IF_ATTRIBUTES,
+        );
+        assert_completes_attributes(
+            "<sp:if name=\"y\">\n<sp:print name=\"y\"/>\n<sp:if n|\n</sp:if>\n",
+            &SP_IF_ATTRIBUTES,
+        );
+    }
+
+    #[test]
+    fn test_completion_for_attributes_does_not_include_those_after_the_cursor() {
+        assert_completes_attributes(
+            "<sp:if name=\"x\" | eq=\"y\">\n</sp:if>\n",
+            &sp_if_attributes_except(&["name", "eq"]),
+        );
+    }
+
+    #[test]
+    fn test_completion_still_suggests_missing_tag_end() {
+        let completions = complete("<sp:if name=\"x\" |");
+        assert!(
+            completions
+                .iter()
+                .any(|completion| completion.insert_text.as_deref() == Some("/>"))
+        );
+    }
+
+    #[test]
+    fn test_completion_for_tags_in_body() {
+        assert_completes_tags("<sp:if name=\"x\">\n|");
+        assert_completes_tags("<sp:if name=\"x\">\n|\n</sp:if>\n");
+        assert_completes_tags("<sp:if name=\"x\">\n<sp:print name=\"y\"/>\n|\n</sp:if>\n");
+    }
+
+    #[test]
+    fn test_completion_for_tags_after_terminated_tag() {
+        assert_completes_tags("<sp:print name=\"x\"/> |");
+        assert_completes_tags("<sp:print name=\"x\"/>\n|");
+        assert_completes_tags("<sp:print name=\"x\"/>\n|\n<div></div>\n");
+        assert_completes_tags("<a href=\"<sp:print name=\"x\"/>\"> |");
+    }
+
+    #[test]
+    fn test_completion_for_tags_while_typing_tag_name() {
+        assert_completes_tags("<sp:if|");
+        assert_completes_tags("<sp:i|");
+        assert_completes_tags("<sp:if name=\"x\">\n<sp:pri|\n</sp:if>\n");
+    }
+
+    #[test]
+    fn test_completion_for_attribute_values() {
+        let completions = complete("<spt:worklist command=\"|\"/>\n");
+        let labels: Vec<&str> = completions.iter().map(|c| c.label.as_str()).collect();
+        assert_eq!(labels, vec!["create", "update"]);
+        assert_eq!(
+            attributes(&complete("<sp:if name=\"x\" eq=\"|")),
+            Vec::<&str>::new()
+        );
+    }
+
+    #[test]
+    fn test_completion_for_closing_tag_does_not_suggest_attributes() {
+        assert_eq!(
+            attributes(&complete("<sp:if name=\"x\">\n</|")),
+            Vec::<&str>::new()
+        );
+        assert_eq!(
+            attributes(&complete("<sp:if name=\"x\">\n</sp:i|")),
+            Vec::<&str>::new()
+        );
+    }
+
+    #[test]
+    fn test_find_unterminated_start_tag() {
+        let find = |text| {
+            find_unterminated_start_tag(text)
+                .map(|(definition, attributes)| (definition.name, attributes))
+        };
+        assert_eq!(find("<sp:if "), Some(("sp:if", vec![])));
+        assert_eq!(find("<sp:if na"), Some(("sp:if", vec![])));
+        assert_eq!(find("<spt:date "), Some(("spt:date", vec![])));
+        assert_eq!(
+            find("<sp:if name=\"a<b>c\"\n\tcondition='x' n"),
+            Some(("sp:if", vec!["name", "condition"])),
+        );
+        assert_eq!(find("<sp:if"), None);
+        assert_eq!(find("<sp:if name"), Some(("sp:if", vec![])));
+        assert_eq!(find("<sp:if name "), None);
+        assert_eq!(find("<sp:if name="), None);
+        assert_eq!(find("<sp:if name=\"x"), None);
+        assert_eq!(find("<sp:if name=\"x\">"), None);
+        assert_eq!(find("<sp:if name=\"x\"/> "), None);
+        assert_eq!(find("<sp:unknown "), None);
+        assert_eq!(find("<tag:custom "), None);
+        assert_eq!(find("<div "), None);
+        assert_eq!(find(""), None);
+    }
+}
