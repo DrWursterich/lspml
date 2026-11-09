@@ -176,7 +176,7 @@ pub trait RangedNode {
     fn range(&self) -> Option<Range>;
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Header {
     pub java_headers: Vec<ParsedHeader<PageHeader>>,
     pub taglib_imports: Vec<ParsedHeader<TagLibImport>>,
@@ -2974,7 +2974,7 @@ impl<'a> TreeParser<'a> {
             ));
         }
         if !self.cursor.goto_first_child() {
-            return Err(anyhow::anyhow!("document is empty"));
+            return Ok(Header::default());
         }
         let mut java_headers = Vec::new();
         let mut taglib_imports = Vec::new();
@@ -3948,16 +3948,6 @@ fn range_from_points(start: tree_sitter::Point, end: tree_sitter::Point) -> Rang
 
 impl Tree {
     pub fn new(ts: tree_sitter::Tree, text: &String) -> Result<Self> {
-        if ts.root_node().child_count() == 0 {
-            // empty (or whitespace-only) documents are valid, they just contain nothing
-            return Ok(Tree {
-                header: Header {
-                    java_headers: Vec::new(),
-                    taglib_imports: Vec::new(),
-                },
-                nodes: Vec::new(),
-            });
-        }
         let parser = &mut TreeParser::new(ts.walk(), text);
         let header = parser.parse_header()?;
         let nodes = parser.parse_tags()?;
