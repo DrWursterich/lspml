@@ -582,14 +582,14 @@ dependencies = [
 
 [[package]]
 name = "lspml-capabilities"
-version = "0.2.0"
+version = "0.0.3"
 dependencies = [
  "lsp-types",
 ]
 
 [[package]]
 name = "lspml-cli"
-version = "0.2.0"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -601,7 +601,7 @@ dependencies = [
 
 [[package]]
 name = "lspml-derive"
-version = "0.2.0"
+version = "0.0.3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -610,7 +610,7 @@ dependencies = [
 
 [[package]]
 name = "lspml-diagnostics"
-version = "0.2.0"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -629,7 +629,7 @@ dependencies = [
 
 [[package]]
 name = "lspml-document-store"
-version = "0.2.0"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "log",
@@ -642,14 +642,14 @@ dependencies = [
 
 [[package]]
 name = "lspml-grammar"
-version = "0.2.0"
+version = "0.0.3"
 dependencies = [
  "anyhow",
 ]
 
 [[package]]
 name = "lspml-modules"
-version = "0.2.0"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "log",
@@ -659,7 +659,7 @@ dependencies = [
 
 [[package]]
 name = "lspml-server"
-version = "0.2.0"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -682,7 +682,7 @@ dependencies = [
 
 [[package]]
 name = "lspml-spel"
-version = "0.2.0"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "lsp-types",
@@ -690,7 +690,7 @@ dependencies = [
 
 [[package]]
 name = "lspml-spml"
-version = "0.2.0"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "log",
